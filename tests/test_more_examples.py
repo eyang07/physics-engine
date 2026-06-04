@@ -4,6 +4,7 @@ import sympy as sp
 from scripts.generate_ideal_spring import generate_ideal_spring_trajectory
 from scripts.generate_kepler_problem import generate_kepler_trajectory
 from scripts.generate_uniform_gravity import generate_uniform_gravity_trajectory
+from scripts.example_specs import KEPLER
 from systems.ideal_spring import build_system as ideal_spring
 from systems.kepler_problem import build_system as kepler_problem
 from systems.uniform_gravity import build_system as uniform_gravity
@@ -70,3 +71,20 @@ def test_kepler_generated_motion_conserves_energy_and_angular_momentum():
 
     assert np.max(np.abs(angular_momentum - angular_momentum[0])) < 1e-8
     assert np.max(np.abs(energy - energy[0])) < 1e-8
+
+
+def test_kepler_effective_potential_matches_radial_energy_reduction():
+    system = KEPLER.build()
+    r, _phi = system.q
+    r_dot, phi_dot = system.qdot
+    m = next(symbol for symbol in system.lagrangian.free_symbols if symbol.name == "m")
+    mu = next(symbol for symbol in system.lagrangian.free_symbols if symbol.name == "mu")
+    ell = sp.Symbol("ell")
+    (effective_potential,) = KEPLER.effective_potentials
+
+    expected = ell**2 / (2 * m * r**2) - mu * m / r
+    assert sp.simplify(effective_potential.expression_for(system) - expected) == 0
+
+    radial_energy = sp.simplify(system.energy().subs({phi_dot: ell / (m * r**2)}))
+    radial_kinetic = m * r_dot**2 / 2
+    assert sp.simplify(radial_energy - (radial_kinetic + expected)) == 0

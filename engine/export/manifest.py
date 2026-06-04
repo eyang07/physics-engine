@@ -99,6 +99,55 @@ class Conserved:
 
 
 @dataclass(frozen=True)
+class EffectivePotential:
+    """A one-dimensional reduction after fixing a conserved quantity.
+
+    For central-force examples this is the radial potential obtained after
+    fixing angular momentum, so the radial energy equation reads
+    ``T_radial + V_eff(r) = constant``.
+    """
+
+    name: str
+    coordinate: str
+    latex: str
+    conserved: str
+    conserved_latex: str
+    expression: Callable[[LagrangianSystem], sp.Expr]
+
+    def expression_for(self, system: LagrangianSystem) -> sp.Expr:
+        return self.expression(system)
+
+
+@dataclass(frozen=True)
+class Lens:
+    """A reusable mathematical view of a system.
+
+    Systems reference lenses by id; the registry describes what kind of view it
+    is and which exported structures it expects. Rendering code can then choose
+    an implementation without baking those meanings into every system spec.
+    """
+
+    id: str
+    title: str
+    kind: str
+    description: str
+    projections: tuple[str, ...] = ()
+    conserved: tuple[str, ...] = ()
+    effective_potentials: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "kind": self.kind,
+            "description": self.description,
+            "projections": list(self.projections),
+            "conserved": list(self.conserved),
+            "effectivePotentials": list(self.effective_potentials),
+        }
+
+
+@dataclass(frozen=True)
 class SystemSpec:
     """Everything Python knows about one example, declared once."""
 
@@ -113,6 +162,7 @@ class SystemSpec:
     conserved: tuple[Conserved, ...]
     lenses: tuple[str, ...]
     data_path: str
+    effective_potentials: tuple[EffectivePotential, ...] = ()
 
     def series(
         self,
@@ -184,6 +234,9 @@ def _symbol_latex(system: LagrangianSystem, spec: SystemSpec) -> dict[sp.Symbol,
             continue
         if symbol not in mapping and symbol.name in names:
             mapping[symbol] = names[symbol.name]
+
+    for potential in spec.effective_potentials:
+        mapping[sp.Symbol(potential.conserved)] = potential.conserved_latex
 
     mapping[system.time] = "t"
     return mapping
@@ -272,6 +325,18 @@ def derivation_entry(
             item["tau_latex"] = latex(sp.simplify(generator.tau))
         conserved.append(item)
 
+    effective_potentials = [
+        {
+            "name": potential.name,
+            "coordinate": potential.coordinate,
+            "latex": potential.latex,
+            "conserved": potential.conserved,
+            "conserved_latex": potential.conserved_latex,
+            "expression_latex": latex(sp.simplify(potential.expression_for(system))),
+        }
+        for potential in spec.effective_potentials
+    ]
+
     return {
         "lagrangian": {
             "expression_latex": latex(system.lagrangian),
@@ -281,6 +346,7 @@ def derivation_entry(
         "legendre_transform": legendre,
         "hamiltonian": hamiltonian,
         "conserved_quantities": conserved,
+        "effective_potentials": effective_potentials,
     }
 
 
@@ -320,6 +386,18 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
                 item["tau_latex"] = latex(sp.simplify(generator.tau))
         conserved.append(item)
 
+    effective_potentials = [
+        {
+            "name": potential.name,
+            "coordinate": potential.coordinate,
+            "latex": potential.latex,
+            "conserved": potential.conserved,
+            "conserved_latex": potential.conserved_latex,
+            "expression_latex": latex(sp.simplify(potential.expression_for(system))),
+        }
+        for potential in spec.effective_potentials
+    ]
+
     return {
         "id": spec.id,
         "title": spec.title,
@@ -330,6 +408,7 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
         "state": [variable.to_dict() for variable in spec.state],
         "projections": {name: list(group) for name, group in spec.projections.items()},
         "conserved": conserved,
+        "effectivePotentials": effective_potentials,
         "lenses": list(spec.lenses),
         "physics": {
             "lagrangian": latex(system.lagrangian),
@@ -341,17 +420,28 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
     }
 
 
-def build_manifest(specs: Mapping[str, SystemSpec] | tuple[SystemSpec, ...] | list[SystemSpec]) -> dict[str, Any]:
+def build_manifest(
+    specs: Mapping[str, SystemSpec] | tuple[SystemSpec, ...] | list[SystemSpec],
+    lenses: Sequence[Lens] = (),
+) -> dict[str, Any]:
     """Assemble the full manifest from an ordered collection of specs."""
 
     items = list(specs.values()) if isinstance(specs, Mapping) else list(specs)
-    return {"version": 1, "systems": [system_entry(spec) for spec in items]}
+    return {
+        "version": 1,
+        "lenses": [lens.to_dict() for lens in lenses],
+        "systems": [system_entry(spec) for spec in items],
+    }
 
 
-def write_manifest(specs: tuple[SystemSpec, ...] | list[SystemSpec], *paths: str | Path) -> dict[str, Any]:
+def write_manifest(
+    specs: tuple[SystemSpec, ...] | list[SystemSpec],
+    *paths: str | Path,
+    lenses: Sequence[Lens] = (),
+) -> dict[str, Any]:
     """Build the manifest and write it (pretty-printed) to each path."""
 
-    manifest = build_manifest(specs)
+    manifest = build_manifest(specs, lenses)
     payload = json.dumps(manifest, indent=2)
     for path in paths:
         output = Path(path)

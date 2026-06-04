@@ -10,17 +10,43 @@ from __future__ import annotations
 import pytest
 
 from engine.export.manifest import build_manifest, system_entry
-from scripts.example_specs import SPECS
+from scripts.example_specs import LENSES, SPECS
 
 
 @pytest.fixture(scope="module")
 def manifest() -> dict:
-    return build_manifest(SPECS)
+    return build_manifest(SPECS, LENSES)
 
 
 def test_ids_are_unique() -> None:
     ids = [spec.id for spec in SPECS]
     assert len(ids) == len(set(ids))
+
+
+def test_lens_ids_are_unique() -> None:
+    ids = [lens.id for lens in LENSES]
+    assert len(ids) == len(set(ids))
+
+
+def test_system_lenses_are_registered() -> None:
+    registered = {lens.id for lens in LENSES}
+    for spec in SPECS:
+        assert set(spec.lenses) <= registered
+
+
+def test_registered_lens_requirements_match_system_specs() -> None:
+    lenses_by_id = {lens.id: lens for lens in LENSES}
+
+    for spec in SPECS:
+        projection_names = set(spec.projections)
+        conserved_names = {quantity.name for quantity in spec.conserved}
+        potential_names = {potential.name for potential in spec.effective_potentials}
+
+        for lens_id in spec.lenses:
+            lens = lenses_by_id[lens_id]
+            assert set(lens.projections) <= projection_names
+            assert set(lens.conserved) <= conserved_names
+            assert set(lens.effective_potentials) <= potential_names
 
 
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
@@ -73,6 +99,64 @@ def test_entry_carries_symbolic_physics(spec) -> None:
 
 
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
+def test_effective_potentials_render_when_declared(spec) -> None:
+    entry = system_entry(spec)
+    assert len(entry["effectivePotentials"]) == len(spec.effective_potentials)
+
+    for declared, rendered in zip(spec.effective_potentials, entry["effectivePotentials"], strict=True):
+        state_names = {variable.name for variable in spec.state}
+        conserved_names = {quantity.name for quantity in spec.conserved}
+
+        assert rendered["name"] == declared.name
+        assert rendered["coordinate"] in state_names
+        assert rendered["conserved"] in conserved_names
+        assert rendered["latex"]
+        assert rendered["conserved_latex"]
+        assert rendered["expression_latex"]
+
+
+@pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
+def test_entry_carries_structured_derivation(spec) -> None:
+    entry = system_entry(spec)
+    system = spec.build()
+    derivation = entry["derivation"]
+
+    assert derivation["lagrangian"]["expression_latex"] == entry["physics"]["lagrangian"]
+    assert len(derivation["generalized_momenta"]) == len(system.q)
+    assert len(derivation["euler_lagrange"]) == len(system.q)
+
+    for momentum in derivation["generalized_momenta"]:
+        assert momentum["coordinate"]
+        assert momentum["velocity"]
+        assert momentum["momentum"]
+        assert momentum["momentum_latex"]
+        assert momentum["expression_latex"]
+        assert momentum["equation_latex"]
+
+    for equation in derivation["euler_lagrange"]:
+        assert equation["coordinate"]
+        assert equation["equation_latex"]
+
+    legendre = derivation["legendre_transform"]
+    assert legendre["regular"] is True
+    assert len(legendre["velocity_solutions"]) == len(system.qdot)
+    assert derivation["hamiltonian"]["expression_latex"] == entry["physics"]["hamiltonian"]
+    assert len(derivation["hamiltonian"]["equations"]) == 2 * len(system.q)
+
+    conserved = derivation["conserved_quantities"]
+    assert [quantity["name"] for quantity in conserved] == [
+        quantity.name for quantity in spec.conserved
+    ]
+    for quantity in conserved:
+        assert quantity["symbol_latex"]
+        assert quantity["symmetry"]
+        assert quantity["charge_latex"]
+        assert "generator_latex" in quantity
+
+    assert derivation["effective_potentials"] == entry["effectivePotentials"]
+
+
+@pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
 def test_conserved_quantities_render(spec) -> None:
     entry = system_entry(spec)
     assert entry["conserved"], "each system should declare at least one invariant"
@@ -97,4 +181,5 @@ def test_conserved_quantities_use_noether_generators(spec) -> None:
 
 def test_manifest_lists_every_spec(manifest) -> None:
     assert manifest["version"] == 1
+    assert [entry["id"] for entry in manifest["lenses"]] == [lens.id for lens in LENSES]
     assert [entry["id"] for entry in manifest["systems"]] == [spec.id for spec in SPECS]

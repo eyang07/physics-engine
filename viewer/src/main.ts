@@ -1,8 +1,13 @@
 import "katex/dist/katex.min.css";
 import { ThreeScene, type ThreeMode, type Trajectory } from "./threeScene";
 import { theme } from "./design/theme";
-import { loadManifest } from "./data/manifest";
+import {
+  loadManifest,
+  type ManifestLens,
+  type SystemManifest,
+} from "./data/manifest";
 import { StaticSource } from "./data/source";
+import { drawEffectivePotentialScene } from "./effectivePotentialCanvas";
 import { renderHome } from "./home";
 import { PlaybackClock, sampleTrajectory } from "./playback";
 import {
@@ -14,21 +19,7 @@ import {
 import { StructurePanel } from "./structurePanel";
 import "./styles.css";
 
-type CanvasMode = "pendulumMotionPhase" | ThreeMode;
-
-type Visualization = {
-  id: CanvasMode;
-  label: string;
-};
-
-type ExampleConfig = {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  dataPath: string;
-  visualizations: Visualization[];
-};
+type CanvasMode = "pendulumMotionPhase" | "effectivePotential";
 
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -37,60 +28,6 @@ function requireElement<T extends Element>(selector: string): T {
   }
   return element;
 }
-
-const examples: ExampleConfig[] = [
-  {
-    id: "pendulum",
-    title: "Simple Pendulum",
-    description: "A nonlinear oscillator viewed as physical motion, phase portrait, or Hamiltonian flow.",
-    category: "Analytical Mechanics",
-    dataPath: "/data/pendulum.json",
-    visualizations: [
-      { id: "pendulumMotionPhase", label: "Motion + Phase" },
-      { id: "pendulumHamiltonian", label: "Hamiltonian Flow" },
-    ],
-  },
-  {
-    id: "sphere-geodesic",
-    title: "Geodesic on a Sphere",
-    description: "Free motion on a curved configuration space; the path becomes a great circle.",
-    category: "Differential Geometry",
-    dataPath: "/data/sphere_geodesic.json",
-    visualizations: [{ id: "sphereGeodesic", label: "Great-Circle Flow" }],
-  },
-  {
-    id: "charged-particle",
-    title: "Electron in a Magnetic Field",
-    description: "Lorentz-force motion from a velocity-dependent electromagnetic Lagrangian.",
-    category: "Fields",
-    dataPath: "/data/charged_particle.json",
-    visualizations: [{ id: "chargedParticle", label: "Lorentz Orbit" }],
-  },
-  {
-    id: "uniform-gravity",
-    title: "Uniform Gravitational Field",
-    description: "Projectile motion from a constant gravitational potential.",
-    category: "Classical Motion",
-    dataPath: "/data/uniform_gravity.json",
-    visualizations: [{ id: "uniformGravity", label: "Projectile Path" }],
-  },
-  {
-    id: "ideal-spring",
-    title: "Ideal Spring",
-    description: "A mass-spring oscillator with conserved quadratic energy.",
-    category: "Oscillators",
-    dataPath: "/data/ideal_spring.json",
-    visualizations: [{ id: "idealSpring", label: "Spring Motion" }],
-  },
-  {
-    id: "kepler",
-    title: "Kepler Problem",
-    description: "Planar inverse-square central-force motion with conserved angular momentum.",
-    category: "Orbital Mechanics",
-    dataPath: "/data/kepler_problem.json",
-    visualizations: [{ id: "keplerOrbit", label: "Orbital Flow" }],
-  },
-];
 
 const homeView = requireElement<HTMLElement>("#homeView");
 const selectionView = requireElement<HTMLElement>("#selectionView");
@@ -128,8 +65,10 @@ const structurePanel = new StructurePanel(principlesPanel, invariantsPanel, para
 const clock = new PlaybackClock();
 
 let activeView: "home" | "selection" | "simulation" = "home";
-let selectedExample = examples[0];
-let selectedVisualization = selectedExample.visualizations[0];
+let examples: SystemManifest[] = [];
+let lensById = new Map<string, ManifestLens>();
+let selectedExample: SystemManifest | null = null;
+let selectedVisualization: ManifestLens | null = null;
 let trajectory: Trajectory | null = null;
 let pendulumBounds: Bounds | null = null;
 
@@ -150,6 +89,22 @@ systemSelect.addEventListener("change", () => {
   void selectExample(systemSelect.value);
 });
 
+function isCanvasMode(id: string): id is CanvasMode {
+  return id === "pendulumMotionPhase" || id === "effectivePotential";
+}
+
+function isThreeMode(id: string): id is ThreeMode {
+  return !isCanvasMode(id);
+}
+
+function lensFor(id: string): ManifestLens {
+  const lens = lensById.get(id);
+  if (!lens) {
+    throw new Error(`System references unknown lens: ${id}`);
+  }
+  return lens;
+}
+
 function populateSystemSelect() {
   systemSelect.replaceChildren();
   examples.forEach((example) => {
@@ -158,7 +113,9 @@ function populateSystemSelect() {
     option.textContent = example.title;
     systemSelect.append(option);
   });
-  systemSelect.value = selectedExample.id;
+  if (selectedExample) {
+    systemSelect.value = selectedExample.id;
+  }
 }
 
 function renderSystemGallery() {
@@ -182,12 +139,16 @@ function renderSystemGallery() {
 
 function renderVisualizationButtons() {
   visualizationModes.replaceChildren();
-  selectedExample.visualizations.forEach((visualization) => {
+  if (!selectedExample || !selectedVisualization) {
+    return;
+  }
+  const activeLensId = selectedVisualization.id;
+  selectedExample.lenses.map(lensFor).forEach((visualization) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "mode-switch__button";
-    button.textContent = visualization.label;
-    button.classList.toggle("mode-switch__button--active", visualization.id === selectedVisualization.id);
+    button.textContent = visualization.title;
+    button.classList.toggle("mode-switch__button--active", visualization.id === activeLensId);
     button.addEventListener("click", () => {
       selectedVisualization = visualization;
       applyVisualization();
@@ -197,7 +158,7 @@ function renderVisualizationButtons() {
   });
 }
 
-function loadTrajectory(example: ExampleConfig): Promise<Trajectory> {
+function loadTrajectory(example: SystemManifest): Promise<Trajectory> {
   // Behind the StaticSource seam: a future GeneratedSource (Python server)
   // implements the same interface, so parameter-driven generation can drop in
   // here without changing the call site.
@@ -216,7 +177,9 @@ function setView(view: "home" | "selection" | "simulation") {
   homeView.classList.toggle("view-hidden", view !== "home");
   selectionView.classList.toggle("view-hidden", view !== "selection");
   app.classList.toggle("view-hidden", view !== "simulation");
-  threeScene.setActive(view === "simulation" && selectedVisualization.id !== "pendulumMotionPhase");
+  threeScene.setActive(
+    view === "simulation" && selectedVisualization !== null && isThreeMode(selectedVisualization.id),
+  );
 }
 
 function showSelection() {
@@ -228,13 +191,13 @@ function showSimulation() {
 }
 
 function applyVisualization() {
-  if (!trajectory) {
+  if (!trajectory || !selectedVisualization) {
     return;
   }
 
-  if (selectedVisualization.id === "pendulumMotionPhase") {
+  if (isCanvasMode(selectedVisualization.id)) {
     setCanvasMode("2d");
-  } else {
+  } else if (isThreeMode(selectedVisualization.id)) {
     setCanvasMode("3d");
     threeScene.setVisualization(selectedVisualization.id, trajectory);
   }
@@ -242,8 +205,11 @@ function applyVisualization() {
 
 async function selectExample(exampleId: string) {
   const nextExample = examples.find((example) => example.id === exampleId) ?? examples[0];
+  if (!nextExample) {
+    return;
+  }
   selectedExample = nextExample;
-  selectedVisualization = nextExample.visualizations[0];
+  selectedVisualization = lensFor(nextExample.lenses[0]);
   systemTitle.textContent = nextExample.title;
   systemSelect.value = nextExample.id;
   renderVisualizationButtons();
@@ -257,7 +223,7 @@ async function selectExample(exampleId: string) {
 }
 
 function resize2dCanvas() {
-  if (selectedVisualization.id !== "pendulumMotionPhase") {
+  if (!selectedVisualization || !isCanvasMode(selectedVisualization.id)) {
     return;
   }
   const pixelRatio = window.devicePixelRatio || 1;
@@ -287,7 +253,7 @@ function render(now: number) {
     return;
   }
 
-  if (!trajectory) {
+  if (!trajectory || !selectedVisualization) {
     resize2dCanvas();
     drawStageBackground(ctx, canvas.clientWidth, canvas.clientHeight);
     ctx.fillStyle = theme.textMuted;
@@ -301,6 +267,8 @@ function render(now: number) {
   if (selectedVisualization.id === "pendulumMotionPhase") {
     resize2dCanvas();
     drawPendulumScene(ctx, trajectory, pendulumBounds, current, canvas.clientWidth, canvas.clientHeight);
+  } else if (selectedVisualization.id === "effectivePotential") {
+    drawEffectivePotentialScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else {
     threeScene.render(current.state, time);
   }
@@ -309,14 +277,26 @@ function render(now: number) {
   requestAnimationFrame(render);
 }
 
-populateSystemSelect();
-renderSystemGallery();
-renderVisualizationButtons();
 setView("home");
 
-// Warm the manifest cache for the Structure panel.
-void loadManifest().catch((error) => {
-  console.warn("Manifest preload failed:", error);
-});
+async function initialize() {
+  try {
+    const manifest = await loadManifest();
+    examples = manifest.systems;
+    lensById = new Map(manifest.lenses.map((lens) => [lens.id, lens]));
+    selectedExample = examples[0] ?? null;
+    selectedVisualization = selectedExample ? lensFor(selectedExample.lenses[0]) : null;
+    if (selectedExample) {
+      systemTitle.textContent = selectedExample.title;
+    }
+    populateSystemSelect();
+    renderSystemGallery();
+    renderVisualizationButtons();
+  } catch (error) {
+    console.warn("Manifest preload failed:", error);
+  }
+}
+
+void initialize();
 
 requestAnimationFrame(render);

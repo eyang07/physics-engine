@@ -67,11 +67,69 @@ export class StructurePanel {
 
   private renderPrinciples(system: SystemManifest): void {
     this.principles.replaceChildren();
-    this.principles.append(principleBlock("Lagrangian", [system.physics.lagrangian]));
-    if (system.physics.hamiltonian) {
-      this.principles.append(principleBlock("Hamiltonian", [system.physics.hamiltonian]));
+    const derivation = system.derivation;
+
+    this.principles.append(principleBlock("Lagrangian", [derivation.lagrangian.expression_latex]));
+    this.principles.append(
+      principleBlock(
+        "Momenta",
+        derivation.generalized_momenta.map((momentum) => momentum.equation_latex),
+      ),
+    );
+    this.principles.append(
+      principleBlock(
+        "Euler-Lagrange",
+        derivation.euler_lagrange.map((equation) => equation.equation_latex),
+      ),
+    );
+
+    if (derivation.legendre_transform.regular && derivation.legendre_transform.velocity_solutions.length > 0) {
+      this.principles.append(
+        principleBlock(
+          "Legendre",
+          derivation.legendre_transform.velocity_solutions.map((solution) => solution.equation_latex),
+        ),
+      );
     }
-    this.principles.append(principleBlock("Equations of motion", system.physics.euler_lagrange));
+
+    if (derivation.hamiltonian) {
+      this.principles.append(principleBlock("Hamiltonian", [derivation.hamiltonian.expression_latex]));
+      this.principles.append(
+        principleBlock(
+          "Hamilton Flow",
+          derivation.hamiltonian.equations.map((equation) => equation.equation_latex),
+        ),
+      );
+    }
+
+    const generators = derivation.conserved_quantities
+      .filter((quantity) => quantity.generator_latex)
+      .map((quantity) => {
+        const components = quantity.generator_latex ?? [];
+        const tau = quantity.tau_latex ?? "0";
+        return `${quantity.symbol_latex}: W=\\left(${components.join(",")}\\right),\\ \\tau=${tau}`;
+      });
+    if (generators.length > 0) {
+      this.principles.append(principleBlock("Generators", generators));
+    }
+
+    const charges = derivation.conserved_quantities
+      .filter((quantity) => quantity.charge_latex)
+      .map((quantity) => `${quantity.symbol_latex}=${quantity.charge_latex}`);
+    if (charges.length > 0) {
+      this.principles.append(principleBlock("Noether", charges));
+    }
+
+    if (derivation.effective_potentials.length > 0) {
+      this.principles.append(
+        principleBlock(
+          "Effective Potential",
+          derivation.effective_potentials.map(
+            (potential) => `${potential.latex}\\left(${potential.coordinate}\\right)=${potential.expression_latex}`,
+          ),
+        ),
+      );
+    }
   }
 
   private renderInvariants(system: SystemManifest, data: Trajectory): void {

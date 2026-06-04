@@ -11,7 +11,16 @@ Adding a system to the gallery is: write ``systems/<name>.py`` + add one spec.
 
 from __future__ import annotations
 
-from engine.export.manifest import Conserved, Parameter, StateVar, SystemSpec
+import sympy as sp
+
+from engine.export.manifest import (
+    Conserved,
+    EffectivePotential,
+    Lens,
+    Parameter,
+    StateVar,
+    SystemSpec,
+)
 from engine.mechanics.symmetries import InfinitesimalSymmetry
 from systems.charged_particle import build_uniform_magnetic_field_system
 from systems.ideal_spring import build_system as build_ideal_spring
@@ -31,6 +40,82 @@ def _cyclic_coordinate(name: str):
         return InfinitesimalSymmetry.coordinate_translation(system.q, coordinate)
 
     return build
+
+
+def _kepler_effective_potential(system):
+    r = next(q for q in system.q if q.name == "r")
+    m = next(symbol for symbol in system.lagrangian.free_symbols if symbol.name == "m")
+    mu = next(symbol for symbol in system.lagrangian.free_symbols if symbol.name == "mu")
+    ell = sp.Symbol("ell")
+    return ell**2 / (2 * m * r**2) - mu * m / r
+
+
+LENSES: tuple[Lens, ...] = (
+    Lens(
+        id="pendulumMotionPhase",
+        title="Motion + Phase",
+        kind="configuration-phase",
+        description="Physical pendulum motion paired with its phase portrait.",
+        projections=("angle", "phase"),
+    ),
+    Lens(
+        id="pendulumHamiltonian",
+        title="Hamiltonian Flow",
+        kind="hamiltonian-flow",
+        description="Hamiltonian surface and advected phase-space flow.",
+        projections=("phase",),
+        conserved=("H",),
+    ),
+    Lens(
+        id="sphereGeodesic",
+        title="Great-Circle Flow",
+        kind="configuration-space",
+        description="Geodesic motion embedded in three-dimensional space.",
+        projections=("embedding3d",),
+        conserved=("H", "p_phi"),
+    ),
+    Lens(
+        id="chargedParticle",
+        title="Lorentz Orbit",
+        kind="configuration-space",
+        description="Charged-particle trajectory in a uniform magnetic field.",
+        projections=("embedding3d",),
+        conserved=("H", "p_z"),
+    ),
+    Lens(
+        id="uniformGravity",
+        title="Projectile Path",
+        kind="configuration-space",
+        description="Projectile motion in a uniform gravitational field.",
+        projections=("embedding2d",),
+        conserved=("H", "p_x"),
+    ),
+    Lens(
+        id="idealSpring",
+        title="Spring Motion",
+        kind="configuration-phase",
+        description="One-dimensional oscillator motion and phase trace.",
+        projections=("line", "phase"),
+        conserved=("H",),
+    ),
+    Lens(
+        id="keplerOrbit",
+        title="Orbital Flow",
+        kind="configuration-space",
+        description="Planar inverse-square orbit in the physical orbital plane.",
+        projections=("orbitPlane",),
+        conserved=("H", "ell"),
+    ),
+    Lens(
+        id="effectivePotential",
+        title="Effective Potential",
+        kind="effective-potential",
+        description="One-dimensional radial reduction after fixing angular momentum.",
+        projections=("phase",),
+        conserved=("H", "ell"),
+        effective_potentials=("kepler_radial",),
+    ),
+)
 
 
 PENDULUM = SystemSpec(
@@ -209,8 +294,18 @@ KEPLER = SystemSpec(
         Conserved("ell", r"\ell", "rotational symmetry",
                   generator=_cyclic_coordinate("phi")),
     ),
-    lenses=("keplerOrbit",),
+    lenses=("keplerOrbit", "effectivePotential"),
     data_path="/data/kepler_problem.json",
+    effective_potentials=(
+        EffectivePotential(
+            name="kepler_radial",
+            coordinate="r",
+            latex=r"V_{\mathrm{eff}}",
+            conserved="ell",
+            conserved_latex=r"\ell",
+            expression=_kepler_effective_potential,
+        ),
+    ),
 )
 
 

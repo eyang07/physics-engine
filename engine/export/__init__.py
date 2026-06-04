@@ -2,6 +2,8 @@
 
 from engine.export.manifest import (
     Conserved,
+    EffectivePotential,
+    Lens,
     Parameter,
     StateVar,
     SystemSpec,
@@ -13,6 +15,8 @@ from engine.export.trajectory import Trajectory
 
 __all__ = [
     "Conserved",
+    "EffectivePotential",
+    "Lens",
     "Parameter",
     "StateVar",
     "SystemSpec",
@@ -21,4 +25,3 @@ __all__ = [
     "system_entry",
     "write_manifest",
 ]
-

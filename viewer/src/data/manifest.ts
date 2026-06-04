@@ -84,6 +84,25 @@ export interface ManifestDerivationConserved {
   tau_latex?: string;
 }
 
+export interface ManifestEffectivePotential {
+  name: string;
+  coordinate: string;
+  latex: string;
+  conserved: string;
+  conserved_latex: string;
+  expression_latex: string;
+}
+
+export interface ManifestLens {
+  id: string;
+  title: string;
+  kind: string;
+  description: string;
+  projections: string[];
+  conserved: string[];
+  effectivePotentials: string[];
+}
+
 export interface ManifestDerivation {
   lagrangian: ManifestDerivationLagrangian;
   generalized_momenta: ManifestDerivationMomentum[];
@@ -91,6 +110,7 @@ export interface ManifestDerivation {
   legendre_transform: ManifestDerivationLegendre;
   hamiltonian: ManifestDerivationHamiltonian | null;
   conserved_quantities: ManifestDerivationConserved[];
+  effective_potentials: ManifestEffectivePotential[];
 }
 
 export interface SystemManifest {
@@ -103,6 +123,7 @@ export interface SystemManifest {
   state: ManifestStateVar[];
   projections: Record<string, string[]>;
   conserved: ManifestConserved[];
+  effectivePotentials: ManifestEffectivePotential[];
   lenses: string[];
   physics: ManifestPhysics;
   derivation: ManifestDerivation;
@@ -110,6 +131,7 @@ export interface SystemManifest {
 
 export interface Manifest {
   version: number;
+  lenses: ManifestLens[];
   systems: SystemManifest[];
 }
 

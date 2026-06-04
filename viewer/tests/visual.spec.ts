@@ -97,5 +97,11 @@ for (const viewport of [
     await page.waitForTimeout(800);
     await expectCanvasNonBlank(page, "#hamiltonianScene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-kepler.png`) });
+
+    await page.getByRole("button", { name: "Effective Potential" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-effective-potential.png`) });
   });
 }

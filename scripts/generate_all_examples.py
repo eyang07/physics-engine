@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from engine.export.manifest import write_manifest
-from scripts.example_specs import SPECS
+from scripts.example_specs import LENSES, SPECS
 from scripts.generate_charged_particle import write_charged_particle_trajectory
 from scripts.generate_ideal_spring import write_ideal_spring_trajectory
 from scripts.generate_kepler_problem import write_kepler_trajectory
@@ -41,6 +41,7 @@ def main() -> None:
         SPECS,
         Path("data/generated/manifest.json"),
         Path("viewer/public/data/manifest.json"),
+        lenses=LENSES,
     )
     print("Wrote all example trajectories and the manifest.")
 
