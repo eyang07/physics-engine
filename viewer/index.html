@@ -7,13 +7,22 @@
   </head>
   <body>
     <main id="app">
-      <section class="stage" aria-label="Pendulum visualization">
-        <canvas id="scene"></canvas>
+      <section class="stage" aria-label="Mechanics visualization">
+        <canvas id="scene" class="stage__canvas stage__canvas--active"></canvas>
+        <canvas id="hamiltonianScene" class="stage__canvas"></canvas>
       </section>
       <aside class="panel" aria-label="Simulation controls">
         <div class="panel__header">
           <p class="eyebrow">Lagrangian System</p>
           <h1>Simple Pendulum</h1>
+        </div>
+        <div class="mode-switch" aria-label="Visualization mode">
+          <button id="pendulumMode" class="mode-switch__button mode-switch__button--active" type="button">
+            Pendulum
+          </button>
+          <button id="hamiltonianMode" class="mode-switch__button" type="button">
+            Hamiltonian
+          </button>
         </div>
         <dl class="readout">
           <div>
@@ -27,6 +36,10 @@
           <div>
             <dt><span data-latex="\dot{\theta}"></span></dt>
             <dd id="omegaValue">0.000 rad/s</dd>
+          </div>
+          <div>
+            <dt><span data-latex="H"></span></dt>
+            <dd id="energyValue">0.000</dd>
           </div>
         </dl>
         <div class="controls">

@@ -9,3 +9,5 @@ data/generated/
 viewer/public/data/*.json
 viewer/node_modules/
 viewer/dist/
+viewer/test-results/
+viewer/playwright-report/

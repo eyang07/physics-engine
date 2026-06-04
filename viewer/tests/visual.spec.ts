@@ -1,0 +1,65 @@
+import { expect, type Page, test } from "@playwright/test";
+
+async function expectCanvasNonBlank(page: Page, selector: string) {
+  const nonBlankPixels = await page.locator(selector).evaluate((canvas: HTMLCanvasElement) => {
+    const context2d = canvas.getContext("2d");
+    if (context2d) {
+      const { width, height } = canvas;
+      const sample = context2d.getImageData(0, 0, width, height).data;
+      let count = 0;
+      for (let i = 0; i < sample.length; i += 16) {
+        const alpha = sample[i + 3];
+        const isLightBackground = sample[i] > 235 && sample[i + 1] > 235 && sample[i + 2] > 235;
+        if (alpha > 0 && !isLightBackground) {
+          count += 1;
+        }
+      }
+      return count;
+    }
+
+    const gl = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+    if (!gl) {
+      return 0;
+    }
+
+    const width = gl.drawingBufferWidth;
+    const height = gl.drawingBufferHeight;
+    const pixels = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+    let count = 0;
+    for (let i = 0; i < pixels.length; i += 16) {
+      const alpha = pixels[i + 3];
+      const isLightBackground = pixels[i] > 235 && pixels[i + 1] > 235 && pixels[i + 2] > 235;
+      if (alpha > 0 && !isLightBackground) {
+        count += 1;
+      }
+    }
+    return count;
+  });
+
+  expect(nonBlankPixels).toBeGreaterThan(200);
+}
+
+for (const viewport of [
+  { name: "desktop", width: 1280, height: 820 },
+  { name: "mobile", width: 390, height: 844 },
+]) {
+  test(`renders pendulum and Hamiltonian modes at ${viewport.name}`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-pendulum.png`) });
+
+    await page.getByRole("button", { name: "Hamiltonian" }).click();
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-hamiltonian.png`) });
+  });
+}
+

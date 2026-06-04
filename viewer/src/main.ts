@@ -1,5 +1,6 @@
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import { HamiltonianScene } from "./hamiltonianScene";
 import "./styles.css";
 
 type Trajectory = {
@@ -15,6 +16,8 @@ type Bounds = {
   maxOmega: number;
 };
 
+type ViewMode = "pendulum" | "hamiltonian";
+
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (!element) {
@@ -24,11 +27,15 @@ function requireElement<T extends Element>(selector: string): T {
 }
 
 const canvas = requireElement<HTMLCanvasElement>("#scene");
+const hamiltonianCanvas = requireElement<HTMLCanvasElement>("#hamiltonianScene");
 const playButton = requireElement<HTMLButtonElement>("#playButton");
+const pendulumModeButton = requireElement<HTMLButtonElement>("#pendulumMode");
+const hamiltonianModeButton = requireElement<HTMLButtonElement>("#hamiltonianMode");
 const speedControl = requireElement<HTMLInputElement>("#speedControl");
 const timeValue = requireElement<HTMLElement>("#timeValue");
 const thetaValue = requireElement<HTMLElement>("#thetaValue");
 const omegaValue = requireElement<HTMLElement>("#omegaValue");
+const energyValue = requireElement<HTMLElement>("#energyValue");
 
 const context = canvas.getContext("2d");
 if (!context) {
@@ -38,14 +45,29 @@ const ctx: CanvasRenderingContext2D = context;
 
 let trajectory: Trajectory | null = null;
 let bounds: Bounds | null = null;
+let hamiltonianScene: HamiltonianScene | null = null;
 let playbackTime = 0;
 let lastFrameTime = performance.now();
 let playing = true;
+let viewMode: ViewMode = "pendulum";
 
 playButton.addEventListener("click", () => {
   playing = !playing;
   playButton.textContent = playing ? "Pause" : "Play";
 });
+
+pendulumModeButton.addEventListener("click", () => setViewMode("pendulum"));
+hamiltonianModeButton.addEventListener("click", () => setViewMode("hamiltonian"));
+
+function setViewMode(mode: ViewMode) {
+  viewMode = mode;
+  const isPendulum = mode === "pendulum";
+  canvas.classList.toggle("stage__canvas--active", isPendulum);
+  hamiltonianCanvas.classList.toggle("stage__canvas--active", !isPendulum);
+  pendulumModeButton.classList.toggle("mode-switch__button--active", isPendulum);
+  hamiltonianModeButton.classList.toggle("mode-switch__button--active", !isPendulum);
+  hamiltonianScene?.setActive(!isPendulum);
+}
 
 function renderLatexLabels() {
   document.querySelectorAll<HTMLElement>("[data-latex]").forEach((element) => {
@@ -57,6 +79,9 @@ function renderLatexLabels() {
 }
 
 function resizeCanvas() {
+  if (viewMode !== "pendulum") {
+    return;
+  }
   const pixelRatio = window.devicePixelRatio || 1;
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
@@ -86,6 +111,10 @@ function computeBounds(data: Trajectory): Bounds {
     minOmega: Math.min(...omega) - omegaPad,
     maxOmega: Math.max(...omega) + omegaPad,
   };
+}
+
+function energy(theta: number, omega: number): number {
+  return 0.5 * omega * omega + 9.81 * (1 - Math.cos(theta));
 }
 
 function sample(data: Trajectory, time: number): { theta: number; omega: number; index: number } {
@@ -262,7 +291,9 @@ function drawPhasePortrait(data: Trajectory, currentIndex: number, sampleTheta: 
 }
 
 function render(now: number) {
-  resizeCanvas();
+  if (viewMode === "pendulum") {
+    resizeCanvas();
+  }
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
   const dt = (now - lastFrameTime) / 1000;
@@ -272,9 +303,9 @@ function render(now: number) {
     playbackTime += dt * Number(speedControl.value);
   }
 
-  drawBackground(width, height);
-
   if (!trajectory) {
+    resizeCanvas();
+    drawBackground(width, height);
     ctx.fillStyle = "#17252d";
     ctx.font = "16px Inter, system-ui, sans-serif";
     ctx.fillText("Loading pendulum data...", 32, 48);
@@ -283,14 +314,20 @@ function render(now: number) {
   }
 
   const current = sample(trajectory, playbackTime);
-  drawPendulum(current.theta, width, height);
+  if (viewMode === "pendulum") {
+    drawBackground(width, height);
+    drawPendulum(current.theta, width, height);
 
-  const phaseArea = new DOMRect(width * 0.53, height * 0.17, width * 0.39, height * 0.62);
-  drawPhasePortrait(trajectory, current.index, current.theta, current.omega, phaseArea);
+    const phaseArea = new DOMRect(width * 0.53, height * 0.17, width * 0.39, height * 0.62);
+    drawPhasePortrait(trajectory, current.index, current.theta, current.omega, phaseArea);
+  } else {
+    hamiltonianScene?.render({ theta: current.theta, momentum: current.omega }, playbackTime);
+  }
 
   timeValue.textContent = `${playbackTime.toFixed(2)} s`;
   thetaValue.textContent = `${current.theta.toFixed(3)} rad`;
   omegaValue.textContent = `${current.omega.toFixed(3)} rad/s`;
+  energyValue.textContent = `${energy(current.theta, current.omega).toFixed(3)}`;
 
   requestAnimationFrame(render);
 }
@@ -299,6 +336,14 @@ loadTrajectory()
   .then((data) => {
     trajectory = data;
     bounds = computeBounds(data);
+    hamiltonianScene = new HamiltonianScene(
+      hamiltonianCanvas,
+      data.states.map((state) => ({
+        theta: state[0],
+        momentum: state[1],
+      })),
+    );
+    hamiltonianScene.setActive(viewMode === "hamiltonian");
   })
   .catch((error: unknown) => {
     ctx.fillStyle = "#8b2f2f";
