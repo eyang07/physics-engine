@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { theme } from "./design/theme";
+import { FlowField } from "./flow";
 import type { Trajectory } from "./data/trajectory";
 
 export type { Trajectory };
@@ -123,48 +124,25 @@ function makePendulumSurface(): THREE.Mesh {
   );
 }
 
-function makePendulumFlowField(): THREE.Group {
-  const group = new THREE.Group();
-  const material = new THREE.LineBasicMaterial({
-    color: new THREE.Color(theme.textMuted),
-    transparent: true,
-    opacity: 0.5,
+// Advected particles drifting along the Hamiltonian phase-space field, replacing
+// the old discrete arrow grid. The same primitive is meant to scale to fluids.
+function makePendulumFlow(): FlowField {
+  return new FlowField({
+    // theta_dot = p,  p_dot = -g sin(theta)
+    field: (theta, momentum) => [momentum, -PENDULUM_GRAVITY * Math.sin(theta)],
+    bounds: { xMin: -2.9, xMax: 2.9, yMin: -3.05, yMax: 3.05 },
+    toPosition: (theta, momentum) => pendulumPoint(theta, momentum, 0.14),
+    count: 900,
+    rate: 0.16,
+    life: 3.0,
+    size: 0.05,
   });
-  const coneMaterial = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(theme.textMuted),
-    transparent: true,
-    opacity: 0.55,
-  });
-
-  for (let theta = -2.6; theta <= 2.61; theta += 0.65) {
-    for (let momentum = -2.6; momentum <= 2.61; momentum += 0.65) {
-      const dTheta = momentum;
-      const dMomentum = -PENDULUM_GRAVITY * Math.sin(theta);
-      const magnitude = Math.hypot(dTheta, dMomentum);
-      if (magnitude < 0.2) {
-        continue;
-      }
-
-      const step = 0.055 / magnitude;
-      const start = pendulumPoint(theta - dTheta * step, momentum - dMomentum * step, 0.14);
-      const end = pendulumPoint(theta + dTheta * step, momentum + dMomentum * step, 0.14);
-      group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([start, end]), material));
-
-      const direction = new THREE.Vector3().subVectors(end, start).normalize();
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.105, 10), coneMaterial);
-      cone.position.copy(end);
-      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
-      group.add(cone);
-    }
-  }
-
-  return group;
 }
 
 function makePendulumHamiltonianGroup(data: Trajectory): THREE.Group {
   const group = new THREE.Group();
   group.rotation.y = -0.22;
-  group.add(makePendulumSurface(), makePendulumFlowField());
+  group.add(makePendulumSurface());
   group.add(
     lineFromPoints(
       data.states.map((state) => pendulumPoint(state[0], state[1], 0.08)),
@@ -346,6 +324,7 @@ export class ThreeScene {
   private readonly root = new THREE.Group();
   private readonly marker: THREE.Mesh;
   private dynamicSpring: THREE.Line | null = null;
+  private flow: FlowField | null = null;
   private active = false;
   private mode: ThreeMode | null = null;
 
@@ -399,9 +378,13 @@ export class ThreeScene {
     this.mode = mode;
     this.root.clear();
     this.dynamicSpring = null;
+    this.flow?.dispose();
+    this.flow = null;
 
     if (mode === "pendulumHamiltonian") {
       this.root.add(makePendulumHamiltonianGroup(data));
+      this.flow = makePendulumFlow();
+      this.root.add(this.flow.object);
       this.camera.position.set(4.3, 2.55, 5.3);
       this.controls.target.set(0, 0.72, 0);
     } else if (mode === "sphereGeodesic") {
@@ -485,6 +468,7 @@ export class ThreeScene {
       this.root.rotation.y = Math.sin(elapsed * 0.08) * 0.08;
     }
 
+    this.flow?.update();
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   }

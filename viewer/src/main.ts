@@ -1,9 +1,17 @@
-import katex from "katex";
 import "katex/dist/katex.min.css";
 import { ThreeScene, type ThreeMode, type Trajectory } from "./threeScene";
 import { theme } from "./design/theme";
-import { findSystem, loadManifest, type SystemManifest } from "./data/manifest";
+import { loadManifest } from "./data/manifest";
 import { StaticSource } from "./data/source";
+import { renderHome } from "./home";
+import { PlaybackClock, sampleTrajectory } from "./playback";
+import {
+  computePendulumBounds,
+  drawPendulumScene,
+  drawStageBackground,
+  type Bounds,
+} from "./pendulumCanvas";
+import { StructurePanel } from "./structurePanel";
 import "./styles.css";
 
 type CanvasMode = "pendulumMotionPhase" | ThreeMode;
@@ -22,29 +30,12 @@ type ExampleConfig = {
   visualizations: Visualization[];
 };
 
-type InvariantLane = {
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
-  series: number[];
-};
-
-type Bounds = {
-  minTheta: number;
-  maxTheta: number;
-  minOmega: number;
-  maxOmega: number;
-};
-
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (!element) {
     throw new Error(`Missing required element: ${selector}`);
   }
   return element;
-}
-
-function clamp(value: number, low: number, high: number): number {
-  return Math.min(high, Math.max(low, value));
 }
 
 const examples: ExampleConfig[] = [
@@ -119,8 +110,6 @@ const principlesPanel = requireElement<HTMLElement>("#principles");
 const invariantsPanel = requireElement<HTMLElement>("#invariants");
 const parametersPanel = requireElement<HTMLElement>("#parameters");
 const loopPhaseArc = requireElement<SVGCircleElement>("#loopPhaseArc");
-const LOOP_CIRCUMFERENCE = 2 * Math.PI * 15;
-let invariantLanes: InvariantLane[] = [];
 
 const context = canvas.getContext("2d");
 if (!context) {
@@ -135,17 +124,17 @@ const homeCtx: CanvasRenderingContext2D = homeContext;
 const threeScene = new ThreeScene(threeCanvas);
 
 const trajectorySource = new StaticSource();
+const structurePanel = new StructurePanel(principlesPanel, invariantsPanel, parametersPanel, loopPhaseArc);
+const clock = new PlaybackClock();
+
 let activeView: "home" | "selection" | "simulation" = "home";
 let selectedExample = examples[0];
 let selectedVisualization = selectedExample.visualizations[0];
 let trajectory: Trajectory | null = null;
 let pendulumBounds: Bounds | null = null;
-let playbackTime = 0;
-let lastFrameTime = performance.now();
-let playing = true;
 
 playButton.addEventListener("click", () => {
-  playing = !playing;
+  const playing = clock.toggle();
   playButton.textContent = playing ? "Pause" : "Play";
 });
 
@@ -160,14 +149,6 @@ backToSystems.addEventListener("click", () => {
 systemSelect.addEventListener("change", () => {
   void selectExample(systemSelect.value);
 });
-
-function renderLatex(element: HTMLElement, latex: string) {
-  element.dataset.latex = latex;
-  katex.render(latex, element, {
-    throwOnError: false,
-    displayMode: false,
-  });
-}
 
 function populateSystemSelect() {
   systemSelect.replaceChildren();
@@ -223,47 +204,6 @@ function loadTrajectory(example: ExampleConfig): Promise<Trajectory> {
   return trajectorySource.get(example);
 }
 
-function computePendulumBounds(data: Trajectory): Bounds {
-  const theta = data.states.map((state) => state[0]);
-  const omega = data.states.map((state) => state[1]);
-  const thetaPad = Math.max(0.1, 0.08 * (Math.max(...theta) - Math.min(...theta)));
-  const omegaPad = Math.max(0.1, 0.08 * (Math.max(...omega) - Math.min(...omega)));
-  return {
-    minTheta: Math.min(...theta) - thetaPad,
-    maxTheta: Math.max(...theta) + thetaPad,
-    minOmega: Math.min(...omega) - omegaPad,
-    maxOmega: Math.max(...omega) + omegaPad,
-  };
-}
-
-function sample(data: Trajectory, time: number): { state: number[]; index: number; wrappedTime: number } {
-  const duration = data.time[data.time.length - 1] ?? 1;
-  const wrapped = ((time % duration) + duration) % duration;
-  let low = 0;
-  let high = data.time.length - 1;
-
-  while (high - low > 1) {
-    const mid = Math.floor((low + high) / 2);
-    if (data.time[mid] <= wrapped) {
-      low = mid;
-    } else {
-      high = mid;
-    }
-  }
-
-  const t0 = data.time[low];
-  const t1 = data.time[high] ?? t0;
-  const alpha = t1 === t0 ? 0 : (wrapped - t0) / (t1 - t0);
-  const state0 = data.states[low];
-  const state1 = data.states[high] ?? state0;
-
-  return {
-    state: state0.map((value, index) => value + alpha * ((state1[index] ?? value) - value)),
-    index: low,
-    wrappedTime: wrapped,
-  };
-}
-
 function setCanvasMode(mode: "2d" | "3d") {
   const is2d = mode === "2d";
   canvas.classList.toggle("stage__canvas--active", is2d);
@@ -307,22 +247,13 @@ async function selectExample(exampleId: string) {
   systemTitle.textContent = nextExample.title;
   systemSelect.value = nextExample.id;
   renderVisualizationButtons();
-  playbackTime = 0;
-  clearStructurePanel();
+  clock.reset();
+  structurePanel.clear();
 
   trajectory = await loadTrajectory(nextExample);
   pendulumBounds = nextExample.id === "pendulum" ? computePendulumBounds(trajectory) : null;
   applyVisualization();
-  void buildStructurePanel(nextExample.id, trajectory);
-}
-
-function resizeHomeCanvas() {
-  const pixelRatio = window.devicePixelRatio || 1;
-  const width = homeCanvas.clientWidth;
-  const height = homeCanvas.clientHeight;
-  homeCanvas.width = Math.max(1, Math.floor(width * pixelRatio));
-  homeCanvas.height = Math.max(1, Math.floor(height * pixelRatio));
-  homeCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  void structurePanel.show(nextExample.id, trajectory);
 }
 
 function resize2dCanvas() {
@@ -338,385 +269,15 @@ function resize2dCanvas() {
 }
 
 window.addEventListener("resize", () => {
-  resizeHomeCanvas();
   resize2dCanvas();
   threeScene.resize();
 });
 
-function drawHomeBackground(now: number) {
-  resizeHomeCanvas();
-  const width = homeCanvas.clientWidth;
-  const height = homeCanvas.clientHeight;
-  const t = now * 0.001;
-
-  const gradient = homeCtx.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, theme.ink900);
-  gradient.addColorStop(0.55, theme.ink800);
-  gradient.addColorStop(1, theme.ink850);
-  homeCtx.fillStyle = gradient;
-  homeCtx.fillRect(0, 0, width, height);
-
-  homeCtx.save();
-  homeCtx.translate(width * 0.58, height * 0.5);
-  homeCtx.strokeStyle = theme.cool;
-  homeCtx.globalAlpha = 0.16;
-  homeCtx.lineWidth = 1.4;
-  for (let orbit = 0; orbit < 7; orbit += 1) {
-    const radiusX = 80 + orbit * 46;
-    const radiusY = 26 + orbit * 17;
-    homeCtx.beginPath();
-    for (let i = 0; i <= 180; i += 1) {
-      const a = (i / 180) * Math.PI * 2 + t * (0.08 + orbit * 0.01);
-      const x = Math.cos(a) * radiusX;
-      const y = Math.sin(a) * radiusY + Math.sin(a * 2 + t) * 9;
-      if (i === 0) {
-        homeCtx.moveTo(x, y);
-      } else {
-        homeCtx.lineTo(x, y);
-      }
-    }
-    homeCtx.stroke();
-  }
-
-  homeCtx.fillStyle = theme.accent;
-  for (let i = 0; i < 18; i += 1) {
-    const a = t * 0.45 + i * 0.9;
-    const x = Math.cos(a) * (100 + (i % 5) * 54);
-    const y = Math.sin(a * 1.3) * (40 + (i % 4) * 32);
-    homeCtx.globalAlpha = 0.14 + (i % 4) * 0.04;
-    homeCtx.beginPath();
-    homeCtx.arc(x, y, 3 + (i % 3), 0, Math.PI * 2);
-    homeCtx.fill();
-  }
-  homeCtx.restore();
-  homeCtx.globalAlpha = 1;
-}
-
-function drawBackground(width: number, height: number) {
-  const gradient = ctx.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, theme.ink900);
-  gradient.addColorStop(0.55, theme.ink800);
-  gradient.addColorStop(1, theme.ink850);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.strokeStyle = theme.hairline;
-  ctx.lineWidth = 1;
-  for (let x = 0; x <= width; x += 36) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, height);
-    ctx.stroke();
-  }
-  for (let y = 0; y <= height; y += 36) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(width, y);
-    ctx.stroke();
-  }
-}
-
-function drawPendulum(theta: number, width: number, height: number) {
-  const centerX = width * 0.33;
-  const centerY = height * 0.24;
-  const length = Math.min(width, height) * 0.34;
-  const bobX = centerX + length * Math.sin(theta);
-  const bobY = centerY + length * Math.cos(theta);
-
-  ctx.save();
-  ctx.lineCap = "round";
-
-  ctx.strokeStyle = theme.hairlineStrong;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, length, Math.PI * 0.62, Math.PI * 0.38, true);
-  ctx.stroke();
-
-  ctx.strokeStyle = theme.textMuted;
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(centerX, centerY);
-  ctx.lineTo(bobX, bobY);
-  ctx.stroke();
-
-  ctx.fillStyle = theme.textPrimary;
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, 7, 0, Math.PI * 2);
-  ctx.fill();
-
-  const bobGradient = ctx.createRadialGradient(bobX - 8, bobY - 10, 4, bobX, bobY, 24);
-  bobGradient.addColorStop(0, "#f8d58b");
-  bobGradient.addColorStop(0.55, "#d88d42");
-  bobGradient.addColorStop(1, "#904f2d");
-  ctx.fillStyle = bobGradient;
-  ctx.beginPath();
-  ctx.arc(bobX, bobY, 24, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = theme.hairline;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(centerX, centerY);
-  ctx.lineTo(centerX, centerY + length + 36);
-  ctx.stroke();
-
-  ctx.restore();
-}
-
-function drawPhasePortrait(data: Trajectory, currentIndex: number, theta: number, omega: number, area: DOMRect) {
-  if (!pendulumBounds) {
-    return;
-  }
-
-  const pad = 38;
-  const left = area.x + pad;
-  const right = area.x + area.width - pad;
-  const top = area.y + pad;
-  const bottom = area.y + area.height - pad;
-
-  const mapX = (value: number) =>
-    left + ((value - pendulumBounds!.minTheta) / (pendulumBounds!.maxTheta - pendulumBounds!.minTheta)) * (right - left);
-  const mapY = (value: number) =>
-    bottom - ((value - pendulumBounds!.minOmega) / (pendulumBounds!.maxOmega - pendulumBounds!.minOmega)) * (bottom - top);
-
-  ctx.save();
-  ctx.strokeStyle = theme.hairlineStrong;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(left, mapY(0));
-  ctx.lineTo(right, mapY(0));
-  ctx.moveTo(mapX(0), top);
-  ctx.lineTo(mapX(0), bottom);
-  ctx.stroke();
-
-  ctx.strokeStyle = theme.cool;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  data.states.forEach((state, index) => {
-    const x = mapX(state[0]);
-    const y = mapY(state[1]);
-    if (index === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-  });
-  ctx.stroke();
-
-  ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 3;
-  ctx.shadowColor = theme.accent;
-  ctx.shadowBlur = 10;
-  ctx.beginPath();
-  data.states.slice(0, currentIndex + 1).forEach((state, index) => {
-    const x = mapX(state[0]);
-    const y = mapY(state[1]);
-    if (index === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-  });
-  ctx.stroke();
-
-  ctx.fillStyle = theme.accentStrong;
-  ctx.beginPath();
-  ctx.arc(mapX(theta), mapY(omega), 6, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = theme.textMuted;
-  ctx.font = "12px Inter, system-ui, sans-serif";
-  ctx.fillText("θ", right - 18, mapY(0) - 8);
-  ctx.fillText("θ̇", mapX(0) + 10, top + 12);
-
-  ctx.restore();
-}
-
-function renderPrincipleBlock(label: string, expressions: string[]): HTMLElement {
-  const block = document.createElement("div");
-  block.className = "principle";
-  const caption = document.createElement("p");
-  caption.className = "principle__label";
-  caption.textContent = label;
-  block.append(caption);
-  expressions.forEach((expression) => {
-    const math = document.createElement("div");
-    math.className = "principle__math";
-    katex.render(expression, math, { throwOnError: false, displayMode: true });
-    block.append(math);
-  });
-  return block;
-}
-
-function renderPrinciples(system: SystemManifest) {
-  principlesPanel.replaceChildren();
-  principlesPanel.append(renderPrincipleBlock("Lagrangian", [system.physics.lagrangian]));
-  if (system.physics.hamiltonian) {
-    principlesPanel.append(renderPrincipleBlock("Hamiltonian", [system.physics.hamiltonian]));
-  }
-  principlesPanel.append(renderPrincipleBlock("Equations of motion", system.physics.euler_lagrange));
-}
-
-function renderInvariants(system: SystemManifest, data: Trajectory) {
-  invariantsPanel.replaceChildren();
-  invariantLanes = [];
-  const series = data.series ?? {};
-
-  system.conserved.forEach((quantity) => {
-    const values = series[quantity.name];
-    if (!values) {
-      return;
-    }
-
-    const row = document.createElement("div");
-    row.className = "invariant";
-
-    const head = document.createElement("div");
-    head.className = "invariant__head";
-    const symbol = document.createElement("span");
-    symbol.className = "invariant__symbol";
-    renderLatex(symbol, quantity.latex);
-    const symmetry = document.createElement("span");
-    symmetry.className = "invariant__symmetry";
-    symmetry.textContent = quantity.symmetry;
-    head.append(symbol, symmetry);
-
-    const lane = document.createElement("canvas");
-    lane.className = "invariant__lane";
-    row.append(head, lane);
-    invariantsPanel.append(row);
-
-    const laneCtx = lane.getContext("2d");
-    if (laneCtx) {
-      invariantLanes.push({ canvas: lane, ctx: laneCtx, series: values });
-    }
-  });
-}
-
-function renderParameters(system: SystemManifest) {
-  parametersPanel.replaceChildren();
-  system.parameters.forEach((parameter) => {
-    const row = document.createElement("div");
-    row.className = "param";
-
-    const symbol = document.createElement("span");
-    symbol.className = "param__symbol";
-    renderLatex(symbol, parameter.latex);
-
-    const track = document.createElement("div");
-    track.className = "param__track";
-    const marker = document.createElement("div");
-    marker.className = "param__marker";
-    const span = parameter.max - parameter.min || 1;
-    marker.style.left = `${clamp((parameter.default - parameter.min) / span, 0, 1) * 100}%`;
-    track.append(marker);
-
-    row.append(symbol, track);
-    parametersPanel.append(row);
-  });
-}
-
-function clearStructurePanel() {
-  principlesPanel.replaceChildren();
-  invariantsPanel.replaceChildren();
-  parametersPanel.replaceChildren();
-  invariantLanes = [];
-}
-
-async function buildStructurePanel(exampleId: string, data: Trajectory) {
-  try {
-    const manifest = await loadManifest();
-    const system = findSystem(manifest, exampleId);
-    if (!system) {
-      clearStructurePanel();
-      return;
-    }
-    renderPrinciples(system);
-    renderInvariants(system, data);
-    renderParameters(system);
-  } catch (error) {
-    console.warn("Structure panel unavailable:", error);
-    clearStructurePanel();
-  }
-}
-
-// A conserved quantity drawn over the whole trajectory. Because it does not
-// change, the line is dead flat — the stillness is the proof, no number needed.
-function drawInvariantLane(lane: InvariantLane, phase: number) {
-  const { canvas, ctx, series } = lane;
-  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
-  const drawWidth = Math.max(1, Math.floor(width * pixelRatio));
-  const drawHeight = Math.max(1, Math.floor(height * pixelRatio));
-  if (canvas.width !== drawWidth || canvas.height !== drawHeight) {
-    canvas.width = drawWidth;
-    canvas.height = drawHeight;
-    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-  }
-  ctx.clearRect(0, 0, width, height);
-
-  const count = series.length;
-  if (count === 0) {
-    return;
-  }
-  const mean = series.reduce((sum, value) => sum + value, 0) / count;
-  // The band represents +/-5% of the quantity's magnitude. A truly conserved
-  // quantity never leaves the centerline; a drift would visibly climb.
-  const half = Math.max(Math.abs(mean) * 0.05, 1e-9);
-  const pad = 4;
-  const yOf = (value: number) =>
-    clamp(height / 2 - ((value - mean) / (2 * half)) * (height / 2 - pad), pad, height - pad);
-  const xOf = (index: number) => (count <= 1 ? 0 : (index / (count - 1)) * width);
-
-  ctx.strokeStyle = theme.hairline;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, height / 2);
-  ctx.lineTo(width, height / 2);
-  ctx.stroke();
-
-  ctx.strokeStyle = theme.cool;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  const step = Math.max(1, Math.floor(count / 240));
-  for (let index = 0; index < count; index += step) {
-    const x = xOf(index);
-    const y = yOf(series[index]);
-    if (index === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-  }
-  ctx.stroke();
-
-  const playIndex = clamp(Math.round(phase * (count - 1)), 0, count - 1);
-  ctx.fillStyle = theme.accentStrong;
-  ctx.shadowColor = theme.accent;
-  ctx.shadowBlur = 8;
-  ctx.beginPath();
-  ctx.arc(clamp(phase, 0, 1) * width, yOf(series[playIndex]), 3.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-}
-
-function updateStructurePanel(phase: number) {
-  invariantLanes.forEach((lane) => drawInvariantLane(lane, phase));
-  loopPhaseArc.style.strokeDashoffset = String(LOOP_CIRCUMFERENCE * (1 - clamp(phase, 0, 1)));
-}
-
 function render(now: number) {
-  const dt = (now - lastFrameTime) / 1000;
-  lastFrameTime = now;
-
-  if (playing) {
-    playbackTime += dt * Number(speedControl.value);
-  }
+  const time = clock.advance(now, Number(speedControl.value));
 
   if (activeView === "home") {
-    drawHomeBackground(now);
+    renderHome(homeCanvas, homeCtx, now);
     requestAnimationFrame(render);
     return;
   }
@@ -728,7 +289,7 @@ function render(now: number) {
 
   if (!trajectory) {
     resize2dCanvas();
-    drawBackground(canvas.clientWidth, canvas.clientHeight);
+    drawStageBackground(ctx, canvas.clientWidth, canvas.clientHeight);
     ctx.fillStyle = theme.textMuted;
     ctx.font = "16px Inter, system-ui, sans-serif";
     ctx.fillText("Loading example data...", 32, 48);
@@ -736,26 +297,15 @@ function render(now: number) {
     return;
   }
 
-  const current = sample(trajectory, playbackTime);
+  const current = sampleTrajectory(trajectory, time);
   if (selectedVisualization.id === "pendulumMotionPhase") {
     resize2dCanvas();
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    drawBackground(width, height);
-    drawPendulum(current.state[0], width, height);
-    drawPhasePortrait(
-      trajectory,
-      current.index,
-      current.state[0],
-      current.state[1],
-      new DOMRect(width * 0.53, height * 0.17, width * 0.39, height * 0.62),
-    );
+    drawPendulumScene(ctx, trajectory, pendulumBounds, current, canvas.clientWidth, canvas.clientHeight);
   } else {
-    threeScene.render(current.state, playbackTime);
+    threeScene.render(current.state, time);
   }
 
-  const duration = trajectory.time[trajectory.time.length - 1] || 1;
-  updateStructurePanel(current.wrappedTime / duration);
+  structurePanel.update(current.phase);
   requestAnimationFrame(render);
 }
 
@@ -764,10 +314,9 @@ renderSystemGallery();
 renderVisualizationButtons();
 setView("home");
 
-// Warm the manifest cache for the Structure panel (Phase 4). Best-effort: the
-// UI still runs off the built-in example config until that phase wires it in.
+// Warm the manifest cache for the Structure panel.
 void loadManifest().catch((error) => {
-  console.warn("Manifest preload failed; using built-in example config:", error);
+  console.warn("Manifest preload failed:", error);
 });
 
 requestAnimationFrame(render);
