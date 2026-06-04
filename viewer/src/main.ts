@@ -291,7 +291,7 @@ function render(now: number) {
     resize2dCanvas();
     drawStageBackground(ctx, canvas.clientWidth, canvas.clientHeight);
     ctx.fillStyle = theme.textMuted;
-    ctx.font = "16px Inter, system-ui, sans-serif";
+    ctx.font = '16px "IBM Plex Sans", system-ui, sans-serif';
     ctx.fillText("Loading example data...", 32, 48);
     requestAnimationFrame(render);
     return;

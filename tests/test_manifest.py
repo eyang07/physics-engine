@@ -83,6 +83,18 @@ def test_conserved_quantities_render(spec) -> None:
             assert quantity["expression_latex"]
 
 
+@pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
+def test_conserved_quantities_use_noether_generators(spec) -> None:
+    system = spec.build()
+    entry = system_entry(spec)
+
+    for declared, rendered in zip(spec.conserved, entry["conserved"], strict=True):
+        assert declared.generator is not None
+        assert declared.expression_for(system) is not None
+        assert rendered["expression_latex"]
+        assert "generator_latex" in rendered
+
+
 def test_manifest_lists_every_spec(manifest) -> None:
     assert manifest["version"] == 1
     assert [entry["id"] for entry in manifest["systems"]] == [spec.id for spec in SPECS]

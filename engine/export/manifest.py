@@ -31,6 +31,7 @@ import sympy as sp
 from engine.mechanics.coordinates import acceleration_symbol, momentum_symbol
 from engine.mechanics.hamiltonian import legendre_transform
 from engine.mechanics.lagrangian import LagrangianSystem
+from engine.mechanics.symmetries import InfinitesimalSymmetry, noether_charge
 
 
 @dataclass(frozen=True)
@@ -76,14 +77,25 @@ class StateVar:
 class Conserved:
     """A conserved quantity and the symmetry that generates it (Noether).
 
-    ``expression`` optionally builds the symbolic quantity from the system, so
-    the same declaration can render LaTeX now and be sampled as a series later.
+    ``generator`` is the preferred Noether-first declaration: it builds the
+    infinitesimal symmetry and the engine derives the charge. ``expression`` is
+    kept for exceptional quantities that are not yet represented by a generator.
     """
 
     name: str
     latex: str
     symmetry: str
     expression: Callable[[LagrangianSystem], sp.Expr] | None = None
+    generator: Callable[[LagrangianSystem], InfinitesimalSymmetry] | None = None
+
+    def expression_for(self, system: LagrangianSystem) -> sp.Expr | None:
+        """Return the symbolic conserved quantity for this system."""
+
+        if self.generator is not None:
+            return noether_charge(system, self.generator(system))
+        if self.expression is not None:
+            return self.expression(system)
+        return None
 
 
 @dataclass(frozen=True)
@@ -128,9 +140,10 @@ class SystemSpec:
 
         sampled: dict[str, list[float]] = {}
         for quantity in self.conserved:
-            if quantity.expression is None:
+            expression = quantity.expression_for(system)
+            if expression is None:
                 continue
-            expression = sp.simplify(quantity.expression(system)).subs(substitutions)
+            expression = sp.simplify(expression).subs(substitutions)
             function = sp.lambdify(state_symbols, expression, modules="numpy")
             values = np.asarray(function(*columns), dtype=float)
             # Broadcast in case the quantity simplifies to a constant.
@@ -176,6 +189,101 @@ def _symbol_latex(system: LagrangianSystem, spec: SystemSpec) -> dict[sp.Symbol,
     return mapping
 
 
+def derivation_entry(
+    spec: SystemSpec,
+    system: LagrangianSystem,
+    transform: Any | None,
+    latex: Callable[[sp.Expr], str],
+) -> dict[str, Any]:
+    """Build structured symbolic steps for the viewer.
+
+    This is deliberately redundant with ``physics``: ``physics`` is the compact
+    display contract, while ``derivation`` preserves the mathematical path from
+    Lagrangian data to equations, Hamiltonian data, and Noether charges.
+    """
+
+    momenta = system.generalized_momenta()
+    momentum_symbols = tuple(momentum_symbol(q) for q in system.q)
+
+    generalized_momenta = [
+        {
+            "coordinate": q.name,
+            "velocity": v.name,
+            "momentum": p.name,
+            "momentum_latex": latex(p),
+            "expression_latex": latex(sp.simplify(momentum)),
+            "equation_latex": latex(sp.Eq(p, sp.simplify(momentum))),
+        }
+        for q, v, p, momentum in zip(system.q, system.qdot, momentum_symbols, momenta, strict=True)
+    ]
+
+    euler_lagrange = [
+        {
+            "coordinate": q.name,
+            "equation_latex": latex(equation),
+        }
+        for q, equation in zip(system.q, system.euler_lagrange_equations(), strict=True)
+    ]
+
+    legendre: dict[str, Any]
+    hamiltonian: dict[str, Any] | None = None
+    if transform is None:
+        legendre = {"regular": False, "velocity_solutions": []}
+    else:
+        hamiltonian_system = transform.hamiltonian_system
+        velocity_solutions = [
+            {
+                "velocity": velocity.name,
+                "expression_latex": latex(sp.simplify(expression)),
+                "equation_latex": latex(sp.Eq(velocity, sp.simplify(expression))),
+            }
+            for velocity, expression in transform.momentum_to_velocity.items()
+        ]
+        legendre = {
+            "regular": True,
+            "velocity_solutions": velocity_solutions,
+        }
+        hamiltonian = {
+            "expression_latex": latex(hamiltonian_system.hamiltonian),
+            "equations": [
+                {
+                    "equation_latex": latex(equation),
+                }
+                for equation in hamiltonian_system.hamilton_equation_equalities()
+            ],
+        }
+
+    conserved = []
+    for quantity in spec.conserved:
+        item: dict[str, Any] = {
+            "name": quantity.name,
+            "symbol_latex": quantity.latex,
+            "symmetry": quantity.symmetry,
+        }
+        expression = quantity.expression_for(system)
+        if expression is not None:
+            item["charge_latex"] = latex(sp.simplify(expression))
+        if quantity.generator is not None:
+            generator = quantity.generator(system)
+            item["generator_latex"] = [
+                latex(sp.simplify(component))
+                for component in generator.components(system.q)
+            ]
+            item["tau_latex"] = latex(sp.simplify(generator.tau))
+        conserved.append(item)
+
+    return {
+        "lagrangian": {
+            "expression_latex": latex(system.lagrangian),
+        },
+        "generalized_momenta": generalized_momenta,
+        "euler_lagrange": euler_lagrange,
+        "legendre_transform": legendre,
+        "hamiltonian": hamiltonian,
+        "conserved_quantities": conserved,
+    }
+
+
 def system_entry(spec: SystemSpec) -> dict[str, Any]:
     """Build one manifest entry, deriving the symbolic physics from the engine."""
 
@@ -185,6 +293,7 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
     def latex(expr: sp.Expr) -> str:
         return sp.latex(expr, symbol_names=symbol_latex)
 
+    transform = None
     hamiltonian_latex: str | None
     try:
         transform = legendre_transform(system)
@@ -201,8 +310,14 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
             "latex": quantity.latex,
             "symmetry": quantity.symmetry,
         }
-        if quantity.expression is not None:
-            item["expression_latex"] = latex(sp.simplify(quantity.expression(system)))
+        expression = quantity.expression_for(system)
+        if expression is not None:
+            item["expression_latex"] = latex(sp.simplify(expression))
+        if quantity.generator is not None:
+            generator = quantity.generator(system)
+            item["generator_latex"] = [latex(sp.simplify(component)) for component in generator.components(system.q)]
+            if generator.tau != 0:
+                item["tau_latex"] = latex(sp.simplify(generator.tau))
         conserved.append(item)
 
     return {
@@ -222,6 +337,7 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
             "energy": latex(sp.simplify(system.energy())),
             "euler_lagrange": [latex(equation) for equation in system.euler_lagrange_equations()],
         },
+        "derivation": derivation_entry(spec, system, transform, latex),
     }
 
 

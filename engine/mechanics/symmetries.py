@@ -25,6 +25,36 @@ class InfinitesimalSymmetry:
     ) -> "InfinitesimalSymmetry":
         return cls(dict(zip(coordinates, components, strict=True)), sp.Integer(0), gauge)
 
+    @classmethod
+    def coordinate_translation(
+        cls,
+        coordinates: Sequence[sp.Symbol],
+        coordinate: sp.Symbol,
+        gauge: sp.Expr = sp.Integer(0),
+    ) -> "InfinitesimalSymmetry":
+        """Return the vertical generator W = partial / partial coordinate."""
+
+        return cls.vertical(
+            coordinates,
+            [sp.Integer(1) if q == coordinate else sp.Integer(0) for q in coordinates],
+            gauge,
+        )
+
+    @classmethod
+    def time_translation(cls, gauge: sp.Expr = sp.Integer(0)) -> "InfinitesimalSymmetry":
+        """Return the time-translation generator whose Noether charge is energy.
+
+        With the sign convention used by ``noether_charge``,
+        ``tau = -1`` gives ``Q = H`` for time-independent Lagrangians.
+        """
+
+        return cls({}, sp.Integer(-1), gauge)
+
+    def components(self, coordinates: Sequence[sp.Symbol]) -> tuple[sp.Expr, ...]:
+        """Return W_i for each coordinate, inserting zero for absent entries."""
+
+        return tuple(self.eta.get(q, sp.Integer(0)) for q in coordinates)
+
 
 def noether_residual(system: LagrangianSystem, symmetry: InfinitesimalSymmetry) -> sp.Expr:
     """Return pr(X)(L) + L D_t(tau) - D_t(F).
@@ -64,4 +94,3 @@ def noether_charge(system: LagrangianSystem, symmetry: InfinitesimalSymmetry) ->
     charge -= energy * symmetry.tau
     charge -= symmetry.gauge
     return sp.simplify(charge)
-

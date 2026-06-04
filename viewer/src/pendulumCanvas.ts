@@ -166,7 +166,7 @@ function drawPhasePortrait(
 
   ctx.shadowBlur = 0;
   ctx.fillStyle = theme.textMuted;
-  ctx.font = "12px Inter, system-ui, sans-serif";
+  ctx.font = '12px "IBM Plex Sans", system-ui, sans-serif';
   ctx.fillText("θ", right - 18, mapY(0) - 8);
   ctx.fillText("θ̇", mapX(0) + 10, top + 12);
 

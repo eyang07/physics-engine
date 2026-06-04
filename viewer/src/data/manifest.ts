@@ -32,6 +32,8 @@ export interface ManifestConserved {
   latex: string;
   symmetry: string;
   expression_latex?: string;
+  generator_latex?: string[];
+  tau_latex?: string;
 }
 
 export interface ManifestPhysics {
@@ -39,6 +41,56 @@ export interface ManifestPhysics {
   hamiltonian: string | null;
   energy: string;
   euler_lagrange: string[];
+}
+
+export interface ManifestDerivationLagrangian {
+  expression_latex: string;
+}
+
+export interface ManifestDerivationMomentum {
+  coordinate: string;
+  velocity: string;
+  momentum: string;
+  momentum_latex: string;
+  expression_latex: string;
+  equation_latex: string;
+}
+
+export interface ManifestDerivationEquation {
+  coordinate?: string;
+  equation_latex: string;
+}
+
+export interface ManifestDerivationLegendre {
+  regular: boolean;
+  velocity_solutions: Array<{
+    velocity: string;
+    expression_latex: string;
+    equation_latex: string;
+  }>;
+}
+
+export interface ManifestDerivationHamiltonian {
+  expression_latex: string;
+  equations: ManifestDerivationEquation[];
+}
+
+export interface ManifestDerivationConserved {
+  name: string;
+  symbol_latex: string;
+  symmetry: string;
+  charge_latex?: string;
+  generator_latex?: string[];
+  tau_latex?: string;
+}
+
+export interface ManifestDerivation {
+  lagrangian: ManifestDerivationLagrangian;
+  generalized_momenta: ManifestDerivationMomentum[];
+  euler_lagrange: ManifestDerivationEquation[];
+  legendre_transform: ManifestDerivationLegendre;
+  hamiltonian: ManifestDerivationHamiltonian | null;
+  conserved_quantities: ManifestDerivationConserved[];
 }
 
 export interface SystemManifest {
@@ -53,6 +105,7 @@ export interface SystemManifest {
   conserved: ManifestConserved[];
   lenses: string[];
   physics: ManifestPhysics;
+  derivation: ManifestDerivation;
 }
 
 export interface Manifest {

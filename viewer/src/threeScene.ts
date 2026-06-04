@@ -25,7 +25,7 @@ function makeLabel(text: string): THREE.Sprite {
     throw new Error("Unable to create label canvas.");
   }
 
-  context.font = "600 42px Inter, system-ui, sans-serif";
+  context.font = '700 42px "Space Grotesk", "IBM Plex Sans", system-ui, sans-serif';
   context.fillStyle = theme.textPrimary;
   context.textAlign = "center";
   context.textBaseline = "middle";

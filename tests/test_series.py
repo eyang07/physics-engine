@@ -34,7 +34,11 @@ def test_series_present_and_conserved(spec, generate) -> None:
     trajectory = generate()
 
     assert trajectory.series is not None
-    expected = {quantity.name for quantity in spec.conserved if quantity.expression is not None}
+    expected = {
+        quantity.name
+        for quantity in spec.conserved
+        if quantity.expression_for(spec.build()) is not None
+    }
     assert set(trajectory.series) == expected
 
     for name, values in trajectory.series.items():

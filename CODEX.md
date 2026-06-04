@@ -41,51 +41,29 @@ the mathematics concrete and inspectable before it tries to be fast or general.
   physical example; a visualization is a way of looking at that system.
 - Generated data should remain disposable and reproducible from scripts.
 
-## Frontend TODO
-
-The frontend now has a home screen, a system-selection gallery, and a
-simulation workspace. It separates physical systems from visualization modes.
-
-Current model:
-
-- The selected **system** is `Simple Pendulum`.
-- The selected **visualization** is one of:
-  - physical-space motion
-  - phase-space portrait
-  - Hamiltonian flow
-  - energy surface
-
-The same structure should apply to all examples: the system is the physical
-example, and the visualization is a mathematical or graphical lens on that
-example.
-
-Longer-term frontend direction:
-
-- Let the user select from many physics examples. Current examples include the
-  simple pendulum, geodesics on a sphere, and a charged particle in a uniform
-  magnetic field, uniform gravitational field, ideal spring, and Kepler
-  problem.
-- Add more examples such as relativistic geodesics and fluid flows.
-- Let the user tune physical parameters and initial conditions.
-- Let the user choose visualization modes such as physical motion, phase space,
-  Hamiltonian flow, conserved quantities, vector fields, and energy surfaces.
-- Keep labels mathematically precise, using LaTeX where appropriate.
-
 ## Next Milestones
 
-1. Add parameter controls for each system.
-   - Pendulum: `length`, `gravity`, `theta0`, `theta_dot0`.
-   - Sphere geodesic: `radius`, `theta0`, `phi0`, `theta_dot0`, `phi_dot0`.
-   - Charged particle: `mass`, `charge`, `B_z`, initial position, initial
-     velocity.
-2. Add a Python generation API:
-   `generate_example(system_id, parameters) -> Trajectory`.
-3. Add a shared example manifest so Python and TypeScript agree on available
-   systems, parameters, generated data, and visualization modes.
-4. Split frontend renderers by responsibility:
-   `pendulum2d`, `hamiltonianSurface`, `sphereGeodesic`, `chargedParticle`.
-5. After the interface supports parameters, add a more ambitious example:
-   central-force or Kepler motion as a bridge toward relativistic geodesics.
+1. Promote Noether's theorem to a first-class engine concept.
+   - Specs should declare infinitesimal symmetry generators, not hand-written
+     momentum expressions.
+   - The engine should derive Noether charges from the generator via
+     `sum p_i W_i` for vertical symmetries, with time-translation support for
+     energy.
+   - Tests should check both the variational-symmetry residual and the derived
+     conserved quantity.
+2. Add a derivation layer to the manifest.
+   - Export structured symbolic steps, not only final formulas: Lagrangian,
+     generalized momenta, Euler-Lagrange equations, Legendre transform,
+     Hamiltonian, symmetry generator, and conserved quantity.
+   - Keep this data generated from Python so the viewer teaches the
+     mathematics without re-deriving physics.
+3. Build the lens registry.
+   - Treat physical systems and visualization lenses as separate concepts.
+   - Lenses should be composable views such as configuration-space motion,
+     phase plane, Hamiltonian vector field, energy level set, conserved
+     quantity stillness, and effective potential.
+   - Kepler/radial motion should use this to show orbit plane, radial phase
+     portrait, effective potential, and angular momentum.
 
 ## Verification
 

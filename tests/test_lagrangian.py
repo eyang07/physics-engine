@@ -126,6 +126,35 @@ def test_noether_translation_symmetry_returns_momentum():
     assert sp.simplify(noether_charge(system, symmetry) - m * x_dot) == 0
 
 
+def test_noether_time_translation_returns_energy():
+    chart = CoordinateChart.from_names("x")
+    (x,) = chart.coordinates
+    (x_dot,) = chart.velocities
+    m, k = sp.symbols("m k", positive=True)
+    lagrangian = sp.Rational(1, 2) * m * x_dot**2 - sp.Rational(1, 2) * k * x**2
+    system = LagrangianSystem(chart.coordinates, lagrangian, chart.time, chart.velocities)
+
+    symmetry = InfinitesimalSymmetry.time_translation()
+
+    assert is_variational_symmetry(system, symmetry)
+    assert sp.simplify(noether_charge(system, symmetry) - system.energy()) == 0
+
+
+def test_noether_cyclic_coordinate_constructor_returns_conjugate_momentum():
+    chart = CoordinateChart.from_names("r phi")
+    r, phi = chart.coordinates
+    r_dot, phi_dot = chart.velocities
+    m = sp.Symbol("m", positive=True)
+    lagrangian = sp.Rational(1, 2) * m * (r_dot**2 + r**2 * phi_dot**2)
+    system = LagrangianSystem(chart.coordinates, lagrangian, chart.time, chart.velocities)
+
+    symmetry = InfinitesimalSymmetry.coordinate_translation(system.q, phi)
+
+    assert symmetry.components(system.q) == (sp.Integer(0), sp.Integer(1))
+    assert is_variational_symmetry(system, symmetry)
+    assert sp.simplify(noether_charge(system, symmetry) - m * r**2 * phi_dot) == 0
+
+
 def test_numeric_rhs_integrates_harmonic_oscillator_with_nearly_constant_energy():
     system = harmonic_oscillator(mass=1.0, spring_constant=1.0)
     rhs = system.numerical_rhs()

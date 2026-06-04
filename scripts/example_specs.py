@@ -12,6 +12,7 @@ Adding a system to the gallery is: write ``systems/<name>.py`` + add one spec.
 from __future__ import annotations
 
 from engine.export.manifest import Conserved, Parameter, StateVar, SystemSpec
+from engine.mechanics.symmetries import InfinitesimalSymmetry
 from systems.charged_particle import build_uniform_magnetic_field_system
 from systems.ideal_spring import build_system as build_ideal_spring
 from systems.kepler_problem import build_system as build_kepler
@@ -20,8 +21,16 @@ from systems.sphere_geodesic import build_system as build_sphere_geodesic
 from systems.uniform_gravity import build_system as build_uniform_gravity
 
 
-def _energy(system):
-    return system.energy()
+def _time_translation(system):
+    return InfinitesimalSymmetry.time_translation()
+
+
+def _cyclic_coordinate(name: str):
+    def build(system):
+        coordinate = next(q for q in system.q if q.name == name)
+        return InfinitesimalSymmetry.coordinate_translation(system.q, coordinate)
+
+    return build
 
 
 PENDULUM = SystemSpec(
@@ -42,7 +51,7 @@ PENDULUM = SystemSpec(
         StateVar("theta_dot", r"\dot{\theta}", "velocity"),
     ),
     projections={"phase": ("theta", "theta_dot"), "angle": ("theta",)},
-    conserved=(Conserved("H", "H", "time translation", _energy),),
+    conserved=(Conserved("H", "H", "time translation", generator=_time_translation),),
     lenses=("pendulumMotionPhase", "pendulumHamiltonian"),
     data_path="/data/pendulum.json",
 )
@@ -73,9 +82,9 @@ SPHERE_GEODESIC = SystemSpec(
     ),
     projections={"embedding3d": ("x", "y", "z")},
     conserved=(
-        Conserved("H", "H", "time translation", _energy),
+        Conserved("H", "H", "time translation", generator=_time_translation),
         Conserved("p_phi", r"p_{\phi}", "rotation about the polar axis",
-                  lambda system: system.generalized_momenta()[1]),
+                  generator=_cyclic_coordinate("phi")),
     ),
     lenses=("sphereGeodesic",),
     data_path="/data/sphere_geodesic.json",
@@ -109,9 +118,9 @@ CHARGED_PARTICLE = SystemSpec(
     ),
     projections={"embedding3d": ("x", "y", "z")},
     conserved=(
-        Conserved("H", "H", "time translation", _energy),
+        Conserved("H", "H", "time translation", generator=_time_translation),
         Conserved("p_z", r"p_{z}", "translation along z",
-                  lambda system: system.generalized_momenta()[2]),
+                  generator=_cyclic_coordinate("z")),
     ),
     lenses=("chargedParticle",),
     data_path="/data/charged_particle.json",
@@ -140,9 +149,9 @@ UNIFORM_GRAVITY = SystemSpec(
     ),
     projections={"embedding2d": ("x", "z")},
     conserved=(
-        Conserved("H", "H", "time translation", _energy),
+        Conserved("H", "H", "time translation", generator=_time_translation),
         Conserved("p_x", r"p_{x}", "horizontal translation",
-                  lambda system: system.generalized_momenta()[0]),
+                  generator=_cyclic_coordinate("x")),
     ),
     lenses=("uniformGravity",),
     data_path="/data/uniform_gravity.json",
@@ -166,7 +175,7 @@ IDEAL_SPRING = SystemSpec(
         StateVar("x_dot", r"\dot{x}", "velocity"),
     ),
     projections={"phase": ("x", "x_dot"), "line": ("x",)},
-    conserved=(Conserved("H", "H", "time translation", _energy),),
+    conserved=(Conserved("H", "H", "time translation", generator=_time_translation),),
     lenses=("idealSpring",),
     data_path="/data/ideal_spring.json",
 )
@@ -196,9 +205,9 @@ KEPLER = SystemSpec(
     ),
     projections={"orbitPlane": ("x", "y"), "phase": ("r", "r_dot")},
     conserved=(
-        Conserved("H", "H", "time translation", _energy),
+        Conserved("H", "H", "time translation", generator=_time_translation),
         Conserved("ell", r"\ell", "rotational symmetry",
-                  lambda system: system.generalized_momenta()[1]),
+                  generator=_cyclic_coordinate("phi")),
     ),
     lenses=("keplerOrbit",),
     data_path="/data/kepler_problem.json",
