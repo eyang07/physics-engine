@@ -6,6 +6,7 @@ from typing import Sequence
 
 from engine.export import Trajectory
 from engine.numerics import integrate_fixed_step
+from scripts.example_specs import IDEAL_SPRING
 from systems.ideal_spring import build_system
 
 
@@ -24,6 +25,7 @@ def generate_ideal_spring_trajectory(
         states=states,
         state_names=["x", "x_dot"],
         metadata={"system": "ideal_spring", "mass": mass, "spring_constant": spring_constant},
+        series=IDEAL_SPRING.series({"m": mass, "k": spring_constant}, states),
     )
 
 

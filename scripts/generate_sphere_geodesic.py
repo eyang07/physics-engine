@@ -8,6 +8,7 @@ import numpy as np
 
 from engine.export import Trajectory
 from engine.numerics import integrate_fixed_step
+from scripts.example_specs import SPHERE_GEODESIC
 from systems.sphere_geodesic import build_system
 
 
@@ -51,6 +52,7 @@ def generate_sphere_geodesic_trajectory(
             "radius": radius,
             "mass": mass,
         },
+        series=SPHERE_GEODESIC.series({"m": mass, "R": radius}, states),
     )
 
 

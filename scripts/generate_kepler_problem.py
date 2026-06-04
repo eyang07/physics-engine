@@ -8,6 +8,7 @@ import numpy as np
 
 from engine.export import Trajectory
 from engine.numerics import integrate_fixed_step
+from scripts.example_specs import KEPLER
 from systems.kepler_problem import build_system
 
 
@@ -34,6 +35,9 @@ def generate_kepler_trajectory(
             "mass": mass,
             "gravitational_parameter": gravitational_parameter,
         },
+        series=KEPLER.series(
+            {"m": mass, "mu": gravitational_parameter}, states
+        ),
     )
 
 

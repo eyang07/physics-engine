@@ -6,6 +6,7 @@ from typing import Sequence
 
 from engine.export import Trajectory
 from engine.numerics import integrate_fixed_step
+from scripts.example_specs import PENDULUM
 from systems.pendulum import build_system
 
 
@@ -31,6 +32,7 @@ def generate_pendulum_trajectory(
         time=time,
         states=states,
         state_names=["theta", "theta_dot"],
+        series=PENDULUM.series({"m": mass, "ell": length, "g": gravity}, states),
     )
 
 

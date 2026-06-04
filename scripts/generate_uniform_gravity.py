@@ -6,6 +6,7 @@ from typing import Sequence
 
 from engine.export import Trajectory
 from engine.numerics import integrate_fixed_step
+from scripts.example_specs import UNIFORM_GRAVITY
 from systems.uniform_gravity import build_system
 
 
@@ -24,6 +25,7 @@ def generate_uniform_gravity_trajectory(
         states=states,
         state_names=["x", "z", "x_dot", "z_dot"],
         metadata={"system": "uniform_gravity", "mass": mass, "gravity": gravity},
+        series=UNIFORM_GRAVITY.series({"m": mass, "g": gravity}, states),
     )
 
 

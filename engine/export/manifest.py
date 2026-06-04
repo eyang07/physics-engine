@@ -23,8 +23,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Sequence
 
+import numpy as np
 import sympy as sp
 
 from engine.mechanics.coordinates import acceleration_symbol, momentum_symbol
@@ -100,6 +101,41 @@ class SystemSpec:
     conserved: tuple[Conserved, ...]
     lenses: tuple[str, ...]
     data_path: str
+
+    def series(
+        self,
+        parameter_values: Mapping[str, float],
+        states: Sequence[Sequence[float]],
+    ) -> dict[str, list[float]]:
+        """Sample the declared conserved quantities along an integrated trajectory.
+
+        Only the leading (q, qdot) columns of ``states`` are used, so this works
+        whether or not the export also carries embedding coordinates.
+        ``parameter_values`` must cover the system's physical parameters by name.
+        A quantity that is genuinely conserved should come back essentially flat
+        — and that stillness is exactly what the viewer renders.
+        """
+
+        system = self.build()
+        state_symbols = (*system.q, *system.qdot)
+        array = np.asarray(states, dtype=float)
+        columns = [array[:, index] for index in range(len(state_symbols))]
+        substitutions = {
+            symbol: parameter_values[symbol.name]
+            for symbol in system.lagrangian.free_symbols
+            if symbol.name in parameter_values
+        }
+
+        sampled: dict[str, list[float]] = {}
+        for quantity in self.conserved:
+            if quantity.expression is None:
+                continue
+            expression = sp.simplify(quantity.expression(system)).subs(substitutions)
+            function = sp.lambdify(state_symbols, expression, modules="numpy")
+            values = np.asarray(function(*columns), dtype=float)
+            # Broadcast in case the quantity simplifies to a constant.
+            sampled[quantity.name] = np.broadcast_to(values, (array.shape[0],)).astype(float).tolist()
+        return sampled
 
 
 def _latex_by_name(spec: SystemSpec) -> dict[str, str]:

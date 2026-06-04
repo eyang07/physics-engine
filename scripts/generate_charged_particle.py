@@ -6,6 +6,7 @@ from typing import Sequence
 
 from engine.export import Trajectory
 from engine.numerics import integrate_fixed_step
+from scripts.example_specs import CHARGED_PARTICLE
 from systems.charged_particle import build_uniform_magnetic_field_system
 
 
@@ -40,6 +41,9 @@ def generate_charged_particle_trajectory(
             "charge": charge,
             "magnetic_field": [0.0, 0.0, magnetic_field_z],
         },
+        series=CHARGED_PARTICLE.series(
+            {"m": mass, "q": charge, "B_z": magnetic_field_z}, states
+        ),
     )
 
 
