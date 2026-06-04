@@ -8,6 +8,8 @@ import sympy as sp
 
 from engine.mechanics.coordinates import momentum_symbol
 from engine.mechanics.lagrangian import LagrangianSystem
+from engine.mechanics.poisson import poisson_bracket, time_evolution
+from engine.mechanics.symplectic import hamiltonian_vector_field, liouville_divergence
 
 
 @dataclass(frozen=True)
@@ -38,9 +40,22 @@ class HamiltonianSystem:
     def hamilton_equations(self) -> tuple[sp.Expr, ...]:
         """Return [dq_i/dt, dp_i/dt] from Hamilton's equations."""
 
-        q_flow = tuple(sp.diff(self.hamiltonian, p_i) for p_i in self.p)
-        p_flow = tuple(-sp.diff(self.hamiltonian, q_i) for q_i in self.q)
-        return tuple(sp.simplify(expr) for expr in q_flow + p_flow)
+        return tuple(hamiltonian_vector_field(self.hamiltonian, self.q, self.p))
+
+    def poisson_bracket(self, f: sp.Expr, g: sp.Expr) -> sp.Expr:
+        return poisson_bracket(f, g, self.q, self.p)
+
+    def time_evolution(self, observable: sp.Expr) -> sp.Expr:
+        return time_evolution(
+            observable,
+            self.hamiltonian,
+            self.q,
+            self.p,
+            time=self.time,
+        )
+
+    def liouville_divergence(self) -> sp.Expr:
+        return liouville_divergence(self.hamiltonian, self.q, self.p)
 
     def hamilton_equation_equalities(self) -> tuple[sp.Eq, ...]:
         qdot = tuple(sp.Symbol(f"{q.name}_dot", real=True) for q in self.q)

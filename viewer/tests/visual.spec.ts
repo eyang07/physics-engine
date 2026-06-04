@@ -45,7 +45,7 @@ for (const viewport of [
   { name: "desktop", width: 1280, height: 820 },
   { name: "mobile", width: 390, height: 844 },
 ]) {
-  test(`renders pendulum and Hamiltonian modes at ${viewport.name}`, async ({ page }, testInfo) => {
+  test(`renders all example systems at ${viewport.name}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto("/");
     await page.waitForSelector("#scene.stage__canvas--active");
@@ -54,12 +54,25 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-pendulum.png`) });
 
-    await page.getByRole("button", { name: "Hamiltonian" }).click();
+    await page.getByRole("button", { name: "Hamiltonian Flow" }).click();
     await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
     await page.waitForTimeout(800);
 
     await expectCanvasNonBlank(page, "#hamiltonianScene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-hamiltonian.png`) });
+
+    await page.locator("#systemSelect").selectOption("sphere-geodesic");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-sphere-geodesic.png`) });
+
+    await page.locator("#systemSelect").selectOption("charged-particle");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-charged-particle.png`) });
   });
 }
-

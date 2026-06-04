@@ -25,6 +25,9 @@ Topics I expect to touch as I go:
   into beautiful interactive animations.
 - Use the engine to explore vector fields, black-hole geodesics, fluid flows,
   and other visualizations of dynamics.
+- Build a growing gallery of examples that can be viewed through multiple
+  mathematical lenses: physical motion, phase space, Hamiltonian flow, energy
+  surfaces, vector fields, and conserved quantities.
 
 ## Architecture
 
@@ -48,6 +51,9 @@ kept concrete and chart-based:
   `(q, p)`.
 - The Legendre transform maps regular Lagrangian systems from `TQ` to `T*Q` by
   `p_i = partial L / partial qdot_i`.
+- Hamiltonian geometry includes canonical Poisson brackets, symplectic
+  matrices, Hamiltonian vector fields, Liouville divergence checks, and
+  canonical-transformation checks.
 - Coordinate changes should expose both tangent pushforwards and cotangent
   pullbacks so generalized velocities and momenta transform correctly.
 
@@ -68,6 +74,12 @@ A likely starting structure:
 - `viewer/` — TypeScript browser app for interactive rendering.
 - `data/generated/` — exported trajectories, vector fields, grids, and other
   generated simulation artifacts.
+
+Current examples include:
+
+- simple pendulum
+- geodesics on a sphere
+- charged particle in a uniform magnetic field
 
 ## Non-goals (for now)
 

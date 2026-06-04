@@ -1,12 +1,26 @@
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { HamiltonianScene } from "./hamiltonianScene";
+import { ThreeScene, type ThreeMode, type Trajectory } from "./threeScene";
 import "./styles.css";
 
-type Trajectory = {
-  time: number[];
-  state_names: string[];
-  states: number[][];
+type CanvasMode = "pendulumMotionPhase" | ThreeMode;
+
+type Visualization = {
+  id: CanvasMode;
+  label: string;
+};
+
+type Readout = {
+  latex: string;
+  value: string;
+};
+
+type ExampleConfig = {
+  id: string;
+  title: string;
+  dataPath: string;
+  visualizations: Visualization[];
+  readouts: (state: number[], time: number) => Readout[];
 };
 
 type Bounds = {
@@ -16,8 +30,6 @@ type Bounds = {
   maxOmega: number;
 };
 
-type ViewMode = "pendulum" | "hamiltonian";
-
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (!element) {
@@ -26,81 +38,152 @@ function requireElement<T extends Element>(selector: string): T {
   return element;
 }
 
+function pendulumEnergy(theta: number, omega: number): number {
+  return 0.5 * omega * omega + 9.81 * (1 - Math.cos(theta));
+}
+
+function speed3(state: number[], startIndex: number): number {
+  return Math.hypot(state[startIndex], state[startIndex + 1], state[startIndex + 2]);
+}
+
+const examples: ExampleConfig[] = [
+  {
+    id: "pendulum",
+    title: "Simple Pendulum",
+    dataPath: "/data/pendulum.json",
+    visualizations: [
+      { id: "pendulumMotionPhase", label: "Motion + Phase" },
+      { id: "pendulumHamiltonian", label: "Hamiltonian Flow" },
+    ],
+    readouts: (state, time) => [
+      { latex: "t", value: `${time.toFixed(2)} s` },
+      { latex: "\\theta", value: `${state[0].toFixed(3)} rad` },
+      { latex: "\\dot{\\theta}", value: `${state[1].toFixed(3)} rad/s` },
+      { latex: "H", value: `${pendulumEnergy(state[0], state[1]).toFixed(3)}` },
+    ],
+  },
+  {
+    id: "sphere-geodesic",
+    title: "Geodesic on a Sphere",
+    dataPath: "/data/sphere_geodesic.json",
+    visualizations: [{ id: "sphereGeodesic", label: "Great-Circle Flow" }],
+    readouts: (state, time) => [
+      { latex: "t", value: `${time.toFixed(2)} s` },
+      { latex: "\\theta", value: `${state[0].toFixed(3)} rad` },
+      { latex: "\\phi", value: `${state[1].toFixed(3)} rad` },
+      { latex: "|r|", value: `${Math.hypot(state[4], state[5], state[6]).toFixed(3)}` },
+    ],
+  },
+  {
+    id: "charged-particle",
+    title: "Electron in a Magnetic Field",
+    dataPath: "/data/charged_particle.json",
+    visualizations: [{ id: "chargedParticle", label: "Lorentz Orbit" }],
+    readouts: (state, time) => [
+      { latex: "t", value: `${time.toFixed(2)} s` },
+      { latex: "|v|", value: `${speed3(state, 3).toFixed(3)}` },
+      { latex: "z", value: `${state[2].toFixed(3)}` },
+      { latex: "B_z", value: "1.000" },
+    ],
+  },
+];
+
 const canvas = requireElement<HTMLCanvasElement>("#scene");
-const hamiltonianCanvas = requireElement<HTMLCanvasElement>("#hamiltonianScene");
+const threeCanvas = requireElement<HTMLCanvasElement>("#hamiltonianScene");
+const systemTitle = requireElement<HTMLElement>("#systemTitle");
+const systemSelect = requireElement<HTMLSelectElement>("#systemSelect");
+const visualizationModes = requireElement<HTMLElement>("#visualizationModes");
 const playButton = requireElement<HTMLButtonElement>("#playButton");
-const pendulumModeButton = requireElement<HTMLButtonElement>("#pendulumMode");
-const hamiltonianModeButton = requireElement<HTMLButtonElement>("#hamiltonianMode");
 const speedControl = requireElement<HTMLInputElement>("#speedControl");
-const timeValue = requireElement<HTMLElement>("#timeValue");
-const thetaValue = requireElement<HTMLElement>("#thetaValue");
-const omegaValue = requireElement<HTMLElement>("#omegaValue");
-const energyValue = requireElement<HTMLElement>("#energyValue");
+const readoutLabels = [
+  requireElement<HTMLElement>("#readoutLabel0"),
+  requireElement<HTMLElement>("#readoutLabel1"),
+  requireElement<HTMLElement>("#readoutLabel2"),
+  requireElement<HTMLElement>("#readoutLabel3"),
+];
+const readoutValues = [
+  requireElement<HTMLElement>("#readoutValue0"),
+  requireElement<HTMLElement>("#readoutValue1"),
+  requireElement<HTMLElement>("#readoutValue2"),
+  requireElement<HTMLElement>("#readoutValue3"),
+];
 
 const context = canvas.getContext("2d");
 if (!context) {
   throw new Error("Canvas 2D context is unavailable.");
 }
 const ctx: CanvasRenderingContext2D = context;
+const threeScene = new ThreeScene(threeCanvas);
 
+const dataCache = new Map<string, Trajectory>();
+let selectedExample = examples[0];
+let selectedVisualization = selectedExample.visualizations[0];
 let trajectory: Trajectory | null = null;
-let bounds: Bounds | null = null;
-let hamiltonianScene: HamiltonianScene | null = null;
+let pendulumBounds: Bounds | null = null;
 let playbackTime = 0;
 let lastFrameTime = performance.now();
 let playing = true;
-let viewMode: ViewMode = "pendulum";
 
 playButton.addEventListener("click", () => {
   playing = !playing;
   playButton.textContent = playing ? "Pause" : "Play";
 });
 
-pendulumModeButton.addEventListener("click", () => setViewMode("pendulum"));
-hamiltonianModeButton.addEventListener("click", () => setViewMode("hamiltonian"));
+systemSelect.addEventListener("change", () => {
+  void selectExample(systemSelect.value);
+});
 
-function setViewMode(mode: ViewMode) {
-  viewMode = mode;
-  const isPendulum = mode === "pendulum";
-  canvas.classList.toggle("stage__canvas--active", isPendulum);
-  hamiltonianCanvas.classList.toggle("stage__canvas--active", !isPendulum);
-  pendulumModeButton.classList.toggle("mode-switch__button--active", isPendulum);
-  hamiltonianModeButton.classList.toggle("mode-switch__button--active", !isPendulum);
-  hamiltonianScene?.setActive(!isPendulum);
-}
-
-function renderLatexLabels() {
-  document.querySelectorAll<HTMLElement>("[data-latex]").forEach((element) => {
-    katex.render(element.dataset.latex ?? "", element, {
-      throwOnError: false,
-      displayMode: false,
-    });
+function renderLatex(element: HTMLElement, latex: string) {
+  element.dataset.latex = latex;
+  katex.render(latex, element, {
+    throwOnError: false,
+    displayMode: false,
   });
 }
 
-function resizeCanvas() {
-  if (viewMode !== "pendulum") {
-    return;
-  }
-  const pixelRatio = window.devicePixelRatio || 1;
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
-  canvas.width = Math.max(1, Math.floor(width * pixelRatio));
-  canvas.height = Math.max(1, Math.floor(height * pixelRatio));
-  ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+function populateSystemSelect() {
+  examples.forEach((example) => {
+    const option = document.createElement("option");
+    option.value = example.id;
+    option.textContent = example.title;
+    systemSelect.append(option);
+  });
+  systemSelect.value = selectedExample.id;
 }
 
-window.addEventListener("resize", resizeCanvas);
+function renderVisualizationButtons() {
+  visualizationModes.replaceChildren();
+  selectedExample.visualizations.forEach((visualization) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "mode-switch__button";
+    button.textContent = visualization.label;
+    button.classList.toggle("mode-switch__button--active", visualization.id === selectedVisualization.id);
+    button.addEventListener("click", () => {
+      selectedVisualization = visualization;
+      applyVisualization();
+      renderVisualizationButtons();
+    });
+    visualizationModes.append(button);
+  });
+}
 
-async function loadTrajectory(): Promise<Trajectory> {
-  const response = await fetch("/data/pendulum.json");
+async function loadTrajectory(example: ExampleConfig): Promise<Trajectory> {
+  const cached = dataCache.get(example.id);
+  if (cached) {
+    return cached;
+  }
+
+  const response = await fetch(example.dataPath);
   if (!response.ok) {
-    throw new Error(`Unable to load pendulum data: ${response.status}`);
+    throw new Error(`Unable to load ${example.title}: ${response.status}`);
   }
-  return response.json();
+  const data = (await response.json()) as Trajectory;
+  dataCache.set(example.id, data);
+  return data;
 }
 
-function computeBounds(data: Trajectory): Bounds {
+function computePendulumBounds(data: Trajectory): Bounds {
   const theta = data.states.map((state) => state[0]);
   const omega = data.states.map((state) => state[1]);
   const thetaPad = Math.max(0.1, 0.08 * (Math.max(...theta) - Math.min(...theta)));
@@ -113,11 +196,7 @@ function computeBounds(data: Trajectory): Bounds {
   };
 }
 
-function energy(theta: number, omega: number): number {
-  return 0.5 * omega * omega + 9.81 * (1 - Math.cos(theta));
-}
-
-function sample(data: Trajectory, time: number): { theta: number; omega: number; index: number } {
+function sample(data: Trajectory, time: number): { state: number[]; index: number; wrappedTime: number } {
   const duration = data.time[data.time.length - 1] ?? 1;
   const wrapped = ((time % duration) + duration) % duration;
   let low = 0;
@@ -139,11 +218,61 @@ function sample(data: Trajectory, time: number): { theta: number; omega: number;
   const state1 = data.states[high] ?? state0;
 
   return {
-    theta: state0[0] + alpha * (state1[0] - state0[0]),
-    omega: state0[1] + alpha * (state1[1] - state0[1]),
+    state: state0.map((value, index) => value + alpha * ((state1[index] ?? value) - value)),
     index: low,
+    wrappedTime: wrapped,
   };
 }
+
+function setCanvasMode(mode: "2d" | "3d") {
+  const is2d = mode === "2d";
+  canvas.classList.toggle("stage__canvas--active", is2d);
+  threeCanvas.classList.toggle("stage__canvas--active", !is2d);
+  threeScene.setActive(!is2d);
+}
+
+function applyVisualization() {
+  if (!trajectory) {
+    return;
+  }
+
+  if (selectedVisualization.id === "pendulumMotionPhase") {
+    setCanvasMode("2d");
+  } else {
+    setCanvasMode("3d");
+    threeScene.setVisualization(selectedVisualization.id, trajectory);
+  }
+}
+
+async function selectExample(exampleId: string) {
+  const nextExample = examples.find((example) => example.id === exampleId) ?? examples[0];
+  selectedExample = nextExample;
+  selectedVisualization = nextExample.visualizations[0];
+  systemTitle.textContent = nextExample.title;
+  renderVisualizationButtons();
+  playbackTime = 0;
+
+  trajectory = await loadTrajectory(nextExample);
+  pendulumBounds = nextExample.id === "pendulum" ? computePendulumBounds(trajectory) : null;
+  applyVisualization();
+}
+
+function resize2dCanvas() {
+  if (selectedVisualization.id !== "pendulumMotionPhase") {
+    return;
+  }
+  const pixelRatio = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  canvas.width = Math.max(1, Math.floor(width * pixelRatio));
+  canvas.height = Math.max(1, Math.floor(height * pixelRatio));
+  ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+}
+
+window.addEventListener("resize", () => {
+  resize2dCanvas();
+  threeScene.resize();
+});
 
 function drawBackground(width: number, height: number) {
   const gradient = ctx.createLinearGradient(0, 0, width, height);
@@ -197,14 +326,7 @@ function drawPendulum(theta: number, width: number, height: number) {
   ctx.arc(centerX, centerY, 7, 0, Math.PI * 2);
   ctx.fill();
 
-  const bobGradient = ctx.createRadialGradient(
-    bobX - 8,
-    bobY - 10,
-    4,
-    bobX,
-    bobY,
-    24,
-  );
+  const bobGradient = ctx.createRadialGradient(bobX - 8, bobY - 10, 4, bobX, bobY, 24);
   bobGradient.addColorStop(0, "#f8d58b");
   bobGradient.addColorStop(0.55, "#d88d42");
   bobGradient.addColorStop(1, "#904f2d");
@@ -223,8 +345,8 @@ function drawPendulum(theta: number, width: number, height: number) {
   ctx.restore();
 }
 
-function drawPhasePortrait(data: Trajectory, currentIndex: number, sampleTheta: number, sampleOmega: number, area: DOMRect) {
-  if (!bounds) {
+function drawPhasePortrait(data: Trajectory, currentIndex: number, theta: number, omega: number, area: DOMRect) {
+  if (!pendulumBounds) {
     return;
   }
 
@@ -234,10 +356,10 @@ function drawPhasePortrait(data: Trajectory, currentIndex: number, sampleTheta: 
   const top = area.y + pad;
   const bottom = area.y + area.height - pad;
 
-  const mapX = (theta: number) =>
-    left + ((theta - bounds!.minTheta) / (bounds!.maxTheta - bounds!.minTheta)) * (right - left);
-  const mapY = (omega: number) =>
-    bottom - ((omega - bounds!.minOmega) / (bounds!.maxOmega - bounds!.minOmega)) * (bottom - top);
+  const mapX = (value: number) =>
+    left + ((value - pendulumBounds!.minTheta) / (pendulumBounds!.maxTheta - pendulumBounds!.minTheta)) * (right - left);
+  const mapY = (value: number) =>
+    bottom - ((value - pendulumBounds!.minOmega) / (pendulumBounds!.maxOmega - pendulumBounds!.minOmega)) * (bottom - top);
 
   ctx.save();
   ctx.strokeStyle = "rgba(23, 37, 45, 0.18)";
@@ -279,7 +401,7 @@ function drawPhasePortrait(data: Trajectory, currentIndex: number, sampleTheta: 
 
   ctx.fillStyle = "#17252d";
   ctx.beginPath();
-  ctx.arc(mapX(sampleTheta), mapY(sampleOmega), 6, 0, Math.PI * 2);
+  ctx.arc(mapX(theta), mapY(omega), 6, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = "rgba(23, 37, 45, 0.72)";
@@ -290,12 +412,14 @@ function drawPhasePortrait(data: Trajectory, currentIndex: number, sampleTheta: 
   ctx.restore();
 }
 
+function updateReadouts(state: number[], time: number) {
+  selectedExample.readouts(state, time).forEach((readout, index) => {
+    renderLatex(readoutLabels[index], readout.latex);
+    readoutValues[index].textContent = readout.value;
+  });
+}
+
 function render(now: number) {
-  if (viewMode === "pendulum") {
-    resizeCanvas();
-  }
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
   const dt = (now - lastFrameTime) / 1000;
   lastFrameTime = now;
 
@@ -304,53 +428,39 @@ function render(now: number) {
   }
 
   if (!trajectory) {
-    resizeCanvas();
-    drawBackground(width, height);
+    resize2dCanvas();
+    drawBackground(canvas.clientWidth, canvas.clientHeight);
     ctx.fillStyle = "#17252d";
     ctx.font = "16px Inter, system-ui, sans-serif";
-    ctx.fillText("Loading pendulum data...", 32, 48);
+    ctx.fillText("Loading example data...", 32, 48);
     requestAnimationFrame(render);
     return;
   }
 
   const current = sample(trajectory, playbackTime);
-  if (viewMode === "pendulum") {
+  if (selectedVisualization.id === "pendulumMotionPhase") {
+    resize2dCanvas();
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
     drawBackground(width, height);
-    drawPendulum(current.theta, width, height);
-
-    const phaseArea = new DOMRect(width * 0.53, height * 0.17, width * 0.39, height * 0.62);
-    drawPhasePortrait(trajectory, current.index, current.theta, current.omega, phaseArea);
+    drawPendulum(current.state[0], width, height);
+    drawPhasePortrait(
+      trajectory,
+      current.index,
+      current.state[0],
+      current.state[1],
+      new DOMRect(width * 0.53, height * 0.17, width * 0.39, height * 0.62),
+    );
   } else {
-    hamiltonianScene?.render({ theta: current.theta, momentum: current.omega }, playbackTime);
+    threeScene.render(current.state, playbackTime);
   }
 
-  timeValue.textContent = `${playbackTime.toFixed(2)} s`;
-  thetaValue.textContent = `${current.theta.toFixed(3)} rad`;
-  omegaValue.textContent = `${current.omega.toFixed(3)} rad/s`;
-  energyValue.textContent = `${energy(current.theta, current.omega).toFixed(3)}`;
-
+  updateReadouts(current.state, current.wrappedTime);
   requestAnimationFrame(render);
 }
 
-loadTrajectory()
-  .then((data) => {
-    trajectory = data;
-    bounds = computeBounds(data);
-    hamiltonianScene = new HamiltonianScene(
-      hamiltonianCanvas,
-      data.states.map((state) => ({
-        theta: state[0],
-        momentum: state[1],
-      })),
-    );
-    hamiltonianScene.setActive(viewMode === "hamiltonian");
-  })
-  .catch((error: unknown) => {
-    ctx.fillStyle = "#8b2f2f";
-    ctx.font = "16px Inter, system-ui, sans-serif";
-    ctx.fillText(error instanceof Error ? error.message : "Unable to load trajectory.", 32, 48);
-  });
-
-renderLatexLabels();
-resizeCanvas();
+populateSystemSelect();
+renderVisualizationButtons();
+void selectExample(selectedExample.id);
 requestAnimationFrame(render);
+

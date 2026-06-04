@@ -13,33 +13,33 @@
       </section>
       <aside class="panel" aria-label="Simulation controls">
         <div class="panel__header">
-          <p class="eyebrow">Lagrangian System</p>
-          <h1>Simple Pendulum</h1>
+          <p class="eyebrow">Selected System</p>
+          <h1 id="systemTitle">Simple Pendulum</h1>
         </div>
-        <div class="mode-switch" aria-label="Visualization mode">
-          <button id="pendulumMode" class="mode-switch__button mode-switch__button--active" type="button">
-            Pendulum
-          </button>
-          <button id="hamiltonianMode" class="mode-switch__button" type="button">
-            Hamiltonian
-          </button>
+        <label class="select-field">
+          <span>system</span>
+          <select id="systemSelect"></select>
+        </label>
+        <div>
+          <p class="control-label">visualization</p>
+          <div id="visualizationModes" class="mode-switch" aria-label="Visualization mode"></div>
         </div>
         <dl class="readout">
           <div>
-            <dt><span data-latex="t"></span></dt>
-            <dd id="timeValue">0.00 s</dd>
+            <dt><span id="readoutLabel0" data-latex="t"></span></dt>
+            <dd id="readoutValue0">0.00 s</dd>
           </div>
           <div>
-            <dt><span data-latex="\theta"></span></dt>
-            <dd id="thetaValue">0.000 rad</dd>
+            <dt><span id="readoutLabel1" data-latex="\theta"></span></dt>
+            <dd id="readoutValue1">0.000 rad</dd>
           </div>
           <div>
-            <dt><span data-latex="\dot{\theta}"></span></dt>
-            <dd id="omegaValue">0.000 rad/s</dd>
+            <dt><span id="readoutLabel2" data-latex="\dot{\theta}"></span></dt>
+            <dd id="readoutValue2">0.000 rad/s</dd>
           </div>
           <div>
-            <dt><span data-latex="H"></span></dt>
-            <dd id="energyValue">0.000</dd>
+            <dt><span id="readoutLabel3" data-latex="H"></span></dt>
+            <dd id="readoutValue3">0.000</dd>
           </div>
         </dl>
         <div class="controls">

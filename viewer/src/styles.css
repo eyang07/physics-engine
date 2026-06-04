@@ -17,7 +17,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -89,9 +90,41 @@ h1 {
   margin: 0;
 }
 
+.select-field {
+  display: grid;
+  gap: 8px;
+  color: rgba(23, 37, 45, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(23, 37, 45, 0.16);
+  border-radius: 6px;
+  color: #17252d;
+  background: rgba(255, 255, 255, 0.86);
+  font-size: 14px;
+  font-weight: 650;
+  text-transform: none;
+}
+
+.control-label {
+  margin: 0 0 8px;
+  color: rgba(23, 37, 45, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
 .mode-switch {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
   border: 1px solid rgba(23, 37, 45, 0.12);
@@ -106,6 +139,8 @@ h1 {
   background: transparent;
   font-size: 13px;
   font-weight: 700;
+  line-height: 1.15;
+  padding: 0 8px;
 }
 
 .mode-switch__button:hover {
