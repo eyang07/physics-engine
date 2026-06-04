@@ -1,0 +1,2 @@
+"""Analytical mechanics engine."""
+

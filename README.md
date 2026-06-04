@@ -21,8 +21,53 @@ Topics I expect to touch as I go:
   doubles as a study aid.
 - Prioritize clarity and mathematical fidelity over performance, at least
   early on.
-- Eventually use the engine to produce graphics and animations — vector
-  fields, fluid dynamics, and other visualizations of the dynamics.
+- Describe motion in concise mathematical files, then turn those descriptions
+  into beautiful interactive animations.
+- Use the engine to explore vector fields, black-hole geodesics, fluid flows,
+  and other visualizations of dynamics.
+
+## Architecture
+
+The project is split into two layers:
+
+- **Python math engine** — defines mechanical systems, derives or states their
+  equations of motion, integrates trajectories and fields, and exports
+  simulation data.
+- **TypeScript visualization layer** — loads exported simulation data and
+  renders interactive graphics in the browser.
+
+The boundary between the layers should stay simple: Python produces structured
+state over time; TypeScript turns that state into visuals.
+
+The mechanics layer uses a small amount of differential-geometric vocabulary,
+kept concrete and chart-based:
+
+- Lagrangian systems live on a tangent bundle chart `TQ` with coordinates
+  `(q, qdot)`.
+- Hamiltonian systems live on a cotangent bundle chart `T*Q` with coordinates
+  `(q, p)`.
+- The Legendre transform maps regular Lagrangian systems from `TQ` to `T*Q` by
+  `p_i = partial L / partial qdot_i`.
+- Coordinate changes should expose both tangent pushforwards and cotangent
+  pullbacks so generalized velocities and momenta transform correctly.
+
+For small examples, JSON is fine. For larger simulations such as fluids or
+black-hole visualizations, the project may later use binary or chunked formats
+such as `.npz`, HDF5, Zarr, Arrow, or custom buffers.
+
+## Rough Shape
+
+A likely starting structure:
+
+- `engine/` — Python package for mechanics, numerical methods, and export
+  helpers.
+  - `engine/mechanics/` — Lagrangian systems, Hamiltonian systems, coordinate
+    charts, bundle charts, transforms, constraints, and symmetries.
+- `systems/` — concise mathematical descriptions of systems such as
+  oscillators, pendulums, geodesics, and fluids.
+- `viewer/` — TypeScript browser app for interactive rendering.
+- `data/generated/` — exported trajectories, vector fields, grids, and other
+  generated simulation artifacts.
 
 ## Non-goals (for now)
 
@@ -32,5 +77,5 @@ Topics I expect to touch as I go:
 ## Status
 
 Early and exploratory. Direction and scope will shift as my understanding
-does. The choice of programming language is not fixed yet; the priority is a
-language that lets the math read clearly before one that's fast.
+does. The current direction is Python for the mathematical core and TypeScript
+for the browser-based visualization layer.

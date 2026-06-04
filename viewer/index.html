@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Analytical Mechanics Viewer</title>
+  </head>
+  <body>
+    <main id="app">
+      <section class="stage" aria-label="Pendulum visualization">
+        <canvas id="scene"></canvas>
+      </section>
+      <aside class="panel" aria-label="Simulation controls">
+        <div class="panel__header">
+          <p class="eyebrow">Lagrangian System</p>
+          <h1>Simple Pendulum</h1>
+        </div>
+        <dl class="readout">
+          <div>
+            <dt><span data-latex="t"></span></dt>
+            <dd id="timeValue">0.00 s</dd>
+          </div>
+          <div>
+            <dt><span data-latex="\theta"></span></dt>
+            <dd id="thetaValue">0.000 rad</dd>
+          </div>
+          <div>
+            <dt><span data-latex="\dot{\theta}"></span></dt>
+            <dd id="omegaValue">0.000 rad/s</dd>
+          </div>
+        </dl>
+        <div class="controls">
+          <button id="playButton" type="button">Pause</button>
+          <label>
+            <span>speed</span>
+            <input id="speedControl" type="range" min="0.2" max="3" step="0.1" value="1" />
+          </label>
+        </div>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
