@@ -80,6 +80,9 @@ Current examples include:
 - simple pendulum
 - geodesics on a sphere
 - charged particle in a uniform magnetic field
+- uniform gravitational field
+- ideal spring
+- Kepler problem
 
 ## Non-goals (for now)
 

@@ -48,6 +48,14 @@ for (const viewport of [
   test(`renders all example systems at ${viewport.name}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto("/");
+    await page.waitForSelector("#homeView:not(.view-hidden)");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-home.png`) });
+
+    await page.getByRole("button", { name: "Enter simulations" }).click();
+    await page.waitForSelector("#selectionView:not(.view-hidden)");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-gallery.png`) });
+
+    await page.getByRole("button", { name: /Simple Pendulum/ }).click();
     await page.waitForSelector("#scene.stage__canvas--active");
     await page.waitForTimeout(500);
 
@@ -74,5 +82,20 @@ for (const viewport of [
 
     await expectCanvasNonBlank(page, "#hamiltonianScene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-charged-particle.png`) });
+
+    await page.locator("#systemSelect").selectOption("uniform-gravity");
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-uniform-gravity.png`) });
+
+    await page.locator("#systemSelect").selectOption("ideal-spring");
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-ideal-spring.png`) });
+
+    await page.locator("#systemSelect").selectOption("kepler");
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-kepler.png`) });
   });
 }

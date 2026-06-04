@@ -43,7 +43,8 @@ the mathematics concrete and inspectable before it tries to be fast or general.
 
 ## Frontend TODO
 
-The frontend now separates physical systems from visualization modes.
+The frontend now has a home screen, a system-selection gallery, and a
+simulation workspace. It separates physical systems from visualization modes.
 
 Current model:
 
@@ -62,9 +63,9 @@ Longer-term frontend direction:
 
 - Let the user select from many physics examples. Current examples include the
   simple pendulum, geodesics on a sphere, and a charged particle in a uniform
-  magnetic field.
-- Add more examples such as harmonic oscillator, central-force motion,
-  relativistic geodesics, and fluid flows.
+  magnetic field, uniform gravitational field, ideal spring, and Kepler
+  problem.
+- Add more examples such as relativistic geodesics and fluid flows.
 - Let the user tune physical parameters and initial conditions.
 - Let the user choose visualization modes such as physical motion, phase space,
   Hamiltonian flow, conserved quantities, vector fields, and energy surfaces.

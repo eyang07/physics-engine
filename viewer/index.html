@@ -6,6 +6,26 @@
     <title>Analytical Mechanics Viewer</title>
   </head>
   <body>
+    <section id="homeView" class="home-view" aria-label="Physics engine home">
+      <canvas id="homeCanvas" class="home-view__canvas"></canvas>
+      <div class="home-view__content">
+        <p class="eyebrow">Analytical Mechanics Engine</p>
+        <h1>Physics as motion, geometry, and conserved structure.</h1>
+        <p class="home-view__copy">
+          Explore Lagrangian systems, Hamiltonian flow, geodesics, fields, and orbital motion through interactive visualizations.
+        </p>
+        <button id="enterSimulations" class="home-view__button" type="button">Enter simulations</button>
+      </div>
+    </section>
+    <section id="selectionView" class="selection-view view-hidden" aria-label="Select a physics system">
+      <div class="selection-view__inner">
+        <div class="selection-view__header">
+          <p class="eyebrow">Simulation Gallery</p>
+          <h1>Choose a system</h1>
+        </div>
+        <div id="systemGallery" class="system-gallery"></div>
+      </div>
+    </section>
     <main id="app">
       <section class="stage" aria-label="Mechanics visualization">
         <canvas id="scene" class="stage__canvas stage__canvas--active"></canvas>
@@ -13,6 +33,7 @@
       </section>
       <aside class="panel" aria-label="Simulation controls">
         <div class="panel__header">
+          <button id="backToSystems" class="panel__back" type="button">Systems</button>
           <p class="eyebrow">Selected System</p>
           <h1 id="systemTitle">Simple Pendulum</h1>
         </div>

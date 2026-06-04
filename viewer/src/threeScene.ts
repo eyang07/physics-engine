@@ -8,7 +8,13 @@ export type Trajectory = {
   metadata?: Record<string, unknown>;
 };
 
-export type ThreeMode = "pendulumHamiltonian" | "sphereGeodesic" | "chargedParticle";
+export type ThreeMode =
+  | "pendulumHamiltonian"
+  | "sphereGeodesic"
+  | "chargedParticle"
+  | "uniformGravity"
+  | "idealSpring"
+  | "keplerOrbit";
 
 const PENDULUM_GRAVITY = 9.81;
 
@@ -250,6 +256,83 @@ function makeChargedParticleGroup(data: Trajectory): THREE.Group {
   return group;
 }
 
+function makeUniformGravityGroup(data: Trajectory): THREE.Group {
+  const group = new THREE.Group();
+  const points = data.states.map((state) => new THREE.Vector3(state[0] - 0.9, state[1] * 0.42 - 0.65, 0));
+  group.add(lineFromPoints(points, 0xd88d42));
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.6, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0xdbe8f0, transparent: true, opacity: 0.45, side: THREE.DoubleSide }),
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.set(0.35, -0.72, 0);
+  group.add(ground);
+
+  const arrowMaterial = new THREE.LineBasicMaterial({ color: 0x3a7c7d, transparent: true, opacity: 0.48 });
+  const coneMaterial = new THREE.MeshBasicMaterial({ color: 0x3a7c7d, transparent: true, opacity: 0.6 });
+  for (let x = -1.2; x <= 1.8; x += 0.5) {
+    const start = new THREE.Vector3(x, 1.05, -0.72);
+    const end = new THREE.Vector3(x, 0.45, -0.72);
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([start, end]), arrowMaterial));
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.12, 10), coneMaterial);
+    cone.position.copy(end);
+    cone.rotation.x = Math.PI;
+    group.add(cone);
+  }
+
+  const label = makeLabel("g");
+  label.position.set(1.95, 0.9, -0.72);
+  group.add(label);
+  return group;
+}
+
+function makeIdealSpringGroup(data: Trajectory): THREE.Group {
+  const group = new THREE.Group();
+  const xValues = data.states.map((state) => state[0]);
+  const pointTrace = xValues.map((x, index) => new THREE.Vector3(x, Math.sin(index * 0.035) * 0.06, 0));
+  group.add(lineFromPoints(pointTrace, 0xd88d42, 0.55));
+
+  const wall = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 1.2, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0x2d4d5d, roughness: 0.7 }),
+  );
+  wall.position.set(-1.35, 0, 0);
+  group.add(wall);
+
+  const rail = lineFromPoints([new THREE.Vector3(-1.35, -0.36, 0), new THREE.Vector3(1.35, -0.36, 0)], 0x17252d, 0.22);
+  group.add(rail);
+
+  const equilibrium = lineFromPoints([new THREE.Vector3(0, -0.52, 0), new THREE.Vector3(0, 0.52, 0)], 0x3a7c7d, 0.32);
+  group.add(equilibrium);
+  return group;
+}
+
+function makeKeplerGroup(data: Trajectory): THREE.Group {
+  const group = new THREE.Group();
+  const points = data.states.map((state) => new THREE.Vector3(state[4], 0, state[5]));
+  group.add(lineFromPoints(points, 0xd88d42));
+
+  const focus = new THREE.Mesh(
+    new THREE.SphereGeometry(0.11, 28, 18),
+    new THREE.MeshStandardMaterial({ color: 0xf0b44c, emissive: 0x8b4a16, emissiveIntensity: 0.22, roughness: 0.35 }),
+  );
+  focus.position.set(0, 0, 0);
+  group.add(focus);
+
+  const plane = new THREE.Mesh(
+    new THREE.CircleGeometry(1.75, 72),
+    new THREE.MeshBasicMaterial({ color: 0xdbe8f0, transparent: true, opacity: 0.25, side: THREE.DoubleSide }),
+  );
+  plane.rotation.x = -Math.PI / 2;
+  group.add(plane);
+
+  const label = makeLabel("μ");
+  label.position.set(0.24, 0.32, 0.16);
+  group.add(label);
+  return group;
+}
+
 export class ThreeScene {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
@@ -257,6 +340,7 @@ export class ThreeScene {
   private readonly controls: OrbitControls;
   private readonly root = new THREE.Group();
   private readonly marker: THREE.Mesh;
+  private dynamicSpring: THREE.Line | null = null;
   private active = false;
   private mode: ThreeMode | null = null;
 
@@ -309,6 +393,7 @@ export class ThreeScene {
   setVisualization(mode: ThreeMode, data: Trajectory) {
     this.mode = mode;
     this.root.clear();
+    this.dynamicSpring = null;
 
     if (mode === "pendulumHamiltonian") {
       this.root.add(makePendulumHamiltonianGroup(data));
@@ -318,9 +403,23 @@ export class ThreeScene {
       this.root.add(makeSphereGeodesicGroup(data));
       this.camera.position.set(2.5, 1.6, 3.2);
       this.controls.target.set(0, 0, 0);
-    } else {
+    } else if (mode === "chargedParticle") {
       this.root.add(makeChargedParticleGroup(data));
       this.camera.position.set(3.4, 2.15, 3.5);
+      this.controls.target.set(0, 0, 0);
+    } else if (mode === "uniformGravity") {
+      this.root.add(makeUniformGravityGroup(data));
+      this.camera.position.set(2.7, 1.8, 3.2);
+      this.controls.target.set(0.25, 0.1, 0);
+    } else if (mode === "idealSpring") {
+      this.root.add(makeIdealSpringGroup(data));
+      this.dynamicSpring = lineFromPoints([], 0x3a7c7d, 0.82);
+      this.root.add(this.dynamicSpring);
+      this.camera.position.set(2.3, 1.25, 2.8);
+      this.controls.target.set(0, 0, 0);
+    } else {
+      this.root.add(makeKeplerGroup(data));
+      this.camera.position.set(2.4, 1.7, 2.8);
       this.controls.target.set(0, 0, 0);
     }
 
@@ -354,13 +453,34 @@ export class ThreeScene {
     } else if (this.mode === "sphereGeodesic") {
       this.marker.position.set(state[4], state[5], state[6]);
       this.root.rotation.y = Math.sin(elapsed * 0.12) * 0.12;
-    } else {
+    } else if (this.mode === "chargedParticle") {
       this.marker.position.set(state[0], state[2] * 0.62, state[1]);
       this.root.rotation.y = Math.sin(elapsed * 0.1) * 0.08;
+    } else if (this.mode === "uniformGravity") {
+      this.marker.position.set(state[0] - 0.9, state[1] * 0.42 - 0.65, 0);
+      this.root.rotation.y = Math.sin(elapsed * 0.1) * 0.08;
+    } else if (this.mode === "idealSpring") {
+      const x = state[0];
+      this.marker.position.set(x, 0, 0);
+      if (this.dynamicSpring) {
+        const left = -1.29;
+        const points: THREE.Vector3[] = [];
+        for (let i = 0; i <= 42; i += 1) {
+          const alpha = i / 42;
+          const sx = left + (x - left) * alpha;
+          const sy = Math.sin(alpha * Math.PI * 16) * 0.12;
+          points.push(new THREE.Vector3(sx, sy, 0));
+        }
+        this.dynamicSpring.geometry.dispose();
+        this.dynamicSpring.geometry = new THREE.BufferGeometry().setFromPoints(points);
+      }
+      this.root.rotation.y = Math.sin(elapsed * 0.08) * 0.06;
+    } else {
+      this.marker.position.set(state[4], 0, state[5]);
+      this.root.rotation.y = Math.sin(elapsed * 0.08) * 0.08;
     }
 
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   }
 }
-

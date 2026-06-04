@@ -18,6 +18,8 @@ type Readout = {
 type ExampleConfig = {
   id: string;
   title: string;
+  description: string;
+  category: string;
   dataPath: string;
   visualizations: Visualization[];
   readouts: (state: number[], time: number) => Readout[];
@@ -50,6 +52,8 @@ const examples: ExampleConfig[] = [
   {
     id: "pendulum",
     title: "Simple Pendulum",
+    description: "A nonlinear oscillator viewed as physical motion, phase portrait, or Hamiltonian flow.",
+    category: "Analytical Mechanics",
     dataPath: "/data/pendulum.json",
     visualizations: [
       { id: "pendulumMotionPhase", label: "Motion + Phase" },
@@ -65,6 +69,8 @@ const examples: ExampleConfig[] = [
   {
     id: "sphere-geodesic",
     title: "Geodesic on a Sphere",
+    description: "Free motion on a curved configuration space; the path becomes a great circle.",
+    category: "Differential Geometry",
     dataPath: "/data/sphere_geodesic.json",
     visualizations: [{ id: "sphereGeodesic", label: "Great-Circle Flow" }],
     readouts: (state, time) => [
@@ -77,6 +83,8 @@ const examples: ExampleConfig[] = [
   {
     id: "charged-particle",
     title: "Electron in a Magnetic Field",
+    description: "Lorentz-force motion from a velocity-dependent electromagnetic Lagrangian.",
+    category: "Fields",
     dataPath: "/data/charged_particle.json",
     visualizations: [{ id: "chargedParticle", label: "Lorentz Orbit" }],
     readouts: (state, time) => [
@@ -86,8 +94,57 @@ const examples: ExampleConfig[] = [
       { latex: "B_z", value: "1.000" },
     ],
   },
+  {
+    id: "uniform-gravity",
+    title: "Uniform Gravitational Field",
+    description: "Projectile motion from a constant gravitational potential.",
+    category: "Classical Motion",
+    dataPath: "/data/uniform_gravity.json",
+    visualizations: [{ id: "uniformGravity", label: "Projectile Path" }],
+    readouts: (state, time) => [
+      { latex: "t", value: `${time.toFixed(2)} s` },
+      { latex: "x", value: `${state[0].toFixed(3)}` },
+      { latex: "z", value: `${state[1].toFixed(3)}` },
+      { latex: "\\dot{z}", value: `${state[3].toFixed(3)}` },
+    ],
+  },
+  {
+    id: "ideal-spring",
+    title: "Ideal Spring",
+    description: "A mass-spring oscillator with conserved quadratic energy.",
+    category: "Oscillators",
+    dataPath: "/data/ideal_spring.json",
+    visualizations: [{ id: "idealSpring", label: "Spring Motion" }],
+    readouts: (state, time) => [
+      { latex: "t", value: `${time.toFixed(2)} s` },
+      { latex: "x", value: `${state[0].toFixed(3)}` },
+      { latex: "\\dot{x}", value: `${state[1].toFixed(3)}` },
+      { latex: "E", value: `${(0.5 * state[1] ** 2 + 0.5 * state[0] ** 2).toFixed(3)}` },
+    ],
+  },
+  {
+    id: "kepler",
+    title: "Kepler Problem",
+    description: "Planar inverse-square central-force motion with conserved angular momentum.",
+    category: "Orbital Mechanics",
+    dataPath: "/data/kepler_problem.json",
+    visualizations: [{ id: "keplerOrbit", label: "Orbital Flow" }],
+    readouts: (state, time) => [
+      { latex: "t", value: `${time.toFixed(2)} s` },
+      { latex: "r", value: `${state[0].toFixed(3)}` },
+      { latex: "\\phi", value: `${state[1].toFixed(3)} rad` },
+      { latex: "\\ell", value: `${(state[0] ** 2 * state[3]).toFixed(3)}` },
+    ],
+  },
 ];
 
+const homeView = requireElement<HTMLElement>("#homeView");
+const selectionView = requireElement<HTMLElement>("#selectionView");
+const app = requireElement<HTMLElement>("#app");
+const homeCanvas = requireElement<HTMLCanvasElement>("#homeCanvas");
+const enterSimulations = requireElement<HTMLButtonElement>("#enterSimulations");
+const backToSystems = requireElement<HTMLButtonElement>("#backToSystems");
+const systemGallery = requireElement<HTMLElement>("#systemGallery");
 const canvas = requireElement<HTMLCanvasElement>("#scene");
 const threeCanvas = requireElement<HTMLCanvasElement>("#hamiltonianScene");
 const systemTitle = requireElement<HTMLElement>("#systemTitle");
@@ -113,9 +170,15 @@ if (!context) {
   throw new Error("Canvas 2D context is unavailable.");
 }
 const ctx: CanvasRenderingContext2D = context;
+const homeContext = homeCanvas.getContext("2d");
+if (!homeContext) {
+  throw new Error("Home canvas 2D context is unavailable.");
+}
+const homeCtx: CanvasRenderingContext2D = homeContext;
 const threeScene = new ThreeScene(threeCanvas);
 
 const dataCache = new Map<string, Trajectory>();
+let activeView: "home" | "selection" | "simulation" = "home";
 let selectedExample = examples[0];
 let selectedVisualization = selectedExample.visualizations[0];
 let trajectory: Trajectory | null = null;
@@ -127,6 +190,14 @@ let playing = true;
 playButton.addEventListener("click", () => {
   playing = !playing;
   playButton.textContent = playing ? "Pause" : "Play";
+});
+
+enterSimulations.addEventListener("click", () => {
+  showSelection();
+});
+
+backToSystems.addEventListener("click", () => {
+  showSelection();
 });
 
 systemSelect.addEventListener("change", () => {
@@ -142,6 +213,7 @@ function renderLatex(element: HTMLElement, latex: string) {
 }
 
 function populateSystemSelect() {
+  systemSelect.replaceChildren();
   examples.forEach((example) => {
     const option = document.createElement("option");
     option.value = example.id;
@@ -149,6 +221,25 @@ function populateSystemSelect() {
     systemSelect.append(option);
   });
   systemSelect.value = selectedExample.id;
+}
+
+function renderSystemGallery() {
+  systemGallery.replaceChildren();
+  examples.forEach((example) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "system-card";
+    button.innerHTML = `
+      <span class="system-card__category">${example.category}</span>
+      <strong>${example.title}</strong>
+      <span>${example.description}</span>
+    `;
+    button.addEventListener("click", () => {
+      showSimulation();
+      void selectExample(example.id);
+    });
+    systemGallery.append(button);
+  });
 }
 
 function renderVisualizationButtons() {
@@ -231,6 +322,22 @@ function setCanvasMode(mode: "2d" | "3d") {
   threeScene.setActive(!is2d);
 }
 
+function setView(view: "home" | "selection" | "simulation") {
+  activeView = view;
+  homeView.classList.toggle("view-hidden", view !== "home");
+  selectionView.classList.toggle("view-hidden", view !== "selection");
+  app.classList.toggle("view-hidden", view !== "simulation");
+  threeScene.setActive(view === "simulation" && selectedVisualization.id !== "pendulumMotionPhase");
+}
+
+function showSelection() {
+  setView("selection");
+}
+
+function showSimulation() {
+  setView("simulation");
+}
+
 function applyVisualization() {
   if (!trajectory) {
     return;
@@ -249,12 +356,22 @@ async function selectExample(exampleId: string) {
   selectedExample = nextExample;
   selectedVisualization = nextExample.visualizations[0];
   systemTitle.textContent = nextExample.title;
+  systemSelect.value = nextExample.id;
   renderVisualizationButtons();
   playbackTime = 0;
 
   trajectory = await loadTrajectory(nextExample);
   pendulumBounds = nextExample.id === "pendulum" ? computePendulumBounds(trajectory) : null;
   applyVisualization();
+}
+
+function resizeHomeCanvas() {
+  const pixelRatio = window.devicePixelRatio || 1;
+  const width = homeCanvas.clientWidth;
+  const height = homeCanvas.clientHeight;
+  homeCanvas.width = Math.max(1, Math.floor(width * pixelRatio));
+  homeCanvas.height = Math.max(1, Math.floor(height * pixelRatio));
+  homeCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
 }
 
 function resize2dCanvas() {
@@ -270,9 +387,58 @@ function resize2dCanvas() {
 }
 
 window.addEventListener("resize", () => {
+  resizeHomeCanvas();
   resize2dCanvas();
   threeScene.resize();
 });
+
+function drawHomeBackground(now: number) {
+  resizeHomeCanvas();
+  const width = homeCanvas.clientWidth;
+  const height = homeCanvas.clientHeight;
+  const t = now * 0.001;
+
+  const gradient = homeCtx.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, "#f8faf7");
+  gradient.addColorStop(0.5, "#dfeef1");
+  gradient.addColorStop(1, "#f5ebd9");
+  homeCtx.fillStyle = gradient;
+  homeCtx.fillRect(0, 0, width, height);
+
+  homeCtx.save();
+  homeCtx.translate(width * 0.58, height * 0.5);
+  homeCtx.strokeStyle = "rgba(58, 124, 125, 0.32)";
+  homeCtx.lineWidth = 1.5;
+  for (let orbit = 0; orbit < 7; orbit += 1) {
+    const radiusX = 80 + orbit * 46;
+    const radiusY = 26 + orbit * 17;
+    homeCtx.beginPath();
+    for (let i = 0; i <= 180; i += 1) {
+      const a = (i / 180) * Math.PI * 2 + t * (0.08 + orbit * 0.01);
+      const x = Math.cos(a) * radiusX;
+      const y = Math.sin(a) * radiusY + Math.sin(a * 2 + t) * 9;
+      if (i === 0) {
+        homeCtx.moveTo(x, y);
+      } else {
+        homeCtx.lineTo(x, y);
+      }
+    }
+    homeCtx.stroke();
+  }
+
+  homeCtx.fillStyle = "#17252d";
+  for (let i = 0; i < 18; i += 1) {
+    const a = t * 0.45 + i * 0.9;
+    const x = Math.cos(a) * (100 + (i % 5) * 54);
+    const y = Math.sin(a * 1.3) * (40 + (i % 4) * 32);
+    homeCtx.globalAlpha = 0.14 + (i % 4) * 0.04;
+    homeCtx.beginPath();
+    homeCtx.arc(x, y, 3 + (i % 3), 0, Math.PI * 2);
+    homeCtx.fill();
+  }
+  homeCtx.restore();
+  homeCtx.globalAlpha = 1;
+}
 
 function drawBackground(width: number, height: number) {
   const gradient = ctx.createLinearGradient(0, 0, width, height);
@@ -427,6 +593,17 @@ function render(now: number) {
     playbackTime += dt * Number(speedControl.value);
   }
 
+  if (activeView === "home") {
+    drawHomeBackground(now);
+    requestAnimationFrame(render);
+    return;
+  }
+
+  if (activeView !== "simulation") {
+    requestAnimationFrame(render);
+    return;
+  }
+
   if (!trajectory) {
     resize2dCanvas();
     drawBackground(canvas.clientWidth, canvas.clientHeight);
@@ -460,7 +637,7 @@ function render(now: number) {
 }
 
 populateSystemSelect();
+renderSystemGallery();
 renderVisualizationButtons();
-void selectExample(selectedExample.id);
+setView("home");
 requestAnimationFrame(render);
-
