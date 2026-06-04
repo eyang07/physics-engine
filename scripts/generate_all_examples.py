@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from engine.export.manifest import write_manifest
+from scripts.example_specs import SPECS
 from scripts.generate_charged_particle import write_charged_particle_trajectory
 from scripts.generate_ideal_spring import write_ideal_spring_trajectory
 from scripts.generate_kepler_problem import write_kepler_trajectory
@@ -35,7 +37,12 @@ def main() -> None:
         Path("data/generated/kepler_problem.json"),
         viewer_output=Path("viewer/public/data/kepler_problem.json"),
     )
-    print("Wrote all example trajectories.")
+    write_manifest(
+        SPECS,
+        Path("data/generated/manifest.json"),
+        Path("viewer/public/data/manifest.json"),
+    )
+    print("Wrote all example trajectories and the manifest.")
 
 
 if __name__ == "__main__":
