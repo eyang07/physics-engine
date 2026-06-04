@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { theme } from "./design/theme";
 
 export type Trajectory = {
   time: number[];
@@ -28,7 +29,7 @@ function makeLabel(text: string): THREE.Sprite {
   }
 
   context.font = "600 42px Inter, system-ui, sans-serif";
-  context.fillStyle = "rgba(23, 37, 45, 0.82)";
+  context.fillStyle = theme.textPrimary;
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillText(text, canvas.width / 2, canvas.height / 2);
@@ -46,7 +47,11 @@ function makeLabel(text: string): THREE.Sprite {
   return sprite;
 }
 
-function lineFromPoints(points: THREE.Vector3[], color: number, opacity = 1): THREE.Line {
+function lineFromPoints(
+  points: THREE.Vector3[],
+  color: THREE.ColorRepresentation,
+  opacity = 1,
+): THREE.Line {
   return new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(points),
     new THREE.LineBasicMaterial({
@@ -125,14 +130,14 @@ function makePendulumSurface(): THREE.Mesh {
 function makePendulumFlowField(): THREE.Group {
   const group = new THREE.Group();
   const material = new THREE.LineBasicMaterial({
-    color: 0x17252d,
+    color: new THREE.Color(theme.textMuted),
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.5,
   });
   const coneMaterial = new THREE.MeshBasicMaterial({
-    color: 0x17252d,
+    color: new THREE.Color(theme.textMuted),
     transparent: true,
-    opacity: 0.48,
+    opacity: 0.55,
   });
 
   for (let theta = -2.6; theta <= 2.61; theta += 0.65) {
@@ -167,7 +172,7 @@ function makePendulumHamiltonianGroup(data: Trajectory): THREE.Group {
   group.add(
     lineFromPoints(
       data.states.map((state) => pendulumPoint(state[0], state[1], 0.08)),
-      0xd88d42,
+      new THREE.Color(theme.accent),
     ),
   );
 
@@ -203,10 +208,10 @@ function makeSphereGeodesicGroup(data: Trajectory): THREE.Group {
   const wire = new THREE.Mesh(
     new THREE.SphereGeometry(1.003, 32, 16),
     new THREE.MeshBasicMaterial({
-      color: 0x2d4d5d,
+      color: new THREE.Color(theme.textFaint),
       wireframe: true,
       transparent: true,
-      opacity: 0.14,
+      opacity: 0.16,
     }),
   );
   group.add(wire);
@@ -214,7 +219,7 @@ function makeSphereGeodesicGroup(data: Trajectory): THREE.Group {
   group.add(
     lineFromPoints(
       data.states.map((state) => new THREE.Vector3(state[4], state[5], state[6])),
-      0xd88d42,
+      new THREE.Color(theme.accent),
     ),
   );
 
@@ -227,15 +232,15 @@ function makeSphereGeodesicGroup(data: Trajectory): THREE.Group {
 function makeChargedParticleGroup(data: Trajectory): THREE.Group {
   const group = new THREE.Group();
   const points = data.states.map((state) => new THREE.Vector3(state[0], state[2] * 0.62, state[1]));
-  group.add(lineFromPoints(points, 0xd88d42));
+  group.add(lineFromPoints(points, new THREE.Color(theme.accent)));
 
   const fieldMaterial = new THREE.LineBasicMaterial({
-    color: 0x3a7c7d,
+    color: new THREE.Color(theme.cool),
     transparent: true,
     opacity: 0.35,
   });
   const coneMaterial = new THREE.MeshBasicMaterial({
-    color: 0x3a7c7d,
+    color: new THREE.Color(theme.cool),
     transparent: true,
     opacity: 0.52,
   });
@@ -259,7 +264,7 @@ function makeChargedParticleGroup(data: Trajectory): THREE.Group {
 function makeUniformGravityGroup(data: Trajectory): THREE.Group {
   const group = new THREE.Group();
   const points = data.states.map((state) => new THREE.Vector3(state[0] - 0.9, state[1] * 0.42 - 0.65, 0));
-  group.add(lineFromPoints(points, 0xd88d42));
+  group.add(lineFromPoints(points, new THREE.Color(theme.accent)));
 
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(3.6, 1.2),
@@ -269,8 +274,8 @@ function makeUniformGravityGroup(data: Trajectory): THREE.Group {
   ground.position.set(0.35, -0.72, 0);
   group.add(ground);
 
-  const arrowMaterial = new THREE.LineBasicMaterial({ color: 0x3a7c7d, transparent: true, opacity: 0.48 });
-  const coneMaterial = new THREE.MeshBasicMaterial({ color: 0x3a7c7d, transparent: true, opacity: 0.6 });
+  const arrowMaterial = new THREE.LineBasicMaterial({ color: new THREE.Color(theme.cool), transparent: true, opacity: 0.48 });
+  const coneMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.cool), transparent: true, opacity: 0.6 });
   for (let x = -1.2; x <= 1.8; x += 0.5) {
     const start = new THREE.Vector3(x, 1.05, -0.72);
     const end = new THREE.Vector3(x, 0.45, -0.72);
@@ -291,19 +296,23 @@ function makeIdealSpringGroup(data: Trajectory): THREE.Group {
   const group = new THREE.Group();
   const xValues = data.states.map((state) => state[0]);
   const pointTrace = xValues.map((x, index) => new THREE.Vector3(x, Math.sin(index * 0.035) * 0.06, 0));
-  group.add(lineFromPoints(pointTrace, 0xd88d42, 0.55));
+  group.add(lineFromPoints(pointTrace, new THREE.Color(theme.accent), 0.55));
 
   const wall = new THREE.Mesh(
     new THREE.BoxGeometry(0.12, 1.2, 0.12),
-    new THREE.MeshStandardMaterial({ color: 0x2d4d5d, roughness: 0.7 }),
+    new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.cool), roughness: 0.7 }),
   );
   wall.position.set(-1.35, 0, 0);
   group.add(wall);
 
-  const rail = lineFromPoints([new THREE.Vector3(-1.35, -0.36, 0), new THREE.Vector3(1.35, -0.36, 0)], 0x17252d, 0.22);
+  const rail = lineFromPoints(
+    [new THREE.Vector3(-1.35, -0.36, 0), new THREE.Vector3(1.35, -0.36, 0)],
+    new THREE.Color(theme.textFaint),
+    0.4,
+  );
   group.add(rail);
 
-  const equilibrium = lineFromPoints([new THREE.Vector3(0, -0.52, 0), new THREE.Vector3(0, 0.52, 0)], 0x3a7c7d, 0.32);
+  const equilibrium = lineFromPoints([new THREE.Vector3(0, -0.52, 0), new THREE.Vector3(0, 0.52, 0)], new THREE.Color(theme.cool), 0.32);
   group.add(equilibrium);
   return group;
 }
@@ -311,7 +320,7 @@ function makeIdealSpringGroup(data: Trajectory): THREE.Group {
 function makeKeplerGroup(data: Trajectory): THREE.Group {
   const group = new THREE.Group();
   const points = data.states.map((state) => new THREE.Vector3(state[4], 0, state[5]));
-  group.add(lineFromPoints(points, 0xd88d42));
+  group.add(lineFromPoints(points, new THREE.Color(theme.accent)));
 
   const focus = new THREE.Mesh(
     new THREE.SphereGeometry(0.11, 28, 18),
@@ -354,7 +363,7 @@ export class ThreeScene {
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
-    this.scene.fog = new THREE.Fog(0xf8faf7, 8, 18);
+    this.scene.fog = new THREE.Fog(new THREE.Color(theme.ink800), 8, 18);
     this.camera.position.set(4.3, 2.55, 5.3);
     this.camera.lookAt(0, 0.72, 0);
     this.controls = new OrbitControls(this.camera, canvas);
@@ -373,11 +382,11 @@ export class ThreeScene {
     this.marker = new THREE.Mesh(
       new THREE.SphereGeometry(0.105, 28, 18),
       new THREE.MeshStandardMaterial({
-        color: 0x17252d,
-        roughness: 0.28,
-        metalness: 0.18,
-        emissive: 0x17252d,
-        emissiveIntensity: 0.08,
+        color: new THREE.Color(theme.accentStrong),
+        roughness: 0.3,
+        metalness: 0.1,
+        emissive: new THREE.Color(theme.accent),
+        emissiveIntensity: 0.5,
       }),
     );
   }
@@ -413,7 +422,7 @@ export class ThreeScene {
       this.controls.target.set(0.25, 0.1, 0);
     } else if (mode === "idealSpring") {
       this.root.add(makeIdealSpringGroup(data));
-      this.dynamicSpring = lineFromPoints([], 0x3a7c7d, 0.82);
+      this.dynamicSpring = lineFromPoints([], new THREE.Color(theme.cool), 0.82);
       this.root.add(this.dynamicSpring);
       this.camera.position.set(2.3, 1.25, 2.8);
       this.controls.target.set(0, 0, 0);

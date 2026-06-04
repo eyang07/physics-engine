@@ -1,6 +1,7 @@
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { ThreeScene, type ThreeMode, type Trajectory } from "./threeScene";
+import { theme } from "./design/theme";
 import "./styles.css";
 
 type CanvasMode = "pendulumMotionPhase" | ThreeMode;
@@ -399,16 +400,17 @@ function drawHomeBackground(now: number) {
   const t = now * 0.001;
 
   const gradient = homeCtx.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, "#f8faf7");
-  gradient.addColorStop(0.5, "#dfeef1");
-  gradient.addColorStop(1, "#f5ebd9");
+  gradient.addColorStop(0, theme.ink900);
+  gradient.addColorStop(0.55, theme.ink800);
+  gradient.addColorStop(1, theme.ink850);
   homeCtx.fillStyle = gradient;
   homeCtx.fillRect(0, 0, width, height);
 
   homeCtx.save();
   homeCtx.translate(width * 0.58, height * 0.5);
-  homeCtx.strokeStyle = "rgba(58, 124, 125, 0.32)";
-  homeCtx.lineWidth = 1.5;
+  homeCtx.strokeStyle = theme.cool;
+  homeCtx.globalAlpha = 0.16;
+  homeCtx.lineWidth = 1.4;
   for (let orbit = 0; orbit < 7; orbit += 1) {
     const radiusX = 80 + orbit * 46;
     const radiusY = 26 + orbit * 17;
@@ -426,7 +428,7 @@ function drawHomeBackground(now: number) {
     homeCtx.stroke();
   }
 
-  homeCtx.fillStyle = "#17252d";
+  homeCtx.fillStyle = theme.accent;
   for (let i = 0; i < 18; i += 1) {
     const a = t * 0.45 + i * 0.9;
     const x = Math.cos(a) * (100 + (i % 5) * 54);
@@ -442,13 +444,13 @@ function drawHomeBackground(now: number) {
 
 function drawBackground(width: number, height: number) {
   const gradient = ctx.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, "#f8faf7");
-  gradient.addColorStop(0.55, "#e9f0f5");
-  gradient.addColorStop(1, "#f3eee5");
+  gradient.addColorStop(0, theme.ink900);
+  gradient.addColorStop(0.55, theme.ink800);
+  gradient.addColorStop(1, theme.ink850);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
-  ctx.strokeStyle = "rgba(22, 35, 48, 0.07)";
+  ctx.strokeStyle = theme.hairline;
   ctx.lineWidth = 1;
   for (let x = 0; x <= width; x += 36) {
     ctx.beginPath();
@@ -474,20 +476,20 @@ function drawPendulum(theta: number, width: number, height: number) {
   ctx.save();
   ctx.lineCap = "round";
 
-  ctx.strokeStyle = "rgba(23, 37, 45, 0.18)";
+  ctx.strokeStyle = theme.hairlineStrong;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.arc(centerX, centerY, length, Math.PI * 0.62, Math.PI * 0.38, true);
   ctx.stroke();
 
-  ctx.strokeStyle = "#2d4d5d";
+  ctx.strokeStyle = theme.textMuted;
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.moveTo(centerX, centerY);
   ctx.lineTo(bobX, bobY);
   ctx.stroke();
 
-  ctx.fillStyle = "#17252d";
+  ctx.fillStyle = theme.textPrimary;
   ctx.beginPath();
   ctx.arc(centerX, centerY, 7, 0, Math.PI * 2);
   ctx.fill();
@@ -501,7 +503,7 @@ function drawPendulum(theta: number, width: number, height: number) {
   ctx.arc(bobX, bobY, 24, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(23, 37, 45, 0.16)";
+  ctx.strokeStyle = theme.hairline;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(centerX, centerY);
@@ -528,7 +530,7 @@ function drawPhasePortrait(data: Trajectory, currentIndex: number, theta: number
     bottom - ((value - pendulumBounds!.minOmega) / (pendulumBounds!.maxOmega - pendulumBounds!.minOmega)) * (bottom - top);
 
   ctx.save();
-  ctx.strokeStyle = "rgba(23, 37, 45, 0.18)";
+  ctx.strokeStyle = theme.hairlineStrong;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(left, mapY(0));
@@ -537,8 +539,8 @@ function drawPhasePortrait(data: Trajectory, currentIndex: number, theta: number
   ctx.lineTo(mapX(0), bottom);
   ctx.stroke();
 
-  ctx.strokeStyle = "#3a7c7d";
-  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = theme.cool;
+  ctx.lineWidth = 2;
   ctx.beginPath();
   data.states.forEach((state, index) => {
     const x = mapX(state[0]);
@@ -551,8 +553,10 @@ function drawPhasePortrait(data: Trajectory, currentIndex: number, theta: number
   });
   ctx.stroke();
 
-  ctx.strokeStyle = "#d88d42";
+  ctx.strokeStyle = theme.accent;
   ctx.lineWidth = 3;
+  ctx.shadowColor = theme.accent;
+  ctx.shadowBlur = 10;
   ctx.beginPath();
   data.states.slice(0, currentIndex + 1).forEach((state, index) => {
     const x = mapX(state[0]);
@@ -565,12 +569,13 @@ function drawPhasePortrait(data: Trajectory, currentIndex: number, theta: number
   });
   ctx.stroke();
 
-  ctx.fillStyle = "#17252d";
+  ctx.fillStyle = theme.accentStrong;
   ctx.beginPath();
   ctx.arc(mapX(theta), mapY(omega), 6, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "rgba(23, 37, 45, 0.72)";
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = theme.textMuted;
   ctx.font = "12px Inter, system-ui, sans-serif";
   ctx.fillText("θ", right - 18, mapY(0) - 8);
   ctx.fillText("θ̇", mapX(0) + 10, top + 12);
@@ -607,7 +612,7 @@ function render(now: number) {
   if (!trajectory) {
     resize2dCanvas();
     drawBackground(canvas.clientWidth, canvas.clientHeight);
-    ctx.fillStyle = "#17252d";
+    ctx.fillStyle = theme.textMuted;
     ctx.font = "16px Inter, system-ui, sans-serif";
     ctx.fillText("Loading example data...", 32, 48);
     requestAnimationFrame(render);
