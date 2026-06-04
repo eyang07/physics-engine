@@ -1,13 +1,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { theme } from "./design/theme";
+import type { Trajectory } from "./data/trajectory";
 
-export type Trajectory = {
-  time: number[];
-  state_names: string[];
-  states: number[][];
-  metadata?: Record<string, unknown>;
-};
+export type { Trajectory };
 
 export type ThreeMode =
   | "pendulumHamiltonian"

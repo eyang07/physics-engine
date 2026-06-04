@@ -2,6 +2,8 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import { ThreeScene, type ThreeMode, type Trajectory } from "./threeScene";
 import { theme } from "./design/theme";
+import { loadManifest } from "./data/manifest";
+import { StaticSource } from "./data/source";
 import "./styles.css";
 
 type CanvasMode = "pendulumMotionPhase" | ThreeMode;
@@ -178,7 +180,7 @@ if (!homeContext) {
 const homeCtx: CanvasRenderingContext2D = homeContext;
 const threeScene = new ThreeScene(threeCanvas);
 
-const dataCache = new Map<string, Trajectory>();
+const trajectorySource = new StaticSource();
 let activeView: "home" | "selection" | "simulation" = "home";
 let selectedExample = examples[0];
 let selectedVisualization = selectedExample.visualizations[0];
@@ -260,19 +262,11 @@ function renderVisualizationButtons() {
   });
 }
 
-async function loadTrajectory(example: ExampleConfig): Promise<Trajectory> {
-  const cached = dataCache.get(example.id);
-  if (cached) {
-    return cached;
-  }
-
-  const response = await fetch(example.dataPath);
-  if (!response.ok) {
-    throw new Error(`Unable to load ${example.title}: ${response.status}`);
-  }
-  const data = (await response.json()) as Trajectory;
-  dataCache.set(example.id, data);
-  return data;
+function loadTrajectory(example: ExampleConfig): Promise<Trajectory> {
+  // Behind the StaticSource seam: a future GeneratedSource (Python server)
+  // implements the same interface, so parameter-driven generation can drop in
+  // here without changing the call site.
+  return trajectorySource.get(example);
 }
 
 function computePendulumBounds(data: Trajectory): Bounds {
@@ -645,4 +639,11 @@ populateSystemSelect();
 renderSystemGallery();
 renderVisualizationButtons();
 setView("home");
+
+// Warm the manifest cache for the Structure panel (Phase 4). Best-effort: the
+// UI still runs off the built-in example config until that phase wires it in.
+void loadManifest().catch((error) => {
+  console.warn("Manifest preload failed; using built-in example config:", error);
+});
+
 requestAnimationFrame(render);
