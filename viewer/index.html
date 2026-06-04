@@ -45,26 +45,26 @@
           <p class="control-label">visualization</p>
           <div id="visualizationModes" class="mode-switch" aria-label="Visualization mode"></div>
         </div>
-        <dl class="readout">
-          <div>
-            <dt><span id="readoutLabel0" data-latex="t"></span></dt>
-            <dd id="readoutValue0">0.00 s</dd>
-          </div>
-          <div>
-            <dt><span id="readoutLabel1" data-latex="\theta"></span></dt>
-            <dd id="readoutValue1">0.000 rad</dd>
-          </div>
-          <div>
-            <dt><span id="readoutLabel2" data-latex="\dot{\theta}"></span></dt>
-            <dd id="readoutValue2">0.000 rad/s</dd>
-          </div>
-          <div>
-            <dt><span id="readoutLabel3" data-latex="H"></span></dt>
-            <dd id="readoutValue3">0.000</dd>
-          </div>
-        </dl>
+        <section class="panel-section">
+          <p class="control-label">principles</p>
+          <div id="principles" class="principles"></div>
+        </section>
+        <section class="panel-section">
+          <p class="control-label">invariants</p>
+          <div id="invariants" class="invariants"></div>
+        </section>
+        <section class="panel-section">
+          <p class="control-label">parameters</p>
+          <div id="parameters" class="parameters"></div>
+        </section>
         <div class="controls">
-          <button id="playButton" type="button">Pause</button>
+          <div class="playback">
+            <svg id="loopPhase" class="loop-phase" viewBox="0 0 36 36" aria-hidden="true">
+              <circle class="loop-phase__track" cx="18" cy="18" r="15"></circle>
+              <circle id="loopPhaseArc" class="loop-phase__arc" cx="18" cy="18" r="15"></circle>
+            </svg>
+            <button id="playButton" type="button">Pause</button>
+          </div>
           <label>
             <span>speed</span>
             <input id="speedControl" type="range" min="0.2" max="3" step="0.1" value="1" />

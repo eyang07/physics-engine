@@ -2,7 +2,7 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import { ThreeScene, type ThreeMode, type Trajectory } from "./threeScene";
 import { theme } from "./design/theme";
-import { loadManifest } from "./data/manifest";
+import { findSystem, loadManifest, type SystemManifest } from "./data/manifest";
 import { StaticSource } from "./data/source";
 import "./styles.css";
 
@@ -13,11 +13,6 @@ type Visualization = {
   label: string;
 };
 
-type Readout = {
-  latex: string;
-  value: string;
-};
-
 type ExampleConfig = {
   id: string;
   title: string;
@@ -25,7 +20,12 @@ type ExampleConfig = {
   category: string;
   dataPath: string;
   visualizations: Visualization[];
-  readouts: (state: number[], time: number) => Readout[];
+};
+
+type InvariantLane = {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  series: number[];
 };
 
 type Bounds = {
@@ -43,12 +43,8 @@ function requireElement<T extends Element>(selector: string): T {
   return element;
 }
 
-function pendulumEnergy(theta: number, omega: number): number {
-  return 0.5 * omega * omega + 9.81 * (1 - Math.cos(theta));
-}
-
-function speed3(state: number[], startIndex: number): number {
-  return Math.hypot(state[startIndex], state[startIndex + 1], state[startIndex + 2]);
+function clamp(value: number, low: number, high: number): number {
+  return Math.min(high, Math.max(low, value));
 }
 
 const examples: ExampleConfig[] = [
@@ -62,12 +58,6 @@ const examples: ExampleConfig[] = [
       { id: "pendulumMotionPhase", label: "Motion + Phase" },
       { id: "pendulumHamiltonian", label: "Hamiltonian Flow" },
     ],
-    readouts: (state, time) => [
-      { latex: "t", value: `${time.toFixed(2)} s` },
-      { latex: "\\theta", value: `${state[0].toFixed(3)} rad` },
-      { latex: "\\dot{\\theta}", value: `${state[1].toFixed(3)} rad/s` },
-      { latex: "H", value: `${pendulumEnergy(state[0], state[1]).toFixed(3)}` },
-    ],
   },
   {
     id: "sphere-geodesic",
@@ -76,12 +66,6 @@ const examples: ExampleConfig[] = [
     category: "Differential Geometry",
     dataPath: "/data/sphere_geodesic.json",
     visualizations: [{ id: "sphereGeodesic", label: "Great-Circle Flow" }],
-    readouts: (state, time) => [
-      { latex: "t", value: `${time.toFixed(2)} s` },
-      { latex: "\\theta", value: `${state[0].toFixed(3)} rad` },
-      { latex: "\\phi", value: `${state[1].toFixed(3)} rad` },
-      { latex: "|r|", value: `${Math.hypot(state[4], state[5], state[6]).toFixed(3)}` },
-    ],
   },
   {
     id: "charged-particle",
@@ -90,12 +74,6 @@ const examples: ExampleConfig[] = [
     category: "Fields",
     dataPath: "/data/charged_particle.json",
     visualizations: [{ id: "chargedParticle", label: "Lorentz Orbit" }],
-    readouts: (state, time) => [
-      { latex: "t", value: `${time.toFixed(2)} s` },
-      { latex: "|v|", value: `${speed3(state, 3).toFixed(3)}` },
-      { latex: "z", value: `${state[2].toFixed(3)}` },
-      { latex: "B_z", value: "1.000" },
-    ],
   },
   {
     id: "uniform-gravity",
@@ -104,12 +82,6 @@ const examples: ExampleConfig[] = [
     category: "Classical Motion",
     dataPath: "/data/uniform_gravity.json",
     visualizations: [{ id: "uniformGravity", label: "Projectile Path" }],
-    readouts: (state, time) => [
-      { latex: "t", value: `${time.toFixed(2)} s` },
-      { latex: "x", value: `${state[0].toFixed(3)}` },
-      { latex: "z", value: `${state[1].toFixed(3)}` },
-      { latex: "\\dot{z}", value: `${state[3].toFixed(3)}` },
-    ],
   },
   {
     id: "ideal-spring",
@@ -118,12 +90,6 @@ const examples: ExampleConfig[] = [
     category: "Oscillators",
     dataPath: "/data/ideal_spring.json",
     visualizations: [{ id: "idealSpring", label: "Spring Motion" }],
-    readouts: (state, time) => [
-      { latex: "t", value: `${time.toFixed(2)} s` },
-      { latex: "x", value: `${state[0].toFixed(3)}` },
-      { latex: "\\dot{x}", value: `${state[1].toFixed(3)}` },
-      { latex: "E", value: `${(0.5 * state[1] ** 2 + 0.5 * state[0] ** 2).toFixed(3)}` },
-    ],
   },
   {
     id: "kepler",
@@ -132,12 +98,6 @@ const examples: ExampleConfig[] = [
     category: "Orbital Mechanics",
     dataPath: "/data/kepler_problem.json",
     visualizations: [{ id: "keplerOrbit", label: "Orbital Flow" }],
-    readouts: (state, time) => [
-      { latex: "t", value: `${time.toFixed(2)} s` },
-      { latex: "r", value: `${state[0].toFixed(3)}` },
-      { latex: "\\phi", value: `${state[1].toFixed(3)} rad` },
-      { latex: "\\ell", value: `${(state[0] ** 2 * state[3]).toFixed(3)}` },
-    ],
   },
 ];
 
@@ -155,18 +115,12 @@ const systemSelect = requireElement<HTMLSelectElement>("#systemSelect");
 const visualizationModes = requireElement<HTMLElement>("#visualizationModes");
 const playButton = requireElement<HTMLButtonElement>("#playButton");
 const speedControl = requireElement<HTMLInputElement>("#speedControl");
-const readoutLabels = [
-  requireElement<HTMLElement>("#readoutLabel0"),
-  requireElement<HTMLElement>("#readoutLabel1"),
-  requireElement<HTMLElement>("#readoutLabel2"),
-  requireElement<HTMLElement>("#readoutLabel3"),
-];
-const readoutValues = [
-  requireElement<HTMLElement>("#readoutValue0"),
-  requireElement<HTMLElement>("#readoutValue1"),
-  requireElement<HTMLElement>("#readoutValue2"),
-  requireElement<HTMLElement>("#readoutValue3"),
-];
+const principlesPanel = requireElement<HTMLElement>("#principles");
+const invariantsPanel = requireElement<HTMLElement>("#invariants");
+const parametersPanel = requireElement<HTMLElement>("#parameters");
+const loopPhaseArc = requireElement<SVGCircleElement>("#loopPhaseArc");
+const LOOP_CIRCUMFERENCE = 2 * Math.PI * 15;
+let invariantLanes: InvariantLane[] = [];
 
 const context = canvas.getContext("2d");
 if (!context) {
@@ -354,10 +308,12 @@ async function selectExample(exampleId: string) {
   systemSelect.value = nextExample.id;
   renderVisualizationButtons();
   playbackTime = 0;
+  clearStructurePanel();
 
   trajectory = await loadTrajectory(nextExample);
   pendulumBounds = nextExample.id === "pendulum" ? computePendulumBounds(trajectory) : null;
   applyVisualization();
+  void buildStructurePanel(nextExample.id, trajectory);
 }
 
 function resizeHomeCanvas() {
@@ -577,11 +533,178 @@ function drawPhasePortrait(data: Trajectory, currentIndex: number, theta: number
   ctx.restore();
 }
 
-function updateReadouts(state: number[], time: number) {
-  selectedExample.readouts(state, time).forEach((readout, index) => {
-    renderLatex(readoutLabels[index], readout.latex);
-    readoutValues[index].textContent = readout.value;
+function renderPrincipleBlock(label: string, expressions: string[]): HTMLElement {
+  const block = document.createElement("div");
+  block.className = "principle";
+  const caption = document.createElement("p");
+  caption.className = "principle__label";
+  caption.textContent = label;
+  block.append(caption);
+  expressions.forEach((expression) => {
+    const math = document.createElement("div");
+    math.className = "principle__math";
+    katex.render(expression, math, { throwOnError: false, displayMode: true });
+    block.append(math);
   });
+  return block;
+}
+
+function renderPrinciples(system: SystemManifest) {
+  principlesPanel.replaceChildren();
+  principlesPanel.append(renderPrincipleBlock("Lagrangian", [system.physics.lagrangian]));
+  if (system.physics.hamiltonian) {
+    principlesPanel.append(renderPrincipleBlock("Hamiltonian", [system.physics.hamiltonian]));
+  }
+  principlesPanel.append(renderPrincipleBlock("Equations of motion", system.physics.euler_lagrange));
+}
+
+function renderInvariants(system: SystemManifest, data: Trajectory) {
+  invariantsPanel.replaceChildren();
+  invariantLanes = [];
+  const series = data.series ?? {};
+
+  system.conserved.forEach((quantity) => {
+    const values = series[quantity.name];
+    if (!values) {
+      return;
+    }
+
+    const row = document.createElement("div");
+    row.className = "invariant";
+
+    const head = document.createElement("div");
+    head.className = "invariant__head";
+    const symbol = document.createElement("span");
+    symbol.className = "invariant__symbol";
+    renderLatex(symbol, quantity.latex);
+    const symmetry = document.createElement("span");
+    symmetry.className = "invariant__symmetry";
+    symmetry.textContent = quantity.symmetry;
+    head.append(symbol, symmetry);
+
+    const lane = document.createElement("canvas");
+    lane.className = "invariant__lane";
+    row.append(head, lane);
+    invariantsPanel.append(row);
+
+    const laneCtx = lane.getContext("2d");
+    if (laneCtx) {
+      invariantLanes.push({ canvas: lane, ctx: laneCtx, series: values });
+    }
+  });
+}
+
+function renderParameters(system: SystemManifest) {
+  parametersPanel.replaceChildren();
+  system.parameters.forEach((parameter) => {
+    const row = document.createElement("div");
+    row.className = "param";
+
+    const symbol = document.createElement("span");
+    symbol.className = "param__symbol";
+    renderLatex(symbol, parameter.latex);
+
+    const track = document.createElement("div");
+    track.className = "param__track";
+    const marker = document.createElement("div");
+    marker.className = "param__marker";
+    const span = parameter.max - parameter.min || 1;
+    marker.style.left = `${clamp((parameter.default - parameter.min) / span, 0, 1) * 100}%`;
+    track.append(marker);
+
+    row.append(symbol, track);
+    parametersPanel.append(row);
+  });
+}
+
+function clearStructurePanel() {
+  principlesPanel.replaceChildren();
+  invariantsPanel.replaceChildren();
+  parametersPanel.replaceChildren();
+  invariantLanes = [];
+}
+
+async function buildStructurePanel(exampleId: string, data: Trajectory) {
+  try {
+    const manifest = await loadManifest();
+    const system = findSystem(manifest, exampleId);
+    if (!system) {
+      clearStructurePanel();
+      return;
+    }
+    renderPrinciples(system);
+    renderInvariants(system, data);
+    renderParameters(system);
+  } catch (error) {
+    console.warn("Structure panel unavailable:", error);
+    clearStructurePanel();
+  }
+}
+
+// A conserved quantity drawn over the whole trajectory. Because it does not
+// change, the line is dead flat — the stillness is the proof, no number needed.
+function drawInvariantLane(lane: InvariantLane, phase: number) {
+  const { canvas, ctx, series } = lane;
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  const drawWidth = Math.max(1, Math.floor(width * pixelRatio));
+  const drawHeight = Math.max(1, Math.floor(height * pixelRatio));
+  if (canvas.width !== drawWidth || canvas.height !== drawHeight) {
+    canvas.width = drawWidth;
+    canvas.height = drawHeight;
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  }
+  ctx.clearRect(0, 0, width, height);
+
+  const count = series.length;
+  if (count === 0) {
+    return;
+  }
+  const mean = series.reduce((sum, value) => sum + value, 0) / count;
+  // The band represents +/-5% of the quantity's magnitude. A truly conserved
+  // quantity never leaves the centerline; a drift would visibly climb.
+  const half = Math.max(Math.abs(mean) * 0.05, 1e-9);
+  const pad = 4;
+  const yOf = (value: number) =>
+    clamp(height / 2 - ((value - mean) / (2 * half)) * (height / 2 - pad), pad, height - pad);
+  const xOf = (index: number) => (count <= 1 ? 0 : (index / (count - 1)) * width);
+
+  ctx.strokeStyle = theme.hairline;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, height / 2);
+  ctx.lineTo(width, height / 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = theme.cool;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  const step = Math.max(1, Math.floor(count / 240));
+  for (let index = 0; index < count; index += step) {
+    const x = xOf(index);
+    const y = yOf(series[index]);
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  ctx.stroke();
+
+  const playIndex = clamp(Math.round(phase * (count - 1)), 0, count - 1);
+  ctx.fillStyle = theme.accentStrong;
+  ctx.shadowColor = theme.accent;
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(clamp(phase, 0, 1) * width, yOf(series[playIndex]), 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+function updateStructurePanel(phase: number) {
+  invariantLanes.forEach((lane) => drawInvariantLane(lane, phase));
+  loopPhaseArc.style.strokeDashoffset = String(LOOP_CIRCUMFERENCE * (1 - clamp(phase, 0, 1)));
 }
 
 function render(now: number) {
@@ -631,7 +754,8 @@ function render(now: number) {
     threeScene.render(current.state, playbackTime);
   }
 
-  updateReadouts(current.state, current.wrappedTime);
+  const duration = trajectory.time[trajectory.time.length - 1] || 1;
+  updateStructurePanel(current.wrappedTime / duration);
   requestAnimationFrame(render);
 }
 
