@@ -69,6 +69,12 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#hamiltonianScene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-hamiltonian.png`) });
 
+    await page.getByRole("button", { name: "Potential" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-pendulum-potential.png`) });
+
     await page.locator("#systemSelect").selectOption("sphere-geodesic");
     await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
     await page.waitForTimeout(800);
@@ -88,10 +94,34 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#hamiltonianScene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-uniform-gravity.png`) });
 
+    await page.getByRole("button", { name: "Vertical Phase" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-uniform-gravity-phase.png`) });
+
+    await page.getByRole("button", { name: "Potential" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-uniform-gravity-potential.png`) });
+
     await page.locator("#systemSelect").selectOption("ideal-spring");
     await page.waitForTimeout(800);
     await expectCanvasNonBlank(page, "#hamiltonianScene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-ideal-spring.png`) });
+
+    await page.getByRole("button", { name: "Phase Portrait" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-ideal-spring-phase.png`) });
+
+    await page.getByRole("button", { name: "Potential" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-ideal-spring-potential.png`) });
 
     await page.locator("#systemSelect").selectOption("kepler");
     await page.waitForTimeout(800);
@@ -103,5 +133,11 @@ for (const viewport of [
     await page.waitForTimeout(500);
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-effective-potential.png`) });
+
+    await page.getByRole("button", { name: "Radial Phase" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-kepler-radial-phase.png`) });
   });
 }

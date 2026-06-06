@@ -4,6 +4,8 @@ import argparse
 from pathlib import Path
 from typing import Sequence
 
+import numpy as np
+
 from engine.export import Trajectory
 from engine.numerics import integrate_fixed_step
 from scripts.example_specs import PENDULUM
@@ -28,11 +30,27 @@ def generate_pendulum_trajectory(
         t_span=t_span,
         dt=dt,
     )
+    series = PENDULUM.series({"m": mass, "ell": length, "g": gravity}, states)
+    theta_values = np.linspace(-np.pi, np.pi, 320)
+    potential_values = mass * gravity * length * (1 - np.cos(theta_values))
     return Trajectory.from_arrays(
         time=time,
         states=states,
         state_names=["theta", "theta_dot"],
-        series=PENDULUM.series({"m": mass, "ell": length, "g": gravity}, states),
+        metadata={
+            "potentialPlots": [
+                {
+                    "name": "pendulum_potential",
+                    "coordinate": "theta",
+                    "coordinateLatex": r"\theta",
+                    "potentialLatex": "V",
+                    "coordinateValues": theta_values.tolist(),
+                    "potentialValues": potential_values.tolist(),
+                    "energy": float(np.mean(series["H"])),
+                }
+            ]
+        },
+        series=series,
     )
 
 
@@ -102,4 +120,3 @@ def main(argv: Sequence[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-

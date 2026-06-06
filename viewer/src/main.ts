@@ -16,10 +16,30 @@ import {
   drawStageBackground,
   type Bounds,
 } from "./pendulumCanvas";
+import { drawPhaseScene, drawPotentialScene } from "./phasePotentialCanvas";
 import { StructurePanel } from "./structurePanel";
 import "./styles.css";
 
-type CanvasMode = "pendulumMotionPhase" | "effectivePotential";
+type CanvasMode =
+  | "pendulumMotionPhase"
+  | "effectivePotential"
+  | "pendulumPotential"
+  | "uniformGravityVerticalPhase"
+  | "uniformGravityPotential"
+  | "idealSpringPhase"
+  | "idealSpringPotential"
+  | "keplerRadialPhase";
+
+const CANVAS_MODE_IDS = new Set<string>([
+  "pendulumMotionPhase",
+  "effectivePotential",
+  "pendulumPotential",
+  "uniformGravityVerticalPhase",
+  "uniformGravityPotential",
+  "idealSpringPhase",
+  "idealSpringPotential",
+  "keplerRadialPhase",
+]);
 
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -90,7 +110,7 @@ systemSelect.addEventListener("change", () => {
 });
 
 function isCanvasMode(id: string): id is CanvasMode {
-  return id === "pendulumMotionPhase" || id === "effectivePotential";
+  return CANVAS_MODE_IDS.has(id);
 }
 
 function isThreeMode(id: string): id is ThreeMode {
@@ -269,6 +289,10 @@ function render(now: number) {
     drawPendulumScene(ctx, trajectory, pendulumBounds, current, canvas.clientWidth, canvas.clientHeight);
   } else if (selectedVisualization.id === "effectivePotential") {
     drawEffectivePotentialScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
+  } else if (selectedExample && isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "configuration-phase") {
+    drawPhaseScene(ctx, trajectory, selectedExample, selectedVisualization, current, canvas.clientWidth, canvas.clientHeight);
+  } else if (selectedExample && isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "potential-energy") {
+    drawPotentialScene(ctx, trajectory, selectedExample, selectedVisualization, current, canvas.clientWidth, canvas.clientHeight);
   } else {
     threeScene.render(current.state, time);
   }

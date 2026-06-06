@@ -1,96 +1,90 @@
 # physics-engine
 
-A physics engine built primarily as a tool for learning classical mechanics
-and beyond. The emphasis is on understanding the mathematics first, with
-implementation following the theory rather than the other way around.
+A learning-oriented analytical mechanics engine with a browser viewer. Python
+is the source of truth for the mechanics and generated data; the TypeScript
+viewer renders exported trajectories, symbolic derivations, invariants, and
+visual lenses without re-deriving the physics.
 
-## Motivation
+## Current Shape
 
-I'm studying the Lagrangian and Hamiltonian formulations of mechanics from a
-pure-mathematics perspective. This repo is where I turn that theory into code.
-Topics I expect to touch as I go:
+- `engine/` contains the Python mechanics and export code.
+- `systems/` contains pure symbolic system definitions.
+- `scripts/example_specs.py` is the gallery registry for parameters, state
+  schema, projections, conserved quantities, effective potentials, and lenses.
+- `scripts/generate_all_examples.py` regenerates trajectories and the manifest.
+- `viewer/` is a Vite/TypeScript app that consumes `viewer/public/data`.
+- `data/generated/` stores the generated Python-side outputs.
 
-- Lagrangian and Hamiltonian mechanics
-- Noether's theorem (symmetries and conserved quantities)
-- Liouville's theorem (phase-space volume preservation)
-- An informal introduction to manifolds and symplectic geometry
+## Backend Tools
 
-## Goals
+The engine currently supports:
 
-- Implement mechanics in a way that mirrors the underlying math, so the code
-  doubles as a study aid.
-- Prioritize clarity and mathematical fidelity over performance, at least
-  early on.
-- Describe motion in concise mathematical files, then turn those descriptions
-  into beautiful interactive animations.
-- Use the engine to explore vector fields, black-hole geodesics, fluid flows,
-  and other visualizations of dynamics.
-- Build a growing gallery of examples that can be viewed through multiple
-  mathematical lenses: physical motion, phase space, Hamiltonian flow, energy
-  surfaces, vector fields, and conserved quantities.
+- Lagrangian systems on tangent bundle charts `(q, qdot)`.
+- Hamiltonian systems on cotangent bundle charts `(q, p)`.
+- Euler-Lagrange equations, generalized momenta, energy, Legendre transforms,
+  Hamilton equations, Poisson brackets, symplectic matrices, Hamiltonian vector
+  fields, Liouville checks, canonical-transformation checks, coordinate
+  pullbacks/pushforwards, holonomic constraints, and Noether charges.
+- Fixed-step RK4 trajectory integration and JSON export.
+- A manifest contract that exports symbolic derivations, lens metadata,
+  parameter ranges, state schemas, projections, conserved quantities, and
+  effective potentials.
 
-## Architecture
+## Current Examples
 
-The project is split into two layers:
+- Simple pendulum
+- Geodesic on a sphere
+- Charged particle in a uniform magnetic field
+- Uniform gravitational field
+- Ideal spring
+- Kepler problem with radial effective potential
 
-- **Python math engine** — defines mechanical systems, derives or states their
-  equations of motion, integrates trajectories and fields, and exports
-  simulation data.
-- **TypeScript visualization layer** — loads exported simulation data and
-  renders interactive graphics in the browser.
+## Viewer
 
-The boundary between the layers should stay simple: Python produces structured
-state over time; TypeScript turns that state into visuals.
+The viewer renders a system gallery, playback controls, mathematical structure
+panels, invariant lanes, a 2D pendulum lens, a Kepler effective-potential lens,
+and Three.js scenes for configuration-space, phase-space, orbit, field, and
+spring views.
 
-The mechanics layer uses a small amount of differential-geometric vocabulary,
-kept concrete and chart-based:
+## Development
 
-- Lagrangian systems live on a tangent bundle chart `TQ` with coordinates
-  `(q, qdot)`.
-- Hamiltonian systems live on a cotangent bundle chart `T*Q` with coordinates
-  `(q, p)`.
-- The Legendre transform maps regular Lagrangian systems from `TQ` to `T*Q` by
-  `p_i = partial L / partial qdot_i`.
-- Hamiltonian geometry includes canonical Poisson brackets, symplectic
-  matrices, Hamiltonian vector fields, Liouville divergence checks, and
-  canonical-transformation checks.
-- Coordinate changes should expose both tangent pushforwards and cotangent
-  pullbacks so generalized velocities and momenta transform correctly.
+Install Python dependencies in your preferred environment, then install viewer
+dependencies:
 
-For small examples, JSON is fine. For larger simulations such as fluids or
-black-hole visualizations, the project may later use binary or chunked formats
-such as `.npz`, HDF5, Zarr, Arrow, or custom buffers.
+```sh
+cd viewer
+npm install
+```
 
-## Rough Shape
+Regenerate all examples and manifest data:
 
-A likely starting structure:
+```sh
+python -m scripts.generate_all_examples
+```
 
-- `engine/` — Python package for mechanics, numerical methods, and export
-  helpers.
-  - `engine/mechanics/` — Lagrangian systems, Hamiltonian systems, coordinate
-    charts, bundle charts, transforms, constraints, and symmetries.
-- `systems/` — concise mathematical descriptions of systems such as
-  oscillators, pendulums, geodesics, and fluids.
-- `viewer/` — TypeScript browser app for interactive rendering.
-- `data/generated/` — exported trajectories, vector fields, grids, and other
-  generated simulation artifacts.
+Run the viewer:
 
-Current examples include:
+```sh
+cd viewer
+npm run dev
+```
 
-- simple pendulum
-- geodesics on a sphere
-- charged particle in a uniform magnetic field
-- uniform gravitational field
-- ideal spring
-- Kepler problem
+Run verification:
 
-## Non-goals (for now)
+```sh
+pytest -q
+cd viewer && npm run build
+```
 
-- High-performance or real-time simulation.
-- Being a general-purpose game/physics engine.
+Visual tests expect the Vite dev server at `http://127.0.0.1:5173/`:
 
-## Status
+```sh
+cd viewer
+npm run test:visual
+```
 
-Early and exploratory. Direction and scope will shift as my understanding
-does. The current direction is Python for the mathematical core and TypeScript
-for the browser-based visualization layer.
+## Direction
+
+The next phase is to add more examples and improve the existing visual lenses
+while keeping the boundary simple: Python exports structured physics data;
+TypeScript turns that data into inspectable, interactive visuals.

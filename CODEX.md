@@ -1,70 +1,62 @@
-# CODEX.md
+# Plan
 
-Guidance for Codex agents working in this repo.
+Build the next phase around the existing contract: Python defines systems and
+generated data, `scripts/example_specs.py` registers gallery metadata/lenses,
+and the viewer renders manifest-driven trajectories. The backend already has
+Lagrangian/Hamiltonian mechanics, Noether quantities, fixed-step RK4
+integration, trajectory JSON export, manifest export, six registered examples,
+and tests covering equations, invariants, and manifest shape.
 
-This is a learning-oriented analytical mechanics engine. Prefer clear,
-inspectable code that mirrors the mathematics over cleverness or performance.
+## Scope
 
-## Current Architecture
+- In: new example systems, reusable generation helpers, manifest/spec
+  expansion, better existing lenses, focused visual primitives, tests and
+  regenerated data.
+- Out: real-time Python server, high-performance solvers, binary data formats,
+  full viewer redesign.
 
-- Python is the source of truth for mechanics and generated data.
-- TypeScript/Vite is the browser viewer; it renders exported data and should
-  not re-derive physics.
-- `systems/` contains pure physical definitions.
-- `scripts/example_specs.py` is the registry that connects systems to
-  parameters, state schema, conserved quantities, effective potentials, and
-  visualization lenses.
-- `engine/export/manifest.py` emits the shared manifest consumed by the viewer.
+## Action items
 
-## Implemented Mechanics
+[ ] Pick 3-4 next examples by visual payoff and backend fit: double pendulum,
+central-force variants, bead on hoop, driven oscillator, or constrained
+pendulum.
 
-- Lagrangian systems on `TQ` with coordinates `(q, qdot)`.
-- Hamiltonian systems on `T*Q` with coordinates `(q, p)`.
-- Legendre transforms, Euler-Lagrange equations, energies, Hamilton equations,
-  Poisson brackets, symplectic helpers, and Liouville checks.
-- Noether support via infinitesimal symmetry generators and derived charges.
-- Kepler radial reduction with exported effective potential
-  `V_eff(r) = ell^2 / (2 m r^2) - m mu / r`.
+[ ] Add a small reusable generator helper around
+`engine.numerics.integrate_fixed_step`, `Trajectory.from_arrays`, parameter
+defaults, viewer-copy output, and invariant series sampling.
 
-## Manifest Contract
+[ ] Add each new example as `systems/<name>.py`, register it in
+`scripts/example_specs.py`, and create a focused `scripts/generate_<name>.py`.
 
-The manifest carries:
+[ ] Extend lens metadata only where needed: reuse `configuration-space`,
+`configuration-phase`, and `effective-potential` first; add new lens kinds only
+for genuinely new visual grammar.
 
-- system metadata, parameters, state variables, projections, and data paths;
-- conserved quantities with Noether generator and charge LaTeX;
-- structured derivations: Lagrangian, generalized momenta, Euler-Lagrange
-  equations, Legendre transform, Hamiltonian flow, Noether charges, and
-  effective potentials;
-- a top-level lens registry, with each system referencing lens ids.
+[ ] Improve existing visuals by upgrading reusable primitives in
+`viewer/src/threeScene.ts`, `viewer/src/flow.ts`,
+`viewer/src/pendulumCanvas.ts`, and
+`viewer/src/effectivePotentialCanvas.ts`: animated trail heads, clearer axes,
+better scale framing, orbit/field affordances, and less generic background
+treatment.
 
-Trajectories carry sampled invariant `series` so the viewer can show
-conservation as flat lines.
+[ ] Make the manifest carry more visual hints where Python already knows the
+structure: embedding bounds, central bodies, force-field vectors, constraint
+surfaces, or preferred camera framing.
 
-## Viewer State
+[ ] Add symbolic tests for each new system's Euler-Lagrange equations, energy,
+Noether charges, and any effective-potential reductions.
 
-- `viewer/src/main.ts` loads systems and lens labels from the manifest.
-- `structurePanel.ts` renders the structured derivation and invariant lanes.
-- `pendulumCanvas.ts` renders the 2D pendulum motion/phase lens.
-- `effectivePotentialCanvas.ts` renders Kepler's radial effective-potential
-  lens.
-- `threeScene.ts` renders the current 3D/phase-space lenses.
+[ ] Add trajectory tests that verify state schema, JSON export, invariant
+flatness, and domain-specific behavior such as staying on a constraint or
+preserving angular momentum.
 
-## Working Rules
+[ ] Regenerate all outputs with `python -m scripts.generate_all_examples`, then
+validate with `pytest -q`, `cd viewer && npm run build`, and visual tests
+against the local Vite server.
 
-- Keep systems separate from presentation metadata.
-- Generated data is disposable; regenerate it from scripts after manifest or
-  system changes.
-- Add symbolic or conservation tests when adding mechanics.
-- Keep the viewer manifest-driven whenever practical.
+## Open questions
 
-## Verification
-
-```sh
-pytest -q
-python -m scripts.generate_all_examples
-cd viewer && npm run build
-cd viewer && npm run dev
-cd viewer && npm run test:visual
-```
-
-Visual tests expect a dev server at `http://127.0.0.1:5173/`.
+- Should the next priority be "more examples quickly" or "make the current six
+  feel substantially better"?
+- Do you want examples to stay classical-mechanics focused, or start moving
+  toward fluids/relativity/field visualizations?

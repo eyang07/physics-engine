@@ -67,6 +67,14 @@ LENSES: tuple[Lens, ...] = (
         conserved=("H",),
     ),
     Lens(
+        id="pendulumPotential",
+        title="Potential",
+        kind="potential-energy",
+        description="Potential-energy curve with the conserved total energy level.",
+        projections=("angle",),
+        conserved=("H",),
+    ),
+    Lens(
         id="sphereGeodesic",
         title="Great-Circle Flow",
         kind="configuration-space",
@@ -91,11 +99,43 @@ LENSES: tuple[Lens, ...] = (
         conserved=("H", "p_x"),
     ),
     Lens(
+        id="uniformGravityVerticalPhase",
+        title="Vertical Phase",
+        kind="configuration-phase",
+        description="Vertical position and velocity as a phase trajectory.",
+        projections=("verticalPhase",),
+        conserved=("H",),
+    ),
+    Lens(
+        id="uniformGravityPotential",
+        title="Potential",
+        kind="potential-energy",
+        description="Linear gravitational potential with the total energy level.",
+        projections=("height",),
+        conserved=("H",),
+    ),
+    Lens(
         id="idealSpring",
         title="Spring Motion",
         kind="configuration-phase",
         description="One-dimensional oscillator motion and phase trace.",
         projections=("line", "phase"),
+        conserved=("H",),
+    ),
+    Lens(
+        id="idealSpringPhase",
+        title="Phase Portrait",
+        kind="configuration-phase",
+        description="The oscillator's closed trajectory in position-velocity space.",
+        projections=("phase",),
+        conserved=("H",),
+    ),
+    Lens(
+        id="idealSpringPotential",
+        title="Potential",
+        kind="potential-energy",
+        description="Quadratic spring potential with the conserved total energy level.",
+        projections=("line",),
         conserved=("H",),
     ),
     Lens(
@@ -114,6 +154,14 @@ LENSES: tuple[Lens, ...] = (
         projections=("phase",),
         conserved=("H", "ell"),
         effective_potentials=("kepler_radial",),
+    ),
+    Lens(
+        id="keplerRadialPhase",
+        title="Radial Phase",
+        kind="configuration-phase",
+        description="Radial motion after reducing the central-force orbit.",
+        projections=("phase",),
+        conserved=("H", "ell"),
     ),
 )
 
@@ -137,7 +185,7 @@ PENDULUM = SystemSpec(
     ),
     projections={"phase": ("theta", "theta_dot"), "angle": ("theta",)},
     conserved=(Conserved("H", "H", "time translation", generator=_time_translation),),
-    lenses=("pendulumMotionPhase", "pendulumHamiltonian"),
+    lenses=("pendulumMotionPhase", "pendulumHamiltonian", "pendulumPotential"),
     data_path="/data/pendulum.json",
 )
 
@@ -232,13 +280,17 @@ UNIFORM_GRAVITY = SystemSpec(
         StateVar("x_dot", r"\dot{x}", "velocity"),
         StateVar("z_dot", r"\dot{z}", "velocity"),
     ),
-    projections={"embedding2d": ("x", "z")},
+    projections={
+        "embedding2d": ("x", "z"),
+        "verticalPhase": ("z", "z_dot"),
+        "height": ("z",),
+    },
     conserved=(
         Conserved("H", "H", "time translation", generator=_time_translation),
         Conserved("p_x", r"p_{x}", "horizontal translation",
                   generator=_cyclic_coordinate("x")),
     ),
-    lenses=("uniformGravity",),
+    lenses=("uniformGravity", "uniformGravityVerticalPhase", "uniformGravityPotential"),
     data_path="/data/uniform_gravity.json",
 )
 
@@ -261,7 +313,7 @@ IDEAL_SPRING = SystemSpec(
     ),
     projections={"phase": ("x", "x_dot"), "line": ("x",)},
     conserved=(Conserved("H", "H", "time translation", generator=_time_translation),),
-    lenses=("idealSpring",),
+    lenses=("idealSpring", "idealSpringPhase", "idealSpringPotential"),
     data_path="/data/ideal_spring.json",
 )
 
@@ -294,7 +346,7 @@ KEPLER = SystemSpec(
         Conserved("ell", r"\ell", "rotational symmetry",
                   generator=_cyclic_coordinate("phi")),
     ),
-    lenses=("keplerOrbit", "effectivePotential"),
+    lenses=("keplerOrbit", "effectivePotential", "keplerRadialPhase"),
     data_path="/data/kepler_problem.json",
     effective_potentials=(
         EffectivePotential(

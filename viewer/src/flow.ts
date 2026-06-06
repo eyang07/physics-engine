@@ -31,6 +31,8 @@ export interface FlowOptions {
   life?: number;
   /** Point size in world units. */
   size?: number;
+  /** Multiplier for particle brightness. */
+  intensity?: number;
 }
 
 export class FlowField {
@@ -42,6 +44,7 @@ export class FlowField {
   private readonly rate: number;
   private readonly life: number;
   private readonly count: number;
+  private readonly intensity: number;
 
   private readonly px: Float32Array;
   private readonly py: Float32Array;
@@ -58,6 +61,7 @@ export class FlowField {
     this.rate = options.rate ?? 1;
     this.life = options.life ?? 2.4;
     this.count = options.count ?? 700;
+    this.intensity = options.intensity ?? 1;
 
     this.px = new Float32Array(this.count);
     this.py = new Float32Array(this.count);
@@ -104,7 +108,7 @@ export class FlowField {
     const direction = (Math.atan2(vy, vx) / (Math.PI * 2) + 0.5) % 1;
     const [r, g, b] = twilight.atUnit(direction);
     // Brightness rises and falls over the particle's life (fade in / out).
-    const brightness = Math.sin(Math.PI * Math.min(1, this.age[i] / this.life));
+    const brightness = this.intensity * Math.sin(Math.PI * Math.min(1, this.age[i] / this.life));
     this.colors[i * 3] = r * brightness;
     this.colors[i * 3 + 1] = g * brightness;
     this.colors[i * 3 + 2] = b * brightness;

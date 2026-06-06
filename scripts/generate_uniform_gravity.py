@@ -4,6 +4,8 @@ import argparse
 from pathlib import Path
 from typing import Sequence
 
+import numpy as np
+
 from engine.export import Trajectory
 from engine.numerics import integrate_fixed_step
 from scripts.example_specs import UNIFORM_GRAVITY
@@ -20,12 +22,33 @@ def generate_uniform_gravity_trajectory(
 ) -> Trajectory:
     system = build_system(mass=mass, gravity=gravity)
     time, states = integrate_fixed_step(system.numerical_rhs(), initial_state, t_span, dt)
+    series = UNIFORM_GRAVITY.series({"m": mass, "g": gravity}, states)
+    z_values = states[:, 1]
+    z_span = float(z_values.max() - z_values.min())
+    pad = max(0.25, z_span * 0.18)
+    coordinate_values = np.linspace(float(z_values.min() - pad), float(z_values.max() + pad), 220)
+    potential_values = mass * gravity * coordinate_values
     return Trajectory.from_arrays(
         time=time,
         states=states,
         state_names=["x", "z", "x_dot", "z_dot"],
-        metadata={"system": "uniform_gravity", "mass": mass, "gravity": gravity},
-        series=UNIFORM_GRAVITY.series({"m": mass, "g": gravity}, states),
+        metadata={
+            "system": "uniform_gravity",
+            "mass": mass,
+            "gravity": gravity,
+            "potentialPlots": [
+                {
+                    "name": "gravity_potential",
+                    "coordinate": "z",
+                    "coordinateLatex": "z",
+                    "potentialLatex": "V",
+                    "coordinateValues": coordinate_values.tolist(),
+                    "potentialValues": potential_values.tolist(),
+                    "energy": float(np.mean(series["H"])),
+                }
+            ],
+        },
+        series=series,
     )
 
 
@@ -56,4 +79,3 @@ def main(argv: Sequence[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-
