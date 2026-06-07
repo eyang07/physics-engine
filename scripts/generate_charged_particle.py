@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Sequence
 
 from engine.export import Trajectory
-from engine.numerics import integrate_fixed_step
 from scripts.example_specs import CHARGED_PARTICLE
+from scripts.generation import generate_lagrangian_trajectory, write_trajectory_outputs
 from systems.charged_particle import build_uniform_magnetic_field_system
 
 
@@ -24,26 +24,20 @@ def generate_charged_particle_trajectory(
         charge=charge,
         magnetic_field_z=magnetic_field_z,
     )
-    rhs = system.numerical_rhs()
-    time, states = integrate_fixed_step(
-        rhs,
+    return generate_lagrangian_trajectory(
+        spec=CHARGED_PARTICLE,
+        system=system,
         initial_state=initial_state,
         t_span=t_span,
         dt=dt,
-    )
-    return Trajectory.from_arrays(
-        time=time,
-        states=states,
         state_names=["x", "y", "z", "x_dot", "y_dot", "z_dot"],
+        physical_parameters={"m": mass, "q": charge, "B_z": magnetic_field_z},
         metadata={
             "system": "charged_particle_uniform_magnetic_field",
             "mass": mass,
             "charge": charge,
             "magnetic_field": [0.0, 0.0, magnetic_field_z],
         },
-        series=CHARGED_PARTICLE.series(
-            {"m": mass, "q": charge, "B_z": magnetic_field_z}, states
-        ),
     )
 
 
@@ -55,10 +49,7 @@ def write_charged_particle_trajectory(
     dt: float = 0.01,
 ) -> Trajectory:
     trajectory = generate_charged_particle_trajectory(t_span=(0.0, t_end), dt=dt)
-    trajectory.write_json(output)
-    if viewer_output is not None:
-        trajectory.write_json(viewer_output)
-    return trajectory
+    return write_trajectory_outputs(trajectory, output, viewer_output)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -89,4 +80,3 @@ def main(argv: Sequence[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -22,9 +22,12 @@ from engine.export.manifest import (
     SystemSpec,
 )
 from engine.mechanics.symmetries import InfinitesimalSymmetry
+from systems.bead_on_hoop import build_system as build_bead_on_hoop
 from systems.charged_particle import build_uniform_magnetic_field_system
+from systems.henon_heiles import build_system as build_henon_heiles
 from systems.ideal_spring import build_system as build_ideal_spring
 from systems.kepler_problem import build_system as build_kepler
+from systems.lorenz_attractor import build_system as build_lorenz
 from systems.pendulum import build_system as build_pendulum
 from systems.sphere_geodesic import build_system as build_sphere_geodesic
 from systems.uniform_gravity import build_system as build_uniform_gravity
@@ -162,6 +165,61 @@ LENSES: tuple[Lens, ...] = (
         description="Radial motion after reducing the central-force orbit.",
         projections=("phase",),
         conserved=("H", "ell"),
+    ),
+    Lens(
+        id="beadHoop",
+        title="Rotating Hoop",
+        kind="configuration-space",
+        description="A bead sliding on a curved constraint as the hoop rotates.",
+        projections=("embedding3d",),
+        conserved=("H",),
+    ),
+    Lens(
+        id="beadHoopPhase",
+        title="Phase Portrait",
+        kind="configuration-phase",
+        description="The bead's reduced coordinate and angular velocity.",
+        projections=("phase",),
+        conserved=("H",),
+    ),
+    Lens(
+        id="beadHoopPotential",
+        title="Potential",
+        kind="potential-energy",
+        description="Effective potential of the rotating hoop.",
+        projections=("angle",),
+        conserved=("H",),
+    ),
+    Lens(
+        id="lorenzAttractor",
+        title="Attractor Flow",
+        kind="attractor-3d",
+        description="Dissipative flow converging onto the Lorenz strange attractor.",
+        projections=("embedding3d",),
+    ),
+    Lens(
+        id="henonHeilesFlow",
+        title="Hamiltonian Flow",
+        kind="hamiltonian-flow",
+        description="Configuration trajectory moving across the Hénon-Heiles potential landscape.",
+        projections=("configurationPlane",),
+        conserved=("H",),
+    ),
+    Lens(
+        id="henonHeilesPhase",
+        title="Phase Portrait",
+        kind="configuration-phase",
+        description="One canonical slice of the four-dimensional Hamiltonian flow.",
+        projections=("xPhase",),
+        conserved=("H",),
+    ),
+    Lens(
+        id="henonHeilesPotential",
+        title="Potential Contours",
+        kind="potential-contour",
+        description="Two-dimensional potential contours with the current configuration point.",
+        projections=("configurationPlane",),
+        conserved=("H",),
     ),
 )
 
@@ -361,6 +419,96 @@ KEPLER = SystemSpec(
 )
 
 
+BEAD_ON_HOOP = SystemSpec(
+    id="bead-on-hoop",
+    title="Bead on a Rotating Hoop",
+    category="Constrained Motion",
+    description="A bead sliding on a circular constraint whose rotation reshapes the effective potential.",
+    build=build_bead_on_hoop,
+    parameters=(
+        Parameter("m", "m", 1.0, 0.2, 3.0),
+        Parameter("R", "R", 1.0, 0.5, 2.0),
+        Parameter("g", "g", 9.81, 1.0, 20.0),
+        Parameter("Omega", r"\Omega", 4.0, 0.0, 8.0),
+        Parameter("theta0", r"\theta_0", 0.82, -3.14, 3.14, role="initial"),
+        Parameter("theta_dot0", r"\dot{\theta}_0", 0.12, -4.0, 4.0, role="initial"),
+    ),
+    state=(
+        StateVar("theta", r"\theta", "coordinate"),
+        StateVar("theta_dot", r"\dot{\theta}", "velocity"),
+        StateVar("x", "x", "embedding"),
+        StateVar("y", "y", "embedding"),
+        StateVar("z", "z", "embedding"),
+    ),
+    projections={
+        "phase": ("theta", "theta_dot"),
+        "angle": ("theta",),
+        "embedding3d": ("x", "y", "z"),
+    },
+    conserved=(Conserved("H", "H", "time translation", generator=_time_translation),),
+    lenses=("beadHoop", "beadHoopPhase", "beadHoopPotential"),
+    data_path="/data/bead_on_hoop.json",
+)
+
+
+LORENZ = SystemSpec(
+    id="lorenz-attractor",
+    title="Lorenz Attractor",
+    category="Dynamical Systems",
+    description="A dissipative three-dimensional flow with a strange attractor.",
+    build=build_lorenz,
+    parameters=(
+        Parameter("sigma", r"\sigma", 10.0, 1.0, 20.0),
+        Parameter("rho", r"\rho", 28.0, 1.0, 40.0),
+        Parameter("beta", r"\beta", 8.0 / 3.0, 0.5, 6.0),
+        Parameter("x0", "x_0", 0.0, -5.0, 5.0, role="initial"),
+        Parameter("y0", "y_0", 1.0, -5.0, 5.0, role="initial"),
+        Parameter("z0", "z_0", 1.05, -5.0, 5.0, role="initial"),
+    ),
+    state=(
+        StateVar("x", "x", "coordinate"),
+        StateVar("y", "y", "coordinate"),
+        StateVar("z", "z", "coordinate"),
+    ),
+    projections={"embedding3d": ("x", "y", "z")},
+    conserved=(),
+    lenses=("lorenzAttractor",),
+    data_path="/data/lorenz_attractor.json",
+    system_kind="first-order-flow",
+)
+
+
+HENON_HEILES = SystemSpec(
+    id="henon-heiles",
+    title="Hénon-Heiles System",
+    category="Hamiltonian Chaos",
+    description="A two-degree conservative Hamiltonian system with nonlinear potential valleys.",
+    build=build_henon_heiles,
+    parameters=(
+        Parameter("m", "m", 1.0, 0.2, 3.0),
+        Parameter("k", "k", 1.0, 0.2, 3.0),
+        Parameter("lambda", r"\lambda", 1.0, 0.0, 2.0),
+        Parameter("x0", "x_0", 0.0, -1.5, 1.5, role="initial"),
+        Parameter("y0", "y_0", 0.1, -1.5, 1.5, role="initial"),
+        Parameter("x_dot0", r"\dot{x}_0", 0.48, -1.5, 1.5, role="initial"),
+        Parameter("y_dot0", r"\dot{y}_0", 0.0, -1.5, 1.5, role="initial"),
+    ),
+    state=(
+        StateVar("x", "x", "coordinate"),
+        StateVar("y", "y", "coordinate"),
+        StateVar("x_dot", r"\dot{x}", "velocity"),
+        StateVar("y_dot", r"\dot{y}", "velocity"),
+    ),
+    projections={
+        "configurationPlane": ("x", "y"),
+        "xPhase": ("x", "x_dot"),
+    },
+    conserved=(Conserved("H", "H", "time translation", generator=_time_translation),),
+    lenses=("henonHeilesFlow", "henonHeilesPhase", "henonHeilesPotential"),
+    data_path="/data/henon_heiles.json",
+)
+
+
 SPECS: tuple[SystemSpec, ...] = (
     PENDULUM,
     SPHERE_GEODESIC,
@@ -368,4 +516,7 @@ SPECS: tuple[SystemSpec, ...] = (
     UNIFORM_GRAVITY,
     IDEAL_SPRING,
     KEPLER,
+    BEAD_ON_HOOP,
+    LORENZ,
+    HENON_HEILES,
 )

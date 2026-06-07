@@ -7,8 +7,8 @@ from typing import Sequence
 import numpy as np
 
 from engine.export import Trajectory
-from engine.numerics import integrate_fixed_step
 from scripts.example_specs import KEPLER
+from scripts.generation import generate_lagrangian_trajectory, write_trajectory_outputs
 from systems.kepler_problem import build_system
 
 
@@ -21,22 +21,25 @@ def generate_kepler_trajectory(
     dt: float = 0.01,
 ) -> Trajectory:
     system = build_system(mass=mass, gravitational_parameter=gravitational_parameter)
-    time, intrinsic_states = integrate_fixed_step(system.numerical_rhs(), initial_state, t_span, dt)
-    r = intrinsic_states[:, 0]
-    phi = intrinsic_states[:, 1]
-    embedded = np.column_stack([r * np.cos(phi), r * np.sin(phi)])
-    states = np.column_stack([intrinsic_states, embedded])
-    return Trajectory.from_arrays(
-        time=time,
-        states=states,
+    return generate_lagrangian_trajectory(
+        spec=KEPLER,
+        system=system,
+        initial_state=initial_state,
+        t_span=t_span,
+        dt=dt,
         state_names=["r", "phi", "r_dot", "phi_dot", "x", "y"],
+        physical_parameters={"m": mass, "mu": gravitational_parameter},
         metadata={
             "system": "kepler_problem",
             "mass": mass,
             "gravitational_parameter": gravitational_parameter,
         },
-        series=KEPLER.series(
-            {"m": mass, "mu": gravitational_parameter}, states
+        state_transform=lambda _time, intrinsic_states: np.column_stack(
+            [
+                intrinsic_states,
+                intrinsic_states[:, 0] * np.cos(intrinsic_states[:, 1]),
+                intrinsic_states[:, 0] * np.sin(intrinsic_states[:, 1]),
+            ]
         ),
     )
 
@@ -47,10 +50,7 @@ def write_kepler_trajectory(
     viewer_output: Path | None = None,
 ) -> Trajectory:
     trajectory = generate_kepler_trajectory()
-    trajectory.write_json(output)
-    if viewer_output is not None:
-        trajectory.write_json(viewer_output)
-    return trajectory
+    return write_trajectory_outputs(trajectory, output, viewer_output)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -68,4 +68,3 @@ def main(argv: Sequence[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-

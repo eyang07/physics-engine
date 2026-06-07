@@ -113,20 +113,34 @@ export interface ManifestDerivation {
   effective_potentials: ManifestEffectivePotential[];
 }
 
+export interface ManifestDynamicsEquation {
+  state: string;
+  equation_latex: string;
+  expression_latex: string;
+}
+
+export interface ManifestDynamics {
+  vector_field: ManifestDynamicsEquation[];
+  divergence_latex: string;
+  jacobian_latex: string;
+}
+
 export interface SystemManifest {
   id: string;
   title: string;
   category: string;
   description: string;
   dataPath: string;
+  systemKind?: "mechanics" | "first-order-flow" | string;
   parameters: ManifestParameter[];
   state: ManifestStateVar[];
   projections: Record<string, string[]>;
   conserved: ManifestConserved[];
   effectivePotentials: ManifestEffectivePotential[];
   lenses: string[];
-  physics: ManifestPhysics;
-  derivation: ManifestDerivation;
+  physics?: ManifestPhysics;
+  derivation?: ManifestDerivation;
+  dynamics?: ManifestDynamics;
 }
 
 export interface Manifest {

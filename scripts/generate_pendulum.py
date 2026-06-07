@@ -7,8 +7,12 @@ from typing import Sequence
 import numpy as np
 
 from engine.export import Trajectory
-from engine.numerics import integrate_fixed_step
 from scripts.example_specs import PENDULUM
+from scripts.generation import (
+    generate_lagrangian_trajectory,
+    potential_plot_metadata,
+    write_trajectory_outputs,
+)
 from systems.pendulum import build_system
 
 
@@ -23,34 +27,37 @@ def generate_pendulum_trajectory(
     dt: float = 0.01,
 ) -> Trajectory:
     system = build_system(mass=mass, length=length, gravity=gravity)
-    rhs = system.numerical_rhs()
-    time, states = integrate_fixed_step(
-        rhs,
+    physical_parameters = {"m": mass, "ell": length, "g": gravity}
+    theta_values = np.linspace(-np.pi, np.pi, 320)
+    potential_values = mass * gravity * length * (1 - np.cos(theta_values))
+
+    trajectory = generate_lagrangian_trajectory(
+        spec=PENDULUM,
+        system=system,
         initial_state=[theta0, theta_dot0],
         t_span=t_span,
         dt=dt,
-    )
-    series = PENDULUM.series({"m": mass, "ell": length, "g": gravity}, states)
-    theta_values = np.linspace(-np.pi, np.pi, 320)
-    potential_values = mass * gravity * length * (1 - np.cos(theta_values))
-    return Trajectory.from_arrays(
-        time=time,
-        states=states,
         state_names=["theta", "theta_dot"],
+        physical_parameters=physical_parameters,
+    )
+    assert trajectory.series is not None
+    return Trajectory.from_arrays(
+        time=trajectory.time,
+        states=trajectory.states,
+        state_names=trajectory.state_names,
         metadata={
             "potentialPlots": [
-                {
-                    "name": "pendulum_potential",
-                    "coordinate": "theta",
-                    "coordinateLatex": r"\theta",
-                    "potentialLatex": "V",
-                    "coordinateValues": theta_values.tolist(),
-                    "potentialValues": potential_values.tolist(),
-                    "energy": float(np.mean(series["H"])),
-                }
+                potential_plot_metadata(
+                    name="pendulum_potential",
+                    coordinate="theta",
+                    coordinate_latex=r"\theta",
+                    coordinate_values=theta_values,
+                    potential_values=potential_values,
+                    energy_series=trajectory.series["H"],
+                )
             ]
         },
-        series=series,
+        series=trajectory.series,
     )
 
 
@@ -75,10 +82,7 @@ def write_pendulum_trajectory(
         t_span=(0.0, t_end),
         dt=dt,
     )
-    trajectory.write_json(output)
-    if viewer_output is not None:
-        trajectory.write_json(viewer_output)
-    return trajectory
+    return write_trajectory_outputs(trajectory, output, viewer_output)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

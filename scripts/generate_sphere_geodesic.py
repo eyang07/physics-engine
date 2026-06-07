@@ -7,8 +7,8 @@ from typing import Sequence
 import numpy as np
 
 from engine.export import Trajectory
-from engine.numerics import integrate_fixed_step
 from scripts.example_specs import SPHERE_GEODESIC
+from scripts.generation import generate_lagrangian_trajectory, write_trajectory_outputs
 from systems.sphere_geodesic import build_system
 
 
@@ -34,25 +34,25 @@ def generate_sphere_geodesic_trajectory(
     dt: float = 0.01,
 ) -> Trajectory:
     system = build_system(mass=mass, radius=radius)
-    rhs = system.numerical_rhs()
-    time, intrinsic_states = integrate_fixed_step(
-        rhs,
+    return generate_lagrangian_trajectory(
+        spec=SPHERE_GEODESIC,
+        system=system,
         initial_state=[theta0, phi0, theta_dot0, phi_dot0],
         t_span=t_span,
         dt=dt,
-    )
-    embedded = embed_sphere(radius, intrinsic_states[:, 0], intrinsic_states[:, 1])
-    states = np.column_stack([intrinsic_states, embedded])
-    return Trajectory.from_arrays(
-        time=time,
-        states=states,
         state_names=["theta", "phi", "theta_dot", "phi_dot", "x", "y", "z"],
+        physical_parameters={"m": mass, "R": radius},
         metadata={
             "system": "sphere_geodesic",
             "radius": radius,
             "mass": mass,
         },
-        series=SPHERE_GEODESIC.series({"m": mass, "R": radius}, states),
+        state_transform=lambda _time, intrinsic_states: np.column_stack(
+            [
+                intrinsic_states,
+                embed_sphere(radius, intrinsic_states[:, 0], intrinsic_states[:, 1]),
+            ]
+        ),
     )
 
 
@@ -69,10 +69,7 @@ def write_sphere_geodesic_trajectory(
         t_span=(0.0, t_end),
         dt=dt,
     )
-    trajectory.write_json(output)
-    if viewer_output is not None:
-        trajectory.write_json(viewer_output)
-    return trajectory
+    return write_trajectory_outputs(trajectory, output, viewer_output)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -105,4 +102,3 @@ def main(argv: Sequence[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-

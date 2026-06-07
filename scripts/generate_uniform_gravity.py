@@ -7,8 +7,12 @@ from typing import Sequence
 import numpy as np
 
 from engine.export import Trajectory
-from engine.numerics import integrate_fixed_step
 from scripts.example_specs import UNIFORM_GRAVITY
+from scripts.generation import (
+    generate_lagrangian_trajectory,
+    potential_plot_metadata,
+    write_trajectory_outputs,
+)
 from systems.uniform_gravity import build_system
 
 
@@ -21,34 +25,41 @@ def generate_uniform_gravity_trajectory(
     dt: float = 0.005,
 ) -> Trajectory:
     system = build_system(mass=mass, gravity=gravity)
-    time, states = integrate_fixed_step(system.numerical_rhs(), initial_state, t_span, dt)
-    series = UNIFORM_GRAVITY.series({"m": mass, "g": gravity}, states)
-    z_values = states[:, 1]
+    trajectory = generate_lagrangian_trajectory(
+        spec=UNIFORM_GRAVITY,
+        system=system,
+        initial_state=initial_state,
+        t_span=t_span,
+        dt=dt,
+        state_names=["x", "z", "x_dot", "z_dot"],
+        physical_parameters={"m": mass, "g": gravity},
+    )
+    assert trajectory.series is not None
+    z_values = trajectory.states[:, 1]
     z_span = float(z_values.max() - z_values.min())
     pad = max(0.25, z_span * 0.18)
     coordinate_values = np.linspace(float(z_values.min() - pad), float(z_values.max() + pad), 220)
     potential_values = mass * gravity * coordinate_values
     return Trajectory.from_arrays(
-        time=time,
-        states=states,
-        state_names=["x", "z", "x_dot", "z_dot"],
+        time=trajectory.time,
+        states=trajectory.states,
+        state_names=trajectory.state_names,
         metadata={
             "system": "uniform_gravity",
             "mass": mass,
             "gravity": gravity,
             "potentialPlots": [
-                {
-                    "name": "gravity_potential",
-                    "coordinate": "z",
-                    "coordinateLatex": "z",
-                    "potentialLatex": "V",
-                    "coordinateValues": coordinate_values.tolist(),
-                    "potentialValues": potential_values.tolist(),
-                    "energy": float(np.mean(series["H"])),
-                }
+                potential_plot_metadata(
+                    name="gravity_potential",
+                    coordinate="z",
+                    coordinate_latex="z",
+                    coordinate_values=coordinate_values,
+                    potential_values=potential_values,
+                    energy_series=trajectory.series["H"],
+                )
             ],
         },
-        series=series,
+        series=trajectory.series,
     )
 
 
@@ -58,10 +69,7 @@ def write_uniform_gravity_trajectory(
     viewer_output: Path | None = None,
 ) -> Trajectory:
     trajectory = generate_uniform_gravity_trajectory()
-    trajectory.write_json(output)
-    if viewer_output is not None:
-        trajectory.write_json(viewer_output)
-    return trajectory
+    return write_trajectory_outputs(trajectory, output, viewer_output)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

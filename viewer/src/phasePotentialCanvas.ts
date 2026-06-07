@@ -28,6 +28,13 @@ type PotentialPlot = {
   energy?: number;
 };
 
+type PotentialSurface = {
+  xValues: number[];
+  yValues: number[];
+  values: number[][];
+  energy?: number;
+};
+
 function setupCanvas(ctx: CanvasRenderingContext2D, width: number, height: number): void {
   const pixelRatio = window.devicePixelRatio || 1;
   const drawingWidth = Math.max(1, Math.floor(width * pixelRatio));
@@ -120,11 +127,16 @@ function labelFor(system: SystemManifest, name: string): string {
   if (!state) {
     return name;
   }
-  return state.latex
+  return plainMathLabel(state.latex);
+}
+
+function plainMathLabel(label: string): string {
+  return label
     .replace(/\\dot\{\\theta\}/g, "theta_dot")
     .replace(/\\dot\{\\phi\}/g, "phi_dot")
     .replace(/\\theta/g, "theta")
-    .replace(/\\phi/g, "phi");
+    .replace(/\\phi/g, "phi")
+    .replace(/\\Omega/g, "Omega");
 }
 
 function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, y: number): void {
@@ -249,6 +261,232 @@ function interpolate(xs: number[], ys: number[], x: number): number {
   return ys[ys.length - 1];
 }
 
+function getPotentialSurface(data: Trajectory): PotentialSurface | undefined {
+  const metadata = data.metadata as { potentialSurface?: PotentialSurface } | undefined;
+  return metadata?.potentialSurface;
+}
+
+function drawContourSegment(
+  ctx: CanvasRenderingContext2D,
+  level: number,
+  corners: Array<{ x: number; y: number; value: number }>,
+): void {
+  const intersections: Array<{ x: number; y: number }> = [];
+  const edges = [
+    [corners[0], corners[1]],
+    [corners[1], corners[2]],
+    [corners[2], corners[3]],
+    [corners[3], corners[0]],
+  ];
+
+  edges.forEach(([start, end]) => {
+    const span = end.value - start.value;
+    if (Math.abs(span) < 1e-12) {
+      return;
+    }
+    const alpha = (level - start.value) / span;
+    if (alpha >= 0 && alpha <= 1) {
+      intersections.push({
+        x: start.x + (end.x - start.x) * alpha,
+        y: start.y + (end.y - start.y) * alpha,
+      });
+    }
+  });
+
+  if (intersections.length >= 2) {
+    ctx.moveTo(intersections[0].x, intersections[0].y);
+    ctx.lineTo(intersections[1].x, intersections[1].y);
+  }
+  if (intersections.length >= 4) {
+    ctx.moveTo(intersections[2].x, intersections[2].y);
+    ctx.lineTo(intersections[3].x, intersections[3].y);
+  }
+}
+
+function drawArrow2d(
+  ctx: CanvasRenderingContext2D,
+  startX: number,
+  startY: number,
+  vectorX: number,
+  vectorY: number,
+  opacity: number,
+): void {
+  const length = Math.hypot(vectorX, vectorY);
+  if (length < 1e-8) {
+    return;
+  }
+  const ux = vectorX / length;
+  const uy = vectorY / length;
+  const endX = startX + vectorX;
+  const endY = startY + vectorY;
+
+  ctx.strokeStyle = `rgba(111, 182, 201, ${opacity})`;
+  ctx.fillStyle = `rgba(111, 182, 201, ${opacity})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(endX, endY);
+  ctx.lineTo(endX - ux * 7 - uy * 3.5, endY - uy * 7 + ux * 3.5);
+  ctx.lineTo(endX - ux * 7 + uy * 3.5, endY - uy * 7 - ux * 3.5);
+  ctx.closePath();
+  ctx.fill();
+}
+
+export function drawPotentialContourScene(
+  ctx: CanvasRenderingContext2D,
+  data: Trajectory,
+  sample: Sample,
+  width: number,
+  height: number,
+): void {
+  const surface = getPotentialSurface(data);
+  if (!surface) {
+    drawUnavailable(ctx, width, height, "Potential surface unavailable.");
+    return;
+  }
+  const indices = stateIndex(data);
+  const xIndex = indices.get("x");
+  const yIndex = indices.get("y");
+  if (xIndex === undefined || yIndex === undefined) {
+    drawUnavailable(ctx, width, height, "Configuration data unavailable.");
+    return;
+  }
+
+  setupCanvas(ctx, width, height);
+  drawBackground(ctx, width, height);
+
+  const area = areaFor(width, height);
+  const xRange = range(surface.xValues, [sample.state[xIndex]]);
+  const yRange = range(surface.yValues, [sample.state[yIndex]]);
+  const flatValues = surface.values.flat().filter(Number.isFinite);
+  const valueRange = range(flatValues, surface.energy === undefined ? [] : [surface.energy]);
+
+  for (let row = 0; row < surface.yValues.length - 1; row += 1) {
+    for (let col = 0; col < surface.xValues.length - 1; col += 1) {
+      const value = surface.values[row][col];
+      const normalized = clamp((value - valueRange.min) / (valueRange.max - valueRange.min), 0, 1);
+      const alpha = 0.025 + normalized * 0.16;
+      ctx.fillStyle = normalized > 0.72 ? `rgba(240, 180, 106, ${alpha})` : `rgba(111, 182, 201, ${alpha})`;
+      const x0 = xOf(surface.xValues[col], xRange, area);
+      const x1 = xOf(surface.xValues[col + 1], xRange, area);
+      const y0 = yOf(surface.yValues[row], yRange, area);
+      const y1 = yOf(surface.yValues[row + 1], yRange, area);
+      ctx.fillRect(x0, y1, Math.max(1, x1 - x0), Math.max(1, y0 - y1));
+    }
+  }
+
+  drawAxes(ctx, xRange, yRange, area);
+
+  const levels = Array.from({ length: 10 }, (_item, index) => {
+    const alpha = (index + 1) / 11;
+    return valueRange.min + alpha * (valueRange.max - valueRange.min);
+  });
+  if (surface.energy !== undefined) {
+    levels.push(surface.energy);
+  }
+  levels.forEach((level) => {
+    ctx.strokeStyle = level === surface.energy ? theme.accent : theme.hairlineStrong;
+    ctx.lineWidth = level === surface.energy ? 2 : 1;
+    ctx.beginPath();
+    for (let row = 0; row < surface.yValues.length - 1; row += 1) {
+      for (let col = 0; col < surface.xValues.length - 1; col += 1) {
+        drawContourSegment(ctx, level, [
+          {
+            x: xOf(surface.xValues[col], xRange, area),
+            y: yOf(surface.yValues[row], yRange, area),
+            value: surface.values[row][col],
+          },
+          {
+            x: xOf(surface.xValues[col + 1], xRange, area),
+            y: yOf(surface.yValues[row], yRange, area),
+            value: surface.values[row][col + 1],
+          },
+          {
+            x: xOf(surface.xValues[col + 1], xRange, area),
+            y: yOf(surface.yValues[row + 1], yRange, area),
+            value: surface.values[row + 1][col + 1],
+          },
+          {
+            x: xOf(surface.xValues[col], xRange, area),
+            y: yOf(surface.yValues[row + 1], yRange, area),
+            value: surface.values[row + 1][col],
+          },
+        ]);
+      }
+    }
+    ctx.stroke();
+  });
+
+  const metadata = data.metadata as { stiffness?: number; coupling?: number } | undefined;
+  const stiffness = metadata?.stiffness ?? 1;
+  const coupling = metadata?.coupling ?? 1;
+  for (let gx = xRange.min; gx <= xRange.max; gx += (xRange.max - xRange.min) / 9) {
+    for (let gy = yRange.min; gy <= yRange.max; gy += (yRange.max - yRange.min) / 7) {
+      const forceX = -(stiffness * gx + 2 * coupling * gx * gy);
+      const forceY = -(stiffness * gy + coupling * (gx * gx - gy * gy));
+      const scale = 18 / Math.max(1, Math.hypot(forceX, forceY));
+      drawArrow2d(
+        ctx,
+        xOf(gx, xRange, area),
+        yOf(gy, yRange, area),
+        forceX * scale,
+        -forceY * scale,
+        0.2,
+      );
+    }
+  }
+
+  const trajectory = data.states.map((state) => ({
+    x: xOf(state[xIndex], xRange, area),
+    y: yOf(state[yIndex], yRange, area),
+  }));
+  ctx.strokeStyle = theme.cool;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  trajectory.forEach((point, index) => {
+    if (index === 0) {
+      ctx.moveTo(point.x, point.y);
+    } else {
+      ctx.lineTo(point.x, point.y);
+    }
+  });
+  ctx.stroke();
+
+  ctx.strokeStyle = theme.accent;
+  ctx.lineWidth = 2.4;
+  ctx.shadowColor = theme.accent;
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  trajectory.slice(0, sample.index + 1).forEach((point, index) => {
+    if (index === 0) {
+      ctx.moveTo(point.x, point.y);
+    } else {
+      ctx.lineTo(point.x, point.y);
+    }
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = theme.accentStrong;
+  ctx.beginPath();
+  ctx.arc(
+    xOf(sample.state[xIndex], xRange, area),
+    yOf(sample.state[yIndex], yRange, area),
+    6,
+    0,
+    Math.PI * 2,
+  );
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  drawLabel(ctx, "Potential Contours", area.left, area.top - 18);
+  drawLabel(ctx, "x", area.right - 20, area.bottom + 30);
+  drawLabel(ctx, "y", area.left + 10, area.top + 18);
+}
+
 export function drawPotentialScene(
   ctx: CanvasRenderingContext2D,
   data: Trajectory,
@@ -325,6 +563,6 @@ export function drawPotentialScene(
   ctx.shadowBlur = 0;
 
   drawLabel(ctx, lens.title, area.left, area.top - 18);
-  drawLabel(ctx, plot.coordinateLatex ?? plot.coordinate, area.right - 48, area.bottom + 30);
-  drawLabel(ctx, plot.potentialLatex ?? "V", area.left + 10, area.top + 18);
+  drawLabel(ctx, plainMathLabel(plot.coordinateLatex ?? plot.coordinate), area.right - 48, area.bottom + 30);
+  drawLabel(ctx, plainMathLabel(plot.potentialLatex ?? "V"), area.left + 10, area.top + 18);
 }

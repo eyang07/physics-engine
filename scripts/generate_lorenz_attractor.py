@@ -1,0 +1,109 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+from typing import Sequence
+
+import numpy as np
+import sympy as sp
+
+from engine.export import Trajectory
+from engine.numerics import integrate_adaptive
+from scripts.generation import write_trajectory_outputs
+from systems.lorenz_attractor import build_system
+
+
+def _real_float(value: sp.Expr) -> float:
+    numeric = complex(sp.N(value))
+    return float(numeric.real)
+
+
+def _complex_pair(value: sp.Expr) -> dict[str, float]:
+    numeric = complex(sp.N(value))
+    return {"real": float(numeric.real), "imag": float(numeric.imag)}
+
+
+def generate_lorenz_trajectory(
+    *,
+    sigma: float = 10.0,
+    rho: float = 28.0,
+    beta: float = 8.0 / 3.0,
+    initial_state: Sequence[float] = (0.0, 1.0, 1.05),
+    t_span: tuple[float, float] = (0.0, 42.0),
+    transient: float = 8.0,
+    sample_dt: float = 0.01,
+) -> Trajectory:
+    system = build_system(sigma=sigma, rho=rho, beta=beta)
+    time, states = integrate_adaptive(
+        system.numerical_rhs(),
+        initial_state,
+        t_span,
+        sample_dt=sample_dt,
+        transient=transient,
+        max_step=0.025,
+    )
+    rhs_values = np.asarray([system.numerical_rhs()(float(t), state) for t, state in zip(time, states, strict=True)])
+    speed = np.linalg.norm(rhs_values, axis=1)
+    radius = np.linalg.norm(states, axis=1)
+
+    x, y, z = system.state
+    fixed_points = []
+    for point in system.fixed_points():
+        coordinates = {symbol.name: _real_float(point[symbol]) for symbol in system.state}
+        eigenvalues = [
+            _complex_pair(eigenvalue)
+            for eigenvalue in system.eigenvalues_at(point)
+        ]
+        fixed_points.append({"coordinates": coordinates, "eigenvalues": eigenvalues})
+
+    bounds = {
+        name: {
+            "min": float(states[:, index].min()),
+            "max": float(states[:, index].max()),
+        }
+        for index, name in enumerate(("x", "y", "z"))
+    }
+
+    return Trajectory.from_arrays(
+        time=time,
+        states=states,
+        state_names=["x", "y", "z"],
+        metadata={
+            "system": "lorenz_attractor",
+            "kind": "first-order-flow",
+            "parameters": {"sigma": sigma, "rho": rho, "beta": beta},
+            "bounds": bounds,
+            "divergence": float(system.divergence()),
+            "fixedPoints": fixed_points,
+        },
+        series={
+            "speed": speed.tolist(),
+            "radius": radius.tolist(),
+        },
+    )
+
+
+def write_lorenz_trajectory(
+    output: Path,
+    *,
+    viewer_output: Path | None = None,
+) -> Trajectory:
+    trajectory = generate_lorenz_trajectory()
+    return write_trajectory_outputs(trajectory, output, viewer_output)
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Generate Lorenz attractor data.")
+    parser.add_argument("--output", type=Path, default=Path("data/generated/lorenz_attractor.json"))
+    parser.add_argument("--viewer-output", type=Path, default=Path("viewer/public/data/lorenz_attractor.json"))
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    args = parse_args(argv)
+    write_lorenz_trajectory(args.output, viewer_output=args.viewer_output)
+    print(f"Wrote trajectory to {args.output}")
+
+
+if __name__ == "__main__":
+    main()

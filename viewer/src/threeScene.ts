@@ -12,9 +12,24 @@ export type ThreeMode =
   | "chargedParticle"
   | "uniformGravity"
   | "idealSpring"
-  | "keplerOrbit";
+  | "keplerOrbit"
+  | "beadHoop"
+  | "lorenzAttractor"
+  | "henonHeilesFlow";
 
 const PENDULUM_GRAVITY = 9.81;
+
+type LorenzTransform = {
+  center: THREE.Vector3;
+  scale: number;
+};
+
+type PotentialSurfaceMetadata = {
+  xValues: number[];
+  yValues: number[];
+  values: number[][];
+  energy?: number;
+};
 
 function makeLabel(text: string): THREE.Sprite {
   const canvas = document.createElement("canvas");
@@ -107,6 +122,51 @@ function trajectoryEvery<T>(items: T[], count: number): T[] {
   }
   const step = Math.max(1, Math.floor(items.length / count));
   return items.filter((_item, index) => index % step === 0);
+}
+
+function rawLorenzPoint(state: number[]): THREE.Vector3 {
+  return new THREE.Vector3(state[0], state[2], state[1]);
+}
+
+function lorenzPoint(state: number[], transform: LorenzTransform): THREE.Vector3 {
+  return rawLorenzPoint(state).sub(transform.center).multiplyScalar(transform.scale);
+}
+
+function lorenzTransform(data: Trajectory): LorenzTransform {
+  const rawPoints = data.states.map(rawLorenzPoint);
+  const box = new THREE.Box3().setFromPoints(rawPoints);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  const scale = 3.1 / Math.max(size.x, size.y, size.z, 1);
+  return { center, scale };
+}
+
+function makeFadingTrail(length: number, color: THREE.ColorRepresentation): THREE.Line {
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(length * 3);
+  const colors = new Float32Array(length * 3);
+  const base = new THREE.Color(color);
+
+  for (let index = 0; index < length; index += 1) {
+    const alpha = index / Math.max(1, length - 1);
+    const brightness = alpha * alpha;
+    colors[index * 3] = base.r * brightness;
+    colors[index * 3 + 1] = base.g * brightness;
+    colors[index * 3 + 2] = base.b * brightness;
+  }
+
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  return new THREE.Line(
+    geometry,
+    new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.95,
+    }),
+  );
 }
 
 function pendulumHamiltonian(theta: number, momentum: number): number {
@@ -466,6 +526,267 @@ function makeKeplerGroup(data: Trajectory): THREE.Group {
   return group;
 }
 
+function beadPoint(state: number[]): THREE.Vector3 {
+  return new THREE.Vector3(state[2], state[4], state[3]);
+}
+
+function makeHoopLine(radius = 1, opacity = 0.38): THREE.Line {
+  return lineFromPoints(
+    Array.from({ length: 161 }, (_, index) => {
+      const theta = (index / 160) * Math.PI * 2;
+      return new THREE.Vector3(radius * Math.sin(theta), -radius * Math.cos(theta), 0);
+    }),
+    new THREE.Color(theme.cool),
+    opacity,
+  );
+}
+
+function makeBeadHoopGroup(data: Trajectory): { group: THREE.Group; hoop: THREE.Group } {
+  const group = new THREE.Group();
+  const hoop = new THREE.Group();
+
+  hoop.add(makeHoopLine(1, 0.58));
+  hoop.add(lineFromPoints([new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 1, 0)], new THREE.Color(theme.textFaint), 0.2));
+  hoop.add(lineFromPoints([new THREE.Vector3(-1, 0, 0), new THREE.Vector3(1, 0, 0)], new THREE.Color(theme.textFaint), 0.16));
+  group.add(hoop);
+
+  for (const angle of [Math.PI / 5, (2 * Math.PI) / 5, (3 * Math.PI) / 5, (4 * Math.PI) / 5]) {
+    const echo = makeHoopLine(1, 0.12);
+    echo.rotation.y = angle;
+    group.add(echo);
+  }
+
+  const trajectory = data.states.map(beadPoint);
+
+  for (const point of trajectoryEvery(trajectory, 12)) {
+    const radial = new THREE.Vector3(point.x, 0, point.z);
+    if (radial.length() > 1e-4) {
+      radial.normalize().multiplyScalar(0.12);
+      group.add(vectorArrow(point.clone().setY(point.y + 0.04), radial, new THREE.Color(theme.textFaint), 0.24));
+    }
+  }
+
+  const axis = lineFromPoints([new THREE.Vector3(0, -1.18, 0), new THREE.Vector3(0, 1.18, 0)], new THREE.Color(theme.textFaint), 0.24);
+  group.add(axis);
+
+  const label = makeLabel("Ω");
+  label.position.set(0.26, 1.22, 0.18);
+  group.add(label);
+  return { group, hoop };
+}
+
+function fixedPointCoordinates(data: Trajectory): number[][] {
+  const fixedPoints = data.metadata?.fixedPoints;
+  if (!Array.isArray(fixedPoints)) {
+    return [];
+  }
+
+  return fixedPoints.flatMap((item) => {
+    if (!item || typeof item !== "object" || !("coordinates" in item)) {
+      return [];
+    }
+    const coordinates = (item as { coordinates?: Record<string, unknown> }).coordinates;
+    const x = coordinates?.x;
+    const y = coordinates?.y;
+    const z = coordinates?.z;
+    return typeof x === "number" && typeof y === "number" && typeof z === "number" ? [[x, y, z]] : [];
+  });
+}
+
+function makeLorenzAttractorGroup(data: Trajectory, transform: LorenzTransform): THREE.Group {
+  const group = new THREE.Group();
+  const points = data.states.map((state) => lorenzPoint(state, transform));
+
+  group.add(lineFromPoints(points, new THREE.Color(theme.accent), 0.38));
+  group.add(lineFromPoints(points, new THREE.Color(theme.cool), 0.12));
+
+  const box = new THREE.Box3().setFromPoints(points);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const guideRadius = Math.max(size.x, size.z) * 0.36;
+  for (const y of [-0.68, 0, 0.68]) {
+    const guide = lineFromPoints(
+      Array.from({ length: 129 }, (_item, index) => {
+        const angle = (index / 128) * Math.PI * 2;
+        return new THREE.Vector3(Math.cos(angle) * guideRadius, y, Math.sin(angle) * guideRadius * 0.7);
+      }),
+      new THREE.Color(theme.textFaint),
+      0.12,
+    );
+    group.add(guide);
+  }
+
+  const step = Math.max(1, Math.floor(points.length / 34));
+  for (let index = step; index < points.length - step; index += step) {
+    const tangent = points[index + 1].clone().sub(points[index - 1]);
+    if (tangent.length() < 1e-5) {
+      continue;
+    }
+    group.add(
+      vectorArrow(
+        points[index].clone(),
+        tangent.normalize().multiplyScalar(0.16),
+        new THREE.Color(theme.textFaint),
+        0.28,
+      ),
+    );
+  }
+
+  const fixedMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(theme.cool),
+    emissive: new THREE.Color(theme.cool),
+    emissiveIntensity: 0.16,
+    transparent: true,
+    opacity: 0.72,
+    roughness: 0.45,
+  });
+  for (const point of fixedPointCoordinates(data)) {
+    const marker = new THREE.Mesh(new THREE.SphereGeometry(0.04, 18, 12), fixedMaterial);
+    marker.position.copy(lorenzPoint(point, transform));
+    group.add(marker);
+  }
+
+  return group;
+}
+
+function potentialSurfaceMetadata(data: Trajectory): PotentialSurfaceMetadata | null {
+  const surface = data.metadata?.potentialSurface;
+  if (!surface || typeof surface !== "object") {
+    return null;
+  }
+  const candidate = surface as Partial<PotentialSurfaceMetadata>;
+  if (!Array.isArray(candidate.xValues) || !Array.isArray(candidate.yValues) || !Array.isArray(candidate.values)) {
+    return null;
+  }
+  return candidate as PotentialSurfaceMetadata;
+}
+
+function henonPotential(x: number, y: number, data: Trajectory): number {
+  const metadata = data.metadata as { stiffness?: number; coupling?: number } | undefined;
+  const stiffness = metadata?.stiffness ?? 1;
+  const coupling = metadata?.coupling ?? 1;
+  return 0.5 * stiffness * (x * x + y * y) + coupling * (x * x * y - (y * y * y) / 3);
+}
+
+function henonPoint(state: number[], data: Trajectory): THREE.Vector3 {
+  const x = state[0];
+  const y = state[1];
+  return new THREE.Vector3(x * 1.38, henonPotential(x, y, data) * 0.95 - 0.36, y * 1.38);
+}
+
+function makeHenonSurface(data: Trajectory): THREE.Group {
+  const group = new THREE.Group();
+  const surface = potentialSurfaceMetadata(data);
+  if (!surface) {
+    return group;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const indices: number[] = [];
+  const color = new THREE.Color();
+  const flatValues = surface.values.flat().filter(Number.isFinite);
+  const minValue = Math.min(...flatValues);
+  const maxValue = Math.max(...flatValues);
+  const span = Math.max(1e-6, maxValue - minValue);
+
+  surface.yValues.forEach((y, row) => {
+    surface.xValues.forEach((x, col) => {
+      const value = surface.values[row][col];
+      positions.push(x * 1.38, value * 0.95 - 0.36, y * 1.38);
+      const normalized = (value - minValue) / span;
+      color.setHSL(0.54 - normalized * 0.37, 0.5, 0.46 + normalized * 0.12);
+      colors.push(color.r, color.g, color.b);
+    });
+  });
+
+  const columns = surface.xValues.length;
+  for (let row = 0; row < surface.yValues.length - 1; row += 1) {
+    for (let col = 0; col < surface.xValues.length - 1; col += 1) {
+      const a = row * columns + col;
+      const b = row * columns + col + 1;
+      const c = (row + 1) * columns + col + 1;
+      const d = (row + 1) * columns + col;
+      indices.push(a, b, d, b, c, d);
+    }
+  }
+
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+
+  group.add(
+    new THREE.Mesh(
+      geometry,
+      new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.5,
+        roughness: 0.78,
+        metalness: 0.03,
+        side: THREE.DoubleSide,
+      }),
+    ),
+  );
+
+  const rowStep = Math.max(1, Math.floor(surface.yValues.length / 10));
+  const colStep = Math.max(1, Math.floor(surface.xValues.length / 10));
+  for (let row = 0; row < surface.yValues.length; row += rowStep) {
+    group.add(
+      lineFromPoints(
+        surface.xValues.map((x, col) => new THREE.Vector3(x * 1.38, surface.values[row][col] * 0.95 - 0.35, surface.yValues[row] * 1.38)),
+        new THREE.Color(theme.textFaint),
+        0.12,
+      ),
+    );
+  }
+  for (let col = 0; col < surface.xValues.length; col += colStep) {
+    group.add(
+      lineFromPoints(
+        surface.yValues.map((y, row) => new THREE.Vector3(surface.xValues[col] * 1.38, surface.values[row][col] * 0.95 - 0.35, y * 1.38)),
+        new THREE.Color(theme.textFaint),
+        0.12,
+      ),
+    );
+  }
+
+  return group;
+}
+
+function makeHenonHeilesGroup(data: Trajectory): THREE.Group {
+  const group = new THREE.Group();
+  group.rotation.y = -0.24;
+  group.add(makeHenonSurface(data));
+
+  const trajectory = data.states.map((state) => henonPoint(state, data));
+  group.add(lineFromPoints(trajectory, new THREE.Color(theme.accent), 0.72));
+  group.add(lineFromPoints(trajectory, new THREE.Color(theme.cool), 0.16));
+
+  const metadata = data.metadata as { stiffness?: number; coupling?: number } | undefined;
+  const stiffness = metadata?.stiffness ?? 1;
+  const coupling = metadata?.coupling ?? 1;
+  for (let x = -0.85; x <= 0.86; x += 0.34) {
+    for (let y = -0.78; y <= 0.79; y += 0.34) {
+      const value = henonPotential(x, y, data);
+      const forceX = -(stiffness * x + 2 * coupling * x * y);
+      const forceY = -(stiffness * y + coupling * (x * x - y * y));
+      const force = new THREE.Vector3(forceX, 0, forceY);
+      if (force.length() < 1e-5) {
+        continue;
+      }
+      const start = new THREE.Vector3(x * 1.38, value * 0.95 - 0.24, y * 1.38);
+      group.add(vectorArrow(start, force.normalize().multiplyScalar(0.12), new THREE.Color(theme.textFaint), 0.22));
+    }
+  }
+
+  const label = makeLabel("H");
+  label.position.set(-1.3, 0.72, -1.25);
+  group.add(label);
+  return group;
+}
+
 export class ThreeScene {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
@@ -474,6 +795,16 @@ export class ThreeScene {
   private readonly root = new THREE.Group();
   private readonly marker: THREE.Mesh;
   private dynamicSpring: THREE.Line | null = null;
+  private beadHoop: THREE.Group | null = null;
+  private beadHoopOmega = 0;
+  private beadTrail: THREE.Line | null = null;
+  private beadTrailPoints: THREE.Vector3[] = [];
+  private lorenzTrail: THREE.Line | null = null;
+  private lorenzTrailPoints: THREE.Vector3[] = [];
+  private lorenzTransform: LorenzTransform = { center: new THREE.Vector3(), scale: 1 };
+  private henonTrail: THREE.Line | null = null;
+  private henonTrailPoints: THREE.Vector3[] = [];
+  private henonData: Trajectory | null = null;
   private flow: FlowField | null = null;
   private active = false;
   private mode: ThreeMode | null = null;
@@ -528,6 +859,16 @@ export class ThreeScene {
     this.mode = mode;
     this.root.clear();
     this.dynamicSpring = null;
+    this.beadHoop = null;
+    this.beadHoopOmega = 0;
+    this.beadTrail = null;
+    this.beadTrailPoints = [];
+    this.lorenzTrail = null;
+    this.lorenzTrailPoints = [];
+    this.lorenzTransform = { center: new THREE.Vector3(), scale: 1 };
+    this.henonTrail = null;
+    this.henonTrailPoints = [];
+    this.henonData = null;
     this.flow?.dispose();
     this.flow = null;
     this.marker.scale.setScalar(1);
@@ -581,7 +922,7 @@ export class ThreeScene {
       this.marker.scale.setScalar(1.35);
       this.camera.position.set(2.25, 1.08, 2.75);
       this.controls.target.set(0, 0, 0);
-    } else {
+    } else if (mode === "keplerOrbit") {
       this.root.add(makeKeplerGroup(data));
       this.marker.scale.setScalar(0.88);
       this.flow = new FlowField({
@@ -601,6 +942,35 @@ export class ThreeScene {
       this.root.add(this.flow.object);
       this.camera.position.set(2.35, 1.55, 2.85);
       this.controls.target.set(0, 0, 0);
+    } else if (mode === "beadHoop") {
+      const { group, hoop } = makeBeadHoopGroup(data);
+      this.root.add(group);
+      this.beadHoop = hoop;
+      this.beadHoopOmega = typeof data.metadata?.angular_speed === "number" ? data.metadata.angular_speed : 0;
+      this.beadTrailPoints = data.states.map(beadPoint);
+      this.beadTrail = makeFadingTrail(90, new THREE.Color(theme.accent));
+      this.root.add(this.beadTrail);
+      this.marker.scale.setScalar(0.9);
+      this.camera.position.set(2.35, 1.35, 2.65);
+      this.controls.target.set(0, 0, 0);
+    } else if (mode === "lorenzAttractor") {
+      this.lorenzTransform = lorenzTransform(data);
+      this.root.add(makeLorenzAttractorGroup(data, this.lorenzTransform));
+      this.lorenzTrailPoints = data.states.map((state) => lorenzPoint(state, this.lorenzTransform));
+      this.lorenzTrail = makeFadingTrail(180, new THREE.Color(theme.accentStrong));
+      this.root.add(this.lorenzTrail);
+      this.marker.scale.setScalar(0.72);
+      this.camera.position.set(3.0, 2.05, 4.4);
+      this.controls.target.set(0, 0.05, 0);
+    } else {
+      this.henonData = data;
+      this.root.add(makeHenonHeilesGroup(data));
+      this.henonTrailPoints = data.states.map((state) => henonPoint(state, data));
+      this.henonTrail = makeFadingTrail(150, new THREE.Color(theme.accentStrong));
+      this.root.add(this.henonTrail);
+      this.marker.scale.setScalar(0.78);
+      this.camera.position.set(2.7, 1.75, 3.45);
+      this.controls.target.set(0, 0.05, 0);
     }
 
     this.root.add(this.marker);
@@ -656,13 +1026,109 @@ export class ThreeScene {
         this.dynamicSpring.geometry = new THREE.BufferGeometry().setFromPoints(points);
       }
       this.root.rotation.y = Math.sin(elapsed * 0.08) * 0.06;
-    } else {
+    } else if (this.mode === "keplerOrbit") {
       this.marker.position.set(state[4], 0, state[5]);
       this.root.rotation.y = Math.sin(elapsed * 0.08) * 0.08;
+    } else if (this.mode === "beadHoop") {
+      this.marker.position.copy(beadPoint(state));
+      if (this.beadTrail) {
+        this.updateBeadTrail(state);
+      }
+      if (this.beadHoop) {
+        this.beadHoop.rotation.y = -this.beadHoopOmega * elapsed;
+      }
+      this.root.rotation.y = Math.sin(elapsed * 0.08) * 0.07;
+    } else if (this.mode === "lorenzAttractor") {
+      const point = lorenzPoint(state, this.lorenzTransform);
+      this.marker.position.copy(point);
+      if (this.lorenzTrail) {
+        this.updateLorenzTrail(point);
+      }
+      this.root.rotation.y = -0.35 + Math.sin(elapsed * 0.065) * 0.08;
+    } else if (this.henonData) {
+      const point = henonPoint(state, this.henonData);
+      this.marker.position.copy(point);
+      if (this.henonTrail) {
+        this.updateHenonTrail(point);
+      }
+      this.root.rotation.y = Math.sin(elapsed * 0.07) * 0.07;
     }
 
     this.flow?.update();
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  private updateBeadTrail(state: number[]) {
+    if (!this.beadTrail || this.beadTrailPoints.length === 0) {
+      return;
+    }
+    const positions = this.beadTrail.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const length = positions.count;
+    const current = beadPoint(state);
+    let nearest = 0;
+    let nearestDistance = Infinity;
+    this.beadTrailPoints.forEach((point, index) => {
+      const distance = point.distanceToSquared(current);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = index;
+      }
+    });
+
+    for (let index = 0; index < length; index += 1) {
+      const sourceIndex = Math.max(0, nearest - (length - 1 - index));
+      const point = this.beadTrailPoints[sourceIndex] ?? current;
+      positions.setXYZ(index, point.x, point.y, point.z);
+    }
+    positions.needsUpdate = true;
+  }
+
+  private updateLorenzTrail(current: THREE.Vector3) {
+    if (!this.lorenzTrail || this.lorenzTrailPoints.length === 0) {
+      return;
+    }
+    const positions = this.lorenzTrail.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const length = positions.count;
+    let nearest = 0;
+    let nearestDistance = Infinity;
+    this.lorenzTrailPoints.forEach((point, index) => {
+      const distance = point.distanceToSquared(current);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = index;
+      }
+    });
+
+    for (let index = 0; index < length; index += 1) {
+      const sourceIndex = Math.max(0, nearest - (length - 1 - index));
+      const point = this.lorenzTrailPoints[sourceIndex] ?? current;
+      positions.setXYZ(index, point.x, point.y, point.z);
+    }
+    positions.needsUpdate = true;
+  }
+
+  private updateHenonTrail(current: THREE.Vector3) {
+    if (!this.henonTrail || this.henonTrailPoints.length === 0) {
+      return;
+    }
+    const positions = this.henonTrail.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const length = positions.count;
+    let nearest = 0;
+    let nearestDistance = Infinity;
+    this.henonTrailPoints.forEach((point, index) => {
+      const distance = point.distanceToSquared(current);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = index;
+      }
+    });
+
+    for (let index = 0; index < length; index += 1) {
+      const sourceIndex = Math.max(0, nearest - (length - 1 - index));
+      const point = this.henonTrailPoints[sourceIndex] ?? current;
+      positions.setXYZ(index, point.x, point.y, point.z);
+    }
+    positions.needsUpdate = true;
   }
 }

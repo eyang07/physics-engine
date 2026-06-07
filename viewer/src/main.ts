@@ -16,7 +16,7 @@ import {
   drawStageBackground,
   type Bounds,
 } from "./pendulumCanvas";
-import { drawPhaseScene, drawPotentialScene } from "./phasePotentialCanvas";
+import { drawPhaseScene, drawPotentialContourScene, drawPotentialScene } from "./phasePotentialCanvas";
 import { StructurePanel } from "./structurePanel";
 import "./styles.css";
 
@@ -28,7 +28,11 @@ type CanvasMode =
   | "uniformGravityPotential"
   | "idealSpringPhase"
   | "idealSpringPotential"
-  | "keplerRadialPhase";
+  | "keplerRadialPhase"
+  | "beadHoopPhase"
+  | "beadHoopPotential"
+  | "henonHeilesPhase"
+  | "henonHeilesPotential";
 
 const CANVAS_MODE_IDS = new Set<string>([
   "pendulumMotionPhase",
@@ -39,6 +43,10 @@ const CANVAS_MODE_IDS = new Set<string>([
   "idealSpringPhase",
   "idealSpringPotential",
   "keplerRadialPhase",
+  "beadHoopPhase",
+  "beadHoopPotential",
+  "henonHeilesPhase",
+  "henonHeilesPotential",
 ]);
 
 function requireElement<T extends Element>(selector: string): T {
@@ -291,6 +299,8 @@ function render(now: number) {
     drawEffectivePotentialScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else if (selectedExample && isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "configuration-phase") {
     drawPhaseScene(ctx, trajectory, selectedExample, selectedVisualization, current, canvas.clientWidth, canvas.clientHeight);
+  } else if (selectedExample && isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "potential-contour") {
+    drawPotentialContourScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else if (selectedExample && isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "potential-energy") {
     drawPotentialScene(ctx, trajectory, selectedExample, selectedVisualization, current, canvas.clientWidth, canvas.clientHeight);
   } else {

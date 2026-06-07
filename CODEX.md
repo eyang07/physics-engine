@@ -21,7 +21,7 @@ and tests covering equations, invariants, and manifest shape.
 central-force variants, bead on hoop, driven oscillator, or constrained
 pendulum.
 
-[ ] Add a small reusable generator helper around
+[x] Add a small reusable generator helper around
 `engine.numerics.integrate_fixed_step`, `Trajectory.from_arrays`, parameter
 defaults, viewer-copy output, and invariant series sampling.
 
@@ -32,7 +32,7 @@ defaults, viewer-copy output, and invariant series sampling.
 `configuration-phase`, and `effective-potential` first; add new lens kinds only
 for genuinely new visual grammar.
 
-[ ] Improve existing visuals by upgrading reusable primitives in
+[x] Improve existing visuals by upgrading reusable primitives in
 `viewer/src/threeScene.ts`, `viewer/src/flow.ts`,
 `viewer/src/pendulumCanvas.ts`, and
 `viewer/src/effectivePotentialCanvas.ts`: animated trail heads, clearer axes,

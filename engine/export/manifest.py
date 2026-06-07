@@ -28,6 +28,7 @@ from typing import Any, Callable, Mapping, Sequence
 import numpy as np
 import sympy as sp
 
+from engine.dynamics import FirstOrderSystem
 from engine.mechanics.coordinates import acceleration_symbol, momentum_symbol
 from engine.mechanics.hamiltonian import legendre_transform
 from engine.mechanics.lagrangian import LagrangianSystem
@@ -155,7 +156,7 @@ class SystemSpec:
     title: str
     category: str
     description: str
-    build: Callable[[], LagrangianSystem]
+    build: Callable[[], Any]
     parameters: tuple[Parameter, ...]
     state: tuple[StateVar, ...]
     projections: Mapping[str, tuple[str, ...]]
@@ -163,6 +164,7 @@ class SystemSpec:
     lenses: tuple[str, ...]
     data_path: str
     effective_potentials: tuple[EffectivePotential, ...] = ()
+    system_kind: str = "mechanics"
 
     def series(
         self,
@@ -179,6 +181,8 @@ class SystemSpec:
         """
 
         system = self.build()
+        if not isinstance(system, LagrangianSystem):
+            return {}
         state_symbols = (*system.q, *system.qdot)
         array = np.asarray(states, dtype=float)
         columns = [array[:, index] for index in range(len(state_symbols))]
@@ -238,6 +242,16 @@ def _symbol_latex(system: LagrangianSystem, spec: SystemSpec) -> dict[sp.Symbol,
     for potential in spec.effective_potentials:
         mapping[sp.Symbol(potential.conserved)] = potential.conserved_latex
 
+    mapping[system.time] = "t"
+    return mapping
+
+
+def _dynamics_symbol_latex(system: FirstOrderSystem, spec: SystemSpec) -> dict[sp.Symbol, str]:
+    names = _latex_by_name(spec)
+    mapping = {
+        symbol: names.get(symbol.name, sp.latex(symbol))
+        for symbol in (*system.state, *system.parameters)
+    }
     mapping[system.time] = "t"
     return mapping
 
@@ -354,6 +368,9 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
     """Build one manifest entry, deriving the symbolic physics from the engine."""
 
     system = spec.build()
+    if isinstance(system, FirstOrderSystem):
+        return first_order_system_entry(spec, system)
+
     symbol_latex = _symbol_latex(system, spec)
 
     def latex(expr: sp.Expr) -> str:
@@ -417,6 +434,43 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
             "euler_lagrange": [latex(equation) for equation in system.euler_lagrange_equations()],
         },
         "derivation": derivation_entry(spec, system, transform, latex),
+    }
+
+
+def first_order_system_entry(spec: SystemSpec, system: FirstOrderSystem) -> dict[str, Any]:
+    symbol_latex = _dynamics_symbol_latex(system, spec)
+
+    def latex(expr: sp.Expr) -> str:
+        return sp.latex(expr, symbol_names=symbol_latex)
+
+    vector_field = [
+        {
+            "state": symbol.name,
+            "equation_latex": latex(sp.Eq(sp.Symbol(f"{symbol.name}_dot", real=True), expression)),
+            "expression_latex": latex(expression),
+        }
+        for symbol, expression in zip(system.state, system.rhs, strict=True)
+    ]
+    jacobian = system.jacobian()
+
+    return {
+        "id": spec.id,
+        "title": spec.title,
+        "category": spec.category,
+        "description": spec.description,
+        "dataPath": spec.data_path,
+        "systemKind": spec.system_kind,
+        "parameters": [parameter.to_dict() for parameter in spec.parameters],
+        "state": [variable.to_dict() for variable in spec.state],
+        "projections": {name: list(group) for name, group in spec.projections.items()},
+        "conserved": [],
+        "effectivePotentials": [],
+        "lenses": list(spec.lenses),
+        "dynamics": {
+            "vector_field": vector_field,
+            "divergence_latex": latex(system.divergence()),
+            "jacobian_latex": latex(jacobian),
+        },
     }
 
 

@@ -67,7 +67,22 @@ export class StructurePanel {
 
   private renderPrinciples(system: SystemManifest): void {
     this.principles.replaceChildren();
+    if (system.dynamics) {
+      this.principles.append(
+        principleBlock(
+          "Vector Field",
+          system.dynamics.vector_field.map((equation) => equation.equation_latex),
+        ),
+      );
+      this.principles.append(principleBlock("Divergence", [system.dynamics.divergence_latex]));
+      this.principles.append(principleBlock("Jacobian", [system.dynamics.jacobian_latex]));
+      return;
+    }
+
     const derivation = system.derivation;
+    if (!derivation) {
+      return;
+    }
 
     this.principles.append(principleBlock("Lagrangian", [derivation.lagrangian.expression_latex]));
     this.principles.append(

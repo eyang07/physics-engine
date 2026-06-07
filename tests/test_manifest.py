@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from engine.export.manifest import build_manifest, system_entry
+from engine.mechanics.lagrangian import LagrangianSystem
 from scripts.example_specs import LENSES, SPECS
 
 
@@ -57,8 +58,12 @@ def test_state_schema_matches_system(spec) -> None:
     coordinates = [variable.name for variable in spec.state if variable.kind == "coordinate"]
     velocities = [variable.name for variable in spec.state if variable.kind == "velocity"]
 
-    assert coordinates == [symbol.name for symbol in system.q]
-    assert velocities == [symbol.name for symbol in system.qdot]
+    if isinstance(system, LagrangianSystem):
+        assert coordinates == [symbol.name for symbol in system.q]
+        assert velocities == [symbol.name for symbol in system.qdot]
+    else:
+        assert coordinates == [symbol.name for symbol in system.state_symbols]
+        assert velocities == []
 
 
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
@@ -71,7 +76,11 @@ def test_projections_reference_known_state(spec) -> None:
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
 def test_physical_parameters_appear_in_lagrangian(spec) -> None:
     system = spec.build()
-    free_names = {symbol.name for symbol in system.lagrangian.free_symbols}
+    if isinstance(system, LagrangianSystem):
+        free_names = {symbol.name for symbol in system.lagrangian.free_symbols}
+    else:
+        expressions = tuple(system.rhs)
+        free_names = {symbol.name for symbol in set().union(*(expr.free_symbols for expr in expressions))}
     for parameter in spec.parameters:
         if parameter.role == "physical":
             assert parameter.name in free_names
@@ -86,6 +95,17 @@ def test_parameter_defaults_within_range(spec) -> None:
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
 def test_entry_carries_symbolic_physics(spec) -> None:
     entry = system_entry(spec)
+    if entry.get("dynamics"):
+        dynamics = entry["dynamics"]
+        assert dynamics["vector_field"] and all(
+            equation["equation_latex"] for equation in dynamics["vector_field"]
+        )
+        assert isinstance(dynamics["divergence_latex"], str) and dynamics["divergence_latex"]
+        assert isinstance(dynamics["jacobian_latex"], str) and dynamics["jacobian_latex"]
+        assert entry["lenses"], "every system needs at least one visualization lens"
+        assert entry["dataPath"].startswith("/data/")
+        return
+
     physics = entry["physics"]
 
     assert isinstance(physics["lagrangian"], str) and physics["lagrangian"]
@@ -118,6 +138,11 @@ def test_effective_potentials_render_when_declared(spec) -> None:
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
 def test_entry_carries_structured_derivation(spec) -> None:
     entry = system_entry(spec)
+    if entry.get("dynamics"):
+        assert "derivation" not in entry
+        assert "physics" not in entry
+        return
+
     system = spec.build()
     derivation = entry["derivation"]
 
@@ -159,6 +184,10 @@ def test_entry_carries_structured_derivation(spec) -> None:
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
 def test_conserved_quantities_render(spec) -> None:
     entry = system_entry(spec)
+    if entry.get("dynamics"):
+        assert entry["conserved"] == []
+        return
+
     assert entry["conserved"], "each system should declare at least one invariant"
     for quantity in entry["conserved"]:
         assert quantity["latex"]
@@ -171,6 +200,9 @@ def test_conserved_quantities_render(spec) -> None:
 def test_conserved_quantities_use_noether_generators(spec) -> None:
     system = spec.build()
     entry = system_entry(spec)
+    if not isinstance(system, LagrangianSystem):
+        assert entry["conserved"] == []
+        return
 
     for declared, rendered in zip(spec.conserved, entry["conserved"], strict=True):
         assert declared.generator is not None

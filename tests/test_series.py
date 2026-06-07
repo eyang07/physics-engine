@@ -12,7 +12,9 @@ import numpy as np
 import pytest
 
 from scripts import example_specs
+from scripts.generate_bead_on_hoop import generate_bead_on_hoop_trajectory
 from scripts.generate_charged_particle import generate_charged_particle_trajectory
+from scripts.generate_henon_heiles import generate_henon_heiles_trajectory
 from scripts.generate_ideal_spring import generate_ideal_spring_trajectory
 from scripts.generate_kepler_problem import generate_kepler_trajectory
 from scripts.generate_pendulum import generate_pendulum_trajectory
@@ -26,6 +28,8 @@ CASES = {
     "uniform-gravity": (example_specs.UNIFORM_GRAVITY, generate_uniform_gravity_trajectory),
     "ideal-spring": (example_specs.IDEAL_SPRING, generate_ideal_spring_trajectory),
     "kepler": (example_specs.KEPLER, generate_kepler_trajectory),
+    "bead-on-hoop": (example_specs.BEAD_ON_HOOP, generate_bead_on_hoop_trajectory),
+    "henon-heiles": (example_specs.HENON_HEILES, generate_henon_heiles_trajectory),
 }
 
 

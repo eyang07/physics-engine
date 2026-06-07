@@ -21,14 +21,17 @@ The engine currently supports:
 
 - Lagrangian systems on tangent bundle charts `(q, qdot)`.
 - Hamiltonian systems on cotangent bundle charts `(q, p)`.
+- General first-order dynamical systems `dx/dt = f(t, x; params)` with
+  symbolic Jacobians, divergence, fixed points, linearization, and numerical RHS
+  generation.
 - Euler-Lagrange equations, generalized momenta, energy, Legendre transforms,
   Hamilton equations, Poisson brackets, symplectic matrices, Hamiltonian vector
   fields, Liouville checks, canonical-transformation checks, coordinate
   pullbacks/pushforwards, holonomic constraints, and Noether charges.
-- Fixed-step RK4 trajectory integration and JSON export.
+- Fixed-step RK4 integration, adaptive `solve_ivp` integration, and JSON export.
 - A manifest contract that exports symbolic derivations, lens metadata,
   parameter ranges, state schemas, projections, conserved quantities, and
-  effective potentials.
+  effective potentials or first-order flow diagnostics.
 
 ## Current Examples
 
@@ -38,13 +41,19 @@ The engine currently supports:
 - Uniform gravitational field
 - Ideal spring
 - Kepler problem with radial effective potential
+- Bead on a rotating hoop
+- Lorenz attractor
+- Hénon-Heiles system
 
 ## Viewer
 
 The viewer renders a system gallery, playback controls, mathematical structure
 panels, invariant lanes, a 2D pendulum lens, a Kepler effective-potential lens,
 and Three.js scenes for configuration-space, phase-space, orbit, field, and
-spring views.
+spring views. The animation style is minimal, physical, and dynamic: dark
+stage, sparse labels, luminous live trajectories, restrained field/flow
+particles, and geometry that shows constraints, curvature, and conserved
+structure without decorative clutter.
 
 ## Development
 
