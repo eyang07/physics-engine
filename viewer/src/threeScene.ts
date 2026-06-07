@@ -108,12 +108,8 @@ function vectorArrow(
   return group;
 }
 
-function glowLine(points: THREE.Vector3[], color: THREE.ColorRepresentation): THREE.Group {
-  const group = new THREE.Group();
-  group.add(lineFromPoints(points, color, 0.95));
-  group.add(lineFromPoints(points, color, 0.22));
-  (group.children[1] as THREE.Line).scale.setScalar(1.006);
-  return group;
+function contextLine(points: THREE.Vector3[], opacity = 0.28): THREE.Line {
+  return lineFromPoints(points, new THREE.Color(theme.cool), opacity);
 }
 
 function trajectoryEvery<T>(items: T[], count: number): T[] {
@@ -254,10 +250,7 @@ function makePendulumHamiltonianGroup(data: Trajectory): THREE.Group {
   group.rotation.y = -0.22;
   group.add(makePendulumSurface());
   group.add(
-    lineFromPoints(
-      data.states.map((state) => pendulumPoint(state[0], state[1], 0.08)),
-      new THREE.Color(theme.accent),
-    ),
+    contextLine(data.states.map((state) => pendulumPoint(state[0], state[1], 0.08)), 0.34),
   );
 
   const thetaLabel = makeLabel("θ");
@@ -301,10 +294,7 @@ function makeSphereGeodesicGroup(data: Trajectory): THREE.Group {
   group.add(wire);
 
   group.add(
-    lineFromPoints(
-      data.states.map((state) => new THREE.Vector3(state[4], state[5], state[6])),
-      new THREE.Color(theme.accent),
-    ),
+    contextLine(data.states.map((state) => new THREE.Vector3(state[4], state[5], state[6])), 0.36),
   );
 
   const north = makeLabel("N");
@@ -316,7 +306,7 @@ function makeSphereGeodesicGroup(data: Trajectory): THREE.Group {
 function makeChargedParticleGroup(data: Trajectory): THREE.Group {
   const group = new THREE.Group();
   const points = data.states.map((state) => new THREE.Vector3(state[0], state[2] * 0.62, state[1]));
-  group.add(glowLine(points, new THREE.Color(theme.accent)));
+  group.add(contextLine(points, 0.36));
 
   const guideMaterial = new THREE.LineBasicMaterial({
     color: new THREE.Color(theme.textFaint),
@@ -371,7 +361,7 @@ function makeChargedParticleGroup(data: Trajectory): THREE.Group {
 function makeUniformGravityGroup(data: Trajectory): THREE.Group {
   const group = new THREE.Group();
   const points = data.states.map((state) => new THREE.Vector3(state[0] - 0.9, state[1] * 0.42 - 0.65, 0));
-  group.add(glowLine(points, new THREE.Color(theme.accent)));
+  group.add(contextLine(points, 0.34));
 
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(3.8, 1.4, 18, 3),
@@ -417,7 +407,7 @@ function makeIdealSpringGroup(data: Trajectory): THREE.Group {
   const xValues = data.states.map((state) => state[0]);
   const span = Math.max(1.1, ...xValues.map(Math.abs));
   const pointTrace = xValues.map((x, index) => new THREE.Vector3(x, -0.04, Math.sin(index * 0.032) * 0.045));
-  group.add(glowLine(pointTrace, new THREE.Color(theme.accent)));
+  group.add(contextLine(pointTrace, 0.28));
 
   const wall = new THREE.Mesh(
     new THREE.BoxGeometry(0.1, 1.05, 0.1),
@@ -469,7 +459,7 @@ function makeIdealSpringGroup(data: Trajectory): THREE.Group {
 function makeKeplerGroup(data: Trajectory): THREE.Group {
   const group = new THREE.Group();
   const points = data.states.map((state) => new THREE.Vector3(state[4], 0, state[5]));
-  group.add(glowLine(points, new THREE.Color(theme.accent)));
+  group.add(contextLine(points, 0.36));
 
   const focus = new THREE.Mesh(
     new THREE.SphereGeometry(0.105, 32, 18),
@@ -597,8 +587,8 @@ function makeLorenzAttractorGroup(data: Trajectory, transform: LorenzTransform):
   const group = new THREE.Group();
   const points = data.states.map((state) => lorenzPoint(state, transform));
 
-  group.add(lineFromPoints(points, new THREE.Color(theme.accent), 0.38));
-  group.add(lineFromPoints(points, new THREE.Color(theme.cool), 0.12));
+  group.add(contextLine(points, 0.26));
+  group.add(lineFromPoints(points, new THREE.Color(theme.textFaint), 0.1));
 
   const box = new THREE.Box3().setFromPoints(points);
   const size = new THREE.Vector3();
@@ -761,8 +751,8 @@ function makeHenonHeilesGroup(data: Trajectory): THREE.Group {
   group.add(makeHenonSurface(data));
 
   const trajectory = data.states.map((state) => henonPoint(state, data));
-  group.add(lineFromPoints(trajectory, new THREE.Color(theme.accent), 0.72));
-  group.add(lineFromPoints(trajectory, new THREE.Color(theme.cool), 0.16));
+  group.add(contextLine(trajectory, 0.28));
+  group.add(lineFromPoints(trajectory, new THREE.Color(theme.textFaint), 0.1));
 
   const metadata = data.metadata as { stiffness?: number; coupling?: number } | undefined;
   const stiffness = metadata?.stiffness ?? 1;
@@ -797,14 +787,10 @@ export class ThreeScene {
   private dynamicSpring: THREE.Line | null = null;
   private beadHoop: THREE.Group | null = null;
   private beadHoopOmega = 0;
-  private beadTrail: THREE.Line | null = null;
-  private beadTrailPoints: THREE.Vector3[] = [];
-  private lorenzTrail: THREE.Line | null = null;
-  private lorenzTrailPoints: THREE.Vector3[] = [];
   private lorenzTransform: LorenzTransform = { center: new THREE.Vector3(), scale: 1 };
-  private henonTrail: THREE.Line | null = null;
-  private henonTrailPoints: THREE.Vector3[] = [];
   private henonData: Trajectory | null = null;
+  private motionTrail: THREE.Line | null = null;
+  private motionTrailPoints: THREE.Vector3[] = [];
   private flow: FlowField | null = null;
   private active = false;
   private mode: ThreeMode | null = null;
@@ -861,30 +847,29 @@ export class ThreeScene {
     this.dynamicSpring = null;
     this.beadHoop = null;
     this.beadHoopOmega = 0;
-    this.beadTrail = null;
-    this.beadTrailPoints = [];
-    this.lorenzTrail = null;
-    this.lorenzTrailPoints = [];
     this.lorenzTransform = { center: new THREE.Vector3(), scale: 1 };
-    this.henonTrail = null;
-    this.henonTrailPoints = [];
     this.henonData = null;
+    this.motionTrail = null;
+    this.motionTrailPoints = [];
     this.flow?.dispose();
     this.flow = null;
     this.marker.scale.setScalar(1);
 
     if (mode === "pendulumHamiltonian") {
       this.root.add(makePendulumHamiltonianGroup(data));
+      this.setMotionTrail(data.states.map((state) => pendulumPoint(state[0], state[1], 0.22)), 90);
       this.flow = makePendulumFlow();
       this.root.add(this.flow.object);
       this.camera.position.set(4.3, 2.55, 5.3);
       this.controls.target.set(0, 0.72, 0);
     } else if (mode === "sphereGeodesic") {
       this.root.add(makeSphereGeodesicGroup(data));
+      this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[4], state[5], state[6])), 90);
       this.camera.position.set(2.5, 1.6, 3.2);
       this.controls.target.set(0, 0, 0);
     } else if (mode === "chargedParticle") {
       this.root.add(makeChargedParticleGroup(data));
+      this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[0], state[2] * 0.62, state[1])), 110);
       this.marker.scale.setScalar(0.82);
       this.flow = new FlowField({
         field: (x, z) => [-z, x],
@@ -901,6 +886,7 @@ export class ThreeScene {
       this.controls.target.set(0, 0, 0);
     } else if (mode === "uniformGravity") {
       this.root.add(makeUniformGravityGroup(data));
+      this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[0] - 0.9, state[1] * 0.42 - 0.65, 0)), 90);
       this.marker.scale.setScalar(0.92);
       this.flow = new FlowField({
         field: (_x, _z) => [0, -1],
@@ -917,6 +903,7 @@ export class ThreeScene {
       this.controls.target.set(0.25, 0.1, 0);
     } else if (mode === "idealSpring") {
       this.root.add(makeIdealSpringGroup(data));
+      this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[0], 0, 0)), 80);
       this.dynamicSpring = lineFromPoints([], new THREE.Color(theme.cool), 0.82);
       this.root.add(this.dynamicSpring);
       this.marker.scale.setScalar(1.35);
@@ -924,6 +911,7 @@ export class ThreeScene {
       this.controls.target.set(0, 0, 0);
     } else if (mode === "keplerOrbit") {
       this.root.add(makeKeplerGroup(data));
+      this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[4], 0, state[5])), 100);
       this.marker.scale.setScalar(0.88);
       this.flow = new FlowField({
         field: (x, z) => {
@@ -947,27 +935,21 @@ export class ThreeScene {
       this.root.add(group);
       this.beadHoop = hoop;
       this.beadHoopOmega = typeof data.metadata?.angular_speed === "number" ? data.metadata.angular_speed : 0;
-      this.beadTrailPoints = data.states.map(beadPoint);
-      this.beadTrail = makeFadingTrail(90, new THREE.Color(theme.accent));
-      this.root.add(this.beadTrail);
+      this.setMotionTrail(data.states.map(beadPoint), 90);
       this.marker.scale.setScalar(0.9);
       this.camera.position.set(2.35, 1.35, 2.65);
       this.controls.target.set(0, 0, 0);
     } else if (mode === "lorenzAttractor") {
       this.lorenzTransform = lorenzTransform(data);
       this.root.add(makeLorenzAttractorGroup(data, this.lorenzTransform));
-      this.lorenzTrailPoints = data.states.map((state) => lorenzPoint(state, this.lorenzTransform));
-      this.lorenzTrail = makeFadingTrail(180, new THREE.Color(theme.accentStrong));
-      this.root.add(this.lorenzTrail);
+      this.setMotionTrail(data.states.map((state) => lorenzPoint(state, this.lorenzTransform)), 180);
       this.marker.scale.setScalar(0.72);
       this.camera.position.set(3.0, 2.05, 4.4);
       this.controls.target.set(0, 0.05, 0);
     } else {
       this.henonData = data;
       this.root.add(makeHenonHeilesGroup(data));
-      this.henonTrailPoints = data.states.map((state) => henonPoint(state, data));
-      this.henonTrail = makeFadingTrail(150, new THREE.Color(theme.accentStrong));
-      this.root.add(this.henonTrail);
+      this.setMotionTrail(data.states.map((state) => henonPoint(state, data)), 150);
       this.marker.scale.setScalar(0.78);
       this.camera.position.set(2.7, 1.75, 3.45);
       this.controls.target.set(0, 0.05, 0);
@@ -991,7 +973,7 @@ export class ThreeScene {
     }
   }
 
-  render(state: number[], elapsed: number) {
+  render(state: number[], elapsed: number, sampleIndex: number) {
     if (!this.active || !this.mode) {
       return;
     }
@@ -1031,9 +1013,6 @@ export class ThreeScene {
       this.root.rotation.y = Math.sin(elapsed * 0.08) * 0.08;
     } else if (this.mode === "beadHoop") {
       this.marker.position.copy(beadPoint(state));
-      if (this.beadTrail) {
-        this.updateBeadTrail(state);
-      }
       if (this.beadHoop) {
         this.beadHoop.rotation.y = -this.beadHoopOmega * elapsed;
       }
@@ -1041,92 +1020,36 @@ export class ThreeScene {
     } else if (this.mode === "lorenzAttractor") {
       const point = lorenzPoint(state, this.lorenzTransform);
       this.marker.position.copy(point);
-      if (this.lorenzTrail) {
-        this.updateLorenzTrail(point);
-      }
       this.root.rotation.y = -0.35 + Math.sin(elapsed * 0.065) * 0.08;
     } else if (this.henonData) {
       const point = henonPoint(state, this.henonData);
       this.marker.position.copy(point);
-      if (this.henonTrail) {
-        this.updateHenonTrail(point);
-      }
       this.root.rotation.y = Math.sin(elapsed * 0.07) * 0.07;
     }
 
+    this.updateMotionTrail(sampleIndex);
     this.flow?.update();
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   }
 
-  private updateBeadTrail(state: number[]) {
-    if (!this.beadTrail || this.beadTrailPoints.length === 0) {
-      return;
-    }
-    const positions = this.beadTrail.geometry.getAttribute("position") as THREE.BufferAttribute;
-    const length = positions.count;
-    const current = beadPoint(state);
-    let nearest = 0;
-    let nearestDistance = Infinity;
-    this.beadTrailPoints.forEach((point, index) => {
-      const distance = point.distanceToSquared(current);
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearest = index;
-      }
-    });
-
-    for (let index = 0; index < length; index += 1) {
-      const sourceIndex = Math.max(0, nearest - (length - 1 - index));
-      const point = this.beadTrailPoints[sourceIndex] ?? current;
-      positions.setXYZ(index, point.x, point.y, point.z);
-    }
-    positions.needsUpdate = true;
+  private setMotionTrail(points: THREE.Vector3[], length: number) {
+    this.motionTrailPoints = points;
+    this.motionTrail = makeFadingTrail(length, new THREE.Color(theme.accentStrong));
+    this.root.add(this.motionTrail);
   }
 
-  private updateLorenzTrail(current: THREE.Vector3) {
-    if (!this.lorenzTrail || this.lorenzTrailPoints.length === 0) {
+  private updateMotionTrail(currentIndex: number) {
+    if (!this.motionTrail || this.motionTrailPoints.length === 0) {
       return;
     }
-    const positions = this.lorenzTrail.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const positions = this.motionTrail.geometry.getAttribute("position") as THREE.BufferAttribute;
     const length = positions.count;
-    let nearest = 0;
-    let nearestDistance = Infinity;
-    this.lorenzTrailPoints.forEach((point, index) => {
-      const distance = point.distanceToSquared(current);
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearest = index;
-      }
-    });
+    const nearest = Math.min(Math.max(0, currentIndex), this.motionTrailPoints.length - 1);
 
     for (let index = 0; index < length; index += 1) {
       const sourceIndex = Math.max(0, nearest - (length - 1 - index));
-      const point = this.lorenzTrailPoints[sourceIndex] ?? current;
-      positions.setXYZ(index, point.x, point.y, point.z);
-    }
-    positions.needsUpdate = true;
-  }
-
-  private updateHenonTrail(current: THREE.Vector3) {
-    if (!this.henonTrail || this.henonTrailPoints.length === 0) {
-      return;
-    }
-    const positions = this.henonTrail.geometry.getAttribute("position") as THREE.BufferAttribute;
-    const length = positions.count;
-    let nearest = 0;
-    let nearestDistance = Infinity;
-    this.henonTrailPoints.forEach((point, index) => {
-      const distance = point.distanceToSquared(current);
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearest = index;
-      }
-    });
-
-    for (let index = 0; index < length; index += 1) {
-      const sourceIndex = Math.max(0, nearest - (length - 1 - index));
-      const point = this.henonTrailPoints[sourceIndex] ?? current;
+      const point = this.motionTrailPoints[sourceIndex] ?? this.motionTrailPoints[nearest];
       positions.setXYZ(index, point.x, point.y, point.z);
     }
     positions.needsUpdate = true;

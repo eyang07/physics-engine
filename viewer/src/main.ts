@@ -304,7 +304,7 @@ function render(now: number) {
   } else if (selectedExample && isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "potential-energy") {
     drawPotentialScene(ctx, trajectory, selectedExample, selectedVisualization, current, canvas.clientWidth, canvas.clientHeight);
   } else {
-    threeScene.render(current.state, time);
+    threeScene.render(current.state, time, current.index);
   }
 
   structurePanel.update(current.phase);

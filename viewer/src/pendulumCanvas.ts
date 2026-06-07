@@ -15,6 +15,11 @@ export type Bounds = {
   maxOmega: number;
 };
 
+type Point2D = {
+  x: number;
+  y: number;
+};
+
 export function drawStageBackground(ctx: CanvasRenderingContext2D, width: number, height: number): void {
   const gradient = ctx.createLinearGradient(0, 0, width, height);
   gradient.addColorStop(0, theme.ink900);
@@ -99,6 +104,29 @@ function drawPendulum(ctx: CanvasRenderingContext2D, theta: number, width: numbe
   ctx.restore();
 }
 
+function drawFadingPath(ctx: CanvasRenderingContext2D, points: Point2D[], width: number): void {
+  if (points.length < 2) {
+    return;
+  }
+
+  ctx.save();
+  ctx.strokeStyle = theme.accent;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = width;
+  for (let index = 1; index < points.length; index += 1) {
+    const alpha = index / (points.length - 1);
+    ctx.globalAlpha = 0.08 + alpha * 0.88;
+    ctx.shadowColor = theme.accent;
+    ctx.shadowBlur = 10 * alpha * alpha;
+    ctx.beginPath();
+    ctx.moveTo(points[index - 1].x, points[index - 1].y);
+    ctx.lineTo(points[index].x, points[index].y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawPhasePortrait(
   ctx: CanvasRenderingContext2D,
   data: Trajectory,
@@ -143,21 +171,14 @@ function drawPhasePortrait(
   });
   ctx.stroke();
 
-  ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 3;
-  ctx.shadowColor = theme.accent;
-  ctx.shadowBlur = 10;
-  ctx.beginPath();
-  data.states.slice(0, currentIndex + 1).forEach((state, index) => {
-    const x = mapX(state[0]);
-    const y = mapY(state[1]);
-    if (index === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-  });
-  ctx.stroke();
+  drawFadingPath(
+    ctx,
+    data.states.slice(Math.max(0, currentIndex - 179), currentIndex + 1).map((state) => ({
+      x: mapX(state[0]),
+      y: mapY(state[1]),
+    })),
+    3,
+  );
 
   ctx.fillStyle = theme.accentStrong;
   ctx.beginPath();

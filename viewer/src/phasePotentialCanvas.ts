@@ -1,6 +1,7 @@
 import { theme } from "./design/theme";
 import type { ManifestLens, SystemManifest } from "./data/manifest";
 import { stateIndex, type Trajectory } from "./data/trajectory";
+import { mathLabel } from "./mathLabel";
 import type { Sample } from "./playback";
 import { clamp } from "./util";
 
@@ -16,6 +17,11 @@ type PlotArea = {
   bottom: number;
   width: number;
   height: number;
+};
+
+type Point2D = {
+  x: number;
+  y: number;
 };
 
 type PotentialPlot = {
@@ -131,18 +137,40 @@ function labelFor(system: SystemManifest, name: string): string {
 }
 
 function plainMathLabel(label: string): string {
-  return label
-    .replace(/\\dot\{\\theta\}/g, "theta_dot")
-    .replace(/\\dot\{\\phi\}/g, "phi_dot")
-    .replace(/\\theta/g, "theta")
-    .replace(/\\phi/g, "phi")
-    .replace(/\\Omega/g, "Omega");
+  return mathLabel(label);
 }
 
 function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, y: number): void {
   ctx.fillStyle = theme.textMuted;
   ctx.font = '13px "IBM Plex Sans", system-ui, sans-serif';
   ctx.fillText(text, x, y);
+}
+
+function recentWindow<T>(items: T[], currentIndex: number, length = 180): T[] {
+  return items.slice(Math.max(0, currentIndex - length + 1), currentIndex + 1);
+}
+
+function drawFadingPath(ctx: CanvasRenderingContext2D, points: Point2D[], width: number): void {
+  if (points.length < 2) {
+    return;
+  }
+
+  ctx.save();
+  ctx.strokeStyle = theme.accent;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = width;
+  for (let index = 1; index < points.length; index += 1) {
+    const alpha = index / (points.length - 1);
+    ctx.globalAlpha = 0.08 + alpha * 0.88;
+    ctx.shadowColor = theme.accent;
+    ctx.shadowBlur = 12 * alpha * alpha;
+    ctx.beginPath();
+    ctx.moveTo(points[index - 1].x, points[index - 1].y);
+    ctx.lineTo(points[index].x, points[index].y);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawUnavailable(ctx: CanvasRenderingContext2D, width: number, height: number, message: string): void {
@@ -201,21 +229,14 @@ export function drawPhaseScene(
   });
   ctx.stroke();
 
-  ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 3;
-  ctx.shadowColor = theme.accent;
-  ctx.shadowBlur = 11;
-  ctx.beginPath();
-  data.states.slice(0, sample.index + 1).forEach((state, index) => {
-    const x = xOf(state[xIndex], xRange, area);
-    const y = yOf(state[yIndex], yRange, area);
-    if (index === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-  });
-  ctx.stroke();
+  drawFadingPath(
+    ctx,
+    recentWindow(data.states, sample.index).map((state) => ({
+      x: xOf(state[xIndex], xRange, area),
+      y: yOf(state[yIndex], yRange, area),
+    })),
+    3,
+  );
 
   ctx.fillStyle = theme.accentStrong;
   ctx.beginPath();
@@ -456,19 +477,7 @@ export function drawPotentialContourScene(
   });
   ctx.stroke();
 
-  ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 2.4;
-  ctx.shadowColor = theme.accent;
-  ctx.shadowBlur = 10;
-  ctx.beginPath();
-  trajectory.slice(0, sample.index + 1).forEach((point, index) => {
-    if (index === 0) {
-      ctx.moveTo(point.x, point.y);
-    } else {
-      ctx.lineTo(point.x, point.y);
-    }
-  });
-  ctx.stroke();
+  drawFadingPath(ctx, recentWindow(trajectory, sample.index), 2.4);
 
   ctx.fillStyle = theme.accentStrong;
   ctx.beginPath();

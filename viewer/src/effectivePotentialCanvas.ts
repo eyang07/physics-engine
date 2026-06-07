@@ -1,5 +1,6 @@
 import { theme } from "./design/theme";
 import type { Trajectory } from "./data/trajectory";
+import { mathLabel } from "./mathLabel";
 import type { Sample } from "./playback";
 import { clamp } from "./util";
 
@@ -197,9 +198,9 @@ export function drawEffectivePotentialScene(
   ctx.fill();
   ctx.shadowBlur = 0;
 
-  drawLabel(ctx, "Veff", left.x + 10, left.y + 18);
+  drawLabel(ctx, mathLabel("V_{\\mathrm{eff}}"), left.x + 10, left.y + 18);
   drawLabel(ctx, "H", left.x + left.width - 22, energyY - 8);
   drawLabel(ctx, "r", left.x + left.width - 12, left.y + left.height + 22);
   drawLabel(ctx, "r", right.x + right.width - 12, right.y + right.height + 22);
-  drawLabel(ctx, "rdot", right.x + 8, right.y + 18);
+  drawLabel(ctx, mathLabel("\\dot{r}"), right.x + 8, right.y + 18);
 }
