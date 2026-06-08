@@ -2,7 +2,13 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { theme } from "./design/theme";
 import { FlowField } from "./flow";
-import type { Trajectory } from "./data/trajectory";
+import {
+  rendererHints,
+  type ReferenceGeometryHint,
+  type RendererHints,
+  type Trajectory,
+  type Vector3Tuple,
+} from "./data/trajectory";
 
 export type { Trajectory };
 
@@ -30,6 +36,22 @@ type PotentialSurfaceMetadata = {
   values: number[][];
   energy?: number;
 };
+
+function vectorFromTuple(value: Vector3Tuple): THREE.Vector3 {
+  return new THREE.Vector3(value[0], value[1], value[2]);
+}
+
+function referenceHint(hints: RendererHints, kind: string): ReferenceGeometryHint | undefined {
+  return hints.referenceGeometry?.find((item) => item.kind === kind);
+}
+
+function axisRange(hints: RendererHints, axis: "x" | "y" | "z", fallback: [number, number]): [number, number] {
+  return hints.bounds?.[axis] ?? fallback;
+}
+
+function flowRange(hints: RendererHints, axis: "x" | "z", fallback: [number, number]): [number, number] {
+  return hints.flow?.bounds?.[axis] ?? fallback;
+}
 
 function makeLabel(text: string): THREE.Sprite {
   const canvas = document.createElement("canvas");
@@ -456,13 +478,20 @@ function makeIdealSpringGroup(data: Trajectory): THREE.Group {
   return group;
 }
 
-function makeKeplerGroup(data: Trajectory): THREE.Group {
+function makeKeplerGroup(data: Trajectory, hints: RendererHints): THREE.Group {
   const group = new THREE.Group();
   const points = data.states.map((state) => new THREE.Vector3(state[4], 0, state[5]));
   group.add(contextLine(points, 0.36));
+  const centralBody = referenceHint(hints, "centralBody");
+  const orbitalPlane = referenceHint(hints, "orbitalPlane");
+  const radialRings = referenceHint(hints, "radialRings");
+  const forceSamples = referenceHint(hints, "centralForceSamples");
+  const centralRadius = centralBody?.radius ?? 0.105;
+  const centralPosition = centralBody?.position ? vectorFromTuple(centralBody.position) : new THREE.Vector3(0, 0, 0);
+  const planeRadius = orbitalPlane?.radius ?? 1.72;
 
   const focus = new THREE.Mesh(
-    new THREE.SphereGeometry(0.105, 32, 18),
+    new THREE.SphereGeometry(centralRadius, 32, 18),
     new THREE.MeshStandardMaterial({
       color: 0xf0b44c,
       emissive: 0x8b4a16,
@@ -470,11 +499,11 @@ function makeKeplerGroup(data: Trajectory): THREE.Group {
       roughness: 0.35,
     }),
   );
-  focus.position.set(0, 0, 0);
+  focus.position.copy(centralPosition);
   group.add(focus);
 
   const plane = new THREE.Mesh(
-    new THREE.CircleGeometry(1.72, 96),
+    new THREE.CircleGeometry(planeRadius, 96),
     new THREE.MeshBasicMaterial({
       color: new THREE.Color(theme.textFaint),
       transparent: true,
@@ -485,7 +514,8 @@ function makeKeplerGroup(data: Trajectory): THREE.Group {
   plane.rotation.x = -Math.PI / 2;
   group.add(plane);
 
-  for (let radius = 0.45; radius <= 1.55; radius += 0.32) {
+  const ringRadii = radialRings?.radii ?? [0.45, 0.77, 1.09, 1.41];
+  for (const radius of ringRadii) {
     const ring = lineFromPoints(
       Array.from({ length: 129 }, (_, index) => {
         const angle = (index / 128) * Math.PI * 2;
@@ -497,8 +527,11 @@ function makeKeplerGroup(data: Trajectory): THREE.Group {
     group.add(ring);
   }
 
-  for (let radius = 0.55; radius <= 1.55; radius += 0.42) {
-    for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+  const forceRadii = forceSamples?.radii ?? [0.55, 0.97, 1.39];
+  const forceAngles = Math.max(3, Math.floor(forceSamples?.angles ?? 8));
+  for (const radius of forceRadii) {
+    for (let angleIndex = 0; angleIndex < forceAngles; angleIndex += 1) {
+      const angle = (angleIndex / forceAngles) * Math.PI * 2;
       const start = new THREE.Vector3(Math.cos(angle) * radius, 0.08, Math.sin(angle) * radius);
       const inward = start.clone().multiplyScalar(-0.13 / Math.max(0.55, radius));
       inward.y = 0;
@@ -511,7 +544,9 @@ function makeKeplerGroup(data: Trajectory): THREE.Group {
   }
 
   const label = makeLabel("μ");
-  label.position.set(0.24, 0.32, 0.16);
+  label.position.copy(
+    centralPosition.clone().add(new THREE.Vector3(centralRadius * 2.3, centralRadius * 3, centralRadius * 1.5)),
+  );
   group.add(label);
   return group;
 }
@@ -531,17 +566,26 @@ function makeHoopLine(radius = 1, opacity = 0.38): THREE.Line {
   );
 }
 
-function makeBeadHoopGroup(data: Trajectory): { group: THREE.Group; hoop: THREE.Group } {
+function makeBeadHoopGroup(data: Trajectory, hints: RendererHints): { group: THREE.Group; hoop: THREE.Group } {
   const group = new THREE.Group();
   const hoop = new THREE.Group();
+  const constraint = referenceHint(hints, "constraintHoop");
+  const rotationAxis = referenceHint(hints, "rotationAxis");
+  const radius = constraint?.radius ?? (typeof data.metadata?.radius === "number" ? data.metadata.radius : 1);
+  const echoAngles = constraint?.echoAngles ?? [
+    Math.PI / 5,
+    (2 * Math.PI) / 5,
+    (3 * Math.PI) / 5,
+    (4 * Math.PI) / 5,
+  ];
 
-  hoop.add(makeHoopLine(1, 0.58));
-  hoop.add(lineFromPoints([new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 1, 0)], new THREE.Color(theme.textFaint), 0.2));
-  hoop.add(lineFromPoints([new THREE.Vector3(-1, 0, 0), new THREE.Vector3(1, 0, 0)], new THREE.Color(theme.textFaint), 0.16));
+  hoop.add(makeHoopLine(radius, 0.58));
+  hoop.add(lineFromPoints([new THREE.Vector3(0, -radius, 0), new THREE.Vector3(0, radius, 0)], new THREE.Color(theme.textFaint), 0.2));
+  hoop.add(lineFromPoints([new THREE.Vector3(-radius, 0, 0), new THREE.Vector3(radius, 0, 0)], new THREE.Color(theme.textFaint), 0.16));
   group.add(hoop);
 
-  for (const angle of [Math.PI / 5, (2 * Math.PI) / 5, (3 * Math.PI) / 5, (4 * Math.PI) / 5]) {
-    const echo = makeHoopLine(1, 0.12);
+  for (const angle of echoAngles) {
+    const echo = makeHoopLine(radius, 0.12);
     echo.rotation.y = angle;
     group.add(echo);
   }
@@ -551,16 +595,18 @@ function makeBeadHoopGroup(data: Trajectory): { group: THREE.Group; hoop: THREE.
   for (const point of trajectoryEvery(trajectory, 12)) {
     const radial = new THREE.Vector3(point.x, 0, point.z);
     if (radial.length() > 1e-4) {
-      radial.normalize().multiplyScalar(0.12);
+      radial.normalize().multiplyScalar(0.12 * radius);
       group.add(vectorArrow(point.clone().setY(point.y + 0.04), radial, new THREE.Color(theme.textFaint), 0.24));
     }
   }
 
-  const axis = lineFromPoints([new THREE.Vector3(0, -1.18, 0), new THREE.Vector3(0, 1.18, 0)], new THREE.Color(theme.textFaint), 0.24);
+  const axisStart = rotationAxis?.start ? vectorFromTuple(rotationAxis.start) : new THREE.Vector3(0, -1.18 * radius, 0);
+  const axisEnd = rotationAxis?.end ? vectorFromTuple(rotationAxis.end) : new THREE.Vector3(0, 1.18 * radius, 0);
+  const axis = lineFromPoints([axisStart, axisEnd], new THREE.Color(theme.textFaint), 0.24);
   group.add(axis);
 
   const label = makeLabel("Ω");
-  label.position.set(0.26, 1.22, 0.18);
+  label.position.set(0.26 * radius, 1.22 * radius, 0.18 * radius);
   group.add(label);
   return { group, hoop };
 }
@@ -843,6 +889,7 @@ export class ThreeScene {
 
   setVisualization(mode: ThreeMode, data: Trajectory) {
     this.mode = mode;
+    const hints = rendererHints(data);
     this.root.clear();
     this.dynamicSpring = null;
     this.beadHoop = null;
@@ -854,6 +901,8 @@ export class ThreeScene {
     this.flow?.dispose();
     this.flow = null;
     this.marker.scale.setScalar(1);
+    this.controls.minDistance = 2.8;
+    this.controls.maxDistance = 9.0;
 
     if (mode === "pendulumHamiltonian") {
       this.root.add(makePendulumHamiltonianGroup(data));
@@ -910,16 +959,18 @@ export class ThreeScene {
       this.camera.position.set(2.25, 1.08, 2.75);
       this.controls.target.set(0, 0, 0);
     } else if (mode === "keplerOrbit") {
-      this.root.add(makeKeplerGroup(data));
+      this.root.add(makeKeplerGroup(data, hints));
       this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[4], 0, state[5])), 100);
       this.marker.scale.setScalar(0.88);
+      const [flowXMin, flowXMax] = flowRange(hints, "x", [-1.55, 1.55]);
+      const [flowZMin, flowZMax] = flowRange(hints, "z", [-1.55, 1.55]);
       this.flow = new FlowField({
         field: (x, z) => {
           const radiusSquared = x * x + z * z + 0.18;
           const scale = 1 / Math.pow(radiusSquared, 1.25);
           return [-x * scale, -z * scale];
         },
-        bounds: { xMin: -1.55, xMax: 1.55, yMin: -1.55, yMax: 1.55 },
+        bounds: { xMin: flowXMin, xMax: flowXMax, yMin: flowZMin, yMax: flowZMax },
         toPosition: (x, z) => new THREE.Vector3(x, 0.12, z),
         count: 260,
         rate: 0.12,
@@ -928,17 +979,15 @@ export class ThreeScene {
         intensity: 0.42,
       });
       this.root.add(this.flow.object);
-      this.camera.position.set(2.35, 1.55, 2.85);
-      this.controls.target.set(0, 0, 0);
+      this.applyCameraHints(hints, [2.35, 1.55, 2.85], [0, 0, 0]);
     } else if (mode === "beadHoop") {
-      const { group, hoop } = makeBeadHoopGroup(data);
+      const { group, hoop } = makeBeadHoopGroup(data, hints);
       this.root.add(group);
       this.beadHoop = hoop;
       this.beadHoopOmega = typeof data.metadata?.angular_speed === "number" ? data.metadata.angular_speed : 0;
       this.setMotionTrail(data.states.map(beadPoint), 90);
       this.marker.scale.setScalar(0.9);
-      this.camera.position.set(2.35, 1.35, 2.65);
-      this.controls.target.set(0, 0, 0);
+      this.applyCameraHints(hints, [2.35, 1.35, 2.65], [0, 0, 0]);
     } else if (mode === "lorenzAttractor") {
       this.lorenzTransform = lorenzTransform(data);
       this.root.add(makeLorenzAttractorGroup(data, this.lorenzTransform));
@@ -957,6 +1006,27 @@ export class ThreeScene {
 
     this.root.add(this.marker);
     this.controls.update();
+  }
+
+  private applyCameraHints(
+    hints: RendererHints,
+    fallbackPosition: Vector3Tuple,
+    fallbackTarget: Vector3Tuple,
+  ) {
+    this.camera.position.copy(vectorFromTuple(hints.camera?.position ?? fallbackPosition));
+    this.controls.target.copy(vectorFromTuple(hints.camera?.target ?? fallbackTarget));
+
+    const xRange = axisRange(hints, "x", [-1, 1]);
+    const yRange = axisRange(hints, "y", [-1, 1]);
+    const zRange = axisRange(hints, "z", [-1, 1]);
+    const span = Math.max(
+      xRange[1] - xRange[0],
+      yRange[1] - yRange[0],
+      zRange[1] - zRange[0],
+      1,
+    );
+    this.controls.minDistance = Math.max(1.2, span * 0.9);
+    this.controls.maxDistance = Math.max(5.5, span * 4.4);
   }
 
   resize() {

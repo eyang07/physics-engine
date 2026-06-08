@@ -33,6 +33,40 @@ def embed_rotating_hoop(
     )
 
 
+def bead_renderer_hints(radius: float) -> dict[str, object]:
+    """Return scene metadata for the rotating-hoop renderer."""
+
+    return {
+        "bounds": {
+            "x": [-radius, radius],
+            "y": [-radius, radius],
+            "z": [-radius, radius],
+        },
+        "camera": {
+            "position": [2.35 * radius, 1.35 * radius, 2.65 * radius],
+            "target": [0.0, 0.0, 0.0],
+        },
+        "referenceGeometry": [
+            {
+                "kind": "constraintHoop",
+                "radius": radius,
+                "axis": [0.0, 1.0, 0.0],
+                "echoAngles": [
+                    float(np.pi / 5),
+                    float(2 * np.pi / 5),
+                    float(3 * np.pi / 5),
+                    float(4 * np.pi / 5),
+                ],
+            },
+            {
+                "kind": "rotationAxis",
+                "start": [0.0, -1.18 * radius, 0.0],
+                "end": [0.0, 1.18 * radius, 0.0],
+            },
+        ],
+    }
+
+
 def generate_bead_on_hoop_trajectory(
     *,
     mass: float = 1.0,
@@ -75,6 +109,7 @@ def generate_bead_on_hoop_trajectory(
             "radius": radius,
             "gravity": gravity,
             "angular_speed": angular_speed,
+            "rendererHints": bead_renderer_hints(radius),
         },
         state_transform=lambda time, states: np.column_stack(
             [

@@ -12,6 +12,56 @@ from scripts.generation import generate_lagrangian_trajectory, write_trajectory_
 from systems.kepler_problem import build_system
 
 
+def kepler_renderer_hints(states: np.ndarray) -> dict[str, object]:
+    """Return scene metadata that describes how to frame the rendered orbit."""
+
+    x = states[:, 4]
+    y = states[:, 5]
+    extent = float(max(np.max(np.abs(x)), np.max(np.abs(y)), 1.0))
+    plane_radius = extent * 1.18
+    ring_radii = np.linspace(plane_radius * 0.28, plane_radius * 0.9, 4)
+    flow_radius = plane_radius * 0.9
+
+    return {
+        "bounds": {
+            "x": [float(np.min(x)), float(np.max(x))],
+            "y": [0.0, 0.0],
+            "z": [float(np.min(y)), float(np.max(y))],
+        },
+        "camera": {
+            "position": [plane_radius * 1.35, plane_radius * 0.9, plane_radius * 1.65],
+            "target": [0.0, 0.0, 0.0],
+        },
+        "referenceGeometry": [
+            {
+                "kind": "centralBody",
+                "position": [0.0, 0.0, 0.0],
+                "radius": plane_radius * 0.061,
+            },
+            {
+                "kind": "orbitalPlane",
+                "radius": plane_radius,
+            },
+            {
+                "kind": "radialRings",
+                "radii": [float(radius) for radius in ring_radii],
+            },
+            {
+                "kind": "centralForceSamples",
+                "radii": [float(radius) for radius in np.linspace(flow_radius * 0.36, flow_radius, 3)],
+                "angles": 8,
+            },
+        ],
+        "flow": {
+            "kind": "centralAttraction",
+            "bounds": {
+                "x": [-flow_radius, flow_radius],
+                "z": [-flow_radius, flow_radius],
+            },
+        },
+    }
+
+
 def generate_kepler_trajectory(
     *,
     mass: float = 1.0,
@@ -21,7 +71,7 @@ def generate_kepler_trajectory(
     dt: float = 0.01,
 ) -> Trajectory:
     system = build_system(mass=mass, gravitational_parameter=gravitational_parameter)
-    return generate_lagrangian_trajectory(
+    trajectory = generate_lagrangian_trajectory(
         spec=KEPLER,
         system=system,
         initial_state=initial_state,
@@ -41,6 +91,15 @@ def generate_kepler_trajectory(
                 intrinsic_states[:, 0] * np.sin(intrinsic_states[:, 1]),
             ]
         ),
+    )
+    metadata = dict(trajectory.metadata or {})
+    metadata["rendererHints"] = kepler_renderer_hints(trajectory.states)
+    return Trajectory.from_arrays(
+        time=trajectory.time,
+        states=trajectory.states,
+        state_names=trajectory.state_names,
+        metadata=metadata,
+        series=trajectory.series,
     )
 
 

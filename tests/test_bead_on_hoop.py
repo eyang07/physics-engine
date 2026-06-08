@@ -39,3 +39,7 @@ def test_bead_on_rotating_hoop_generated_path_stays_on_constraint():
     assert trajectory.metadata is not None
     assert trajectory.metadata["angular_speed"] == 4.0
     assert "potentialPlots" in trajectory.metadata
+    hints = trajectory.metadata["rendererHints"]
+    assert hints["referenceGeometry"][0]["kind"] == "constraintHoop"
+    assert hints["referenceGeometry"][0]["radius"] == 1.0
+    assert hints["camera"]["target"] == [0.0, 0.0, 0.0]

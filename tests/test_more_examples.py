@@ -71,6 +71,11 @@ def test_kepler_generated_motion_conserves_energy_and_angular_momentum():
 
     assert np.max(np.abs(angular_momentum - angular_momentum[0])) < 1e-8
     assert np.max(np.abs(energy - energy[0])) < 1e-8
+    assert trajectory.metadata is not None
+    hints = trajectory.metadata["rendererHints"]
+    assert hints["camera"]["position"][1] > 0
+    assert hints["referenceGeometry"][0]["kind"] == "centralBody"
+    assert hints["flow"]["kind"] == "centralAttraction"
 
 
 def test_kepler_effective_potential_matches_radial_energy_reduction():
