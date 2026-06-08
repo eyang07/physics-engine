@@ -44,6 +44,7 @@ The engine currently supports:
 - Bead on a rotating hoop
 - Lorenz attractor
 - Hénon-Heiles system
+- Variable-speed wavefront propagation
 
 ## Viewer
 

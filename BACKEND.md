@@ -24,14 +24,14 @@ visualization lenses, and renderer hints.
 
 [x] Registered examples: simple pendulum, geodesic on a sphere, charged particle
 in a uniform magnetic field, uniform gravitational field, ideal spring, Kepler
-problem, bead on a rotating hoop, Lorenz attractor, and Hénon-Heiles system.
+problem, bead on a rotating hoop, Lorenz attractor, Hénon-Heiles system, and
+variable-speed wavefront propagation.
 
-[x] Backend-only wavefront prototype: a variable-speed 2D medium now exports a
-ray bundle and wavefront snapshots using cotangent Hamiltonian flow. It is not
-registered in the gallery yet because the frontend does not have a ray-bundle
-lens.
+[x] Wavefront prototype: a variable-speed 2D medium now exports a ray bundle and
+wavefront snapshots using cotangent Hamiltonian flow, and the viewer renders it
+with a dedicated 2D wavefront lens.
 
-[x] Verification baseline: `pytest -q` passes with 149 tests. Full project
+[x] Verification baseline: `pytest -q` passes with 158 tests. Full project
 verification also includes `cd viewer && npm run build` and `cd viewer && npm
 run test:visual`.
 
@@ -101,8 +101,8 @@ Recommended implementation sequence:
 3. Preserve the current export shape: shared time, per-ray states, wavefront
    snapshots, renderer bounds, and Hamiltonian drift diagnostics.
 4. Add focused tests for helper determinism and drift reporting.
-5. Keep gallery registration blocked until the frontend has a real `ray-bundle`
-   or `wavefront` lens.
+5. Keep future wave/GR examples out of the gallery until they have honest lens
+   support.
 
 ## Backend Tools To Add
 
@@ -123,16 +123,20 @@ and geodesic RHS, starting with low-dimensional or symmetry-reduced metrics.
 [ ] Diagnostics for wave/ray examples: Hamiltonian constraint drift, caustic
 proximity, travel time, and wavefront envelope metadata.
 
+## Example Generation Notes
+
+- Review VisualPDE as an inspiration/reference source for future generated PDE
+  examples, especially wave propagation, pattern formation, reaction-diffusion,
+  and parameterized media demos.
+
 ## Itinerary
 
-1. Add gallery registration only after the frontend has a dedicated ray-bundle
-   lens.
-2. Generalize the ray-bundle export helper so future microlocal/GR ray examples
+1. Generalize the ray-bundle export helper so future microlocal/GR ray examples
    do not duplicate generator logic.
-3. Add approximate Lyapunov exponent diagnostics for Lorenz or Hénon-Heiles.
-4. Add a Poincare-section export for Hénon-Heiles.
-5. Decide the parameter-interactivity backend strategy.
-6. Add the next physics example after the data-contract direction is settled.
+2. Add approximate Lyapunov exponent diagnostics for Lorenz or Hénon-Heiles.
+3. Add a Poincare-section export for Hénon-Heiles.
+4. Decide the parameter-interactivity backend strategy.
+5. Add the next physics example after the data-contract direction is settled.
 
 ## Open Questions
 

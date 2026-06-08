@@ -31,6 +31,7 @@ from systems.lorenz_attractor import build_system as build_lorenz
 from systems.pendulum import build_system as build_pendulum
 from systems.sphere_geodesic import build_system as build_sphere_geodesic
 from systems.uniform_gravity import build_system as build_uniform_gravity
+from systems.variable_speed_wavefront import build_system as build_variable_speed_wavefront
 
 
 def _time_translation(system):
@@ -220,6 +221,13 @@ LENSES: tuple[Lens, ...] = (
         description="Two-dimensional potential contours with the current configuration point.",
         projections=("configurationPlane",),
         conserved=("H",),
+    ),
+    Lens(
+        id="variableSpeedWavefront",
+        title="Wavefront",
+        kind="ray-bundle",
+        description="Bicharacteristic rays bending through a variable-speed medium.",
+        projections=("rayPlane",),
     ),
 )
 
@@ -509,6 +517,31 @@ HENON_HEILES = SystemSpec(
 )
 
 
+VARIABLE_SPEED_WAVEFRONT = SystemSpec(
+    id="variable-speed-wavefront",
+    title="Variable-Speed Wavefront",
+    category="Wave Propagation",
+    description="A ray bundle evolving through a Gaussian slow-speed lens in geometric optics.",
+    build=build_variable_speed_wavefront,
+    parameters=(
+        Parameter("c0", "c_0", 1.0, 0.5, 2.0),
+        Parameter("alpha", r"\alpha", 0.42, 0.0, 0.75),
+        Parameter("sigma", r"\sigma", 0.85, 0.25, 1.75),
+    ),
+    state=(
+        StateVar("x", "x", "coordinate"),
+        StateVar("y", "y", "coordinate"),
+        StateVar("xi", r"\xi", "momentum"),
+        StateVar("eta", r"\eta", "momentum"),
+    ),
+    projections={"rayPlane": ("x", "y")},
+    conserved=(),
+    lenses=("variableSpeedWavefront",),
+    data_path="/data/variable_speed_wavefront.json",
+    system_kind="ray-bundle",
+)
+
+
 SPECS: tuple[SystemSpec, ...] = (
     PENDULUM,
     SPHERE_GEODESIC,
@@ -519,4 +552,5 @@ SPECS: tuple[SystemSpec, ...] = (
     BEAD_ON_HOOP,
     LORENZ,
     HENON_HEILES,
+    VARIABLE_SPEED_WAVEFRONT,
 )

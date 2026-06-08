@@ -13,6 +13,7 @@ from scripts.generate_lorenz_attractor import write_lorenz_trajectory
 from scripts.generate_pendulum import write_pendulum_trajectory
 from scripts.generate_sphere_geodesic import write_sphere_geodesic_trajectory
 from scripts.generate_uniform_gravity import write_uniform_gravity_trajectory
+from scripts.generate_variable_speed_wavefront import write_variable_speed_wavefront
 
 
 def main() -> None:
@@ -51,6 +52,10 @@ def main() -> None:
     write_henon_heiles_trajectory(
         Path("data/generated/henon_heiles.json"),
         viewer_output=Path("viewer/public/data/henon_heiles.json"),
+    )
+    write_variable_speed_wavefront(
+        Path("data/generated/variable_speed_wavefront.json"),
+        viewer_output=Path("viewer/public/data/variable_speed_wavefront.json"),
     )
     write_manifest(
         SPECS,

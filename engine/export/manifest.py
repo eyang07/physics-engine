@@ -28,7 +28,7 @@ from typing import Any, Callable, Mapping, Sequence
 import numpy as np
 import sympy as sp
 
-from engine.dynamics import FirstOrderSystem
+from engine.dynamics import CotangentHamiltonianSystem, FirstOrderSystem
 from engine.mechanics.coordinates import acceleration_symbol, momentum_symbol
 from engine.mechanics.hamiltonian import legendre_transform
 from engine.mechanics.lagrangian import LagrangianSystem
@@ -370,6 +370,8 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
     system = spec.build()
     if isinstance(system, FirstOrderSystem):
         return first_order_system_entry(spec, system)
+    if isinstance(system, CotangentHamiltonianSystem):
+        return first_order_system_entry(spec, system.first_order_system())
 
     symbol_latex = _symbol_latex(system, spec)
 

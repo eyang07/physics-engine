@@ -9,7 +9,7 @@ import {
 import { StaticSource } from "./data/source";
 import { drawEffectivePotentialScene } from "./effectivePotentialCanvas";
 import { renderHome } from "./home";
-import { PlaybackClock, sampleTrajectory } from "./playback";
+import { PlaybackClock, sampleTrajectory, trajectoryDuration } from "./playback";
 import {
   computePendulumBounds,
   drawPendulumScene,
@@ -18,6 +18,7 @@ import {
 } from "./pendulumCanvas";
 import { drawPhaseScene, drawPotentialContourScene, drawPotentialScene } from "./phasePotentialCanvas";
 import { StructurePanel } from "./structurePanel";
+import { drawWavefrontScene } from "./wavefrontCanvas";
 import "./styles.css";
 
 type CanvasMode =
@@ -32,7 +33,8 @@ type CanvasMode =
   | "beadHoopPhase"
   | "beadHoopPotential"
   | "henonHeilesPhase"
-  | "henonHeilesPotential";
+  | "henonHeilesPotential"
+  | "variableSpeedWavefront";
 
 const CANVAS_MODE_IDS = new Set<string>([
   "pendulumMotionPhase",
@@ -47,6 +49,7 @@ const CANVAS_MODE_IDS = new Set<string>([
   "beadHoopPotential",
   "henonHeilesPhase",
   "henonHeilesPotential",
+  "variableSpeedWavefront",
 ]);
 
 function requireElement<T extends Element>(selector: string): T {
@@ -100,9 +103,23 @@ let selectedVisualization: ManifestLens | null = null;
 let trajectory: Trajectory | null = null;
 let pendulumBounds: Bounds | null = null;
 
+function syncPlayButton() {
+  const duration = trajectory ? trajectoryDuration(trajectory) : 0;
+  if (!clock.playing && duration > 0 && clock.time >= duration) {
+    playButton.textContent = "Replay";
+  } else {
+    playButton.textContent = clock.playing ? "Pause" : "Play";
+  }
+}
+
 playButton.addEventListener("click", () => {
-  const playing = clock.toggle();
-  playButton.textContent = playing ? "Pause" : "Play";
+  const duration = trajectory ? trajectoryDuration(trajectory) : 0;
+  if (!clock.playing && duration > 0 && clock.time >= duration) {
+    clock.reset();
+  } else {
+    clock.toggle();
+  }
+  syncPlayButton();
 });
 
 enterSimulations.addEventListener("click", () => {
@@ -242,6 +259,7 @@ async function selectExample(exampleId: string) {
   systemSelect.value = nextExample.id;
   renderVisualizationButtons();
   clock.reset();
+  syncPlayButton();
   structurePanel.clear();
 
   trajectory = await loadTrajectory(nextExample);
@@ -268,8 +286,6 @@ window.addEventListener("resize", () => {
 });
 
 function render(now: number) {
-  const time = clock.advance(now, Number(speedControl.value));
-
   if (activeView === "home") {
     renderHome(homeCanvas, homeCtx, now);
     requestAnimationFrame(render);
@@ -291,6 +307,12 @@ function render(now: number) {
     return;
   }
 
+  const time = clock.advance(now, Number(speedControl.value));
+  const duration = trajectoryDuration(trajectory);
+  if (duration > 0 && time >= duration && clock.playing) {
+    clock.pause();
+    syncPlayButton();
+  }
   const current = sampleTrajectory(trajectory, time);
   if (selectedVisualization.id === "pendulumMotionPhase") {
     resize2dCanvas();
@@ -303,6 +325,8 @@ function render(now: number) {
     drawPotentialContourScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else if (selectedExample && isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "potential-energy") {
     drawPotentialScene(ctx, trajectory, selectedExample, selectedVisualization, current, canvas.clientWidth, canvas.clientHeight);
+  } else if (selectedVisualization.id === "variableSpeedWavefront") {
+    drawWavefrontScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else {
     threeScene.render(current.state, time, current.index);
   }

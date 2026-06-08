@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from engine.export.manifest import build_manifest, system_entry
+from engine.dynamics import CotangentHamiltonianSystem
 from engine.mechanics.lagrangian import LagrangianSystem
 from scripts.example_specs import LENSES, SPECS
 
@@ -61,6 +62,11 @@ def test_state_schema_matches_system(spec) -> None:
     if isinstance(system, LagrangianSystem):
         assert coordinates == [symbol.name for symbol in system.q]
         assert velocities == [symbol.name for symbol in system.qdot]
+    elif isinstance(system, CotangentHamiltonianSystem):
+        momenta = [variable.name for variable in spec.state if variable.kind == "momentum"]
+        assert coordinates == [symbol.name for symbol in system.coordinates]
+        assert momenta == [symbol.name for symbol in system.momenta]
+        assert velocities == []
     else:
         assert coordinates == [symbol.name for symbol in system.state_symbols]
         assert velocities == []
@@ -78,6 +84,9 @@ def test_physical_parameters_appear_in_lagrangian(spec) -> None:
     system = spec.build()
     if isinstance(system, LagrangianSystem):
         free_names = {symbol.name for symbol in system.lagrangian.free_symbols}
+    elif isinstance(system, CotangentHamiltonianSystem):
+        expressions = system.rhs()
+        free_names = {symbol.name for symbol in set().union(*(expr.free_symbols for expr in expressions))}
     else:
         expressions = tuple(system.rhs)
         free_names = {symbol.name for symbol in set().union(*(expr.free_symbols for expr in expressions))}

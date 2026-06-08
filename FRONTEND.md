@@ -11,7 +11,7 @@ interactive visuals.
 gallery, playback controls, structure panels, invariant lanes, 2D canvas lenses,
 potential/effective-potential lenses, and Three.js views.
 
-[x] Verification after the renderer-hints rollout: `pytest -q` passes with 145
+[x] Verification after the wavefront lens addition: `pytest -q` passes with 158
 tests, `cd viewer && npm run build` passes, and `cd viewer && npm run
 test:visual` passes with desktop/mobile coverage. The viewer build emits a
 non-fatal Vite chunk-size warning for the main JavaScript bundle.
@@ -48,6 +48,10 @@ sampling, sphere radius, and gravity-field sampling bounds.
 [x] Fix the Lorenz renderer-hints bounds bug. The Lorenz scene applies a
 center/scale transform before rendering, so the viewer needs scene-space bounds
 from the generated data.
+
+[x] Add a dedicated 2D ray-bundle/wavefront canvas lens for the variable-speed
+wavefront example. The lens draws the medium, ray traces, historical
+wavefronts, the active wavefront, and the center-ray marker from backend data.
 
 [ ] Add a small frontend affordance for renderer-hint-backed scenes, such as a
 camera reset button or a "fit to system" action that reapplies the exported
@@ -97,4 +101,4 @@ Recommended implementation sequence:
 Latest baseline: `pytest -q`, `cd viewer && npm run build`, and the Playwright
 visual suite all pass. The visual suite passed 2 tests covering desktop and
 mobile rendering across the registered examples after the full renderer-hints
-rollout and Lorenz bounds fix.
+rollout, Lorenz bounds fix, and wavefront lens addition.

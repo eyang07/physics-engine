@@ -47,21 +47,33 @@ def _initial_covector(
     return 1.0 / speed, 0.0
 
 
-def wavefront_renderer_hints(rays: np.ndarray) -> dict[str, object]:
+def wavefront_renderer_hints(
+    rays: np.ndarray,
+    *,
+    x0: float,
+    y_span: tuple[float, float],
+) -> dict[str, object]:
     positions = rays[:, :, :2].reshape(-1, 2)
     x_min = float(positions[:, 0].min())
     x_max = float(positions[:, 0].max())
     y_min = float(positions[:, 1].min())
     y_max = float(positions[:, 1].max())
+    viewport_x = [float(x0 - 0.25), float(-x0 + 0.35)]
+    viewport_y = [float(y_span[0] - 0.3), float(y_span[1] + 0.3)]
     return {
         "bounds": {
             "x": [x_min, x_max],
             "y": [y_min, y_max],
             "z": [0.0, 0.0],
         },
+        "viewportBounds": {
+            "x": viewport_x,
+            "y": viewport_y,
+            "z": [0.0, 0.0],
+        },
         "camera": {
             "position": [0.0, 0.0, 6.0],
-            "target": [(x_min + x_max) / 2, (y_min + y_max) / 2, 0.0],
+            "target": [(viewport_x[0] + viewport_x[1]) / 2, (viewport_y[0] + viewport_y[1]) / 2, 0.0],
         },
         "referenceGeometry": [
             {
@@ -80,7 +92,7 @@ def generate_variable_speed_wavefront(
     ray_count: int = 33,
     y_span: tuple[float, float] = (-1.8, 1.8),
     x0: float = -3.0,
-    t_span: tuple[float, float] = (0.0, 5.2),
+    t_span: tuple[float, float] = (0.0, 12.0),
     dt: float = 0.01,
     snapshot_stride: int = 40,
 ) -> Trajectory:
@@ -160,7 +172,7 @@ def generate_variable_speed_wavefront(
             ],
         },
         "wavefronts": wavefronts,
-        "rendererHints": wavefront_renderer_hints(rays),
+        "rendererHints": wavefront_renderer_hints(rays, x0=x0, y_span=y_span),
         "hamiltonian": {
             "initial": hamiltonians[:, 0].astype(float).tolist(),
             "maxDrift": float(np.max(np.abs(hamiltonians - hamiltonians[:, [0]]))),
@@ -193,7 +205,7 @@ def write_variable_speed_wavefront(
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate variable-speed wavefront ray data.")
     parser.add_argument("--output", type=Path, default=Path("data/generated/variable_speed_wavefront.json"))
-    parser.add_argument("--viewer-output", type=Path, default=None)
+    parser.add_argument("--viewer-output", type=Path, default=Path("viewer/public/data/variable_speed_wavefront.json"))
     return parser.parse_args(argv)
 
 

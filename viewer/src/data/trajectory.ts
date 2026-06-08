@@ -35,6 +35,7 @@ export type ReferenceGeometryHint = {
 
 export type RendererHints = {
   bounds?: AxisBounds;
+  viewportBounds?: AxisBounds;
   camera?: {
     position?: Vector3Tuple;
     target?: Vector3Tuple;
@@ -137,6 +138,7 @@ export function rendererHints(trajectory: Trajectory): RendererHints {
       : undefined;
   return {
     bounds: isBounds(candidate.bounds) ? candidate.bounds : undefined,
+    viewportBounds: isBounds(candidate.viewportBounds) ? candidate.viewportBounds : undefined,
     camera: {
       position: isNumberTuple3(camera.position) ? camera.position : undefined,
       target: isNumberTuple3(camera.target) ? camera.target : undefined,

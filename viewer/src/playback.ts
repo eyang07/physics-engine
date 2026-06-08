@@ -1,29 +1,39 @@
 /**
- * Playback: a looping clock plus trajectory sampling.
+ * Playback: a one-shot clock plus trajectory sampling.
  *
  * Time advances independently of rendering; the clock is the single source of
  * the animation's progress, and `sampleTrajectory` interpolates the exported
- * state at any (wrapped) time so the loop is seamless.
+ * state until the final sample. The viewer treats the data span as one complete
+ * run of the example instead of wrapping early.
  */
 import type { Trajectory } from "./data/trajectory";
+import { clamp } from "./util";
 
 export type Sample = {
   state: number[];
   index: number;
+  /** Clamped trajectory time for this sample. */
   wrappedTime: number;
-  /** Position within one loop of the trajectory, in [0, 1). */
+  /** Position within one complete run of the trajectory, in [0, 1]. */
   phase: number;
 };
 
+export function trajectoryDuration(data: Trajectory): number {
+  const start = data.time[0] ?? 0;
+  const end = data.time[data.time.length - 1] ?? start;
+  return Math.max(0, end - start);
+}
+
 export function sampleTrajectory(data: Trajectory, time: number): Sample {
-  const duration = data.time[data.time.length - 1] ?? 1;
-  const wrapped = ((time % duration) + duration) % duration;
+  const start = data.time[0] ?? 0;
+  const duration = trajectoryDuration(data);
+  const sampledTime = start + clamp(time, 0, duration);
 
   let low = 0;
   let high = data.time.length - 1;
   while (high - low > 1) {
     const mid = Math.floor((low + high) / 2);
-    if (data.time[mid] <= wrapped) {
+    if (data.time[mid] <= sampledTime) {
       low = mid;
     } else {
       high = mid;
@@ -32,15 +42,15 @@ export function sampleTrajectory(data: Trajectory, time: number): Sample {
 
   const t0 = data.time[low];
   const t1 = data.time[high] ?? t0;
-  const alpha = t1 === t0 ? 0 : (wrapped - t0) / (t1 - t0);
+  const alpha = t1 === t0 ? 0 : (sampledTime - t0) / (t1 - t0);
   const state0 = data.states[low];
   const state1 = data.states[high] ?? state0;
 
   return {
     state: state0.map((value, index) => value + alpha * ((state1[index] ?? value) - value)),
     index: low,
-    wrappedTime: wrapped,
-    phase: duration > 0 ? wrapped / duration : 0,
+    wrappedTime: sampledTime,
+    phase: duration > 0 ? (sampledTime - start) / duration : 1,
   };
 }
 
@@ -62,6 +72,12 @@ export class PlaybackClock {
 
   reset(): void {
     this.time = 0;
+    this.playing = true;
+    this.last = performance.now();
+  }
+
+  pause(): void {
+    this.playing = false;
   }
 
   toggle(): boolean {
