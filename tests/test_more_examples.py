@@ -29,6 +29,10 @@ def test_uniform_gravity_generated_motion_is_parabolic():
     assert np.max(np.abs(z - (z_dot[0] * time - 0.5 * 9.81 * time**2))) < 1e-10
     assert np.max(np.abs(x_dot - x_dot[0])) < 1e-12
     assert np.max(np.abs(z_dot - (z_dot[0] - 9.81 * time))) < 1e-10
+    assert trajectory.metadata is not None
+    hints = trajectory.metadata["rendererHints"]
+    assert hints["referenceGeometry"][0]["kind"] == "groundPlane"
+    assert hints["flow"]["kind"] == "uniformGravity"
 
 
 def test_ideal_spring_equation_and_energy():

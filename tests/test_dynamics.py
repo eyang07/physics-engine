@@ -80,6 +80,10 @@ def test_lorenz_export_metadata_and_series() -> None:
     assert trajectory.metadata["divergence"] == -(10.0 + 1.0 + 8.0 / 3.0)
     assert set(trajectory.metadata["bounds"]) == {"x", "y", "z"}
     assert len(trajectory.metadata["fixedPoints"]) == 3
+    hints = trajectory.metadata["rendererHints"]
+    assert hints["transform"]["scale"] > 0
+    assert hints["referenceGeometry"][0]["kind"] == "guideRings"
+    assert hints["referenceGeometry"][1]["kind"] == "fixedPointMarkers"
 
 
 def test_lorenz_manifest_registration() -> None:

@@ -22,6 +22,32 @@ def embed_sphere(radius: float, theta: np.ndarray, phi: np.ndarray) -> np.ndarra
     )
 
 
+def sphere_renderer_hints(radius: float) -> dict[str, object]:
+    """Return renderer metadata for the sphere scene."""
+
+    return {
+        "bounds": {
+            "x": [-radius, radius],
+            "y": [-radius, radius],
+            "z": [-radius, radius],
+        },
+        "camera": {
+            "position": [2.5 * radius, 1.6 * radius, 3.2 * radius],
+            "target": [0.0, 0.0, 0.0],
+        },
+        "referenceGeometry": [
+            {
+                "kind": "sphere",
+                "radius": radius,
+            },
+            {
+                "kind": "northPoleLabel",
+                "position": [0.0, 1.28 * radius, 0.0],
+            },
+        ],
+    }
+
+
 def generate_sphere_geodesic_trajectory(
     *,
     mass: float = 1.0,
@@ -46,6 +72,7 @@ def generate_sphere_geodesic_trajectory(
             "system": "sphere_geodesic",
             "radius": radius,
             "mass": mass,
+            "rendererHints": sphere_renderer_hints(radius),
         },
         state_transform=lambda _time, intrinsic_states: np.column_stack(
             [

@@ -23,6 +23,51 @@ def _complex_pair(value: sp.Expr) -> dict[str, float]:
     return {"real": float(numeric.real), "imag": float(numeric.imag)}
 
 
+def lorenz_renderer_hints(states: np.ndarray) -> dict[str, object]:
+    """Return renderer metadata derived from the attractor bounds."""
+
+    raw_x = states[:, 0]
+    raw_y = states[:, 1]
+    raw_z = states[:, 2]
+    # The viewer maps raw Lorenz coordinates (x, y, z) to scene (x, z, y).
+    scene_min = np.array([raw_x.min(), raw_z.min(), raw_y.min()], dtype=float)
+    scene_max = np.array([raw_x.max(), raw_z.max(), raw_y.max()], dtype=float)
+    center = (scene_min + scene_max) / 2
+    size = scene_max - scene_min
+    scale = float(3.1 / max(size.max(), 1.0))
+
+    transformed_min = (scene_min - center) * scale
+    transformed_max = (scene_max - center) * scale
+
+    return {
+        "bounds": {
+            "x": [float(transformed_min[0]), float(transformed_max[0])],
+            "y": [float(transformed_min[1]), float(transformed_max[1])],
+            "z": [float(transformed_min[2]), float(transformed_max[2])],
+        },
+        "camera": {
+            "position": [3.0, 2.05, 4.4],
+            "target": [0.0, 0.05, 0.0],
+        },
+        "transform": {
+            "center": [float(center[0]), float(center[1]), float(center[2])],
+            "scale": scale,
+        },
+        "referenceGeometry": [
+            {
+                "kind": "guideRings",
+                "radius": float(max(size[0], size[2]) * scale * 0.36),
+                "scale": [1.0, 1.0, 0.7],
+                "yValues": [-0.68, 0.0, 0.68],
+            },
+            {
+                "kind": "fixedPointMarkers",
+                "radius": 0.04,
+            },
+        ],
+    }
+
+
 def generate_lorenz_trajectory(
     *,
     sigma: float = 10.0,
@@ -75,6 +120,7 @@ def generate_lorenz_trajectory(
             "bounds": bounds,
             "divergence": float(system.divergence()),
             "fixedPoints": fixed_points,
+            "rendererHints": lorenz_renderer_hints(states),
         },
         series={
             "speed": speed.tolist(),

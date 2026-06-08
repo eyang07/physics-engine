@@ -74,6 +74,10 @@ def test_sphere_geodesic_generated_path_stays_on_great_circle():
     assert np.max(np.abs(np.linalg.norm(positions, axis=1) - 1.0)) < 1e-12
     assert np.max(np.abs(positions @ initial_plane_normal)) < 5e-9
     assert np.max(np.linalg.norm(angular_momentum - angular_momentum[0], axis=1)) < 5e-8
+    hints = trajectory.metadata["rendererHints"]
+    assert hints["referenceGeometry"][0]["kind"] == "sphere"
+    assert hints["referenceGeometry"][0]["radius"] == 1.0
+    assert hints["camera"]["target"] == [0.0, 0.0, 0.0]
 
 
 def test_charged_particle_lorentz_force_equations():
@@ -104,6 +108,9 @@ def test_charged_particle_generated_motion_conserves_speed_and_z_velocity():
     assert trajectory.state_names == ("x", "y", "z", "x_dot", "y_dot", "z_dot")
     assert np.max(np.abs(speed_squared - speed_squared[0])) < 1e-10
     assert np.max(np.abs(velocities[:, 2] - velocities[0, 2])) < 1e-12
+    hints = trajectory.metadata["rendererHints"]
+    assert hints["referenceGeometry"][0]["kind"] == "magneticField"
+    assert hints["flow"]["kind"] == "magneticRotation"
 
 
 def test_new_example_scripts_write_primary_and_viewer_outputs(tmp_path):
@@ -131,4 +138,3 @@ def test_new_example_scripts_write_primary_and_viewer_outputs(tmp_path):
     assert json.loads(charged_output.read_text(encoding="utf-8")) == json.loads(
         charged_viewer_output.read_text(encoding="utf-8")
     )
-

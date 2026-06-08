@@ -39,3 +39,7 @@ def test_henon_heiles_generated_energy_and_potential_surface() -> None:
     assert len(surface["yValues"]) == 120
     assert np.asarray(surface["values"], dtype=float).shape == (120, 120)
     assert abs(surface["energy"] - float(energy.mean())) < 1e-12
+    hints = trajectory.metadata["rendererHints"]
+    assert hints["referenceGeometry"][0]["kind"] == "potentialSurface"
+    assert hints["flow"]["kind"] == "potentialGradient"
+    assert set(hints["bounds"]) == {"x", "y", "z"}

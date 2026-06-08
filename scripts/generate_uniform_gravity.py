@@ -16,6 +16,42 @@ from scripts.generation import (
 from systems.uniform_gravity import build_system
 
 
+def uniform_gravity_renderer_hints(states: np.ndarray) -> dict[str, object]:
+    """Return renderer metadata for the projectile and gravity-field scene."""
+
+    scene_x = states[:, 0] - 0.9
+    scene_y = states[:, 1] * 0.42 - 0.65
+    return {
+        "bounds": {
+            "x": [float(scene_x.min()), float(scene_x.max())],
+            "y": [float(scene_y.min()), float(scene_y.max())],
+            "z": [0.0, 0.0],
+        },
+        "camera": {
+            "position": [2.65, 1.65, 3.25],
+            "target": [0.25, 0.1, 0.0],
+        },
+        "referenceGeometry": [
+            {
+                "kind": "groundPlane",
+                "scale": [3.8, 1.4, 1.0],
+                "position": [0.28, -0.74, 0.0],
+            },
+            {
+                "kind": "gravityField",
+                "length": 0.42,
+            },
+        ],
+        "flow": {
+            "kind": "uniformGravity",
+            "bounds": {
+                "x": [-1.45, 1.95],
+                "z": [-0.56, 1.1],
+            },
+        },
+    }
+
+
 def generate_uniform_gravity_trajectory(
     *,
     mass: float = 1.0,
@@ -48,6 +84,7 @@ def generate_uniform_gravity_trajectory(
             "system": "uniform_gravity",
             "mass": mass,
             "gravity": gravity,
+            "rendererHints": uniform_gravity_renderer_hints(trajectory.states),
             "potentialPlots": [
                 potential_plot_metadata(
                     name="gravity_potential",

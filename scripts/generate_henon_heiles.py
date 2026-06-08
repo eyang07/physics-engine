@@ -16,6 +16,42 @@ def _potential(x: np.ndarray, y: np.ndarray, stiffness: float, coupling: float) 
     return 0.5 * stiffness * (x**2 + y**2) + coupling * (x**2 * y - y**3 / 3.0)
 
 
+def henon_renderer_hints(grid_x: np.ndarray, grid_y: np.ndarray, potential: np.ndarray) -> dict[str, object]:
+    """Return renderer metadata for the potential-surface lens."""
+
+    x_min = float(grid_x.min())
+    x_max = float(grid_x.max())
+    y_min = float(grid_y.min())
+    y_max = float(grid_y.max())
+    value_min = float(np.nanmin(potential))
+    value_max = float(np.nanmax(potential))
+    return {
+        "bounds": {
+            "x": [x_min, x_max],
+            "y": [value_min, value_max],
+            "z": [y_min, y_max],
+        },
+        "camera": {
+            "position": [2.7, 1.75, 3.45],
+            "target": [0.0, 0.05, 0.0],
+        },
+        "referenceGeometry": [
+            {
+                "kind": "potentialSurface",
+                "scale": [1.38, 0.95, 1.38],
+                "offset": [0.0, -0.36, 0.0],
+            }
+        ],
+        "flow": {
+            "kind": "potentialGradient",
+            "bounds": {
+                "x": [x_min * 0.78, x_max * 0.78],
+                "z": [y_min * 0.72, y_max * 0.72],
+            },
+        },
+    }
+
+
 def generate_henon_heiles_trajectory(
     *,
     mass: float = 1.0,
@@ -66,6 +102,7 @@ def generate_henon_heiles_trajectory(
                 "values": potential.tolist(),
                 "energy": float(np.mean(np.asarray(trajectory.series["H"], dtype=float))),
             },
+            "rendererHints": henon_renderer_hints(grid_x, grid_y, potential),
         },
         series=trajectory.series,
     )

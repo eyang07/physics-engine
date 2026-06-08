@@ -4,10 +4,52 @@ import argparse
 from pathlib import Path
 from typing import Sequence
 
+import numpy as np
+
 from engine.export import Trajectory
 from scripts.example_specs import CHARGED_PARTICLE
 from scripts.generation import generate_lagrangian_trajectory, write_trajectory_outputs
 from systems.charged_particle import build_uniform_magnetic_field_system
+
+
+def charged_particle_renderer_hints(states: np.ndarray) -> dict[str, object]:
+    """Return renderer metadata for the magnetic-field scene."""
+
+    x = states[:, 0]
+    y = states[:, 1]
+    z = states[:, 2] * 0.62
+    x_extent = float(max(np.max(np.abs(x)), 1.2))
+    y_extent = float(max(np.max(np.abs(y)), 1.2))
+    z_min = float(min(z.min(), -1.05))
+    z_max = float(max(z.max(), 1.05))
+
+    return {
+        "bounds": {
+            "x": [float(x.min()), float(x.max())],
+            "y": [z_min, z_max],
+            "z": [float(y.min()), float(y.max())],
+        },
+        "camera": {
+            "position": [3.0, 2.0, 3.4],
+            "target": [0.0, 0.0, 0.0],
+        },
+        "referenceGeometry": [
+            {
+                "kind": "magneticField",
+                "radii": [0.86],
+                "yValues": [-0.7, 0.05, 0.8],
+                "start": [0.0, -1.05, 0.0],
+                "end": [0.0, 1.05, 0.0],
+            }
+        ],
+        "flow": {
+            "kind": "magneticRotation",
+            "bounds": {
+                "x": [-x_extent, x_extent],
+                "z": [-y_extent, y_extent],
+            },
+        },
+    }
 
 
 def generate_charged_particle_trajectory(
@@ -24,7 +66,7 @@ def generate_charged_particle_trajectory(
         charge=charge,
         magnetic_field_z=magnetic_field_z,
     )
-    return generate_lagrangian_trajectory(
+    trajectory = generate_lagrangian_trajectory(
         spec=CHARGED_PARTICLE,
         system=system,
         initial_state=initial_state,
@@ -38,6 +80,15 @@ def generate_charged_particle_trajectory(
             "charge": charge,
             "magnetic_field": [0.0, 0.0, magnetic_field_z],
         },
+    )
+    metadata = dict(trajectory.metadata or {})
+    metadata["rendererHints"] = charged_particle_renderer_hints(trajectory.states)
+    return Trajectory.from_arrays(
+        time=trajectory.time,
+        states=trajectory.states,
+        state_names=trajectory.state_names,
+        metadata=metadata,
+        series=trajectory.series,
     )
 
 

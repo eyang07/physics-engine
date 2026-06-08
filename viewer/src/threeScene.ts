@@ -150,15 +150,21 @@ function lorenzPoint(state: number[], transform: LorenzTransform): THREE.Vector3
   return rawLorenzPoint(state).sub(transform.center).multiplyScalar(transform.scale);
 }
 
-function lorenzTransform(data: Trajectory): LorenzTransform {
+function lorenzTransform(data: Trajectory, hints: RendererHints): LorenzTransform {
+  const center = hints.transform?.center;
+  const scale = hints.transform?.scale;
+  if (center && typeof scale === "number") {
+    return { center: vectorFromTuple(center), scale };
+  }
+
   const rawPoints = data.states.map(rawLorenzPoint);
   const box = new THREE.Box3().setFromPoints(rawPoints);
   const size = new THREE.Vector3();
-  const center = new THREE.Vector3();
+  const computedCenter = new THREE.Vector3();
   box.getSize(size);
-  box.getCenter(center);
-  const scale = 3.1 / Math.max(size.x, size.y, size.z, 1);
-  return { center, scale };
+  box.getCenter(computedCenter);
+  const computedScale = 3.1 / Math.max(size.x, size.y, size.z, 1);
+  return { center: computedCenter, scale: computedScale };
 }
 
 function makeFadingTrail(length: number, color: THREE.ColorRepresentation): THREE.Line {
@@ -290,10 +296,13 @@ function makePendulumHamiltonianGroup(data: Trajectory): THREE.Group {
   return group;
 }
 
-function makeSphereGeodesicGroup(data: Trajectory): THREE.Group {
+function makeSphereGeodesicGroup(data: Trajectory, hints: RendererHints): THREE.Group {
   const group = new THREE.Group();
+  const sphereHint = referenceHint(hints, "sphere");
+  const northHint = referenceHint(hints, "northPoleLabel");
+  const radius = sphereHint?.radius ?? (typeof data.metadata?.radius === "number" ? data.metadata.radius : 1);
   const sphere = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 64, 36),
+    new THREE.SphereGeometry(radius, 64, 36),
     new THREE.MeshStandardMaterial({
       color: 0xdbe8f0,
       transparent: true,
@@ -305,7 +314,7 @@ function makeSphereGeodesicGroup(data: Trajectory): THREE.Group {
   group.add(sphere);
 
   const wire = new THREE.Mesh(
-    new THREE.SphereGeometry(1.003, 32, 16),
+    new THREE.SphereGeometry(radius * 1.003, 32, 16),
     new THREE.MeshBasicMaterial({
       color: new THREE.Color(theme.textFaint),
       wireframe: true,
@@ -320,27 +329,34 @@ function makeSphereGeodesicGroup(data: Trajectory): THREE.Group {
   );
 
   const north = makeLabel("N");
-  north.position.set(0, 1.28, 0);
+  north.position.copy(northHint?.position ? vectorFromTuple(northHint.position) : new THREE.Vector3(0, 1.28 * radius, 0));
   group.add(north);
   return group;
 }
 
-function makeChargedParticleGroup(data: Trajectory): THREE.Group {
+function makeChargedParticleGroup(data: Trajectory, hints: RendererHints): THREE.Group {
   const group = new THREE.Group();
   const points = data.states.map((state) => new THREE.Vector3(state[0], state[2] * 0.62, state[1]));
   group.add(contextLine(points, 0.36));
+  const fieldHint = referenceHint(hints, "magneticField");
+  const ringRadius = fieldHint?.radii?.[0] ?? 0.86;
+  const ringYValues = fieldHint?.yValues ?? [-0.7, 0.05, 0.8];
+  const fieldStartY = fieldHint?.start?.[1] ?? -1.05;
+  const fieldEndY = fieldHint?.end?.[1] ?? 1.05;
+  const [fieldXMin, fieldXMax] = flowRange(hints, "x", [-1.2, 1.2]);
+  const [fieldZMin, fieldZMax] = flowRange(hints, "z", [-1.2, 1.2]);
 
   const guideMaterial = new THREE.LineBasicMaterial({
     color: new THREE.Color(theme.textFaint),
     transparent: true,
     opacity: 0.18,
   });
-  for (const y of [-0.7, 0.05, 0.8]) {
+  for (const y of ringYValues) {
     const ring = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(
         Array.from({ length: 129 }, (_, index) => {
           const angle = (index / 128) * Math.PI * 2;
-          return new THREE.Vector3(Math.cos(angle) * 0.86, y, Math.sin(angle) * 0.86);
+          return new THREE.Vector3(Math.cos(angle) * ringRadius, y, Math.sin(angle) * ringRadius);
         }),
       ),
       guideMaterial,
@@ -358,10 +374,12 @@ function makeChargedParticleGroup(data: Trajectory): THREE.Group {
     transparent: true,
     opacity: 0.42,
   });
-  for (let x = -1.2; x <= 1.21; x += 0.6) {
-    for (let z = -1.2; z <= 1.21; z += 0.6) {
-      const start = new THREE.Vector3(x, -1.05, z);
-      const end = new THREE.Vector3(x, 1.05, z);
+  const xStep = Math.max(0.2, (fieldXMax - fieldXMin) / 4);
+  const zStep = Math.max(0.2, (fieldZMax - fieldZMin) / 4);
+  for (let x = fieldXMin; x <= fieldXMax + 1e-6; x += xStep) {
+    for (let z = fieldZMin; z <= fieldZMax + 1e-6; z += zStep) {
+      const start = new THREE.Vector3(x, fieldStartY, z);
+      const end = new THREE.Vector3(x, fieldEndY, z);
       group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([start, end]), fieldMaterial));
       const cone = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.12, 12), coneMaterial);
       cone.position.copy(end);
@@ -375,18 +393,25 @@ function makeChargedParticleGroup(data: Trajectory): THREE.Group {
   }
 
   const label = makeLabel("B");
-  label.position.set(1.48, 1.2, 1.22);
+  label.position.set(fieldXMax + 0.28, fieldEndY + 0.15, fieldZMax + 0.02);
   group.add(label);
   return group;
 }
 
-function makeUniformGravityGroup(data: Trajectory): THREE.Group {
+function makeUniformGravityGroup(data: Trajectory, hints: RendererHints): THREE.Group {
   const group = new THREE.Group();
   const points = data.states.map((state) => new THREE.Vector3(state[0] - 0.9, state[1] * 0.42 - 0.65, 0));
   group.add(contextLine(points, 0.34));
+  const groundHint = referenceHint(hints, "groundPlane");
+  const gravityHint = referenceHint(hints, "gravityField");
+  const groundScale = groundHint?.scale ?? [3.8, 1.4, 1.0];
+  const groundPosition = groundHint?.position ?? [0.28, -0.74, 0.0];
+  const fieldLength = gravityHint?.length ?? 0.42;
+  const [fieldXMin, fieldXMax] = flowRange(hints, "x", [-1.45, 1.95]);
+  const [fieldYMin, fieldYMax] = flowRange(hints, "z", [-0.56, 1.1]);
 
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(3.8, 1.4, 18, 3),
+    new THREE.PlaneGeometry(groundScale[0], groundScale[1], 18, 3),
     new THREE.MeshBasicMaterial({
       color: new THREE.Color(theme.textFaint),
       wireframe: true,
@@ -396,15 +421,17 @@ function makeUniformGravityGroup(data: Trajectory): THREE.Group {
     }),
   );
   ground.rotation.x = -Math.PI / 2;
-  ground.position.set(0.28, -0.74, 0);
+  ground.position.copy(vectorFromTuple(groundPosition));
   group.add(ground);
 
-  for (let x = -1.3; x <= 1.8; x += 0.45) {
-    for (let z = -0.55; z <= 0.56; z += 0.55) {
+  const xStep = Math.max(0.25, (fieldXMax - fieldXMin) / 7);
+  const zStep = 0.55;
+  for (let x = fieldXMin + 0.15; x <= fieldXMax - 0.15 + 1e-6; x += xStep) {
+    for (let z = fieldYMin; z <= Math.min(0.56, fieldYMax) + 1e-6; z += zStep) {
       group.add(
         vectorArrow(
-          new THREE.Vector3(x, 0.98, z),
-          new THREE.Vector3(0, -0.42, 0),
+          new THREE.Vector3(x, fieldYMax - 0.12, z),
+          new THREE.Vector3(0, -fieldLength, 0),
           new THREE.Color(theme.cool),
           0.3,
         ),
@@ -419,7 +446,7 @@ function makeUniformGravityGroup(data: Trajectory): THREE.Group {
   }
 
   const label = makeLabel("g");
-  label.position.set(1.42, 0.86, -0.55);
+  label.position.set(fieldXMax - 0.53, fieldYMax - 0.24, fieldYMin + 0.01);
   group.add(label);
   return group;
 }
@@ -629,9 +656,11 @@ function fixedPointCoordinates(data: Trajectory): number[][] {
   });
 }
 
-function makeLorenzAttractorGroup(data: Trajectory, transform: LorenzTransform): THREE.Group {
+function makeLorenzAttractorGroup(data: Trajectory, transform: LorenzTransform, hints: RendererHints): THREE.Group {
   const group = new THREE.Group();
   const points = data.states.map((state) => lorenzPoint(state, transform));
+  const guideHint = referenceHint(hints, "guideRings");
+  const fixedPointHint = referenceHint(hints, "fixedPointMarkers");
 
   group.add(contextLine(points, 0.26));
   group.add(lineFromPoints(points, new THREE.Color(theme.textFaint), 0.1));
@@ -639,12 +668,18 @@ function makeLorenzAttractorGroup(data: Trajectory, transform: LorenzTransform):
   const box = new THREE.Box3().setFromPoints(points);
   const size = new THREE.Vector3();
   box.getSize(size);
-  const guideRadius = Math.max(size.x, size.z) * 0.36;
-  for (const y of [-0.68, 0, 0.68]) {
+  const guideRadius = guideHint?.radius ?? Math.max(size.x, size.z) * 0.36;
+  const guideScale = guideHint?.scale ?? [1.0, 1.0, 0.7];
+  const guideYValues = guideHint?.yValues ?? [-0.68, 0, 0.68];
+  for (const y of guideYValues) {
     const guide = lineFromPoints(
       Array.from({ length: 129 }, (_item, index) => {
         const angle = (index / 128) * Math.PI * 2;
-        return new THREE.Vector3(Math.cos(angle) * guideRadius, y, Math.sin(angle) * guideRadius * 0.7);
+        return new THREE.Vector3(
+          Math.cos(angle) * guideRadius * guideScale[0],
+          y * guideScale[1],
+          Math.sin(angle) * guideRadius * guideScale[2],
+        );
       }),
       new THREE.Color(theme.textFaint),
       0.12,
@@ -677,7 +712,7 @@ function makeLorenzAttractorGroup(data: Trajectory, transform: LorenzTransform):
     roughness: 0.45,
   });
   for (const point of fixedPointCoordinates(data)) {
-    const marker = new THREE.Mesh(new THREE.SphereGeometry(0.04, 18, 12), fixedMaterial);
+    const marker = new THREE.Mesh(new THREE.SphereGeometry(fixedPointHint?.radius ?? 0.04, 18, 12), fixedMaterial);
     marker.position.copy(lorenzPoint(point, transform));
     group.add(marker);
   }
@@ -704,18 +739,32 @@ function henonPotential(x: number, y: number, data: Trajectory): number {
   return 0.5 * stiffness * (x * x + y * y) + coupling * (x * x * y - (y * y * y) / 3);
 }
 
-function henonPoint(state: number[], data: Trajectory): THREE.Vector3 {
-  const x = state[0];
-  const y = state[1];
-  return new THREE.Vector3(x * 1.38, henonPotential(x, y, data) * 0.95 - 0.36, y * 1.38);
+function henonSurfaceTransform(hints: RendererHints): { scale: Vector3Tuple; offset: Vector3Tuple } {
+  const surface = referenceHint(hints, "potentialSurface");
+  return {
+    scale: surface?.scale ?? [1.38, 0.95, 1.38],
+    offset: surface?.offset ?? [0.0, -0.36, 0.0],
+  };
 }
 
-function makeHenonSurface(data: Trajectory): THREE.Group {
+function henonPoint(state: number[], data: Trajectory, hints: RendererHints): THREE.Vector3 {
+  const x = state[0];
+  const y = state[1];
+  const transform = henonSurfaceTransform(hints);
+  return new THREE.Vector3(
+    x * transform.scale[0] + transform.offset[0],
+    henonPotential(x, y, data) * transform.scale[1] + transform.offset[1],
+    y * transform.scale[2] + transform.offset[2],
+  );
+}
+
+function makeHenonSurface(data: Trajectory, hints: RendererHints): THREE.Group {
   const group = new THREE.Group();
   const surface = potentialSurfaceMetadata(data);
   if (!surface) {
     return group;
   }
+  const transform = henonSurfaceTransform(hints);
 
   const geometry = new THREE.BufferGeometry();
   const positions: number[] = [];
@@ -730,7 +779,11 @@ function makeHenonSurface(data: Trajectory): THREE.Group {
   surface.yValues.forEach((y, row) => {
     surface.xValues.forEach((x, col) => {
       const value = surface.values[row][col];
-      positions.push(x * 1.38, value * 0.95 - 0.36, y * 1.38);
+      positions.push(
+        x * transform.scale[0] + transform.offset[0],
+        value * transform.scale[1] + transform.offset[1],
+        y * transform.scale[2] + transform.offset[2],
+      );
       const normalized = (value - minValue) / span;
       color.setHSL(0.54 - normalized * 0.37, 0.5, 0.46 + normalized * 0.12);
       colors.push(color.r, color.g, color.b);
@@ -772,7 +825,14 @@ function makeHenonSurface(data: Trajectory): THREE.Group {
   for (let row = 0; row < surface.yValues.length; row += rowStep) {
     group.add(
       lineFromPoints(
-        surface.xValues.map((x, col) => new THREE.Vector3(x * 1.38, surface.values[row][col] * 0.95 - 0.35, surface.yValues[row] * 1.38)),
+        surface.xValues.map(
+          (x, col) =>
+            new THREE.Vector3(
+              x * transform.scale[0] + transform.offset[0],
+              surface.values[row][col] * transform.scale[1] + transform.offset[1] + 0.01,
+              surface.yValues[row] * transform.scale[2] + transform.offset[2],
+            ),
+        ),
         new THREE.Color(theme.textFaint),
         0.12,
       ),
@@ -781,7 +841,14 @@ function makeHenonSurface(data: Trajectory): THREE.Group {
   for (let col = 0; col < surface.xValues.length; col += colStep) {
     group.add(
       lineFromPoints(
-        surface.yValues.map((y, row) => new THREE.Vector3(surface.xValues[col] * 1.38, surface.values[row][col] * 0.95 - 0.35, y * 1.38)),
+        surface.yValues.map(
+          (y, row) =>
+            new THREE.Vector3(
+              surface.xValues[col] * transform.scale[0] + transform.offset[0],
+              surface.values[row][col] * transform.scale[1] + transform.offset[1] + 0.01,
+              y * transform.scale[2] + transform.offset[2],
+            ),
+        ),
         new THREE.Color(theme.textFaint),
         0.12,
       ),
@@ -791,20 +858,25 @@ function makeHenonSurface(data: Trajectory): THREE.Group {
   return group;
 }
 
-function makeHenonHeilesGroup(data: Trajectory): THREE.Group {
+function makeHenonHeilesGroup(data: Trajectory, hints: RendererHints): THREE.Group {
   const group = new THREE.Group();
   group.rotation.y = -0.24;
-  group.add(makeHenonSurface(data));
+  group.add(makeHenonSurface(data, hints));
+  const transform = henonSurfaceTransform(hints);
 
-  const trajectory = data.states.map((state) => henonPoint(state, data));
+  const trajectory = data.states.map((state) => henonPoint(state, data, hints));
   group.add(contextLine(trajectory, 0.28));
   group.add(lineFromPoints(trajectory, new THREE.Color(theme.textFaint), 0.1));
 
   const metadata = data.metadata as { stiffness?: number; coupling?: number } | undefined;
   const stiffness = metadata?.stiffness ?? 1;
   const coupling = metadata?.coupling ?? 1;
-  for (let x = -0.85; x <= 0.86; x += 0.34) {
-    for (let y = -0.78; y <= 0.79; y += 0.34) {
+  const [sampleXMin, sampleXMax] = flowRange(hints, "x", [-0.85, 0.86]);
+  const [sampleYMin, sampleYMax] = flowRange(hints, "z", [-0.78, 0.79]);
+  const xStep = Math.max(0.12, (sampleXMax - sampleXMin) / 5);
+  const yStep = Math.max(0.12, (sampleYMax - sampleYMin) / 5);
+  for (let x = sampleXMin; x <= sampleXMax + 1e-6; x += xStep) {
+    for (let y = sampleYMin; y <= sampleYMax + 1e-6; y += yStep) {
       const value = henonPotential(x, y, data);
       const forceX = -(stiffness * x + 2 * coupling * x * y);
       const forceY = -(stiffness * y + coupling * (x * x - y * y));
@@ -812,7 +884,11 @@ function makeHenonHeilesGroup(data: Trajectory): THREE.Group {
       if (force.length() < 1e-5) {
         continue;
       }
-      const start = new THREE.Vector3(x * 1.38, value * 0.95 - 0.24, y * 1.38);
+      const start = new THREE.Vector3(
+        x * transform.scale[0] + transform.offset[0],
+        value * transform.scale[1] + transform.offset[1] + 0.12,
+        y * transform.scale[2] + transform.offset[2],
+      );
       group.add(vectorArrow(start, force.normalize().multiplyScalar(0.12), new THREE.Color(theme.textFaint), 0.22));
     }
   }
@@ -835,6 +911,7 @@ export class ThreeScene {
   private beadHoopOmega = 0;
   private lorenzTransform: LorenzTransform = { center: new THREE.Vector3(), scale: 1 };
   private henonData: Trajectory | null = null;
+  private henonHints: RendererHints = {};
   private motionTrail: THREE.Line | null = null;
   private motionTrailPoints: THREE.Vector3[] = [];
   private flow: FlowField | null = null;
@@ -896,6 +973,7 @@ export class ThreeScene {
     this.beadHoopOmega = 0;
     this.lorenzTransform = { center: new THREE.Vector3(), scale: 1 };
     this.henonData = null;
+    this.henonHints = {};
     this.motionTrail = null;
     this.motionTrailPoints = [];
     this.flow?.dispose();
@@ -912,17 +990,18 @@ export class ThreeScene {
       this.camera.position.set(4.3, 2.55, 5.3);
       this.controls.target.set(0, 0.72, 0);
     } else if (mode === "sphereGeodesic") {
-      this.root.add(makeSphereGeodesicGroup(data));
+      this.root.add(makeSphereGeodesicGroup(data, hints));
       this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[4], state[5], state[6])), 90);
-      this.camera.position.set(2.5, 1.6, 3.2);
-      this.controls.target.set(0, 0, 0);
+      this.applyCameraHints(hints, [2.5, 1.6, 3.2], [0, 0, 0]);
     } else if (mode === "chargedParticle") {
-      this.root.add(makeChargedParticleGroup(data));
+      this.root.add(makeChargedParticleGroup(data, hints));
       this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[0], state[2] * 0.62, state[1])), 110);
       this.marker.scale.setScalar(0.82);
+      const [flowXMin, flowXMax] = flowRange(hints, "x", [-1.28, 1.28]);
+      const [flowZMin, flowZMax] = flowRange(hints, "z", [-1.28, 1.28]);
       this.flow = new FlowField({
         field: (x, z) => [-z, x],
-        bounds: { xMin: -1.28, xMax: 1.28, yMin: -1.28, yMax: 1.28 },
+        bounds: { xMin: flowXMin, xMax: flowXMax, yMin: flowZMin, yMax: flowZMax },
         toPosition: (x, z) => new THREE.Vector3(x, -0.58, z),
         count: 240,
         rate: 0.24,
@@ -931,15 +1010,16 @@ export class ThreeScene {
         intensity: 0.46,
       });
       this.root.add(this.flow.object);
-      this.camera.position.set(3.0, 2.0, 3.4);
-      this.controls.target.set(0, 0, 0);
+      this.applyCameraHints(hints, [3.0, 2.0, 3.4], [0, 0, 0]);
     } else if (mode === "uniformGravity") {
-      this.root.add(makeUniformGravityGroup(data));
+      this.root.add(makeUniformGravityGroup(data, hints));
       this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[0] - 0.9, state[1] * 0.42 - 0.65, 0)), 90);
       this.marker.scale.setScalar(0.92);
+      const [flowXMin, flowXMax] = flowRange(hints, "x", [-1.45, 1.95]);
+      const [flowYMin, flowYMax] = flowRange(hints, "z", [-0.56, 1.1]);
       this.flow = new FlowField({
         field: (_x, _z) => [0, -1],
-        bounds: { xMin: -1.45, xMax: 1.95, yMin: -0.56, yMax: 1.1 },
+        bounds: { xMin: flowXMin, xMax: flowXMax, yMin: flowYMin, yMax: flowYMax },
         toPosition: (x, z) => new THREE.Vector3(x, z, -0.58),
         count: 180,
         rate: 0.34,
@@ -948,8 +1028,7 @@ export class ThreeScene {
         intensity: 0.42,
       });
       this.root.add(this.flow.object);
-      this.camera.position.set(2.65, 1.65, 3.25);
-      this.controls.target.set(0.25, 0.1, 0);
+      this.applyCameraHints(hints, [2.65, 1.65, 3.25], [0.25, 0.1, 0]);
     } else if (mode === "idealSpring") {
       this.root.add(makeIdealSpringGroup(data));
       this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[0], 0, 0)), 80);
@@ -989,19 +1068,18 @@ export class ThreeScene {
       this.marker.scale.setScalar(0.9);
       this.applyCameraHints(hints, [2.35, 1.35, 2.65], [0, 0, 0]);
     } else if (mode === "lorenzAttractor") {
-      this.lorenzTransform = lorenzTransform(data);
-      this.root.add(makeLorenzAttractorGroup(data, this.lorenzTransform));
+      this.lorenzTransform = lorenzTransform(data, hints);
+      this.root.add(makeLorenzAttractorGroup(data, this.lorenzTransform, hints));
       this.setMotionTrail(data.states.map((state) => lorenzPoint(state, this.lorenzTransform)), 180);
       this.marker.scale.setScalar(0.72);
-      this.camera.position.set(3.0, 2.05, 4.4);
-      this.controls.target.set(0, 0.05, 0);
+      this.applyCameraHints(hints, [3.0, 2.05, 4.4], [0, 0.05, 0]);
     } else {
       this.henonData = data;
-      this.root.add(makeHenonHeilesGroup(data));
-      this.setMotionTrail(data.states.map((state) => henonPoint(state, data)), 150);
+      this.henonHints = hints;
+      this.root.add(makeHenonHeilesGroup(data, hints));
+      this.setMotionTrail(data.states.map((state) => henonPoint(state, data, hints)), 150);
       this.marker.scale.setScalar(0.78);
-      this.camera.position.set(2.7, 1.75, 3.45);
-      this.controls.target.set(0, 0.05, 0);
+      this.applyCameraHints(hints, [2.7, 1.75, 3.45], [0, 0.05, 0]);
     }
 
     this.root.add(this.marker);
@@ -1092,7 +1170,7 @@ export class ThreeScene {
       this.marker.position.copy(point);
       this.root.rotation.y = -0.35 + Math.sin(elapsed * 0.065) * 0.08;
     } else if (this.henonData) {
-      const point = henonPoint(state, this.henonData);
+      const point = henonPoint(state, this.henonData, this.henonHints);
       this.marker.position.copy(point);
       this.root.rotation.y = Math.sin(elapsed * 0.07) * 0.07;
     }
