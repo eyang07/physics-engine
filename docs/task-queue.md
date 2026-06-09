@@ -2,243 +2,173 @@
 
 Self-contained implementation specs handed from Claude (planning) to Codex
 (execution). Each task is scoped for one focused branch. Codex: treat the
-**Invariants / specification** section as the contract, respect **Forbidden
-files** literally, and report every command run with its real pass/fail outcome.
-If reality contradicts the spec (a named symbol / path / field is wrong, or an
-invariant cannot hold), stop and report rather than redesigning. See
-`docs/agent-workflow.md` for the handoff/review/merge protocol.
+**Definition of done** as the contract, respect **Forbidden files** literally,
+and report every command run with its real pass/fail outcome. If reality
+contradicts the spec (a named symbol / path / field is wrong, or an invariant
+cannot hold), stop and report rather than redesigning. See
+`docs/agent-workflow.md` for the handoff / review / merge protocol.
+
+## Completed
+
+- **Task 1 — Invariant-residual tracking for conserved quantities** — merged.
+  Reviewed green (`pytest -q` 166 passed). See `docs/BACKEND.md` Completed
+  Missions / Itinerary #1.
 
 ---
 
-## TASK 1 — Invariant-residual tracking for conserved quantities
+### Task 2: Finite-time Lyapunov diagnostic for the Hénon–Heiles system
 
-- **Owner:** Codex
-- **Branch:** `codex/task-1`
-- **Status:** `[ ]` ready for Codex.
+Owner: Codex
+Branch: codex/task-2
+Status: Ready
 
-### Goal
+Goal:
+Add a finite-time largest-Lyapunov-exponent diagnostic to the existing
+Hénon–Heiles generated trajectory, reusing the existing
+`engine.dynamics.finite_time_lyapunov` and the Lagrangian's first-order form. The
+generated `henon_heiles.json` should carry a `diagnostics.lyapunov` metadata
+block and `ftle` / `lyapunov_local_growth` series, exactly mirroring the Lorenz
+example's shape, so the viewer can consume both with one code path. This advances
+the CLAUDE.md design responsibility "finite-time Lyapunov diagnostics (Lorenz,
+then a Hamiltonian chaotic system)."
 
-Advance `docs/BACKEND.md` Itinerary #1 / "Next Best Three Items" #1: expose
-numerical conservation error as a first-class diagnostic. For every mechanics
-example that already exports conserved-quantity series (energy `H`, momenta
-`p_*`, angular momentum `ell`, …), compute residual summaries — how far each
-"conserved" quantity drifts along the integrated trajectory — and attach them to
-the trajectory metadata so the viewer can later display numerical error
-honestly. This automatically covers energy drift for all Hamiltonian/Lagrangian
-examples.
+Context:
+- The diagnostic already exists and is exercised only on Lorenz today:
+  `engine/dynamics/diagnostics.py:finite_time_lyapunov`, wired in
+  `scripts/generate_lorenz_attractor.py:94` and surfaced as
+  `metadata["diagnostics"]["lyapunov"]` (fields: `kind`, `method`, `series`,
+  `localGrowthSeries`, `initialTangent`, `finalTangent`, `finalEstimate`,
+  `sampleCount`, `timeWindow`) plus `series["ftle"]` and
+  `series["lyapunov_local_growth"]`. Mirror that shape verbatim.
+- `finite_time_lyapunov(system, time, states, ...)` requires a
+  `FirstOrderSystem` whose `jacobian()` has **no unresolved free symbols** beyond
+  `time` and the state symbols. The Hénon–Heiles `LagrangianSystem` already
+  provides the bridge: `LagrangianSystem.first_order_expressions()`
+  (`engine/mechanics/lagrangian.py:98`) returns `[q̇, q̈(q, q̇, t)]` in the order
+  `(*system.q, *system.qdot)` — which is exactly the trajectory's exported
+  column order `["x", "y", "x_dot", "y_dot"]`.
+- Because `systems/henon_heiles.py:build_system` is called with concrete numeric
+  parameters (`mass=1.0, stiffness=1.0, coupling=1.0`) in the generator, the
+  resulting Lagrangian has no symbolic parameters, so the constructed
+  `FirstOrderSystem` Jacobian resolves fully with **no `substitutions`** needed.
+- The trajectory exports only the 4 intrinsic columns (no `state_transform`), so
+  `trajectory.states` already has shape `(N, 4)` matching the 4 state symbols.
+- **Series-ordering invariant (do not break Task 1):**
+  `generate_lagrangian_trajectory` computes `invariantResiduals` from the series
+  it builds (only the conserved quantity `H`) *before* the generator adds the
+  Lyapunov series. Add `ftle` / `lyapunov_local_growth` to `series` only in the
+  generator's final `Trajectory.from_arrays(...)`, so residuals stay limited to
+  conserved quantities and never get computed for the Lyapunov series.
 
-This is a **metadata addition**, consistent with the existing
-`metadata["lyapunov"]` (`scripts/generate_lorenz_attractor.py:126`),
-`metadata["poincareSections"]`, and `metadata["rendererHints"]` precedents. It is
-**not** a change to the core Trajectory/manifest schema (`time` / `state_names` /
-`states` / `series`), and therefore needs no schema escalation.
+Allowed files:
+- `scripts/generate_henon_heiles.py` — build the `FirstOrderSystem`, call
+  `finite_time_lyapunov`, add `metadata["diagnostics"]["lyapunov"]`, and merge the
+  two new series into the existing series dict.
+- `tests/test_henon_heiles.py` — add assertions for the new diagnostic.
+- `docs/BACKEND.md` — add a Completed Missions line **only after** verification
+  passes (do not flip any other itinerary item; this is not Next-Best #2 or #3).
 
-### Exact scope
-
-1. **Add a reusable helper** to `engine/dynamics/diagnostics.py`:
-   - A frozen dataclass `InvariantResidual` with fields:
-     `name: str`, `reference: float`, `max_abs: float`, `rms: float`,
-     `max_relative: float | None`, `scale: float`.
-   - A function
-     `invariant_residuals(series: Mapping[str, Sequence[float]], *, reference: str = "initial") -> dict[str, InvariantResidual]`.
-   - Export both from `engine/dynamics/__init__.py` (`__all__` + imports), matching
-     the existing `LyapunovResult` / `PoincareSection` pattern, and add them to the
-     module `__all__` in `engine/dynamics/diagnostics.py`.
-
-2. **Wire it into the shared generation path** in `scripts/generation.py`:
-   - In `generate_lagrangian_trajectory`, after `series = spec.series(...)` is
-     computed, if `series` is non-empty, compute residuals and merge a JSON-ready
-     list into the returned trajectory's `metadata` under the key
-     `"invariantResiduals"`. If `series` is empty (non-mechanics systems such as
-     Lorenz, whose `conserved=()`), do nothing — no key added.
-   - Merge, do not overwrite: preserve any `metadata` passed in by the caller.
-
-3. **Fix generators that rebuild metadata from scratch** so the new key survives:
-   - `scripts/generate_henon_heiles.py` constructs a fresh `metadata={...}` dict in
-     `Trajectory.from_arrays(...)` and would drop `invariantResiduals`. Update it to
-     start from `dict(trajectory.metadata or {})` and add its extra keys (mirroring
-     `scripts/generate_kepler_problem.py:95`, which already does
-     `metadata = dict(trajectory.metadata or {})`).
-   - **Audit every `scripts/generate_*.py`** for the same rebuild-from-scratch
-     pattern and apply the same preserve-then-extend fix where found. Generators
-     that pass `series=trajectory.series` and return the helper's trajectory
-     directly already preserve metadata.
-
-4. **Regenerate data**: run `python -m scripts.generate_all_examples` and commit the
-   regenerated `data/generated/*.json` and `viewer/public/data/*.json` in the same
-   commit as the code.
-
-5. **Tests** (see Invariants/specification).
-
-### JSON shape of the new metadata key
-
-For each conserved series, emit one record. Example for the pendulum
-(`conserved=("H",)`):
-
-```json
-"invariantResiduals": [
-  {
-    "name": "H",
-    "series": "H",
-    "reference": -9.62,
-    "referenceKind": "initial",
-    "maxAbs": 3.1e-6,
-    "rms": 1.4e-6,
-    "maxRelative": 3.2e-7,
-    "scale": 9.62
-  }
-]
-```
-
-- `series` echoes the key into `trajectory.series` so the viewer can plot the full
-  per-sample residual by subtracting `reference` from the existing series (pure
-  subtraction — not physics — so this respects the Python=truth / TS=render
-  boundary and avoids duplicating the full series in metadata).
-- `referenceKind` records the reference convention (`"initial"`).
-- `maxRelative` is `null` when the reference is near zero (see spec below).
-
-### Allowed files
-
-- `engine/dynamics/diagnostics.py` — add dataclass + function + `__all__`.
-- `engine/dynamics/__init__.py` — re-export.
-- `scripts/generation.py` — wire residuals into `generate_lagrangian_trajectory`.
-- `scripts/generate_henon_heiles.py` — preserve helper metadata (plus any other
-  generator the audit flags; confirm `scripts/generate_kepler_problem.py` already
-  preserves it).
-- `tests/test_invariant_residuals.py` — new helper unit tests.
-- An existing trajectory test (e.g. `tests/test_more_examples.py` or
-  `tests/test_new_examples.py`) — add an assertion that the exported metadata
-  carries the key with the right shape.
-- `data/generated/*.json`, `viewer/public/data/*.json` — regenerated outputs only.
-- `docs/BACKEND.md` — flip Itinerary #1 / Next-Best #1 to `[x]` and add a
-  "Completed Missions" line **only after** verification passes.
-
-### Forbidden files
-
-- The core Trajectory/manifest schema: `engine/export/trajectory.py` field set /
-  `to_dict()` top-level keys, and `engine/export/manifest.py`. You add a metadata
-  *key*; you do not change the contract.
-- `spec.series(...)` semantics or the `Conserved` declarations in
-  `scripts/example_specs.py`.
-- Any viewer TypeScript (`viewer/src/**`). Frontend consumption of this diagnostic
-  is a separate FRONTEND task; do not add it here.
+Forbidden files:
+- `engine/**` — this is pure reuse; no new engine surface. Build the
+  `FirstOrderSystem` inline in the generator (a few lines). If you believe a
+  reusable `LagrangianSystem → FirstOrderSystem` bridge helper is warranted,
+  **stop and report** — that is a Claude-owned abstraction decision, not part of
+  this task.
+- `engine/export/manifest.py`, `engine/export/trajectory.py` — no schema change;
+  you are adding a metadata key and series entries, both established patterns.
+- `scripts/generation.py`, `scripts/example_specs.py`, and every other
+  `scripts/generate_*.py` — do not touch other systems.
+- `viewer/**` — frontend consumption of this diagnostic is a separate task.
 - No new gallery examples, no new lens kinds, no renderer-hint changes.
 - Do not reformat, re-sort imports, or rename across files.
 
-### Invariants / specification / proof obligations
+Steps:
+1. In `scripts/generate_henon_heiles.py`, after the trajectory is integrated and
+   `system = build_system(mass=..., stiffness=..., coupling=...)` exists, construct
+   `FirstOrderSystem(state=(*system.q, *system.qdot),
+   rhs=system.first_order_expressions(), parameters=(), time=system.time)` (import
+   `FirstOrderSystem` from `engine.dynamics`).
+2. Call `lyapunov = finite_time_lyapunov(first_order_system, trajectory.time,
+   trajectory.states[:, :4])` (import `finite_time_lyapunov` from
+   `engine.dynamics`). Do not pass a custom tangent; use the default.
+3. Add a `diagnostics` dict to the rebuilt metadata containing a `lyapunov` block
+   with the **same field names and values shape** as Lorenz
+   (`scripts/generate_lorenz_attractor.py:125-136`): `kind:
+   "finite-time-largest"`, `method: "sampled-variational-jacobian"`, `series:
+   "ftle"`, `localGrowthSeries: "lyapunov_local_growth"`, `initialTangent`,
+   `finalTangent`, `finalEstimate`, `sampleCount`, `timeWindow`.
+4. In the generator's final `Trajectory.from_arrays(...)`, change
+   `series=trajectory.series` to a merged dict:
+   `series={**trajectory.series, "ftle": lyapunov.estimate.astype(float).tolist(),
+   "lyapunov_local_growth": lyapunov.local_growth.astype(float).tolist()}`.
+5. Regenerate the Hénon–Heiles data:
+   `python -m scripts.generate_henon_heiles` (writes `data/generated/` and
+   `viewer/public/data/`; both are gitignored — regeneration confirms determinism,
+   there is nothing to commit).
+6. Add tests (see Definition of done). The tests must assert presence, shape,
+   finiteness, and determinism — **not** that the orbit is chaotic.
 
-Let a series be `v[0..n-1]`, reference `r = v[0]` (since `reference="initial"`;
-the conserved value is the one set by the initial conditions). Define
-`d[i] = v[i] - r`. Then:
+Commands to run:
+- `git branch --show-current`   (must print `codex/task-2` before editing)
+- `git status`
+- `pytest -q`                   (full suite must pass; report the count)
+- `python -m scripts.generate_henon_heiles`
+- `python3 -c "import json,sys; d=json.load(open('data/generated/henon_heiles.json')); ly=d['metadata']['diagnostics']['lyapunov']; print('finalEstimate', ly['finalEstimate']); print('series keys', sorted(d['series'])); print('residual names', [r['name'] for r in d['metadata']['invariantResiduals']])"`
+  (inspection: confirm the lyapunov block, the two new series keys, and that
+  `invariantResiduals` still lists only conserved quantities — i.e. `['H']`)
+- `cd viewer && npm run build`  (no viewer code changed; must stay clean)
 
-- `reference = r`.
-- `max_abs = max_i |d[i]|`  → real, finite, `>= 0`.
-- `rms = sqrt(mean_i d[i]^2)` → real, finite, `>= 0`, and `rms <= max_abs`.
-- `scale = max(|r|, max_i |v[i]|, eps)` with a small `eps` (e.g. `1e-12`).
-- `max_relative = max_abs / scale` **unless** `|r| < eps` (a genuinely near-zero
-  invariant, e.g. angular momentum `ell` initialized to 0), in which case
-  `max_relative = None` and only the absolute measures are meaningful.
+Definition of done:
+- `data/generated/henon_heiles.json` and `viewer/public/data/henon_heiles.json`
+  contain `metadata.diagnostics.lyapunov` with the Lorenz field set, and
+  `series.ftle` / `series.lyapunov_local_growth` of length equal to the trajectory
+  sample count.
+- `metadata.invariantResiduals` for Hénon–Heiles still contains exactly the
+  conserved quantities (just `H`) — no residual record for `ftle` or
+  `lyapunov_local_growth`.
+- A new test in `tests/test_henon_heiles.py` asserts: the lyapunov metadata block
+  exists with the documented keys; `ftle` and `lyapunov_local_growth` series exist
+  and match the trajectory length; `finalEstimate` and the tangents are finite; the
+  initial tangent is unit-norm; and running the generator twice yields identical
+  `finalEstimate` (determinism). The test must **not** assert the FTLE is positive
+  or that the system is chaotic.
+- `pytest -q` passes — and you ran it (report the count).
+- The generator was run and the inspection command shows the expected fields.
+- `cd viewer && npm run build` is clean.
+- `docs/BACKEND.md` has a Completed Missions line describing the addition; no other
+  status markers changed.
+- Your report lists exactly what changed, every command with its real pass/fail
+  outcome, and the **measured** `finalEstimate` — described as a measured
+  finite-time estimate, not as evidence of chaos.
 
-Tests must encode these proof obligations:
+Failure/reporting rules:
+- If a command fails, report the exact command and failure.
+- If the task requires files outside the allowed scope, stop and report the needed
+  scope expansion (in particular: if you find the Jacobian has unresolved symbols,
+  or you think an `engine/` bridge helper is needed, stop and route to Claude
+  rather than editing `engine/`).
+- If a failing test encodes a real invariant (determinism, series length, finite
+  values), assume the code is wrong, not the test; do not loosen or skip it.
+- Do not silently change architecture or project goals. This task adds a metadata
+  diagnostic to one existing system; it does not introduce a new abstraction, a new
+  example, or a schema change.
+- Never claim a green run you did not produce. Honest "this still fails" beats a
+  false green.
 
-1. **Exact-conservation sanity**: a constant series `[c, c, c, …]` yields
-   `max_abs == 0.0`, `rms == 0.0`, `max_relative == 0.0` (or `None` if `c == 0`).
-2. **Closed-form residual**: for `v = [1.0, 1.0, 1.0 + δ]` the helper returns
-   `max_abs == δ`, `reference == 1.0`, `rms == sqrt(δ^2 / 3)`,
-   `max_relative == δ / 1.0` (within float tolerance).
-3. **Near-zero guard**: a series with `r ≈ 0` returns `max_relative is None` and a
-   finite, non-negative `max_abs`.
-4. **Determinism**: identical input → bitwise-identical float outputs.
-5. **Validation**: empty or single-sample series raises `ValueError` with a clear
-   message; a `reference` outside the supported set raises `ValueError`.
-6. **Real-trajectory presence/shape**: a generated mechanics example (e.g. pendulum
-   or ideal spring) exports `metadata["invariantResiduals"]` as a non-empty list;
-   each record has the keys above; `series` matches a key in the exported `series`;
-   energy `maxRelative` is finite and below a generous sanity ceiling (assert
-   `< 1e-1`). **The ceiling must be confirmed by an actual run** — if the measured
-   drift is far smaller you may tighten it, but do not invent a tolerance you did
-   not observe. Report the measured value.
-
-Do **not** present the RK4 energy residual as "energy is conserved": it is a
-*measured* numerical drift, not a proof. Keep that distinction in any docstring or
-doc note.
-
-### Commands to run
-
-(From the repo's verification set — see `docs/agent-workflow.md`. Do not invent
-others.)
-
-```sh
-git branch --show-current          # must print codex/task-1 before editing
-git status                         # confirm a known starting tree
-
-pytest -q                          # full Python suite must pass (report the count)
-python -m scripts.generate_all_examples
-git status --porcelain data/generated viewer/public/data   # confirm regenerated outputs
-cd viewer && npm run build         # type-check gate; no viewer code changed, must stay clean
-```
-
-- No Python linter/formatter is configured — match surrounding style; do not
-  mass-reformat.
-- `cd viewer && npm run test:visual` is **not** required (no visual change), but
-  `npm run build` must stay clean.
-- The known non-fatal Vite chunk-size warning is acceptable.
-
-### Definition of done
-
-1. `invariant_residuals` + `InvariantResidual` exist in
-   `engine/dynamics/diagnostics.py`, are exported from `engine/dynamics/__init__.py`,
-   and satisfy the specification above.
-2. `generate_lagrangian_trajectory` attaches `metadata["invariantResiduals"]` for
-   every mechanics example with a non-empty conserved-series set; non-mechanics
-   examples are unaffected.
-3. All generators that rebuild metadata preserve the key (henon_heiles fixed; audit
-   done).
-4. `pytest -q` passes — and you ran it (report the count).
-5. `python -m scripts.generate_all_examples` was run; regenerated data is committed
-   with the code, and the only diffs in `data/generated` / `viewer/public/data` are
-   the added `invariantResiduals` blocks (plus any deterministic re-serialization).
-6. `cd viewer && npm run build` is clean.
-7. `docs/BACKEND.md` Itinerary #1 / Next-Best #1 flipped to `[x]` with a Completed
-   Missions line — only because the above actually passed.
-8. The report lists exactly what changed and every command with its real outcome,
-   including the measured energy `maxRelative` for at least one example.
-
-### Failure / reporting rules
-
-- **A failing test that encodes a mathematical invariant** (energy, Noether charge,
-  divergence, determinism) means the **code** is wrong until proven otherwise — do
-  not loosen, skip, or `xfail` the test to go green.
-- **Henon-Heiles drops the key**: its `Trajectory.from_arrays(..., metadata={...})`
-  rebuilds metadata from scratch. If you skip step 3 its JSON will lack
-  `invariantResiduals` while pendulum/spring/kepler have it — the trajectory test
-  should catch this. Audit *all* generators.
-- **Non-mechanics no-op**: Lorenz / variable-speed wavefront have empty or no
-  conserved series. The helper must be a clean no-op (no key, no crash), not a
-  `KeyError` or an empty list on everything.
-- **Near-zero relative blowup**: invariants initialized to 0 (e.g. `ell`) must not
-  produce `inf`/`NaN`; use the `scale` + near-zero guard and emit `null`.
-- **Unexpected large data diff**: if regeneration rewrites unrelated fields or
-  reorders existing keys, stop and investigate — the diff should be additive.
-- If a named symbol/path/field in this spec does not match the repo, or an invariant
-  cannot hold, **stop and report back** to Claude rather than redesigning.
-- Report honestly: changed files grouped by intent, every command with its real
-  pass/fail outcome, the measured energy `maxRelative`, and any deviation from this
-  spec with its reason. Never claim a green run you did not produce.
-
-### Review checklist (for Claude's conceptual review of the diff)
-
-- [ ] Helper lives in `engine/` (reusable); generators stay thin — no residual math
-      duplicated in `scripts/`.
-- [ ] `max_abs`, `rms`, `scale` are real, finite, `>= 0`; `rms <= max_abs`; no
-      `NaN`/`inf` reaches JSON; near-zero invariants yield `maxRelative: null`.
-- [ ] Metadata addition only — core Trajectory/manifest schema untouched; the
-      Python=truth / TS=render boundary preserved (viewer reconstructs the residual
-      series by subtraction, not by recomputing physics).
-- [ ] All mechanics examples carry the key; non-mechanics examples don't; no
-      generator silently drops it.
-- [ ] Data regenerated deterministically; the `data/generated` diff is additive.
-- [ ] Tests encode the closed-form residual, the exact-conservation case, the
-      near-zero guard, validation errors, determinism, and real-trajectory presence.
-- [ ] Claim hygiene: residuals described as *measured numerical drift*, never as a
-      proof of conservation. `docs/BACKEND.md` items flipped only post-verification.
+Claude review checklist:
+- [ ] `FirstOrderSystem` is built from `system.first_order_expressions()` with
+      state `(*system.q, *system.qdot)`; its `jacobian()` has no unresolved symbols
+      at the numeric parameters (no `substitutions` hack needed).
+- [ ] States passed to `finite_time_lyapunov` are the 4 intrinsic columns in the
+      same order as `system.state` / the exported `state_names`.
+- [ ] `metadata.diagnostics.lyapunov` mirrors the Lorenz field set; the two series
+      reuse the Lorenz key names (`ftle`, `lyapunov_local_growth`) so the viewer can
+      use one code path.
+- [ ] `invariantResiduals` is uncontaminated — only conserved quantities (`H`),
+      because the Lyapunov series are merged after the helper runs.
+- [ ] Series lengths equal the trajectory sample count; values finite.
+- [ ] Claim hygiene: the diagnostic is reported as a *measured finite-time
+      estimate*; no assertion or doc text claims the orbit is chaotic.
+- [ ] Scope: only `scripts/generate_henon_heiles.py`, `tests/test_henon_heiles.py`,
+      and a `docs/BACKEND.md` Completed Missions line changed; `engine/**` and other
+      generators untouched.
