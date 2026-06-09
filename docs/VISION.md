@@ -6,7 +6,7 @@ from symbolic mechanics, derives equations of motion, simulates flows, exposes
 invariants and geometric structure, and eventually produces artifacts useful for
 analysis, verification, and AI-assisted mathematical reasoning.
 
-The viewer is the interface, not the central contribution. The central
+The viewer is the interface, the central
 contribution is the pipeline:
 
 ```text

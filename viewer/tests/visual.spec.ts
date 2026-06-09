@@ -41,6 +41,25 @@ async function expectCanvasNonBlank(page: Page, selector: string) {
   expect(nonBlankPixels).toBeGreaterThan(200);
 }
 
+async function expectFitToSystemKeepsSceneRendered(page: Page) {
+  await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+  await expect(page.locator("#fitToSystem")).toBeVisible();
+  await page.locator("#fitToSystem").click();
+  await page.waitForTimeout(300);
+  await expectCanvasNonBlank(page, "#hamiltonianScene");
+}
+
+const threeJsSystems = [
+  "sphere-geodesic",
+  "charged-particle",
+  "uniform-gravity",
+  "ideal-spring",
+  "kepler",
+  "bead-on-hoop",
+  "lorenz-attractor",
+  "henon-heiles",
+];
+
 for (const viewport of [
   { name: "desktop", width: 1280, height: 820 },
   { name: "mobile", width: 390, height: 844 },
@@ -187,5 +206,23 @@ for (const viewport of [
     await page.waitForTimeout(500);
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-variable-speed-wavefront.png`) });
+  });
+
+  test(`fit-to-system reset preserves Three.js rendering at ${viewport.name}`, async ({ page }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#homeView:not(.view-hidden)");
+
+    await page.getByRole("button", { name: "Enter simulations" }).click();
+    await page.waitForSelector("#selectionView:not(.view-hidden)");
+
+    await page.getByRole("button", { name: /Simple Pendulum/ }).click();
+    await page.getByRole("button", { name: "Hamiltonian Flow" }).click();
+    await expectFitToSystemKeepsSceneRendered(page);
+
+    for (const systemId of threeJsSystems) {
+      await page.locator("#systemSelect").selectOption(systemId);
+      await expectFitToSystemKeepsSceneRendered(page);
+    }
   });
 }
