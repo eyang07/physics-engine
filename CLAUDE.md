@@ -51,10 +51,10 @@ Architecture and boundary:
 Maturity: a working v0.1 with multiple registered examples (pendulum, sphere
 geodesic, charged particle, uniform gravity, ideal spring, Kepler, bead on
 rotating hoop, Lorenz, Hénon–Heiles, variable-speed wavefront). The verification
-baseline noted in docs is `pytest -q` green (≈158 tests), `viewer` build clean,
-and Playwright visual tests passing. The next phase (`docs/VISION.md` §"v0.2") is
-diagnostics and phase-space structure: Poincaré sections, Lyapunov diagnostics,
-invariant residuals, parameter sweeps, regression tests.
+baseline noted in docs is `pytest -q` green (167 tests), `viewer` build clean,
+and Playwright visual tests passing. The current phase (`docs/VISION.md`
+§"v0.2") is diagnostics and phase-space structure: Poincaré sections, Lyapunov
+diagnostics, invariant residuals, parameter sweeps, and regression tests.
 
 The living planning docs are `docs/VISION.md`, `docs/BACKEND.md`,
 `docs/FRONTEND.md`, and `docs/dynamics.md`. Treat them as authoritative for scope
@@ -170,9 +170,10 @@ statement actually matches the model it claims to be about.
   ("Data and Export Strategy"): system metadata, parameters, coordinates,
   equations, trajectories, invariants, diagnostics, events, sections, render
   hints, camera hints, lens metadata. Propose schema evolution deliberately.
-- Design the v0.2 diagnostics layer: Poincaré-section export (Hénon–Heiles
-  first), finite-time Lyapunov diagnostics (Lorenz, then a Hamiltonian chaotic
-  system), invariant-residual tracking, parameter-sweep manifests.
+- Design the remaining v0.2 diagnostics layer: parameter-sweep manifests,
+  frontend diagnostics surfaces, and follow-on phase-space structure now that
+  Poincaré-section export, Lorenz/Hénon-Heiles finite-time Lyapunov diagnostics,
+  and invariant-residual tracking are implemented.
 - Specify reusable geometric data models (e.g. generalize the ray-bundle helper
   over any `CotangentHamiltonianSystem`) rather than one-off generators.
 - Define what counts as a "research object" the engine should emit (phase

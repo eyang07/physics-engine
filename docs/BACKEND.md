@@ -31,7 +31,7 @@ variable-speed wavefront propagation.
 wavefront snapshots using cotangent Hamiltonian flow, and the viewer renders it
 with a dedicated 2D wavefront lens.
 
-[x] Verification baseline: `pytest -q` passes with 166 tests. Full project
+[x] Verification baseline: `pytest -q` passes with 167 tests. Full project
 verification also includes `cd viewer && npm run build` and `cd viewer && npm
 run test:visual`.
 
@@ -109,18 +109,18 @@ invariant residuals scoped to conserved quantities.
 
 ## Next Best Three Items
 
-1. [x] Add invariant-residual tracking for known conserved quantities.
-   Start with energy drift for Hamiltonian examples and expose max/series
-   residuals in trajectory metadata so the viewer can display numerical error
-   as a first-class diagnostic.
-
-2. Add parameter sweep manifests for selected systems.
+1. Add parameter sweep manifests for selected systems.
    Begin with Lorenz or Hénon-Heiles and export deterministic precomputed
    variants before introducing arbitrary browser-side regeneration.
 
-3. Generalize parameterized media helpers.
+2. Generalize parameterized media helpers.
    Extend the wave/ray backend beyond the Gaussian slow-speed lens toward
    reusable scalar wave-speed, refractive-index, or metric-coefficient models.
+
+3. Add diagnostics for wave/ray examples.
+   Extend ray-bundle exports with Hamiltonian constraint drift, caustic
+   proximity, travel time, and wavefront envelope metadata where those
+   quantities are mathematically defined.
 
 ## Backend Tools To Add
 

@@ -92,17 +92,18 @@ qualitative structure of a dynamical system.
 
 Priority features:
 
-1. Implement Poincare-section export for Hénon-Heiles.
-2. Add finite-time Lyapunov diagnostics for Lorenz.
-3. Extend Lyapunov diagnostics to Hénon-Heiles or another Hamiltonian chaotic
-   system.
-4. Add invariant-residual tracking for known conserved quantities.
-5. Add parameter sweep manifests.
-6. Add numerical regression tests for invariant drift and deterministic outputs.
-7. Add visual regression coverage for camera reset and frontend framing.
-8. Generalize the ray-bundle export helper.
-9. Improve phase-space lens support.
-10. Add a control/barrier-function example.
+1. [x] Implement Poincare-section export for Hénon-Heiles.
+2. [x] Add finite-time Lyapunov diagnostics for Lorenz.
+3. [x] Extend Lyapunov diagnostics to Hénon-Heiles or another Hamiltonian
+   chaotic system.
+4. [x] Add invariant-residual tracking for known conserved quantities.
+5. [ ] Add parameter sweep manifests.
+6. [x] Add numerical regression tests for invariant drift and deterministic
+   outputs.
+7. [x] Add visual regression coverage for camera reset and frontend framing.
+8. [x] Generalize the ray-bundle export helper.
+9. [ ] Improve phase-space lens support.
+10. [ ] Add a control/barrier-function example.
 
 Microlocal or GR examples should wait until the frontend can honestly represent
 the geometry they require: phase space, cotangent bundles, covectors, ray

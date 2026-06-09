@@ -11,7 +11,7 @@ interactive visuals.
 gallery, playback controls, structure panels, invariant lanes, 2D canvas lenses,
 potential/effective-potential lenses, and Three.js views.
 
-[x] Verification after the wavefront lens addition: `pytest -q` passes with 166
+[x] Verification after the wavefront lens addition: `pytest -q` passes with 167
 tests, `cd viewer && npm run build` passes, and `cd viewer && npm run
 test:visual` passes with desktop/mobile coverage. The visual suite now includes
 the all-examples pass and the fit-to-system camera-reset regression on desktop
@@ -77,8 +77,9 @@ after the camera reset on desktop and mobile.
 ## Next Best Three Items
 
 1. Add a diagnostics panel for exported backend diagnostics. Start with
-   Lorenz finite-time Lyapunov metadata and Hénon-Heiles Poincare-section
-   metadata, consuming Python outputs without recomputing dynamics.
+   Lorenz and Hénon-Heiles finite-time Lyapunov metadata plus Hénon-Heiles
+   Poincare-section metadata, consuming Python outputs without recomputing
+   dynamics.
 
 2. Add a focused Poincare-section lens for Hénon-Heiles. Render the exported
    `(x, p_x)` section points separately from the trajectory phase portrait.
@@ -96,7 +97,7 @@ after the camera reset on desktop and mobile.
 4. Keep visual polish focused on diagnostic readability before adding new
    frontend surfaces.
 
-Latest baseline: `pytest -q` (166 tests), `cd viewer && npm run build`, and the
+Latest baseline: `pytest -q` (167 tests), `cd viewer && npm run build`, and the
 Playwright visual suite (4 tests: all-examples desktop/mobile and
 fit-to-system desktop/mobile) all pass after adding the fit-to-system
 camera-reset regression.
