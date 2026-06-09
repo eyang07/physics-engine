@@ -8,6 +8,8 @@ integrated motion (to the tolerance of fixed-step RK4).
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pytest
 
@@ -52,6 +54,41 @@ def test_series_present_and_conserved(spec, generate) -> None:
         scale = float(np.abs(sampled).mean()) + 1.0
         drift = float(sampled.max() - sampled.min())
         assert drift <= 1e-2 * scale, f"{spec.id}:{name} drifted by {drift} (scale {scale})"
+
+    assert trajectory.metadata is not None
+    residuals = trajectory.metadata["invariantResiduals"]
+    assert isinstance(residuals, list)
+    assert len(residuals) == len(expected)
+    for record in residuals:
+        assert set(record) == {
+            "name",
+            "series",
+            "reference",
+            "referenceKind",
+            "maxAbs",
+            "rms",
+            "maxRelative",
+            "scale",
+        }
+        assert record["name"] in expected
+        assert record["series"] in trajectory.series
+        assert record["referenceKind"] == "initial"
+        assert isinstance(record["reference"], float)
+        assert isinstance(record["maxAbs"], float)
+        assert isinstance(record["rms"], float)
+        assert isinstance(record["scale"], float)
+        assert math.isfinite(record["reference"])
+        assert math.isfinite(record["maxAbs"])
+        assert math.isfinite(record["rms"])
+        assert math.isfinite(record["scale"])
+        assert record["maxAbs"] >= 0.0
+        assert record["rms"] >= 0.0
+        assert record["rms"] <= record["maxAbs"] + 1e-15
+        if record["maxRelative"] is not None:
+            assert math.isfinite(record["maxRelative"])
+            assert record["maxRelative"] >= 0.0
+            if record["series"] == "H":
+                assert record["maxRelative"] < 1e-1
 
 
 def test_series_survives_json_roundtrip() -> None:

@@ -39,11 +39,9 @@ def generate_ideal_spring_trajectory(
     span = max(abs(float(x_values.min())), abs(float(x_values.max())), 1.0) * 1.18
     coordinate_values = np.linspace(-span, span, 260)
     potential_values = 0.5 * spring_constant * coordinate_values**2
-    return Trajectory.from_arrays(
-        time=trajectory.time,
-        states=trajectory.states,
-        state_names=trajectory.state_names,
-        metadata={
+    metadata = dict(trajectory.metadata or {})
+    metadata.update(
+        {
             "system": "ideal_spring",
             "mass": mass,
             "spring_constant": spring_constant,
@@ -57,7 +55,13 @@ def generate_ideal_spring_trajectory(
                     energy_series=trajectory.series["H"],
                 )
             ],
-        },
+        }
+    )
+    return Trajectory.from_arrays(
+        time=trajectory.time,
+        states=trajectory.states,
+        state_names=trajectory.state_names,
+        metadata=metadata,
         series=trajectory.series,
     )
 

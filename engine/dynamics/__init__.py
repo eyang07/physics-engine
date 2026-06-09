@@ -2,9 +2,11 @@
 
 from engine.dynamics.cotangent import CotangentHamiltonianSystem
 from engine.dynamics.diagnostics import (
+    InvariantResidual,
     LyapunovResult,
     PoincareSection,
     finite_time_lyapunov,
+    invariant_residuals,
     poincare_section_crossings,
 )
 from engine.dynamics.first_order import FirstOrderSystem
@@ -18,10 +20,12 @@ from engine.dynamics.ray_bundle import (
 __all__ = [
     "CotangentHamiltonianSystem",
     "FirstOrderSystem",
+    "InvariantResidual",
     "LyapunovResult",
     "PoincareSection",
     "RayBundleResult",
     "finite_time_lyapunov",
+    "invariant_residuals",
     "integrate_ray_bundle",
     "poincare_section_crossings",
     "ray_bundle_coordinate_bounds",

@@ -76,11 +76,9 @@ def generate_uniform_gravity_trajectory(
     pad = max(0.25, z_span * 0.18)
     coordinate_values = np.linspace(float(z_values.min() - pad), float(z_values.max() + pad), 220)
     potential_values = mass * gravity * coordinate_values
-    return Trajectory.from_arrays(
-        time=trajectory.time,
-        states=trajectory.states,
-        state_names=trajectory.state_names,
-        metadata={
+    metadata = dict(trajectory.metadata or {})
+    metadata.update(
+        {
             "system": "uniform_gravity",
             "mass": mass,
             "gravity": gravity,
@@ -95,7 +93,13 @@ def generate_uniform_gravity_trajectory(
                     energy_series=trajectory.series["H"],
                 )
             ],
-        },
+        }
+    )
+    return Trajectory.from_arrays(
+        time=trajectory.time,
+        states=trajectory.states,
+        state_names=trajectory.state_names,
+        metadata=metadata,
         series=trajectory.series,
     )
 

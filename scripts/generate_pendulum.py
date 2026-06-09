@@ -41,22 +41,22 @@ def generate_pendulum_trajectory(
         physical_parameters=physical_parameters,
     )
     assert trajectory.series is not None
+    metadata = dict(trajectory.metadata or {})
+    metadata["potentialPlots"] = [
+        potential_plot_metadata(
+            name="pendulum_potential",
+            coordinate="theta",
+            coordinate_latex=r"\theta",
+            coordinate_values=theta_values,
+            potential_values=potential_values,
+            energy_series=trajectory.series["H"],
+        )
+    ]
     return Trajectory.from_arrays(
         time=trajectory.time,
         states=trajectory.states,
         state_names=trajectory.state_names,
-        metadata={
-            "potentialPlots": [
-                potential_plot_metadata(
-                    name="pendulum_potential",
-                    coordinate="theta",
-                    coordinate_latex=r"\theta",
-                    coordinate_values=theta_values,
-                    potential_values=potential_values,
-                    energy_series=trajectory.series["H"],
-                )
-            ]
-        },
+        metadata=metadata,
         series=trajectory.series,
     )
 

@@ -81,6 +81,7 @@ def test_lorenz_export_metadata_and_series() -> None:
     assert trajectory.series["ftle"][0] == 0.0
     assert trajectory.series["ftle"][-1] > 0.0
     assert trajectory.metadata["kind"] == "first-order-flow"
+    assert "invariantResiduals" not in trajectory.metadata
     assert trajectory.metadata["divergence"] == -(10.0 + 1.0 + 8.0 / 3.0)
     assert set(trajectory.metadata["bounds"]) == {"x", "y", "z"}
     assert len(trajectory.metadata["fixedPoints"]) == 3
