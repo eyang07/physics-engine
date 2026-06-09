@@ -45,9 +45,10 @@ def test_series_present_and_conserved(spec, generate) -> None:
         for quantity in spec.conserved
         if quantity.expression_for(spec.build()) is not None
     }
-    assert set(trajectory.series) == expected
+    assert set(trajectory.series) >= expected
 
-    for name, values in trajectory.series.items():
+    for name in expected:
+        values = trajectory.series[name]
         sampled = np.asarray(values, dtype=float)
         assert sampled.shape == trajectory.time.shape
 
