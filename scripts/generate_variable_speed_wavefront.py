@@ -7,24 +7,9 @@ from typing import Sequence
 import numpy as np
 import sympy as sp
 
+from engine.dynamics import integrate_ray_bundle, ray_bundle_coordinate_bounds
 from engine.export import Trajectory
-from engine.numerics import integrate_fixed_step
 from systems.variable_speed_wavefront import build_system, wave_speed
-
-
-def _hamiltonian_values(
-    states: np.ndarray,
-    *,
-    base_speed: float,
-    lens_strength: float,
-    lens_width: float,
-) -> np.ndarray:
-    x = states[:, 0]
-    y = states[:, 1]
-    xi = states[:, 2]
-    eta = states[:, 3]
-    speed = base_speed * (1 - lens_strength * np.exp(-(x**2 + y**2) / (2 * lens_width**2)))
-    return 0.5 * speed**2 * (xi**2 + eta**2)
 
 
 def _initial_covector(
@@ -53,19 +38,10 @@ def wavefront_renderer_hints(
     x0: float,
     y_span: tuple[float, float],
 ) -> dict[str, object]:
-    positions = rays[:, :, :2].reshape(-1, 2)
-    x_min = float(positions[:, 0].min())
-    x_max = float(positions[:, 0].max())
-    y_min = float(positions[:, 1].min())
-    y_max = float(positions[:, 1].max())
     viewport_x = [float(x0 - 0.25), float(-x0 + 0.35)]
     viewport_y = [float(y_span[0] - 0.3), float(y_span[1] + 0.3)]
     return {
-        "bounds": {
-            "x": [x_min, x_max],
-            "y": [y_min, y_max],
-            "z": [0.0, 0.0],
-        },
+        "bounds": ray_bundle_coordinate_bounds(rays, coordinate_count=2),
         "viewportBounds": {
             "x": viewport_x,
             "y": viewport_y,
@@ -104,12 +80,9 @@ def generate_variable_speed_wavefront(
         lens_strength=lens_strength,
         lens_width=lens_width,
     )
-    rhs = system.numerical_rhs()
 
     y0_values = np.linspace(y_span[0], y_span[1], ray_count)
-    ray_states: list[np.ndarray] = []
-    ray_hamiltonians: list[np.ndarray] = []
-    shared_time: np.ndarray | None = None
+    initial_states = []
     for y0 in y0_values:
         xi0, eta0 = _initial_covector(
             x=x0,
@@ -118,39 +91,15 @@ def generate_variable_speed_wavefront(
             lens_strength=lens_strength,
             lens_width=lens_width,
         )
-        time, states = integrate_fixed_step(
-            rhs,
-            initial_state=[x0, float(y0), xi0, eta0],
-            t_span=t_span,
-            dt=dt,
-        )
-        if shared_time is None:
-            shared_time = time
-        ray_states.append(states)
-        ray_hamiltonians.append(
-            _hamiltonian_values(
-                states,
-                base_speed=base_speed,
-                lens_strength=lens_strength,
-                lens_width=lens_width,
-            )
-        )
+        initial_states.append([x0, float(y0), xi0, eta0])
 
-    assert shared_time is not None
-    rays = np.stack(ray_states, axis=0)
-    hamiltonians = np.stack(ray_hamiltonians, axis=0)
-    center_ray = rays[ray_count // 2]
-    snapshot_indices = list(range(0, len(shared_time), snapshot_stride))
-    if snapshot_indices[-1] != len(shared_time) - 1:
-        snapshot_indices.append(len(shared_time) - 1)
-
-    wavefronts = [
-        {
-            "time": float(shared_time[index]),
-            "points": rays[:, index, :2].astype(float).tolist(),
-        }
-        for index in snapshot_indices
-    ]
+    bundle = integrate_ray_bundle(
+        system,
+        initial_states,
+        t_span=t_span,
+        dt=dt,
+        state_names=["x", "y", "xi", "eta"],
+    )
 
     metadata = {
         "system": "variable_speed_wavefront",
@@ -161,31 +110,25 @@ def generate_variable_speed_wavefront(
             "lens_width": lens_width,
         },
         "rayBundle": {
-            "stateNames": ["x", "y", "xi", "eta"],
+            "stateNames": list(bundle.state_names),
             "initialY": y0_values.astype(float).tolist(),
-            "rays": [
-                {
-                    "index": index,
-                    "states": rays[index].astype(float).tolist(),
-                }
-                for index in range(ray_count)
-            ],
+            "rays": bundle.ray_records(),
         },
-        "wavefronts": wavefronts,
-        "rendererHints": wavefront_renderer_hints(rays, x0=x0, y_span=y_span),
+        "wavefronts": bundle.wavefront_records(snapshot_stride),
+        "rendererHints": wavefront_renderer_hints(bundle.rays, x0=x0, y_span=y_span),
         "hamiltonian": {
-            "initial": hamiltonians[:, 0].astype(float).tolist(),
-            "maxDrift": float(np.max(np.abs(hamiltonians - hamiltonians[:, [0]]))),
+            "initial": bundle.hamiltonian_initials.astype(float).tolist(),
+            "maxDrift": bundle.max_hamiltonian_drift,
         },
     }
 
     return Trajectory.from_arrays(
-        time=shared_time,
-        states=center_ray,
-        state_names=["x", "y", "xi", "eta"],
+        time=bundle.time,
+        states=bundle.center_ray,
+        state_names=bundle.state_names,
         metadata=metadata,
         series={
-            "p": hamiltonians[ray_count // 2].astype(float).tolist(),
+            "p": bundle.hamiltonians[bundle.center_index].astype(float).tolist(),
         },
     )
 

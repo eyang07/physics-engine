@@ -3,7 +3,11 @@ from __future__ import annotations
 import numpy as np
 import sympy as sp
 
-from engine.dynamics import CotangentHamiltonianSystem
+from engine.dynamics import (
+    CotangentHamiltonianSystem,
+    integrate_ray_bundle,
+    ray_bundle_coordinate_bounds,
+)
 from scripts.generate_variable_speed_wavefront import generate_variable_speed_wavefront
 from systems.variable_speed_wavefront import build_system, wave_speed
 
@@ -34,6 +38,46 @@ def test_variable_speed_wavefront_symbol_and_rhs() -> None:
     assert sp.simplify(system.symbol - expected_symbol) == 0
     assert sp.simplify(system.rhs()[0] - speed**2 * xi) == 0
     assert sp.simplify(system.rhs()[1] - speed**2 * eta) == 0
+
+
+def test_ray_bundle_helper_is_deterministic_and_reports_drift() -> None:
+    x, y, xi, eta = sp.symbols("x y xi eta", real=True)
+    system = CotangentHamiltonianSystem(
+        coordinates=(x, y),
+        momenta=(xi, eta),
+        symbol=(xi**2 + eta**2) / 2,
+    )
+    initial_states = [
+        [-1.0, -0.25, 1.0, 0.0],
+        [-1.0, 0.25, 2.0, 0.0],
+    ]
+
+    first = integrate_ray_bundle(
+        system,
+        initial_states,
+        t_span=(0.0, 0.2),
+        dt=0.05,
+        state_names=["x", "y", "xi", "eta"],
+    )
+    second = integrate_ray_bundle(
+        system,
+        initial_states,
+        t_span=(0.0, 0.2),
+        dt=0.05,
+        state_names=["x", "y", "xi", "eta"],
+    )
+
+    assert np.array_equal(first.time, second.time)
+    assert np.array_equal(first.rays, second.rays)
+    assert first.rays.shape == (2, 5, 4)
+    assert first.state_names == ("x", "y", "xi", "eta")
+    assert np.allclose(first.hamiltonian_initials, [0.5, 2.0])
+    assert first.max_hamiltonian_drift < 1e-12
+    assert np.isclose(first.wavefront_records(snapshot_stride=2)[-1]["time"], 0.2)
+
+    bounds = ray_bundle_coordinate_bounds(first.rays, coordinate_count=2)
+    assert set(bounds) == {"x", "y", "z"}
+    assert np.allclose(bounds["x"], [-1.0, -0.6])
 
 
 def test_variable_speed_wavefront_export_shape_and_hamiltonian_drift() -> None:
