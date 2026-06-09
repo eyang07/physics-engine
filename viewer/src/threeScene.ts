@@ -917,6 +917,13 @@ export class ThreeScene {
   private flow: FlowField | null = null;
   private active = false;
   private mode: ThreeMode | null = null;
+  // The exported "home" framing for the current scene, captured after
+  // setVisualization applies camera hints. resetCamera() restores it.
+  private readonly homeCameraPosition = new THREE.Vector3();
+  private readonly homeTarget = new THREE.Vector3();
+  private homeMinDistance = 2.8;
+  private homeMaxDistance = 9.0;
+  private hasHomeCamera = false;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -1083,7 +1090,28 @@ export class ThreeScene {
     }
 
     this.root.add(this.marker);
+    this.homeCameraPosition.copy(this.camera.position);
+    this.homeTarget.copy(this.controls.target);
+    this.homeMinDistance = this.controls.minDistance;
+    this.homeMaxDistance = this.controls.maxDistance;
+    this.hasHomeCamera = true;
     this.controls.update();
+  }
+
+  // Reapply the current scene's exported camera framing and distance bounds
+  // without reloading the trajectory, leaving OrbitControls interaction intact.
+  resetCamera() {
+    if (!this.hasHomeCamera) {
+      return;
+    }
+    this.camera.position.copy(this.homeCameraPosition);
+    this.controls.target.copy(this.homeTarget);
+    this.controls.minDistance = this.homeMinDistance;
+    this.controls.maxDistance = this.homeMaxDistance;
+    this.controls.update();
+    if (this.active) {
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 
   private applyCameraHints(

@@ -53,9 +53,12 @@ from the generated data.
 wavefront example. The lens draws the medium, ray traces, historical
 wavefronts, the active wavefront, and the center-ray marker from backend data.
 
-[ ] Add a small frontend affordance for renderer-hint-backed scenes, such as a
-camera reset button or a "fit to system" action that reapplies the exported
-camera/bounds without reloading the trajectory.
+[x] Add a small frontend affordance for renderer-hint-backed scenes: a
+"Fit to system" control overlaid on the Three.js stage that reapplies the
+exported camera position, target, and distance bounds without reloading the
+trajectory. The button is shown only for the orbit-controlled 3D scenes, and
+`ThreeScene.resetCamera()` restores the home framing captured in
+`setVisualization` while leaving OrbitControls interaction intact.
 
 ## Open questions
 
@@ -66,39 +69,30 @@ camera/bounds without reloading the trajectory.
 
 ## Next Best Realistic Item
 
-Add a small frontend affordance that uses the renderer-hints work directly.
-The scenes now load with exported framing and geometry metadata; the next
-realistic improvement is to let users recover that framing after orbiting,
-zooming, or comparing systems.
-
-These hints answer questions like:
-
-- How does a user reset the camera to the system's exported best view?
-- Can each scene expose a consistent "fit to system" behavior?
-- Should the viewer preserve per-system camera state or always return to the
-  exported camera when switching systems?
+Add a lightweight visual regression check that directly opens each
+Three.js-heavy system and clicks the new "Fit to system" control, asserting
+the active canvas still has meaningful rendered pixels after the camera reset.
+The fit affordance now exists, so the next realistic improvement is to guard it
+(and the renderer-hint framing it relies on) against regressions per system.
 
 Recommended implementation sequence:
 
-1. Add a small reset/fit control near the Three.js stage controls.
-2. Expose a `resetCamera()` method on `ThreeScene` that reapplies the current
-   scene's exported camera and distance bounds.
-3. Keep the current OrbitControls interaction intact.
-4. Rerun `pytest -q`, `cd viewer && npm run build`, and
+1. Extend `viewer/tests/visual.spec.ts` to iterate the Three.js systems, click
+   `#fitToSystem`, and reuse the existing non-blank-canvas assertion.
+2. Keep the current desktop/mobile coverage intact.
+3. Rerun `pytest -q`, `cd viewer && npm run build`, and
    `cd viewer && npm run test:visual`.
 
 ## Itinerary
 
-1. Add camera reset / fit-to-system control.
-2. Add a lightweight visual regression check that directly opens each
+1. Add a lightweight visual regression check that directly opens each
    Three.js-heavy system and asserts its active canvas has meaningful rendered
-   pixels after applying renderer hints.
-3. Consider parameter UI behavior once backend support for regenerated or
+   pixels after applying renderer hints and the fit-to-system reset.
+2. Consider parameter UI behavior once backend support for regenerated or
    precomputed variants is defined.
-4. Keep visual polish focused on the current nine examples before adding new
+3. Keep visual polish focused on the current examples before adding new
    frontend surfaces.
 
-Latest baseline: `pytest -q`, `cd viewer && npm run build`, and the Playwright
-visual suite all pass. The visual suite passed 2 tests covering desktop and
-mobile rendering across the registered examples after the full renderer-hints
-rollout, Lorenz bounds fix, and wavefront lens addition.
+Latest baseline: `pytest -q` (158 tests), `cd viewer && npm run build`, and the
+Playwright visual suite (2 tests, desktop + mobile) all pass after adding the
+fit-to-system camera-reset control.

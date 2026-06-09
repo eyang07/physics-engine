@@ -73,6 +73,7 @@ const systemTitle = requireElement<HTMLElement>("#systemTitle");
 const systemSelect = requireElement<HTMLSelectElement>("#systemSelect");
 const visualizationModes = requireElement<HTMLElement>("#visualizationModes");
 const playButton = requireElement<HTMLButtonElement>("#playButton");
+const fitToSystem = requireElement<HTMLButtonElement>("#fitToSystem");
 const speedControl = requireElement<HTMLInputElement>("#speedControl");
 const principlesPanel = requireElement<HTMLElement>("#principles");
 const invariantsPanel = requireElement<HTMLElement>("#invariants");
@@ -120,6 +121,10 @@ playButton.addEventListener("click", () => {
     clock.toggle();
   }
   syncPlayButton();
+});
+
+fitToSystem.addEventListener("click", () => {
+  threeScene.resetCamera();
 });
 
 enterSimulations.addEventListener("click", () => {
@@ -215,6 +220,9 @@ function setCanvasMode(mode: "2d" | "3d") {
   canvas.classList.toggle("stage__canvas--active", is2d);
   threeCanvas.classList.toggle("stage__canvas--active", !is2d);
   threeScene.setActive(!is2d);
+  // The fit-to-system control only applies to the orbit-controlled Three.js
+  // scenes; the 2D canvas lenses have no camera to reset.
+  fitToSystem.hidden = is2d;
 }
 
 function setView(view: "home" | "selection" | "simulation") {
