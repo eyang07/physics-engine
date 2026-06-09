@@ -103,6 +103,10 @@ trajectory metadata now carries measured max absolute, RMS, and relative
 drift summaries keyed to the existing invariant series, with near-zero
 references reported as absolute-only diagnostics.
 
+[x] Add a finite-time Lyapunov diagnostic for Hénon-Heiles. The generated
+trajectory now mirrors the Lorenz FTLE metadata and series shape while keeping
+invariant residuals scoped to conserved quantities.
+
 ## Next Best Three Items
 
 1. [x] Add invariant-residual tracking for known conserved quantities.

@@ -33,6 +33,7 @@ def test_henon_heiles_generated_energy_and_potential_surface() -> None:
     assert trajectory.series is not None
     energy = np.asarray(trajectory.series["H"], dtype=float)
     assert np.max(np.abs(energy - energy[0])) < 1e-8
+    assert [record["name"] for record in trajectory.metadata["invariantResiduals"]] == ["H"]
 
     surface = trajectory.metadata["potentialSurface"]
     assert len(surface["xValues"]) == 120
@@ -56,3 +57,45 @@ def test_henon_heiles_generated_energy_and_potential_surface() -> None:
     assert hints["referenceGeometry"][0]["kind"] == "potentialSurface"
     assert hints["flow"]["kind"] == "potentialGradient"
     assert set(hints["bounds"]) == {"x", "y", "z"}
+
+
+def test_henon_heiles_generated_lyapunov_diagnostic() -> None:
+    trajectory = generate_henon_heiles_trajectory(t_span=(0.0, 12.0), dt=0.01)
+    repeat = generate_henon_heiles_trajectory(t_span=(0.0, 12.0), dt=0.01)
+
+    assert trajectory.series is not None
+    lyapunov = trajectory.metadata["diagnostics"]["lyapunov"]
+    assert set(lyapunov) == {
+        "kind",
+        "method",
+        "series",
+        "localGrowthSeries",
+        "initialTangent",
+        "finalTangent",
+        "finalEstimate",
+        "sampleCount",
+        "timeWindow",
+    }
+    assert lyapunov["kind"] == "finite-time-largest"
+    assert lyapunov["method"] == "sampled-variational-jacobian"
+    assert lyapunov["series"] == "ftle"
+    assert lyapunov["localGrowthSeries"] == "lyapunov_local_growth"
+    assert lyapunov["sampleCount"] == len(trajectory.time)
+    assert lyapunov["timeWindow"] == [float(trajectory.time[0]), float(trajectory.time[-1])]
+
+    ftle = np.asarray(trajectory.series["ftle"], dtype=float)
+    local_growth = np.asarray(trajectory.series["lyapunov_local_growth"], dtype=float)
+    assert len(ftle) == len(trajectory.time)
+    assert len(local_growth) == len(trajectory.time)
+    assert np.all(np.isfinite(ftle))
+    assert np.all(np.isfinite(local_growth))
+
+    initial_tangent = np.asarray(lyapunov["initialTangent"], dtype=float)
+    final_tangent = np.asarray(lyapunov["finalTangent"], dtype=float)
+    assert initial_tangent.shape == (4,)
+    assert final_tangent.shape == (4,)
+    assert np.all(np.isfinite(initial_tangent))
+    assert np.all(np.isfinite(final_tangent))
+    assert abs(float(np.linalg.norm(initial_tangent)) - 1.0) < 1e-12
+    assert np.isfinite(float(lyapunov["finalEstimate"]))
+    assert lyapunov["finalEstimate"] == repeat.metadata["diagnostics"]["lyapunov"]["finalEstimate"]

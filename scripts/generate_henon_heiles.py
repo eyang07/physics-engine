@@ -6,7 +6,7 @@ from typing import Sequence
 
 import numpy as np
 
-from engine.dynamics import poincare_section_crossings
+from engine.dynamics import FirstOrderSystem, finite_time_lyapunov, poincare_section_crossings
 from engine.export import Trajectory
 from scripts.example_specs import HENON_HEILES
 from scripts.generation import generate_lagrangian_trajectory, write_trajectory_outputs
@@ -120,13 +120,34 @@ def generate_henon_heiles_trajectory(
     xx, yy = np.meshgrid(grid_x, grid_y)
     potential = _potential(xx, yy, stiffness, coupling)
     energy = np.asarray(trajectory.series["H"], dtype=float)
+    first_order_system = FirstOrderSystem(
+        state=(*system.q, *system.qdot),
+        rhs=system.first_order_expressions(),
+        parameters=(),
+        time=system.time,
+    )
+    lyapunov = finite_time_lyapunov(first_order_system, trajectory.time, trajectory.states[:, :4])
+
     metadata = dict(trajectory.metadata or {})
+    diagnostics = dict(metadata.get("diagnostics", {}))
+    diagnostics["lyapunov"] = {
+        "kind": "finite-time-largest",
+        "method": "sampled-variational-jacobian",
+        "series": "ftle",
+        "localGrowthSeries": "lyapunov_local_growth",
+        "initialTangent": lyapunov.initial_tangent.astype(float).tolist(),
+        "finalTangent": lyapunov.final_tangent.astype(float).tolist(),
+        "finalEstimate": lyapunov.final_estimate,
+        "sampleCount": int(len(trajectory.time)),
+        "timeWindow": [float(trajectory.time[0]), float(trajectory.time[-1])],
+    }
     metadata.update(
         {
             "system": "henon_heiles",
             "mass": mass,
             "stiffness": stiffness,
             "coupling": coupling,
+            "diagnostics": diagnostics,
             "potentialSurface": {
                 "xValues": grid_x.tolist(),
                 "yValues": grid_y.tolist(),
@@ -150,7 +171,11 @@ def generate_henon_heiles_trajectory(
         states=trajectory.states,
         state_names=trajectory.state_names,
         metadata=metadata,
-        series=trajectory.series,
+        series={
+            **trajectory.series,
+            "ftle": lyapunov.estimate.astype(float).tolist(),
+            "lyapunov_local_growth": lyapunov.local_growth.astype(float).tolist(),
+        },
     )
 
 
