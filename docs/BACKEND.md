@@ -31,7 +31,7 @@ variable-speed wavefront propagation.
 wavefront snapshots using cotangent Hamiltonian flow, and the viewer renders it
 with a dedicated 2D wavefront lens.
 
-[x] Verification baseline: `pytest -q` passes with 159 tests. Full project
+[x] Verification baseline: `pytest -q` passes with 166 tests. Full project
 verification also includes `cd viewer && npm run build` and `cd viewer && npm
 run test:visual`.
 
@@ -98,9 +98,14 @@ metadata describing the variational-Jacobian method.
 exports interpolated `y = 0`, upward-crossing section points with `(x, p_x)`
 axes, full state coordinates, momentum extras, and energy samples.
 
+[x] Add invariant-residual tracking for known conserved quantities. Mechanics
+trajectory metadata now carries measured max absolute, RMS, and relative
+drift summaries keyed to the existing invariant series, with near-zero
+references reported as absolute-only diagnostics.
+
 ## Next Best Three Items
 
-1. Add invariant-residual tracking for known conserved quantities.
+1. [x] Add invariant-residual tracking for known conserved quantities.
    Start with energy drift for Hamiltonian examples and expose max/series
    residuals in trajectory metadata so the viewer can display numerical error
    as a first-class diagnostic.
@@ -144,7 +149,7 @@ proximity, travel time, and wavefront envelope metadata.
 
 ## Itinerary
 
-1. Add invariant-residual tracking for known conserved quantities.
+1. [x] Add invariant-residual tracking for known conserved quantities.
 2. Add parameter sweep manifests for selected systems.
 3. Generalize parameterized media helpers.
 4. Decide the parameter-interactivity backend strategy.

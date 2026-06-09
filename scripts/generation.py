@@ -7,12 +7,26 @@ from typing import Any, Callable, Mapping, Sequence
 
 import numpy as np
 
+from engine.dynamics import InvariantResidual, invariant_residuals
 from engine.export import Trajectory
 from engine.mechanics import LagrangianSystem
 from engine.numerics import integrate_fixed_step
 from engine.export.manifest import SystemSpec
 
 StateTransform = Callable[[np.ndarray, np.ndarray], np.ndarray]
+
+
+def _invariant_residual_record(residual: InvariantResidual) -> dict[str, Any]:
+    return {
+        "name": residual.name,
+        "series": residual.name,
+        "reference": residual.reference,
+        "referenceKind": "initial",
+        "maxAbs": residual.max_abs,
+        "rms": residual.rms,
+        "maxRelative": residual.max_relative,
+        "scale": residual.scale,
+    }
 
 
 def physical_parameter_defaults(spec: SystemSpec) -> dict[str, float]:
@@ -74,11 +88,18 @@ def generate_lagrangian_trajectory(
     )
     states = state_transform(time, intrinsic_states) if state_transform else intrinsic_states
     series = spec.series(physical_parameters, states)
+    output_metadata = dict(metadata) if metadata is not None else None
+    if series:
+        output_metadata = dict(output_metadata or {})
+        output_metadata["invariantResiduals"] = [
+            _invariant_residual_record(residual)
+            for residual in invariant_residuals(series).values()
+        ]
     return Trajectory.from_arrays(
         time=time,
         states=states,
         state_names=state_names,
-        metadata=dict(metadata) if metadata is not None else None,
+        metadata=output_metadata,
         series=series,
     )
 

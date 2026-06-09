@@ -31,6 +31,16 @@ class PoincareSection:
     points: list[dict[str, object]]
 
 
+@dataclass(frozen=True)
+class InvariantResidual:
+    name: str
+    reference: float
+    max_abs: float
+    rms: float
+    max_relative: float | None
+    scale: float
+
+
 def finite_time_lyapunov(
     system: FirstOrderSystem,
     time: Sequence[float],
@@ -102,6 +112,52 @@ def finite_time_lyapunov(
         initial_tangent=normalized_initial_tangent,
         final_tangent=tangent,
     )
+
+
+def invariant_residuals(
+    series: Mapping[str, Sequence[float]],
+    *,
+    reference: str = "initial",
+) -> dict[str, InvariantResidual]:
+    """Summarize measured numerical drift for sampled invariant series."""
+
+    if reference != "initial":
+        raise ValueError("reference must be 'initial'")
+
+    residuals: dict[str, InvariantResidual] = {}
+    eps = 1e-12
+    for name, values in series.items():
+        sampled = np.asarray(values, dtype=float)
+        if sampled.ndim != 1:
+            raise ValueError(f"invariant series {name!r} must be one-dimensional")
+        if len(sampled) < 2:
+            raise ValueError(f"invariant series {name!r} must contain at least two samples")
+        if not np.all(np.isfinite(sampled)):
+            raise ValueError(f"invariant series {name!r} must contain only finite values")
+
+        initial = float(sampled[0])
+        delta = sampled - initial
+        abs_delta = np.abs(delta)
+        max_abs = float(abs_delta.max())
+        rms = float(np.sqrt(np.mean(delta**2)))
+        scale = float(max(abs(initial), float(np.abs(sampled).max()), eps))
+        max_relative = None if abs(initial) < eps else float(max_abs / scale)
+
+        if not np.isfinite(max_abs) or not np.isfinite(rms) or not np.isfinite(scale):
+            raise ValueError(f"invariant series {name!r} produced a non-finite residual")
+        if max_relative is not None and not np.isfinite(max_relative):
+            raise ValueError(f"invariant series {name!r} produced a non-finite relative residual")
+
+        residuals[name] = InvariantResidual(
+            name=name,
+            reference=initial,
+            max_abs=max_abs,
+            rms=rms,
+            max_relative=max_relative,
+            scale=scale,
+        )
+
+    return residuals
 
 
 def poincare_section_crossings(
@@ -222,8 +278,10 @@ def _crosses(left: float, right: float, direction: str) -> bool:
 
 
 __all__ = [
+    "InvariantResidual",
     "LyapunovResult",
     "PoincareSection",
     "finite_time_lyapunov",
+    "invariant_residuals",
     "poincare_section_crossings",
 ]

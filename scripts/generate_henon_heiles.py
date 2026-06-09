@@ -120,12 +120,9 @@ def generate_henon_heiles_trajectory(
     xx, yy = np.meshgrid(grid_x, grid_y)
     potential = _potential(xx, yy, stiffness, coupling)
     energy = np.asarray(trajectory.series["H"], dtype=float)
-
-    return Trajectory.from_arrays(
-        time=trajectory.time,
-        states=trajectory.states,
-        state_names=trajectory.state_names,
-        metadata={
+    metadata = dict(trajectory.metadata or {})
+    metadata.update(
+        {
             "system": "henon_heiles",
             "mass": mass,
             "stiffness": stiffness,
@@ -145,7 +142,14 @@ def generate_henon_heiles_trajectory(
                 )
             ],
             "rendererHints": henon_renderer_hints(grid_x, grid_y, potential),
-        },
+        }
+    )
+
+    return Trajectory.from_arrays(
+        time=trajectory.time,
+        states=trajectory.states,
+        state_names=trajectory.state_names,
+        metadata=metadata,
         series=trajectory.series,
     )
 
