@@ -11,10 +11,12 @@ interactive visuals.
 gallery, playback controls, structure panels, invariant lanes, 2D canvas lenses,
 potential/effective-potential lenses, and Three.js views.
 
-[x] Verification after the wavefront lens addition: `pytest -q` passes with 158
+[x] Verification after the wavefront lens addition: `pytest -q` passes with 159
 tests, `cd viewer && npm run build` passes, and `cd viewer && npm run
-test:visual` passes with desktop/mobile coverage. The viewer build emits a
-non-fatal Vite chunk-size warning for the main JavaScript bundle.
+test:visual` passes with desktop/mobile coverage. The visual suite now includes
+the all-examples pass and the fit-to-system camera-reset regression on desktop
+and mobile. The viewer build emits a non-fatal Vite chunk-size warning for the
+main JavaScript bundle.
 
 ## Scope
 
@@ -60,6 +62,11 @@ trajectory. The button is shown only for the orbit-controlled 3D scenes, and
 `ThreeScene.resetCamera()` restores the home framing captured in
 `setVisualization` while leaving OrbitControls interaction intact.
 
+[x] Add lightweight visual regression coverage for the fit-to-system control.
+The Playwright visual suite now opens each Three.js-heavy system, clicks
+`#fitToSystem`, and asserts the active WebGL canvas still has meaningful pixels
+after the camera reset on desktop and mobile.
+
 ## Open questions
 
 - Should the viewer preserve per-system camera state, or always return to the
@@ -67,32 +74,29 @@ trajectory. The button is shown only for the orbit-controlled 3D scenes, and
 - Should parameter changes wait for backend regeneration support, or should the
   frontend first support precomputed variants?
 
-## Next Best Realistic Item
+## Next Best Three Items
 
-Add a lightweight visual regression check that directly opens each
-Three.js-heavy system and clicks the new "Fit to system" control, asserting
-the active canvas still has meaningful rendered pixels after the camera reset.
-The fit affordance now exists, so the next realistic improvement is to guard it
-(and the renderer-hint framing it relies on) against regressions per system.
+1. Add a diagnostics panel once backend Lyapunov or invariant-residual outputs
+   exist. The viewer should consume exported diagnostic metadata instead of
+   recomputing dynamics.
 
-Recommended implementation sequence:
+2. Define parameter-family UI behavior around backend-generated variants or
+   sweeps. Avoid arbitrary browser-side regeneration until the backend data
+   contract is settled.
 
-1. Extend `viewer/tests/visual.spec.ts` to iterate the Three.js systems, click
-   `#fitToSystem`, and reuse the existing non-blank-canvas assertion.
-2. Keep the current desktop/mobile coverage intact.
-3. Rerun `pytest -q`, `cd viewer && npm run build`, and
-   `cd viewer && npm run test:visual`.
+3. Add focused visual coverage for the next diagnostic lens as it lands,
+   especially section plots, residual plots, or parameter-family selectors.
 
 ## Itinerary
 
-1. Add a lightweight visual regression check that directly opens each
-   Three.js-heavy system and asserts its active canvas has meaningful rendered
-   pixels after applying renderer hints and the fit-to-system reset.
+1. Add a manifest-driven diagnostics panel after backend diagnostic exports are
+   available.
 2. Consider parameter UI behavior once backend support for regenerated or
    precomputed variants is defined.
-3. Keep visual polish focused on the current examples before adding new
+3. Keep visual polish focused on diagnostic readability before adding new
    frontend surfaces.
 
-Latest baseline: `pytest -q` (158 tests), `cd viewer && npm run build`, and the
-Playwright visual suite (2 tests, desktop + mobile) all pass after adding the
-fit-to-system camera-reset control.
+Latest baseline: `pytest -q` (159 tests), `cd viewer && npm run build`, and the
+Playwright visual suite (4 tests: all-examples desktop/mobile and
+fit-to-system desktop/mobile) all pass after adding the fit-to-system
+camera-reset regression.

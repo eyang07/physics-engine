@@ -31,7 +31,7 @@ variable-speed wavefront propagation.
 wavefront snapshots using cotangent Hamiltonian flow, and the viewer renders it
 with a dedicated 2D wavefront lens.
 
-[x] Verification baseline: `pytest -q` passes with 158 tests. Full project
+[x] Verification baseline: `pytest -q` passes with 159 tests. Full project
 verification also includes `cd viewer && npm run build` and `cd viewer && npm
 run test:visual`.
 
@@ -84,25 +84,26 @@ renderer-hints changes and validate with the full backend/frontend baseline.
 wavefront propagation in a Gaussian slow-speed medium, exported as a ray bundle
 with wavefront snapshots and Hamiltonian drift diagnostics.
 
-## Next Best Realistic Item
+[x] Generalize the ray-bundle export helper. Ray integration, shared time
+sampling, wavefront snapshot records, renderer coordinate bounds, and
+Hamiltonian drift reporting now live in reusable `engine.dynamics.ray_bundle`
+utilities, and the variable-speed wavefront generator delegates to them without
+changing generated JSON outputs.
 
-Generalize the ray-bundle export helper before adding more microlocal or
-general-relativity examples. The prototype generator works, but its bundle
-assembly, wavefront snapshotting, Hamiltonian drift sampling, and renderer
-bounds should become reusable backend utilities so future ray/geodesic examples
-do not duplicate generator logic.
+## Next Best Three Items
 
-Recommended implementation sequence:
+1. Add approximate finite-time Lyapunov diagnostics for Lorenz.
+   This is the lowest-risk v0.2 diagnostics step because Lorenz is already a
+   first-order flow with an exported trajectory and symbolic Jacobian support.
 
-1. Move repeated ray-bundle assembly from
-   `scripts/generate_variable_speed_wavefront.py` into a reusable helper.
-2. Keep the helper generic over any `CotangentHamiltonianSystem` and list of
-   initial states.
-3. Preserve the current export shape: shared time, per-ray states, wavefront
-   snapshots, renderer bounds, and Hamiltonian drift diagnostics.
-4. Add focused tests for helper determinism and drift reporting.
-5. Keep future wave/GR examples out of the gallery until they have honest lens
-   support.
+2. Add a Poincare-section export for Hénon-Heiles.
+   This should produce structured section-crossing data for a Hamiltonian
+   chaotic system, not just another trajectory.
+
+3. Add invariant-residual tracking for known conserved quantities.
+   Start with energy drift for Hamiltonian examples and expose max/series
+   residuals in trajectory metadata so the viewer can display numerical error
+   as a first-class diagnostic.
 
 ## Backend Tools To Add
 
@@ -111,6 +112,10 @@ flow.
 
 [x] Ray-bundle trajectory export: multiple rays, shared time samples, per-ray
 states, wavefront snapshots, and renderer bounds.
+
+[x] Reusable ray-bundle generator utilities for cotangent Hamiltonian systems:
+shared time integration, Hamiltonian drift reporting, wavefront records, and
+coordinate bounds.
 
 [x] First parameterized scalar wave-speed helper for a Gaussian slow-speed lens.
 
@@ -131,10 +136,9 @@ proximity, travel time, and wavefront envelope metadata.
 
 ## Itinerary
 
-1. Generalize the ray-bundle export helper so future microlocal/GR ray examples
-   do not duplicate generator logic.
-2. Add approximate Lyapunov exponent diagnostics for Lorenz or Hénon-Heiles.
-3. Add a Poincare-section export for Hénon-Heiles.
+1. Add approximate Lyapunov exponent diagnostics for Lorenz.
+2. Add a Poincare-section export for Hénon-Heiles.
+3. Add invariant-residual tracking for known conserved quantities.
 4. Decide the parameter-interactivity backend strategy.
 5. Add the next physics example after the data-contract direction is settled.
 
