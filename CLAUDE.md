@@ -203,6 +203,37 @@ spec that Codex can execute narrowly. Include:
 When useful, capture larger plans as updates to `docs/BACKEND.md` /
 `docs/FRONTEND.md` itineraries so the hand-off is durable.
 
+The full handoff format and a copy-paste task template live in
+`docs/agent-workflow.md` and `docs/task-template.md`.
+
+---
+
+## Two-Agent Worktree Workflow
+
+This repo runs a disciplined two-agent setup. **`docs/agent-workflow.md` is the
+shared source of truth for process**; this section is the Claude-side summary.
+
+- **Claude works on branch `claude/planning`, in worktree `../project-claude`.**
+  Claude does planning, specs, invariants, and reviews here. Claude **never edits
+  the base branch** and **never edits Codex's task worktree**.
+- **Codex works on task branches** (`codex/task-1`, `codex/fix-build`,
+  `codex/docs-cleanup`, …) in its own worktree (`../project-codex`). One branch
+  and one worktree per task; the two agents never edit the same branch at once.
+- The base branch (`main`, in the main repo) is the **merge target only** — the
+  source of truth, edited by neither agent directly.
+
+The loop: Claude writes a Task Spec on `claude/planning` → hands it to Codex →
+Codex implements exactly that spec on its task branch and reports commands +
+results → Claude reviews the diff against the spec's invariants (APPROVE /
+CHANGES REQUESTED) → merge to base only after approval and green verification →
+remove the task worktree and start the next task fresh.
+
+Claude's review is **read-only on the implementation**: Claude judges the diff
+against the spec, it does not rewrite Codex's code. If a task surfaces a design
+decision (architecture, manifest schema, scope), Claude resolves it by updating
+the spec, not by silently implementing around it. See the Review Checklist in
+`docs/agent-workflow.md`.
+
 ---
 
 ## Verification Commands (discovered in the repo)

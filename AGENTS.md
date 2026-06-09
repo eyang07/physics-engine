@@ -58,6 +58,26 @@ Claude / the human rather than improvising (see "How to Handle Unclear Specs").
 
 ---
 
+## Two-Agent Worktree Workflow
+
+This repo runs a disciplined two-agent setup. **`docs/agent-workflow.md` is the
+shared source of truth for process**; this section is the Codex-side summary.
+
+- **Codex works on task branches** named by intent — `codex/task-1`,
+  `codex/fix-build`, `codex/docs-cleanup`, … — each in its own worktree
+  (default `../project-codex`). **One scoped task per branch/worktree.**
+- **Codex never edits the base branch (`main`) directly** and **never edits
+  Claude's `claude/planning` worktree (`../project-claude`).** Two agents must
+  not edit the same branch/worktree at the same time.
+- Codex receives a **Task Spec** from Claude (format in `docs/task-template.md`),
+  implements exactly that spec, runs verification, and reports commands +
+  results for Claude to review. Merge to base happens only after Claude approves
+  and verification is green.
+- Start each new task from an up-to-date base in a fresh worktree:
+  `git worktree add -b codex/<task> ../project-codex-<task> origin/main`.
+
+---
+
 ## Concrete Implementation Workflow
 
 1. **Locate the task in the plan.** Identify the relevant `docs/*.md` itinerary
@@ -71,8 +91,10 @@ Claude / the human rather than improvising (see "How to Handle Unclear Specs").
 3. **Make the smallest change that satisfies the spec.** Match surrounding style.
 4. **Add/update tests** for the change (see "Definition of Done").
 5. **Regenerate data if backend output changed:**
-   `python -m scripts.generate_all_examples`. Commit regenerated data in the same
-   change as the code that produced it.
+   `python -m scripts.generate_all_examples`. This is a *verification* step:
+   confirm the output reproduces deterministically. The generated outputs
+   (`data/generated/`, `viewer/public/data/*.json`) are **gitignored** — do not
+   try to commit them; reproducibility lives in the tracked generators and specs.
 6. **Verify** (see commands). Run the relevant subset for small changes; run the
    full baseline before declaring done.
 7. **Report** what changed (files + intent) and the exact commands run, with
@@ -148,8 +170,9 @@ General:
   branch is warranted, create one first.
 - Prefer **small, verifiable commits** with clear messages describing what
   changed and why.
-- Keep generated data changes (`data/generated/`, `viewer/public/data`) in the
-  same commit as the code that generates them, so the repo stays reproducible.
+- Do **not** commit generated data (`data/generated/`, `viewer/public/data/*.json`):
+  it is gitignored. Reproducibility comes from the tracked generators/specs plus
+  `python -m scripts.generate_all_examples`, not from committed data blobs.
 - Use the `gh` CLI for GitHub operations. Interactive git flags (`-i`) are not
   available in this environment.
 - A PR-ready change: focused diff, tests added/updated and passing, data
@@ -195,10 +218,12 @@ General:
 
 ## How to Receive Tasks from Claude-Style Planning Docs
 
-Claude hands off self-contained specs (see `CLAUDE.md` → "How Claude Hands Off").
-A typical hand-off names: the goal and which plan doc it advances, the files to
-touch, the invariants/specification with tolerances, an ordered step sequence,
-the test obligations, the verification commands, and explicit out-of-scope items.
+Claude hands off self-contained specs (see `CLAUDE.md` → "How Claude Hands Off",
+and the copy-paste form in `docs/task-template.md`). A typical hand-off names:
+the goal and which plan doc it advances, the target `codex/<task>` branch, the
+files to touch, the invariants/specification with tolerances, an ordered step
+sequence, the test obligations, the verification commands, and explicit
+out-of-scope items.
 
 When you receive one:
 - Treat the **invariants/specification as the contract.** Your diff must satisfy
@@ -258,7 +283,8 @@ A task is done only when **all** of these hold:
    JSON export shape, invariant flatness, domain behavior).
 3. `pytest -q` passes — and you ran it.
 4. If backend output changed: `python -m scripts.generate_all_examples` was run
-   and the regenerated data is committed with the code.
+   and reproduces deterministic output. (The output is gitignored, so "done"
+   means *regenerates cleanly*, not *committed*.)
 5. If the viewer was touched: `cd viewer && npm run build` is clean, and
    `cd viewer && npm run test:visual` passes when visuals changed.
 6. Docs/itineraries are updated if a plan item was completed.
