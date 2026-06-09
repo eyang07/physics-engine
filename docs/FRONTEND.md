@@ -11,7 +11,7 @@ interactive visuals.
 gallery, playback controls, structure panels, invariant lanes, 2D canvas lenses,
 potential/effective-potential lenses, and Three.js views.
 
-[x] Verification after the wavefront lens addition: `pytest -q` passes with 159
+[x] Verification after the wavefront lens addition: `pytest -q` passes with 166
 tests, `cd viewer && npm run build` passes, and `cd viewer && npm run
 test:visual` passes with desktop/mobile coverage. The visual suite now includes
 the all-examples pass and the fit-to-system camera-reset regression on desktop
@@ -96,7 +96,7 @@ after the camera reset on desktop and mobile.
 4. Keep visual polish focused on diagnostic readability before adding new
    frontend surfaces.
 
-Latest baseline: `pytest -q` (159 tests), `cd viewer && npm run build`, and the
+Latest baseline: `pytest -q` (166 tests), `cd viewer && npm run build`, and the
 Playwright visual suite (4 tests: all-examples desktop/mobile and
 fit-to-system desktop/mobile) all pass after adding the fit-to-system
 camera-reset regression.
