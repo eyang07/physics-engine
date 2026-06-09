@@ -90,20 +90,28 @@ Hamiltonian drift reporting now live in reusable `engine.dynamics.ray_bundle`
 utilities, and the variable-speed wavefront generator delegates to them without
 changing generated JSON outputs.
 
+[x] Add approximate finite-time Lyapunov diagnostics for Lorenz. The Lorenz
+export now carries sampled largest-FTLE series data, local growth rates, and
+metadata describing the variational-Jacobian method.
+
+[x] Add a Poincare-section export for Hénon-Heiles. The generated trajectory now
+exports interpolated `y = 0`, upward-crossing section points with `(x, p_x)`
+axes, full state coordinates, momentum extras, and energy samples.
+
 ## Next Best Three Items
 
-1. Add approximate finite-time Lyapunov diagnostics for Lorenz.
-   This is the lowest-risk v0.2 diagnostics step because Lorenz is already a
-   first-order flow with an exported trajectory and symbolic Jacobian support.
-
-2. Add a Poincare-section export for Hénon-Heiles.
-   This should produce structured section-crossing data for a Hamiltonian
-   chaotic system, not just another trajectory.
-
-3. Add invariant-residual tracking for known conserved quantities.
+1. Add invariant-residual tracking for known conserved quantities.
    Start with energy drift for Hamiltonian examples and expose max/series
    residuals in trajectory metadata so the viewer can display numerical error
    as a first-class diagnostic.
+
+2. Add parameter sweep manifests for selected systems.
+   Begin with Lorenz or Hénon-Heiles and export deterministic precomputed
+   variants before introducing arbitrary browser-side regeneration.
+
+3. Generalize parameterized media helpers.
+   Extend the wave/ray backend beyond the Gaussian slow-speed lens toward
+   reusable scalar wave-speed, refractive-index, or metric-coefficient models.
 
 ## Backend Tools To Add
 
@@ -136,9 +144,9 @@ proximity, travel time, and wavefront envelope metadata.
 
 ## Itinerary
 
-1. Add approximate Lyapunov exponent diagnostics for Lorenz.
-2. Add a Poincare-section export for Hénon-Heiles.
-3. Add invariant-residual tracking for known conserved quantities.
+1. Add invariant-residual tracking for known conserved quantities.
+2. Add parameter sweep manifests for selected systems.
+3. Generalize parameterized media helpers.
 4. Decide the parameter-interactivity backend strategy.
 5. Add the next physics example after the data-contract direction is settled.
 

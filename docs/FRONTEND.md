@@ -76,24 +76,24 @@ after the camera reset on desktop and mobile.
 
 ## Next Best Three Items
 
-1. Add a diagnostics panel once backend Lyapunov or invariant-residual outputs
-   exist. The viewer should consume exported diagnostic metadata instead of
-   recomputing dynamics.
+1. Add a diagnostics panel for exported backend diagnostics. Start with
+   Lorenz finite-time Lyapunov metadata and Hénon-Heiles Poincare-section
+   metadata, consuming Python outputs without recomputing dynamics.
 
-2. Define parameter-family UI behavior around backend-generated variants or
+2. Add a focused Poincare-section lens for Hénon-Heiles. Render the exported
+   `(x, p_x)` section points separately from the trajectory phase portrait.
+
+3. Define parameter-family UI behavior around backend-generated variants or
    sweeps. Avoid arbitrary browser-side regeneration until the backend data
    contract is settled.
 
-3. Add focused visual coverage for the next diagnostic lens as it lands,
-   especially section plots, residual plots, or parameter-family selectors.
-
 ## Itinerary
 
-1. Add a manifest-driven diagnostics panel after backend diagnostic exports are
-   available.
-2. Consider parameter UI behavior once backend support for regenerated or
+1. Add a manifest-driven diagnostics panel for exported diagnostics.
+2. Add a Poincare-section lens for Hénon-Heiles.
+3. Consider parameter UI behavior once backend support for regenerated or
    precomputed variants is defined.
-3. Keep visual polish focused on diagnostic readability before adding new
+4. Keep visual polish focused on diagnostic readability before adding new
    frontend surfaces.
 
 Latest baseline: `pytest -q` (159 tests), `cd viewer && npm run build`, and the

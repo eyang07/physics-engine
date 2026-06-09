@@ -6,6 +6,7 @@ from typing import Sequence
 
 import numpy as np
 
+from engine.dynamics import poincare_section_crossings
 from engine.export import Trajectory
 from scripts.example_specs import HENON_HEILES
 from scripts.generation import generate_lagrangian_trajectory, write_trajectory_outputs
@@ -52,6 +53,38 @@ def henon_renderer_hints(grid_x: np.ndarray, grid_y: np.ndarray, potential: np.n
     }
 
 
+def henon_poincare_section(
+    time: np.ndarray,
+    states: np.ndarray,
+    energy: np.ndarray,
+    *,
+    mass: float,
+) -> dict[str, object]:
+    p_x = mass * states[:, 2]
+    p_y = mass * states[:, 3]
+    section = poincare_section_crossings(
+        time,
+        states,
+        state_names=["x", "y", "x_dot", "y_dot"],
+        coordinate="y",
+        value=0.0,
+        direction="positive",
+        series={"H": energy},
+        extra_values={"p_x": p_x, "p_y": p_y},
+    )
+    return {
+        "name": "y_zero_upward",
+        "title": "Poincare section y = 0, y_dot > 0",
+        "coordinate": section.coordinate,
+        "value": section.value,
+        "direction": section.direction,
+        "stateNames": list(section.state_names),
+        "axes": ["x", "p_x"],
+        "pointCount": len(section.points),
+        "points": section.points,
+    }
+
+
 def generate_henon_heiles_trajectory(
     *,
     mass: float = 1.0,
@@ -86,6 +119,7 @@ def generate_henon_heiles_trajectory(
     grid_y = np.linspace(-span, span, 120)
     xx, yy = np.meshgrid(grid_x, grid_y)
     potential = _potential(xx, yy, stiffness, coupling)
+    energy = np.asarray(trajectory.series["H"], dtype=float)
 
     return Trajectory.from_arrays(
         time=trajectory.time,
@@ -100,8 +134,16 @@ def generate_henon_heiles_trajectory(
                 "xValues": grid_x.tolist(),
                 "yValues": grid_y.tolist(),
                 "values": potential.tolist(),
-                "energy": float(np.mean(np.asarray(trajectory.series["H"], dtype=float))),
+                "energy": float(np.mean(energy)),
             },
+            "poincareSections": [
+                henon_poincare_section(
+                    trajectory.time,
+                    trajectory.states,
+                    energy,
+                    mass=mass,
+                )
+            ],
             "rendererHints": henon_renderer_hints(grid_x, grid_y, potential),
         },
         series=trajectory.series,

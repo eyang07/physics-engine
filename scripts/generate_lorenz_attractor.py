@@ -7,6 +7,7 @@ from typing import Sequence
 import numpy as np
 import sympy as sp
 
+from engine.dynamics import finite_time_lyapunov
 from engine.export import Trajectory
 from engine.numerics import integrate_adaptive
 from scripts.generation import write_trajectory_outputs
@@ -90,6 +91,7 @@ def generate_lorenz_trajectory(
     rhs_values = np.asarray([system.numerical_rhs()(float(t), state) for t, state in zip(time, states, strict=True)])
     speed = np.linalg.norm(rhs_values, axis=1)
     radius = np.linalg.norm(states, axis=1)
+    lyapunov = finite_time_lyapunov(system, time, states)
 
     x, y, z = system.state
     fixed_points = []
@@ -120,11 +122,26 @@ def generate_lorenz_trajectory(
             "bounds": bounds,
             "divergence": float(system.divergence()),
             "fixedPoints": fixed_points,
+            "diagnostics": {
+                "lyapunov": {
+                    "kind": "finite-time-largest",
+                    "method": "sampled-variational-jacobian",
+                    "series": "ftle",
+                    "localGrowthSeries": "lyapunov_local_growth",
+                    "initialTangent": lyapunov.initial_tangent.astype(float).tolist(),
+                    "finalTangent": lyapunov.final_tangent.astype(float).tolist(),
+                    "finalEstimate": lyapunov.final_estimate,
+                    "sampleCount": int(len(time)),
+                    "timeWindow": [float(time[0]), float(time[-1])],
+                }
+            },
             "rendererHints": lorenz_renderer_hints(states),
         },
         series={
             "speed": speed.tolist(),
             "radius": radius.tolist(),
+            "ftle": lyapunov.estimate.astype(float).tolist(),
+            "lyapunov_local_growth": lyapunov.local_growth.astype(float).tolist(),
         },
     )
 
