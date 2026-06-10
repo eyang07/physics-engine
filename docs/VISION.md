@@ -97,7 +97,7 @@ Priority features:
 3. [x] Extend Lyapunov diagnostics to Hénon-Heiles or another Hamiltonian
    chaotic system.
 4. [x] Add invariant-residual tracking for known conserved quantities.
-5. [ ] Add parameter sweep manifests.
+5. [x] Add parameter sweep manifests.
 6. [x] Add numerical regression tests for invariant drift and deterministic
    outputs.
 7. [x] Add visual regression coverage for camera reset and frontend framing.
@@ -125,8 +125,10 @@ it should report residuals over time. This turns visual output into scientific
 output.
 
 Parameter sweeps should favor reproducible, precomputed variants before
-arbitrary browser-side regeneration. This keeps the system deterministic,
-testable, cacheable, and scientifically interpretable.
+arbitrary browser-side regeneration. The manifest now supports system-attached
+precomputed variants, with Lorenz rho-family trajectories as the first slice;
+the Python backend remains deterministic, testable, cacheable, and
+scientifically interpretable.
 
 Ray-bundle export matters for wavefronts, optics, geometric mechanics, and
 eventual microlocal examples, but it should be generalized as a geometric data

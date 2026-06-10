@@ -113,6 +113,154 @@ function referenceGeometryHint(value: unknown): ReferenceGeometryHint | null {
   };
 }
 
+/**
+ * A finite-time Lyapunov diagnostic, as exported in
+ * `metadata.diagnostics.lyapunov`. The numbers Python measured (the running
+ * estimate, the local growth) live in `trajectory.series`; this metadata only
+ * names which series to read and records how they were produced. The viewer
+ * never recomputes the exponent — it renders the exported series.
+ */
+export type LyapunovDiagnostic = {
+  kind?: string;
+  method?: string;
+  /** Name of the running finite-time estimate series in `trajectory.series`. */
+  series?: string;
+  /** Name of the local growth-rate series in `trajectory.series`. */
+  localGrowthSeries?: string;
+  timeWindow?: [number, number];
+  sampleCount?: number;
+};
+
+/** A single section crossing: only the exported axis values (+ crossing time). */
+export type PoincarePoint = {
+  /** Values for the section's `axes`, in axis order. */
+  axisValues: number[];
+  time?: number;
+};
+
+/**
+ * A Poincaré section exported in `metadata.poincareSections`. The crossings are
+ * found by Python; the viewer plots the exported axis values as markers and
+ * never integrates or root-finds them itself.
+ */
+export type PoincareSection = {
+  name: string;
+  coordinate?: string;
+  value?: number;
+  direction?: "positive" | "negative" | string;
+  axes: string[];
+  points: PoincarePoint[];
+};
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+}
+
+/** Read the Lyapunov diagnostic Python attached to the trajectory metadata. */
+export function lyapunovDiagnostic(trajectory: Trajectory): LyapunovDiagnostic | null {
+  const diagnostics = asRecord(trajectory.metadata?.diagnostics);
+  const raw = asRecord(diagnostics?.lyapunov);
+  if (!raw) {
+    return null;
+  }
+  const timeWindow =
+    Array.isArray(raw.timeWindow) &&
+    raw.timeWindow.length === 2 &&
+    raw.timeWindow.every((item) => typeof item === "number")
+      ? (raw.timeWindow as [number, number])
+      : undefined;
+  return {
+    kind: typeof raw.kind === "string" ? raw.kind : undefined,
+    method: typeof raw.method === "string" ? raw.method : undefined,
+    series: typeof raw.series === "string" ? raw.series : undefined,
+    localGrowthSeries: typeof raw.localGrowthSeries === "string" ? raw.localGrowthSeries : undefined,
+    timeWindow,
+    sampleCount: typeof raw.sampleCount === "number" ? raw.sampleCount : undefined,
+  };
+}
+
+// Resolve one section axis (e.g. "x", "p_x") to its exported value for a single
+// crossing, preferring the named coordinate/extra maps and falling back to the
+// state vector by name. No physics: it only looks the value up.
+function resolveAxisValue(
+  axis: string,
+  coordinates: Record<string, unknown> | undefined,
+  extra: Record<string, unknown> | undefined,
+  state: unknown[] | undefined,
+  stateNames: string[],
+): number | null {
+  if (coordinates && typeof coordinates[axis] === "number") {
+    return coordinates[axis] as number;
+  }
+  if (extra && typeof extra[axis] === "number") {
+    return extra[axis] as number;
+  }
+  const column = stateNames.indexOf(axis);
+  if (column >= 0 && state && typeof state[column] === "number") {
+    return state[column] as number;
+  }
+  return null;
+}
+
+/** Read the Poincaré sections Python attached to the trajectory metadata. */
+export function poincareSections(trajectory: Trajectory): PoincareSection[] {
+  const raw = trajectory.metadata?.poincareSections;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.flatMap((item) => {
+    const section = asRecord(item);
+    if (!section) {
+      return [];
+    }
+    const axes =
+      Array.isArray(section.axes) && section.axes.every((axis) => typeof axis === "string")
+        ? (section.axes as string[])
+        : [];
+    if (axes.length < 2) {
+      return [];
+    }
+    const stateNames =
+      Array.isArray(section.stateNames) && section.stateNames.every((name) => typeof name === "string")
+        ? (section.stateNames as string[])
+        : [];
+    const rawPoints = Array.isArray(section.points) ? section.points : [];
+    const points = rawPoints.flatMap((entry) => {
+      const point = asRecord(entry);
+      if (!point) {
+        return [];
+      }
+      const coordinates = asRecord(point.coordinates);
+      const extra = asRecord(point.extra);
+      const state = Array.isArray(point.state) ? point.state : undefined;
+      const axisValues: number[] = [];
+      for (const axis of axes) {
+        const value = resolveAxisValue(axis, coordinates, extra, state, stateNames);
+        if (value === null) {
+          return [];
+        }
+        axisValues.push(value);
+      }
+      const poincarePoint: PoincarePoint = { axisValues };
+      if (typeof point.time === "number") {
+        poincarePoint.time = point.time;
+      }
+      return [poincarePoint];
+    });
+    const value = typeof section.value === "number" ? section.value : undefined;
+    return [
+      {
+        name: typeof section.name === "string" ? section.name : "section",
+        coordinate: typeof section.coordinate === "string" ? section.coordinate : undefined,
+        value,
+        direction: typeof section.direction === "string" ? section.direction : undefined,
+        axes,
+        points,
+      },
+    ];
+  });
+}
+
 /** Renderer-only scene hints exported by Python alongside the trajectory. */
 export function rendererHints(trajectory: Trajectory): RendererHints {
   const raw = trajectory.metadata?.rendererHints;

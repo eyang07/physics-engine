@@ -18,6 +18,7 @@ from engine.export.manifest import (
     EffectivePotential,
     Lens,
     Parameter,
+    ParameterVariant,
     StateVar,
     SystemSpec,
 )
@@ -483,6 +484,47 @@ LORENZ = SystemSpec(
     lenses=("lorenzAttractor",),
     data_path="/data/lorenz_attractor.json",
     system_kind="first-order-flow",
+    variants=(
+        ParameterVariant(
+            id="rho-20",
+            label="rho = 20",
+            parameters={
+                "sigma": 10.0,
+                "rho": 20.0,
+                "beta": 8.0 / 3.0,
+                "x0": 0.0,
+                "y0": 1.0,
+                "z0": 1.05,
+            },
+            data_path="/data/lorenz_attractor_rho_20.json",
+        ),
+        ParameterVariant(
+            id="rho-28",
+            label="rho = 28",
+            parameters={
+                "sigma": 10.0,
+                "rho": 28.0,
+                "beta": 8.0 / 3.0,
+                "x0": 0.0,
+                "y0": 1.0,
+                "z0": 1.05,
+            },
+            data_path="/data/lorenz_attractor.json",
+        ),
+        ParameterVariant(
+            id="rho-35",
+            label="rho = 35",
+            parameters={
+                "sigma": 10.0,
+                "rho": 35.0,
+                "beta": 8.0 / 3.0,
+                "x0": 0.0,
+                "y0": 1.0,
+                "z0": 1.05,
+            },
+            data_path="/data/lorenz_attractor_rho_35.json",
+        ),
+    ),
 )
 
 

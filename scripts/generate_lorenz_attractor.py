@@ -10,6 +10,7 @@ import sympy as sp
 from engine.dynamics import finite_time_lyapunov
 from engine.export import Trajectory
 from engine.numerics import integrate_adaptive
+from scripts.example_specs import LORENZ
 from scripts.generation import write_trajectory_outputs
 from systems.lorenz_attractor import build_system
 
@@ -150,9 +151,55 @@ def write_lorenz_trajectory(
     output: Path,
     *,
     viewer_output: Path | None = None,
+    sigma: float = 10.0,
+    rho: float = 28.0,
+    beta: float = 8.0 / 3.0,
+    initial_state: Sequence[float] = (0.0, 1.0, 1.05),
 ) -> Trajectory:
-    trajectory = generate_lorenz_trajectory()
+    trajectory = generate_lorenz_trajectory(
+        sigma=sigma,
+        rho=rho,
+        beta=beta,
+        initial_state=initial_state,
+    )
     return write_trajectory_outputs(trajectory, output, viewer_output)
+
+
+def _variant_filename(data_path: str) -> str:
+    prefix = "/data/"
+    if not data_path.startswith(prefix):
+        raise ValueError(f"Lorenz variant path must start with {prefix!r}: {data_path!r}")
+    return data_path.removeprefix(prefix)
+
+
+def write_lorenz_variant_trajectories(
+    output_dir: Path,
+    *,
+    viewer_output_dir: Path | None = None,
+) -> list[Trajectory]:
+    trajectories = []
+    for variant in LORENZ.variants:
+        if variant.data_path == LORENZ.data_path:
+            continue
+
+        parameters = variant.parameters
+        filename = _variant_filename(variant.data_path)
+        viewer_output = None if viewer_output_dir is None else viewer_output_dir / filename
+        trajectories.append(
+            write_lorenz_trajectory(
+                output_dir / filename,
+                viewer_output=viewer_output,
+                sigma=parameters["sigma"],
+                rho=parameters["rho"],
+                beta=parameters["beta"],
+                initial_state=(
+                    parameters["x0"],
+                    parameters["y0"],
+                    parameters["z0"],
+                ),
+            )
+        )
+    return trajectories
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

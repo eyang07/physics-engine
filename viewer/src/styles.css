@@ -467,6 +467,12 @@ input[type="range"]::-moz-range-thumb {
   gap: var(--space-2);
 }
 
+/* The `display: grid` above outranks the UA [hidden] rule, so make hiding a
+   panel-section (e.g. diagnostics on systems that export none) explicit. */
+.panel-section[hidden] {
+  display: none;
+}
+
 /* Principles: the symbolic Lagrangian / Hamiltonian / equations of motion. */
 .principles {
   display: grid;
@@ -541,6 +547,59 @@ input[type="range"]::-moz-range-thumb {
   display: block;
   width: 100%;
   height: 30px;
+}
+
+/* Diagnostics: exported phase-space structure, still symbols-only. The
+   finite-time Lyapunov estimate converges against a neutral baseline; each
+   Poincaré section is a scatter of crossings with no numeric ticks. */
+.diagnostics {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.diagnostic {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.diagnostic__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.diagnostic__symbol {
+  color: var(--accent);
+  font-size: 1.05em;
+}
+
+.diagnostic__symbol .katex {
+  color: var(--accent);
+}
+
+.diagnostic__caption {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.diagnostic__caption .katex {
+  color: var(--text-faint);
+}
+
+.diagnostic__lyapunov {
+  display: block;
+  width: 100%;
+  height: 48px;
+}
+
+.diagnostic__section {
+  display: block;
+  width: 100%;
+  height: 140px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
 }
 
 /* Parameters: read by feel, labeled only by symbol — no number in sight. */

@@ -11,7 +11,7 @@ interactive visuals.
 gallery, playback controls, structure panels, invariant lanes, 2D canvas lenses,
 potential/effective-potential lenses, and Three.js views.
 
-[x] Verification after the wavefront lens addition: `pytest -q` passes with 167
+[x] Verification after the wavefront lens addition: `pytest -q` passes with 178
 tests, `cd viewer && npm run build` passes, and `cd viewer && npm run
 test:visual` passes with desktop/mobile coverage. The visual suite now includes
 the all-examples pass and the fit-to-system camera-reset regression on desktop
@@ -71,8 +71,8 @@ after the camera reset on desktop and mobile.
 
 - Should the viewer preserve per-system camera state, or always return to the
   exported camera when switching systems?
-- Should parameter changes wait for backend regeneration support, or should the
-  frontend first support precomputed variants?
+- How should the viewer expose backend-generated parameter variants without
+  implying arbitrary browser-side regeneration?
 
 ## Next Best Three Items
 
@@ -85,19 +85,18 @@ after the camera reset on desktop and mobile.
    `(x, p_x)` section points separately from the trajectory phase portrait.
 
 3. Define parameter-family UI behavior around backend-generated variants or
-   sweeps. Avoid arbitrary browser-side regeneration until the backend data
-   contract is settled.
+   sweeps. Start from the manifest `variants` field and avoid arbitrary
+   browser-side regeneration.
 
 ## Itinerary
 
 1. Add a manifest-driven diagnostics panel for exported diagnostics.
 2. Add a Poincare-section lens for Hénon-Heiles.
-3. Consider parameter UI behavior once backend support for regenerated or
-   precomputed variants is defined.
+3. Consider parameter UI behavior for backend-generated precomputed variants.
 4. Keep visual polish focused on diagnostic readability before adding new
    frontend surfaces.
 
-Latest baseline: `pytest -q` (167 tests), `cd viewer && npm run build`, and the
+Latest baseline: `pytest -q` (178 tests), `cd viewer && npm run build`, and the
 Playwright visual suite (4 tests: all-examples desktop/mobile and
 fit-to-system desktop/mobile) all pass after adding the fit-to-system
 camera-reset regression.

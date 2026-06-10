@@ -7,7 +7,7 @@ import sympy as sp
 
 from engine.numerics import integrate_adaptive
 from scripts.example_specs import LORENZ
-from scripts.generate_lorenz_attractor import generate_lorenz_trajectory
+from scripts.generate_lorenz_attractor import generate_lorenz_trajectory, write_lorenz_variant_trajectories
 from engine.export.manifest import system_entry
 from systems.lorenz_attractor import build_system
 
@@ -108,3 +108,29 @@ def test_lorenz_manifest_registration() -> None:
     assert "physics" not in entry
     assert "derivation" not in entry
     assert len(entry["dynamics"]["vector_field"]) == 3
+    assert [variant["id"] for variant in entry["variants"]] == ["rho-20", "rho-28", "rho-35"]
+
+
+def test_lorenz_variant_generation_matches_manifest(tmp_path) -> None:
+    output_dir = tmp_path / "data"
+    viewer_output_dir = tmp_path / "viewer-data"
+    trajectories = write_lorenz_variant_trajectories(output_dir, viewer_output_dir=viewer_output_dir)
+    written_variants = [
+        variant
+        for variant in LORENZ.variants
+        if variant.data_path != LORENZ.data_path
+    ]
+
+    assert len(trajectories) == len(written_variants)
+    for variant, trajectory in zip(written_variants, trajectories, strict=True):
+        filename = variant.data_path.removeprefix("/data/")
+        assert (output_dir / filename).exists()
+        assert (viewer_output_dir / filename).exists()
+        assert trajectory.metadata["parameters"] == {
+            "sigma": variant.parameters["sigma"],
+            "rho": variant.parameters["rho"],
+            "beta": variant.parameters["beta"],
+        }
+        assert trajectory.states.shape[1] == 3
+        assert trajectory.series is not None
+        assert len(trajectory.series["ftle"]) == len(trajectory.time)

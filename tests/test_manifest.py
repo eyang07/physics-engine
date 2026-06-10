@@ -102,6 +102,31 @@ def test_parameter_defaults_within_range(spec) -> None:
 
 
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
+def test_parameter_variants_are_well_formed(spec) -> None:
+    entry = system_entry(spec)
+    variants = entry.get("variants", [])
+    assert len(variants) == len(spec.variants)
+
+    parameter_by_name = {parameter.name: parameter for parameter in spec.parameters}
+    ids = [variant["id"] for variant in variants]
+    paths = [variant["dataPath"] for variant in variants]
+    assert len(ids) == len(set(ids))
+    assert len(paths) == len(set(paths))
+
+    for declared, rendered in zip(spec.variants, variants, strict=True):
+        assert rendered["id"] == declared.id
+        assert rendered["label"] == declared.label
+        assert rendered["dataPath"] == declared.data_path
+        assert rendered["dataPath"].startswith("/data/")
+        assert rendered["dataPath"].endswith(".json")
+        assert rendered["parameters"] == declared.parameters
+        assert set(rendered["parameters"]) <= set(parameter_by_name)
+        for name, value in rendered["parameters"].items():
+            parameter = parameter_by_name[name]
+            assert parameter.minimum <= value <= parameter.maximum
+
+
+@pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
 def test_entry_carries_symbolic_physics(spec) -> None:
     entry = system_entry(spec)
     if entry.get("dynamics"):

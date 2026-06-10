@@ -9,7 +9,7 @@ from scripts.generate_charged_particle import write_charged_particle_trajectory
 from scripts.generate_henon_heiles import write_henon_heiles_trajectory
 from scripts.generate_ideal_spring import write_ideal_spring_trajectory
 from scripts.generate_kepler_problem import write_kepler_trajectory
-from scripts.generate_lorenz_attractor import write_lorenz_trajectory
+from scripts.generate_lorenz_attractor import write_lorenz_trajectory, write_lorenz_variant_trajectories
 from scripts.generate_pendulum import write_pendulum_trajectory
 from scripts.generate_sphere_geodesic import write_sphere_geodesic_trajectory
 from scripts.generate_uniform_gravity import write_uniform_gravity_trajectory
@@ -48,6 +48,10 @@ def main() -> None:
     write_lorenz_trajectory(
         Path("data/generated/lorenz_attractor.json"),
         viewer_output=Path("viewer/public/data/lorenz_attractor.json"),
+    )
+    write_lorenz_variant_trajectories(
+        Path("data/generated"),
+        viewer_output_dir=Path("viewer/public/data"),
     )
     write_henon_heiles_trajectory(
         Path("data/generated/henon_heiles.json"),

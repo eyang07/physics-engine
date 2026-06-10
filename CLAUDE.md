@@ -51,7 +51,7 @@ Architecture and boundary:
 Maturity: a working v0.1 with multiple registered examples (pendulum, sphere
 geodesic, charged particle, uniform gravity, ideal spring, Kepler, bead on
 rotating hoop, Lorenz, Hénon–Heiles, variable-speed wavefront). The verification
-baseline noted in docs is `pytest -q` green (167 tests), `viewer` build clean,
+baseline noted in docs is `pytest -q` green (178 tests), `viewer` build clean,
 and Playwright visual tests passing. The current phase (`docs/VISION.md`
 §"v0.2") is diagnostics and phase-space structure: Poincaré sections, Lyapunov
 diagnostics, invariant residuals, parameter sweeps, and regression tests.
@@ -170,10 +170,11 @@ statement actually matches the model it claims to be about.
   ("Data and Export Strategy"): system metadata, parameters, coordinates,
   equations, trajectories, invariants, diagnostics, events, sections, render
   hints, camera hints, lens metadata. Propose schema evolution deliberately.
-- Design the remaining v0.2 diagnostics layer: parameter-sweep manifests,
-  frontend diagnostics surfaces, and follow-on phase-space structure now that
-  Poincaré-section export, Lorenz/Hénon-Heiles finite-time Lyapunov diagnostics,
-  and invariant-residual tracking are implemented.
+- Design the remaining v0.2 diagnostics layer: frontend diagnostics surfaces,
+  broader parameter-variant coverage, and follow-on phase-space structure now
+  that Poincaré-section export, Lorenz/Hénon-Heiles finite-time Lyapunov
+  diagnostics, invariant-residual tracking, and the first parameter-sweep
+  manifest slice are implemented.
 - Specify reusable geometric data models (e.g. generalize the ray-bundle helper
   over any `CotangentHamiltonianSystem`) rather than one-off generators.
 - Define what counts as a "research object" the engine should emit (phase
@@ -284,10 +285,9 @@ Stop and ask (rather than guessing) when:
 
 - A change would alter the **manifest/export schema** or the Python↔TS boundary.
 - A decision is genuinely open in the docs — e.g. the `docs/BACKEND.md` open
-  questions: precomputed variants vs. local regeneration vs. parameter sweeps;
-  chaos diagnostics vs. more classical examples next; whether to move beyond JSON
-  for large sweeps; whether microlocal/GR examples may enter the main manifest
-  before honest lens support exists.
+  questions: chaos diagnostics vs. more classical examples next; whether to
+  move beyond JSON for large sweeps; whether microlocal/GR examples may enter
+  the main manifest before honest lens support exists.
 - The task implies **expanding or narrowing project scope** or contradicts
   `docs/VISION.md`'s "What Not To Prioritize."
 - A correctness question cannot be resolved symbolically or numerically from the

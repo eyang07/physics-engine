@@ -19,6 +19,13 @@ export interface ManifestParameter {
   role: ParameterRole;
 }
 
+export interface ManifestParameterVariant {
+  id: string;
+  label: string;
+  parameters: Record<string, number>;
+  dataPath: string;
+}
+
 export type StateKind = "coordinate" | "velocity" | "momentum" | "embedding";
 
 export interface ManifestStateVar {
@@ -133,6 +140,7 @@ export interface SystemManifest {
   dataPath: string;
   systemKind?: "mechanics" | "first-order-flow" | string;
   parameters: ManifestParameter[];
+  variants?: ManifestParameterVariant[];
   state: ManifestStateVar[];
   projections: Record<string, string[]>;
   conserved: ManifestConserved[];

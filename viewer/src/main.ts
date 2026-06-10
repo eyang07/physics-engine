@@ -18,6 +18,7 @@ import {
 } from "./pendulumCanvas";
 import { drawPhaseScene, drawPotentialContourScene, drawPotentialScene } from "./phasePotentialCanvas";
 import { StructurePanel } from "./structurePanel";
+import { DiagnosticsPanel } from "./diagnosticsPanel";
 import { drawWavefrontScene } from "./wavefrontCanvas";
 import "./styles.css";
 
@@ -79,6 +80,8 @@ const principlesPanel = requireElement<HTMLElement>("#principles");
 const invariantsPanel = requireElement<HTMLElement>("#invariants");
 const parametersPanel = requireElement<HTMLElement>("#parameters");
 const loopPhaseArc = requireElement<SVGCircleElement>("#loopPhaseArc");
+const diagnosticsSection = requireElement<HTMLElement>("#diagnosticsSection");
+const diagnosticsPanel_ = requireElement<HTMLElement>("#diagnostics");
 
 const context = canvas.getContext("2d");
 if (!context) {
@@ -94,6 +97,7 @@ const threeScene = new ThreeScene(threeCanvas);
 
 const trajectorySource = new StaticSource();
 const structurePanel = new StructurePanel(principlesPanel, invariantsPanel, parametersPanel, loopPhaseArc);
+const diagnosticsPanel = new DiagnosticsPanel(diagnosticsSection, diagnosticsPanel_);
 const clock = new PlaybackClock();
 
 let activeView: "home" | "selection" | "simulation" = "home";
@@ -269,11 +273,13 @@ async function selectExample(exampleId: string) {
   clock.reset();
   syncPlayButton();
   structurePanel.clear();
+  diagnosticsPanel.clear();
 
   trajectory = await loadTrajectory(nextExample);
   pendulumBounds = nextExample.id === "pendulum" ? computePendulumBounds(trajectory) : null;
   applyVisualization();
   void structurePanel.show(nextExample.id, trajectory);
+  diagnosticsPanel.show(trajectory);
 }
 
 function resize2dCanvas() {
@@ -340,6 +346,7 @@ function render(now: number) {
   }
 
   structurePanel.update(current.phase);
+  diagnosticsPanel.update(current.phase);
   requestAnimationFrame(render);
 }
 

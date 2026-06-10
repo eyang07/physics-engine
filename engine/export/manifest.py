@@ -59,6 +59,24 @@ class Parameter:
 
 
 @dataclass(frozen=True)
+class ParameterVariant:
+    """A deterministic precomputed trajectory for a named parameter set."""
+
+    id: str
+    label: str
+    parameters: Mapping[str, float]
+    data_path: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "label": self.label,
+            "parameters": dict(self.parameters),
+            "dataPath": self.data_path,
+        }
+
+
+@dataclass(frozen=True)
 class StateVar:
     """One component of the exported state vector.
 
@@ -165,6 +183,7 @@ class SystemSpec:
     data_path: str
     effective_potentials: tuple[EffectivePotential, ...] = ()
     system_kind: str = "mechanics"
+    variants: tuple[ParameterVariant, ...] = ()
 
     def series(
         self,
@@ -417,7 +436,7 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
         for potential in spec.effective_potentials
     ]
 
-    return {
+    entry = {
         "id": spec.id,
         "title": spec.title,
         "category": spec.category,
@@ -437,6 +456,9 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
         },
         "derivation": derivation_entry(spec, system, transform, latex),
     }
+    if spec.variants:
+        entry["variants"] = [variant.to_dict() for variant in spec.variants]
+    return entry
 
 
 def first_order_system_entry(spec: SystemSpec, system: FirstOrderSystem) -> dict[str, Any]:
@@ -455,7 +477,7 @@ def first_order_system_entry(spec: SystemSpec, system: FirstOrderSystem) -> dict
     ]
     jacobian = system.jacobian()
 
-    return {
+    entry = {
         "id": spec.id,
         "title": spec.title,
         "category": spec.category,
@@ -474,6 +496,9 @@ def first_order_system_entry(spec: SystemSpec, system: FirstOrderSystem) -> dict
             "jacobian_latex": latex(jacobian),
         },
     }
+    if spec.variants:
+        entry["variants"] = [variant.to_dict() for variant in spec.variants]
+    return entry
 
 
 def build_manifest(

@@ -31,7 +31,7 @@ variable-speed wavefront propagation.
 wavefront snapshots using cotangent Hamiltonian flow, and the viewer renders it
 with a dedicated 2D wavefront lens.
 
-[x] Verification baseline: `pytest -q` passes with 167 tests. Full project
+[x] Verification baseline: `pytest -q` passes with 178 tests. Full project
 verification also includes `cd viewer && npm run build` and `cd viewer && npm
 run test:visual`.
 
@@ -107,20 +107,24 @@ references reported as absolute-only diagnostics.
 trajectory now mirrors the Lorenz FTLE metadata and series shape while keeping
 invariant residuals scoped to conserved quantities.
 
+[x] Add parameter-sweep manifest support for selected systems. The manifest can
+now attach deterministic precomputed `variants` to a system, and Lorenz exports
+rho-family trajectories alongside the default path.
+
 ## Next Best Three Items
 
-1. Add parameter sweep manifests for selected systems.
-   Begin with Lorenz or Hénon-Heiles and export deterministic precomputed
-   variants before introducing arbitrary browser-side regeneration.
-
-2. Generalize parameterized media helpers.
+1. Generalize parameterized media helpers.
    Extend the wave/ray backend beyond the Gaussian slow-speed lens toward
    reusable scalar wave-speed, refractive-index, or metric-coefficient models.
 
-3. Add diagnostics for wave/ray examples.
+2. Add diagnostics for wave/ray examples.
    Extend ray-bundle exports with Hamiltonian constraint drift, caustic
    proximity, travel time, and wavefront envelope metadata where those
    quantities are mathematically defined.
+
+3. Extend parameter variants beyond Lorenz.
+   Add Hénon-Heiles or another high-value system once the frontend can expose
+   backend-generated variants without arbitrary browser-side regeneration.
 
 ## Backend Tools To Add
 
@@ -154,15 +158,15 @@ proximity, travel time, and wavefront envelope metadata.
 ## Itinerary
 
 1. [x] Add invariant-residual tracking for known conserved quantities.
-2. Add parameter sweep manifests for selected systems.
+2. [x] Add parameter sweep manifests for selected systems.
 3. Generalize parameterized media helpers.
 4. Decide the parameter-interactivity backend strategy.
 5. Add the next physics example after the data-contract direction is settled.
 
 ## Open Questions
 
-- Should parameter interactivity use precomputed variants, local regeneration,
-  or parameter sweeps?
+- How broad should the first frontend parameter-family UI be now that the
+  backend manifest supports precomputed variants?
 - Should the next backend emphasis be chaos diagnostics or more classical
   mechanics examples?
 - Should generated JSON remain the transport format, or should larger sweeps
