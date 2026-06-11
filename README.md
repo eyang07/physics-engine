@@ -79,11 +79,11 @@ cd viewer
 npm run dev
 ```
 
-Run verification:
+Run focused verification while iterating:
 
 ```sh
-pytest -q
-cd viewer && npm run build
+pytest -q                             # broad backend check
+cd viewer && npm run build             # TypeScript/build check
 ```
 
 Visual tests expect the Vite dev server at `http://127.0.0.1:5173/`:
@@ -92,6 +92,9 @@ Visual tests expect the Vite dev server at `http://127.0.0.1:5173/`:
 cd viewer
 npm run test:visual
 ```
+
+For small incremental changes, run the narrowest relevant test/build instead of
+the full baseline by default.
 
 ## Direction
 

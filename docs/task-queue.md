@@ -1,12 +1,13 @@
 # Codex Task Queue
 
 Self-contained implementation specs handed from Claude (planning) to Codex
-(execution). Each task is scoped for one focused branch. Codex: treat the
-**Definition of done** as the contract, respect **Forbidden files** literally,
-and report every command run with its real pass/fail outcome. If reality
-contradicts the spec (a named symbol / path / field is wrong, or an invariant
-cannot hold), stop and report rather than redesigning. See
-`docs/agent-workflow.md` for the handoff / review / merge protocol.
+(execution). Use a focused branch only when isolation/review is useful; small
+human-directed work may stay on the current branch. Codex: treat the
+**Definition of done** as proportional to the change, respect **Forbidden files**
+literally, and report every command run with its real pass/fail outcome. If
+reality contradicts the spec in a way that blocks a small safe implementation,
+stop and report rather than redesigning. See `docs/agent-workflow.md` for the
+handoff / review / merge protocol.
 
 ## Completed
 

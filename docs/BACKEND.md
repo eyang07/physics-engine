@@ -31,9 +31,10 @@ variable-speed wavefront propagation.
 wavefront snapshots using cotangent Hamiltonian flow, and the viewer renders it
 with a dedicated 2D wavefront lens.
 
-[x] Verification baseline: `pytest -q` passes with 178 tests. Full project
-verification also includes `cd viewer && npm run build` and `cd viewer && npm
-run test:visual`.
+[x] Reference verification baseline: `pytest -q` passes with 178 tests. Full
+project verification also includes `cd viewer && npm run build` and
+`cd viewer && npm run test:visual`, but small backend iterations should use
+targeted tests or specific generators first.
 
 ## Scope
 
@@ -78,7 +79,9 @@ center/scale transform before rendering, so renderer bounds must be exported in
 scene space instead of raw Lorenz coordinates.
 
 [x] Regenerate all outputs with `python -m scripts.generate_all_examples` after
-renderer-hints changes and validate with the full backend/frontend baseline.
+shared renderer-hints changes and validate with the full backend/frontend
+baseline. For one-system output changes, prefer the specific generator while
+iterating.
 
 [x] Add the first backend-only microlocal/wave prototype: variable-speed 2D
 wavefront propagation in a Gaussian slow-speed medium, exported as a ray bundle

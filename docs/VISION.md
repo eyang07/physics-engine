@@ -1,304 +1,342 @@
 # Project Vision
 
-This project is not merely a mechanics visualization repo. Its long-term goal is
-to become a structure-aware dynamical systems laboratory: a system that starts
-from symbolic mechanics, derives equations of motion, simulates flows, exposes
-invariants and geometric structure, and eventually produces artifacts useful for
-analysis, verification, and AI-assisted mathematical reasoning.
+## 1. Project Thesis
 
-The viewer is the interface, the central
-contribution is the pipeline:
+This project is a **theory-first mechanics workbench**. It starts from analytical
+mechanics and dynamical systems as the source of mathematical truth, and treats
+that structure — Lagrangians, Hamiltonians, constraints, potentials, symmetries,
+conserved quantities, controls, safe sets, and certificate candidates — as the
+thing that drives simulation, visualization, and eventual verification artifacts.
 
-```text
-mathematical system
--> symbolic formulation
--> equations of motion
--> numerical flow
--> invariants and diagnostics
--> qualitative structure
--> parameter families
--> verification or proof targets
-```
+Numerical integration is a **derived tool** for exploration and rendering, not
+the conceptual foundation. We simulate because it helps us see and probe
+structure; the structure comes first.
 
-A useful slogan:
+Refined identity:
 
-> A proof-oriented analytical mechanics engine: simulation first, structure
-> always, verification eventually.
+> A theory-first mechanics engine that transforms analytical structure into
+> visual simulations, certificate candidates, and backend-agnostic proof
+> obligations for mechanics-based cyber-physical systems.
 
-## Research Identity
+The engine **proposes and organizes**; external verifiers, checkers, and provers
+**dispose**. Its comparative advantage is upstream of any prover: structure-aware
+model generation, certificate-candidate generation, proof-obligation generation,
+and visualization of proof-relevant geometry.
 
-The project sits at the intersection of analytical mechanics, dynamical systems,
-formal verification, and AI-assisted mathematics.
+## 2. What the Project Is / Is Not
 
-Mechanics should be treated as a source of mathematical structure, not just a
-source of animations. Important objects include conserved quantities,
-symmetries, Hamiltonian flows, Lyapunov functions, control barrier functions,
-invariant sets, phase-space geometry, and proof obligations.
+**It is:**
 
-The project should not become a generic physics engine. Its comparative
-advantage is symbolic mechanics, mathematical diagnostics, reproducible
-simulation, and eventual verification/proof orientation.
+- a structure-aware engine for analytical mechanics and dynamical systems;
+- a generator of *models*, *certificate candidates*, and *proof obligations* for
+  mechanics-based systems;
+- a mathematical viewer for trajectories, phase-space structure, diagnostics, and
+  (eventually) safe/unsafe geometry and certificate status;
+- a backend-agnostic front end that can export verification problems to external
+  tools through adapters.
 
-## Current Foundation
+**It is not:**
 
-The repo already has a strong foundation:
+- a generic physics engine or game engine;
+- a generic robotics simulator;
+- a generic cyber-physical-systems (CPS) verification front end for arbitrary
+  systems;
+- an arbitrary "theorem-to-animation" tool;
+- a theorem prover, and not a competitor to mature verification tools.
 
-- symbolic mechanics backend;
-- Hamiltonian and Lagrangian system support;
-- first-order dynamics;
-- numerical integration;
-- JSON export and manifest generation;
-- multiple example systems;
-- Vite/TypeScript frontend;
-- Three.js and canvas rendering lenses;
-- playback controls, structure panels, invariant displays;
-- renderer-hint-based camera framing.
+The project does not try to verify everything. It deliberately specializes in
+systems whose behavior and safety are governed by *mechanics*.
 
-This is enough to move beyond demo-gallery development. Future work should
-deepen the project as a dynamical systems and mathematical-structure tool.
+## 3. Theory-First Mechanics Philosophy
 
-## North Star
+Mechanics is treated as a source of mathematical structure, not just a source of
+animations. The objects that matter are conserved quantities, symmetries,
+Hamiltonian and Lagrangian structure, constraints, potentials, invariant sets,
+phase-space geometry, controlled vector fields, admissible controls, safe sets,
+and candidate certificates.
 
-The long-term workflow should be:
-
-1. Define a mathematical system.
-2. Derive or encode its equations of motion.
-3. Simulate trajectories reproducibly.
-4. Detect, compute, or display mathematical structure.
-5. Run diagnostics for stability, chaos, invariants, and qualitative behavior.
-6. Explore parameter families.
-7. Export artifacts for analysis, verification, or theorem proving.
-
-The project should eventually produce research objects such as:
-
-- Poincare sections;
-- Lyapunov diagnostics;
-- invariant residuals;
-- energy drift measurements;
-- phase portraits;
-- bifurcation data;
-- parameter sweeps;
-- candidate Lyapunov functions;
-- candidate control barrier functions;
-- proof-obligation stubs;
-- formal verification targets;
-- datasets of dynamical systems with known structure.
-
-## Short-Term Theme: v0.2 Diagnostics and Phase-Space Structure
-
-The next development phase should make the engine more research-grade. The
-system should not merely render trajectories; it should help users study the
-qualitative structure of a dynamical system.
-
-Priority features:
-
-1. [x] Implement Poincare-section export for Hénon-Heiles.
-2. [x] Add finite-time Lyapunov diagnostics for Lorenz.
-3. [x] Extend Lyapunov diagnostics to Hénon-Heiles or another Hamiltonian
-   chaotic system.
-4. [x] Add invariant-residual tracking for known conserved quantities.
-5. [x] Add parameter sweep manifests.
-6. [x] Add numerical regression tests for invariant drift and deterministic
-   outputs.
-7. [x] Add visual regression coverage for camera reset and frontend framing.
-8. [x] Generalize the ray-bundle export helper.
-9. [ ] Improve phase-space lens support.
-10. [ ] Add a control/barrier-function example.
-
-Microlocal or GR examples should wait until the frontend can honestly represent
-the geometry they require: phase space, cotangent bundles, covectors, ray
-bundles, null geodesics, caustics, wavefronts, or lensing maps.
-
-## Why These Priorities Matter
-
-Poincare sections move the project from trajectory visualization to qualitative
-dynamics. Hénon-Heiles is the right initial target because it connects
-Hamiltonian mechanics, conserved energy, chaos, and phase-space structure.
-
-Lyapunov diagnostics turn the engine into a stability and chaos workbench. They
-also create bridges to control theory, reinforcement learning dynamics, and
-energy landscapes.
-
-Invariant residuals make the engine self-checking. For Hamiltonian systems, the
-engine should track energy drift. For systems with known conserved quantities,
-it should report residuals over time. This turns visual output into scientific
-output.
-
-Parameter sweeps should favor reproducible, precomputed variants before
-arbitrary browser-side regeneration. The manifest now supports system-attached
-precomputed variants, with Lorenz rho-family trajectories as the first slice;
-the Python backend remains deterministic, testable, cacheable, and
-scientifically interpretable.
-
-Ray-bundle export matters for wavefronts, optics, geometric mechanics, and
-eventual microlocal examples, but it should be generalized as a geometric data
-model, not as a one-off rendering feature.
-
-## Gallery Direction
-
-The gallery should eventually be organized around mathematical phenomena, not
-just example names:
-
-- Integrable Hamiltonian systems: oscillator, pendulum, Kepler, central-force
-  systems.
-- Chaotic and nonlinear systems: Lorenz, Hénon-Heiles, double pendulum,
-  restricted three-body problem, kicked rotor, standard map.
-- Constrained mechanics: bead on wire, spherical pendulum, rolling constraints,
-  particles on surfaces.
-- Wave, ray, and geometric optics systems: wavefronts, ray bundles, Hamiltonian
-  optics, caustics.
-- Control and safety systems: Lyapunov-stable systems, control barrier
-  functions, safe-set invariance examples.
-- Geometric mechanics systems: rigid body, magnetic flow, geodesic flow,
-  systems on manifolds.
-
-## Medium-Term Milestones
-
-The medium-term goal is to turn the engine into a structure-extraction platform.
-Diagnostic modules should include:
-
-- conserved quantity checking;
-- energy drift measurement;
-- symplectic integrator comparison;
-- equilibrium detection and linearization;
-- phase portrait generation;
-- Poincare section generation;
-- finite-time Lyapunov exponent estimation;
-- bifurcation diagram generation;
-- invariant set approximation;
-- candidate Lyapunov function evaluation;
-- candidate control barrier function evaluation.
-
-The guiding question should be:
-
-> What mathematical object would a researcher inspect before attempting a proof?
-
-The engine should produce that object.
-
-## Long-Term Research Directions
-
-### Hamiltonian Chaos Workbench
-
-Build a suite of Hamiltonian systems with diagnostics for chaos and phase-space
-structure: Hénon-Heiles, double pendulum, Kepler perturbations, restricted
-three-body problem, kicked rotor, and standard map.
-
-Core outputs should include energy surfaces, Poincare sections, Lyapunov
-exponents, symplectic integration comparisons, and parameter-dependent
-transition diagrams.
-
-### Lyapunov and Control-Barrier Certificate Sandbox
-
-Use the engine to test candidate Lyapunov functions and control barrier
-functions. Outputs should include certificate residuals, safe-set visualization,
-invariant-region approximations, counterexample trajectories, and controller
-comparisons.
-
-### Formal Verification and Proof-Obligation Generation
-
-Eventually, the engine should export statements consumable by Lean, SMT solvers,
-or other verification tools. Examples include energy conservation, set
-invariance, Lyapunov decrease, barrier safety, input bounds, and numerical
-counterexamples when evidence suggests failure.
-
-### AI-Assisted Mathematical Reasoning Dataset
-
-The engine can generate structured families of dynamical systems with known
-properties: conserved quantities, equilibria, stability regimes, invariant
-regions, candidate certificates, and symbolic proof obligations.
-
-### Learned Dynamics and Energy Landscapes
-
-The same infrastructure can later study learned vector fields, neural ODEs,
-score flows, energy-based models, and diffusion-inspired dynamics using
-diagnostics for energy decay, landscape roughness, stability, invariant
-violation, and Lyapunov behavior.
-
-## Data and Export Strategy
-
-Keep JSON for now, but do not assume JSON will remain sufficient for all future
-outputs.
-
-Short term:
-
-- use JSON for metadata, manifests, system definitions, diagnostics, and small
-  trajectory outputs;
-- keep schemas explicit and documented;
-- prioritize stable conceptual organization over premature optimization.
-
-Medium term:
-
-- preserve JSON as the manifest layer;
-- move large numerical arrays to compact formats when necessary;
-- consider `.npz`, Arrow, Zarr, HDF5-like formats, or another
-  columnar/chunked representation for large sweeps and long trajectories.
-
-The conceptual schema should separate system metadata, parameters, coordinates,
-equations, trajectories, invariants, diagnostics, events, sections, render
-hints, camera hints, and frontend lens metadata.
-
-## Frontend Direction
-
-The frontend should remain a mathematical viewer, not just a rendering layer. It
-should help users answer:
-
-- What is the system?
-- What are the coordinates?
-- What quantities are conserved?
-- What diagnostics were computed?
-- What parameter regime is being viewed?
-- What qualitative behavior is visible?
-- What numerical errors or residuals are present?
-
-Important frontend concepts include trajectory lenses, phase-space lenses,
-invariant panels, diagnostic panels, section viewers, parameter-family
-selectors, residual plots, camera metadata, and system-structure panels.
-
-## Backend Direction
-
-The backend should remain the source of mathematical truth. Priorities include
-symbolic system definitions, equation derivation, numerical integration, event
-detection, section extraction, diagnostic computation, invariant checking,
-parameter sweep generation, manifest generation, reproducible exports, and
-regression tests.
-
-The backend should not become an ad hoc simulation script collection. It should
-remain modular, typed where reasonable, tested, and organized around reusable
-abstractions.
-
-## Design Principles
+Design principles:
 
 - Prefer structure over spectacle.
 - Prefer reproducibility over arbitrary interactivity.
-- Prefer diagnostics over more examples.
+- Prefer diagnostics and certificates over more demos.
 - Prefer mathematical generality over one-off hacks.
-- Prefer proof-oriented artifacts.
-- Keep advanced geometry honest.
+- Keep advanced geometry honest: do not visualize what the engine cannot yet
+  represent faithfully.
+- Never present a numerical simulation as a proof.
 
-## What Not To Prioritize
+## 4. Core Pipeline
 
-- More visual demos without new mathematical structure.
-- Browser-side parameter tweaking before reproducible sweep support exists.
-- Advanced examples whose geometry cannot yet be represented honestly.
-- One-off scripts that bypass the manifest/export architecture.
-- Frontend polish that does not improve mathematical inspection.
+The conceptual spine of the engine:
+
+```text
+analytical mechanics
+-> structured controlled dynamical system
+-> simulation and visualization
+-> certificate candidates
+-> proof obligations
+-> optional backend adapters for verification / certification
+```
+
+Each stage is a deliberate artifact, not a side effect. The first three stages
+exist today in a partial, *autonomous* (uncontrolled) form. The later stages —
+controlled dynamics, certificate candidates, proof obligations, and backend
+adapters — are the roadmap, not current capability.
+
+## 5. Target Domain: Mechanics-Based CPS and Robotics
+
+The engine targets **mechanics-based dynamical systems, robotics, and physical
+CPS** — especially systems where safety depends on motion, forces, constraints,
+energy, reachability, stability, collision avoidance, actuator bounds, or
+controller admissibility.
+
+It deliberately **deprioritizes** non-physical verification: pure software
+protocols, generic distributed systems, network logic, database consistency, and
+other tasks whose state is not a physical configuration governed by mechanics.
+These may be expressible in some backend the engine targets, but they are out of
+scope for the engine's own modeling and certificate-generation layer.
+
+## 6. Verification and Certification Philosophy
+
+The engine generates *candidates* and *obligations*; it does not, by itself,
+certify or prove. A central rule:
+
+> The engine must never present a numerical simulation as a proof. Simulations
+> explain and explore; certificates and proofs justify, and only under stated
+> assumptions.
+
+Concretely:
+
+- A trajectory that "stays safe" in simulation is **evidence**, not a guarantee.
+- A computed residual within tolerance is a **measurement**, not a theorem.
+- A barrier/Lyapunov *candidate* is a proposal until a checker or prover accepts
+  it under explicit assumptions.
+
+The engine's job is to make the distinction between these states legible, and to
+package the artifact a verifier would need.
+
+## 7. Rigor Ladder
+
+Every claim the engine emits should be tagged with one of four rigor levels, and
+these must never be conflated:
+
+1. **Measured / simulation-supported.** Behavior observed in one or more
+   numerical runs (e.g. invariant residual within tolerance, trajectory avoided
+   the unsafe set on this run). Exploratory evidence only.
+2. **Certified numerical bounds.** Rigorous enclosures from validated numerics
+   (e.g. interval / Taylor-model reachability), valid under stated assumptions.
+3. **Reachability / SOS / barrier / Lyapunov-certified.** A certificate accepted
+   by a sound method (e.g. an SOS-verified barrier or Lyapunov function, a
+   reachability over-approximation), under stated assumptions.
+4. **Deductively proved.** A theorem established in a theorem prover or proof
+   calculus for hybrid/continuous dynamics.
+
+The engine today operates at **level 1** for behavior and diagnostics. Levels
+2–4 are reached only by routing exported artifacts to appropriate backends; the
+engine's own contribution at those levels is to *generate the problem*, not to
+discharge it.
+
+## 8. Core Abstractions
+
+The conceptual schema the engine is organized around:
+
+- configuration / state / phase space;
+- Lagrangian and Hamiltonian systems;
+- constraints and potentials;
+- vector fields and flows;
+- controlled dynamics `x' = f(x, u, d; θ)` (continuous) or
+  `x_{k+1} = F(x_k, u_k, d_k; θ)` (discrete);
+- admissible controls and disturbances;
+- safe / unsafe sets;
+- obstacles and geometric constraints;
+- invariants;
+- conserved quantities;
+- Lyapunov and barrier *candidates*;
+- proof obligations;
+- a verification-problem intermediate representation (IR);
+- visualization metadata.
+
+**Status note (honesty):** today the engine implements configuration/state/phase
+space, Lagrangian/Hamiltonian systems, constraints, potentials, vector fields and
+flows, conserved quantities, and invariant *diagnostics*. It does **not** yet
+implement controls `u`, disturbances `d`, safe/unsafe sets, obstacles, certificate
+candidates, proof obligations, or the verification-problem IR. The dynamics layer
+is currently autonomous (`dx/dt = f(t, x; θ)`).
+
+A specific distinction to preserve: the existing **finite-time Lyapunov exponent**
+diagnostic (`engine/dynamics/diagnostics.py`) measures sensitive dependence /
+chaos. It is **not** a Lyapunov *function* (a stability certificate). These are
+different objects and the codebase and docs should keep them named distinctly.
+
+## 9. Architecture: Python Backend, TypeScript Frontend, Schema Boundary
+
+The Python ↔ TypeScript boundary is load-bearing and stays intact.
+
+**Python is the mathematical backend.** It owns mechanics, symbolic computation,
+equation derivation, numerical integration, diagnostics, and — going forward —
+controlled dynamics, certificate candidates, and IR export.
+
+- `engine/mechanics/` — Lagrangian/Hamiltonian mechanics, Euler–Lagrange,
+  Legendre transforms, Noether charges, Poisson brackets, symplectic utilities,
+  constraints, coordinate transforms.
+- `engine/dynamics/` — first-order systems (symbolic Jacobian, divergence, fixed
+  points, linearization), cotangent Hamiltonian flow, ray bundles, and
+  diagnostics (Poincaré sections, finite-time Lyapunov exponents,
+  invariant residuals).
+- `engine/numerics/` — fixed-step RK4 and adaptive integration.
+- `engine/export/` — `Trajectory`, the manifest contract, and JSON export.
+- `systems/` — pure symbolic system definitions (one file per system).
+- `scripts/` — generators and the `example_specs.py` registry; deterministic,
+  regenerable outputs.
+
+**TypeScript is the visualization frontend.** It consumes generated data and
+renders: interactive animations, phase portraits, plots, structure/invariant
+panels, diagnostics panels, and — going forward — safe/unsafe-set display,
+rollout playback, and certificate/proof-status panels. It must not re-derive
+physics or become responsible for deep mechanics.
+
+**The boundary is a structured schema/manifest.** All new capability crosses the
+boundary as explicit, documented schema, not as logic duplicated in the viewer.
+
+## 10. Verification-Problem IR
+
+The near-term architectural priority is a **backend-agnostic verification-problem
+intermediate representation (IR)**. It is the stable foundation of the verification
+direction; no specific external tool is. The IR should encode:
+
+- variables and parameters;
+- dynamics (continuous or discrete, controlled);
+- controls;
+- disturbances / uncertainty;
+- domain assumptions;
+- safe / unsafe sets;
+- candidate certificates (barrier, Lyapunov, invariant);
+- proof obligations;
+- visualization hooks;
+- export targets / adapters.
+
+The IR is the analogue, for the verification layer, of what the manifest/export
+contract is for the visualization layer. Backend adapters (to whatever external
+verification or certification tools are appropriate) target the IR; the IR does
+not depend on them. This keeps the project tool-agnostic: external tools may
+appear as *future adapters* or as *examples of backend categories*
+(reachability, SOS/certificate synthesis, deductive provers), never as the
+foundation.
+
+## 11. Near-Term Roadmap
+
+In priority order:
+
+1. **Controlled dynamics.** Extend the dynamics layer to `x' = f(x, u, d; θ)`
+   (and a discrete analogue), with admissible-control and disturbance sets. This
+   is the prerequisite for any honest notion of "safety."
+2. **Safety / certificate metadata.** Add safe/unsafe sets, obstacles, and
+   *candidate* barrier / Lyapunov / invariant representations as structured data
+   — candidates only, clearly labeled, not certified.
+3. **Verification-problem IR (v0).** Define and serialize the IR above, even if
+   the only adapter is a stub that writes the problem out for inspection.
+4. **First serious case study (see §13).** Push one small controlled system end
+   to end through the pipeline.
+5. **Frontend safety surfaces.** Safe/unsafe-set rendering, certificate-value
+   display, and a proof-status panel that respects the rigor ladder (showing
+   "candidate" / "measured" honestly).
+
+External verification integrations come *after* controlled dynamics and IR
+exist — not before. Building serious adapters against an unstable model would be
+premature.
+
+## 12. Long-Term Roadmap
+
+- A library of controlled mechanical systems with safe sets and candidate
+  certificates.
+- Multiple backend adapter *categories* (reachability, certificate synthesis,
+  deductive proof) targeting the IR, chosen pragmatically and kept optional.
+- Certified-numeric and certificate-level results (rigor levels 2–3) for selected
+  systems, with the assumptions made explicit.
+- A growing set of proof-obligation artifacts that an external prover could
+  discharge, with selected deductive proofs (rigor level 4) as aspirational
+  capstones rather than routine output.
+- Theory-grounded reinforcement-learning environments as a downstream extension
+  (see §13), not a core deliverable.
+- Possible support for **user-created systems** through a *restricted, structured
+  model schema* — templates and controlled schemas first, never arbitrary
+  executable frontend code, and only later (if ever) more free-form systems.
+- Data/transport: keep JSON as the manifest/IR layer; move large numerical arrays
+  (long trajectories, big sweeps, reachable sets) to a compact columnar/chunked
+  format (`.npz`, Arrow, Zarr, or similar) only when JSON becomes a real
+  bottleneck.
+
+## 13. Case Studies
+
+**Classical mechanics (existing foundation).** Pendulum, geodesic on a sphere,
+charged particle in a magnetic field, uniform gravity, ideal spring, Kepler
+problem, bead on a rotating hoop, Lorenz attractor, Hénon–Heiles, and a
+variable-speed wavefront. These exercise symbolic mechanics, conserved
+quantities, Poincaré sections, finite-time Lyapunov *exponents*, invariant
+residuals, a first parameter-sweep manifest slice (Lorenz ρ-family), and
+ray-bundle / cotangent-Hamiltonian export. They remain valuable as the structural
+and diagnostic backbone.
+
+**Controlled systems (first serious target).** Choose **one** small controlled
+mechanical system — controlled pendulum, cart-pole, or a drone point-mass model —
+and push it deeply:
+
+- derive or specify the controlled dynamics;
+- define a safe set and admissible controls;
+- generate or represent a barrier / Lyapunov / invariant *candidate*;
+- visualize the trajectory, the safe/unsafe region, certificate values, and
+  proof-relevant geometry;
+- export a verification-problem artifact, even if the first backend adapter is
+  only a stub.
+
+Depth on one system is worth more than breadth across many.
+
+**Drone (motivating flagship application).** A drone is a natural flagship
+*application* of the engine, but the engine must not become drone-specific. The
+drone is described as a motivating case study: geofence, obstacles, buffer
+region, controller action, velocity bounds, admissible controls, and safety
+invariants — all expressed through the same general abstractions as any other
+controlled mechanical system. (No drone model exists in this repository yet; it
+is a target, not a current capability.)
+
+**Reinforcement-learning extension (downstream).** The same mechanics model can
+later be exposed through a Gymnasium-style API with reset / step / reward /
+termination / constraint signals. The distinctive angle is **theory-grounded RL
+environments with explicit safety structure** (safe sets, admissible controls,
+invariants) — not a generic RL platform. This is an extension, not the core.
+
+## 14. Non-Goals and Credibility Boundaries
+
+**Non-goals:**
+
+- Generic physics, robotics, or CPS tooling for arbitrary systems.
+- Non-physical verification (software protocols, distributed-systems logic,
+  network/database consistency).
+- Reimplementing or competing with mature verification tools.
+- Browser-side physics or arbitrary user-supplied executable systems.
+- More visual demos that add no new mathematical structure.
+
+**Credibility boundaries (what the engine must not claim):**
+
+- It does **not** currently verify, certify, or prove any system. It currently
+  *simulates*, *diagnoses*, and *visualizes*, and the verification layer is
+  roadmap.
+- A finite-time Lyapunov *exponent* is a chaos diagnostic, not a Lyapunov
+  *function*; the engine has the former, not the latter.
+- A "certificate" produced by the engine is a **candidate** until an external
+  sound method accepts it, and then only **under stated assumptions**.
+- Every emitted claim should carry its rigor level (§7), and "measured" must
+  never be reported as "proved."
 
 ## Definition of Success
 
-The project succeeds if users can define a dynamical system, derive or inspect
-its equations, simulate it reproducibly, visualize trajectories and phase-space
-objects, inspect invariants and residuals, compute qualitative diagnostics,
-explore parameter families, export data for analysis, and eventually export
-statements for verification or proof.
+The project succeeds if a user can define a mechanics-based controlled dynamical
+system, inspect its structure, simulate and visualize it reproducibly, see its
+safe/unsafe geometry and invariants, obtain candidate certificates and explicit
+proof obligations, and export a backend-agnostic verification problem that an
+external tool can attempt to discharge — with every claim honestly labeled by its
+level of rigor.
 
-The project should be judged by whether it helps users understand and certify
-dynamical structure, not by how many visual demos it contains.
-
-## Final Vision Statement
-
-This project is a structure-aware analytical mechanics engine. It uses symbolic
-mechanics, simulation, visualization, and diagnostics to expose the qualitative
-behavior of dynamical systems. Its long-term purpose is to connect mechanics
-with formal verification and AI-assisted mathematical reasoning, turning
-simulations into mathematical artifacts and eventually into proof-oriented
-workflows.
+The project should be judged by whether it helps users understand, structure, and
+eventually certify the safety of mechanics-based dynamical systems — not by how
+many visual demos it contains.

@@ -11,12 +11,12 @@ interactive visuals.
 gallery, playback controls, structure panels, invariant lanes, 2D canvas lenses,
 potential/effective-potential lenses, and Three.js views.
 
-[x] Verification after the wavefront lens addition: `pytest -q` passes with 178
-tests, `cd viewer && npm run build` passes, and `cd viewer && npm run
-test:visual` passes with desktop/mobile coverage. The visual suite now includes
-the all-examples pass and the fit-to-system camera-reset regression on desktop
-and mobile. The viewer build emits a non-fatal Vite chunk-size warning for the
-main JavaScript bundle.
+[x] Reference verification after the wavefront lens addition: `pytest -q` passes
+with 178 tests, `cd viewer && npm run build` passes, and `cd viewer && npm run
+test:visual` passes with desktop/mobile coverage. Use this as the full baseline
+for broad/release-style checks; small frontend iterations should prefer
+`npm run build` or a focused visual check only when relevant. The viewer build
+emits a non-fatal Vite chunk-size warning for the main JavaScript bundle.
 
 ## Scope
 
@@ -34,8 +34,9 @@ main JavaScript bundle.
 better scale framing, orbit/field affordances, and less generic background
 treatment.
 
-[x] Run the Playwright visual test suite against the local Vite server and
-inspect generated screenshots for desktop/mobile regressions across all lenses.
+[x] Run the Playwright visual test suite against the local Vite server for broad
+visual changes and inspect generated screenshots for desktop/mobile regressions
+across all lenses. For small UI wiring changes, prefer a focused check.
 
 [x] Add the first renderer-hints slice where Python already knows the geometry.
 These hints are presentation metadata that lets the viewer frame each system
@@ -96,7 +97,8 @@ after the camera reset on desktop and mobile.
 4. Keep visual polish focused on diagnostic readability before adding new
    frontend surfaces.
 
-Latest baseline: `pytest -q` (178 tests), `cd viewer && npm run build`, and the
-Playwright visual suite (4 tests: all-examples desktop/mobile and
-fit-to-system desktop/mobile) all pass after adding the fit-to-system
-camera-reset regression.
+Latest reference baseline: `pytest -q` (178 tests), `cd viewer && npm run
+build`, and the Playwright visual suite (4 tests: all-examples desktop/mobile
+and fit-to-system desktop/mobile) all pass after adding the fit-to-system
+camera-reset regression. Do not treat the full visual suite as mandatory for
+every small frontend edit.

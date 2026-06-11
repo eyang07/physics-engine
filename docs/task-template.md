@@ -1,14 +1,14 @@
 # Task Spec Template (Claude → Codex)
 
 Copy this block per task. Claude fills it out on `claude/planning`; Codex
-executes it on the named `codex/<task>` branch. See `docs/agent-workflow.md` for
-the surrounding process. A spec missing invariants or out-of-scope bounds is not
-ready to hand off.
+executes it on the current branch for small direct work, or on a named
+`codex/<task>` branch when isolation/review is useful. See
+`docs/agent-workflow.md` for the surrounding process.
 
 ```markdown
 ## Task: <short imperative title>
 
-**Branch:** codex/<task-name>
+**Branch:** current branch | codex/<task-name if isolation/review is useful>
 **Advances:** <docs/VISION.md | docs/BACKEND.md | docs/FRONTEND.md | docs/dynamics.md> — <which item>
 **Status:** draft | ready-for-codex | in-progress | in-review | done
 
@@ -30,14 +30,16 @@ ready to hand off.
 2. <...>
 
 ### Test obligations
-- tests/test_<name>.py — <symbolic checks: RHS / Jacobian / divergence / energy / Noether>
-- tests/test_<name>.py — <trajectory checks: state schema / JSON export shape / invariant flatness / domain behavior>
+- <Only tests worth adding/updating for meaningful behavior, math invariants, export contracts, or regressions.>
+- <Use "none" for low-risk wiring, docs, copy, or obvious one-line fixes.>
 
-### Verification commands (must pass)
-- [ ] pytest -q
-- [ ] python -m scripts.generate_all_examples   # if backend output changed (output is gitignored)
-- [ ] cd viewer && npm run build                # if viewer changed
-- [ ] cd viewer && npm run test:visual          # if visuals changed
+### Verification commands (choose the smallest useful set)
+- [ ] targeted pytest path/test name             # if backend behavior changed
+- [ ] pytest -q                                  # broad backend/shared changes only
+- [ ] specific generator                         # if one system's output changed
+- [ ] python -m scripts.generate_all_examples    # shared output/export changes only
+- [ ] cd viewer && npm run build                 # TypeScript/bundling changes
+- [ ] cd viewer && npm run test:visual           # visual rendering/layout changes
 
 ### Out of scope
 - <e.g. do not change the manifest/export schema>

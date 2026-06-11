@@ -29,8 +29,9 @@ first-order-flow example without breaking current mechanics examples.
 live point, sparse vector-flow cues, fixed-point markers, and restrained
 dark-stage styling matching the current visual system.
 
-[x] Add tests for Lorenz RHS, divergence, fixed points, Jacobian eigenvalues,
-adaptive integration output shape, exported metadata, and manifest registration.
+[x] Add focused tests for Lorenz RHS, divergence, fixed points, Jacobian
+eigenvalues, adaptive integration output shape, exported metadata, and manifest
+registration.
 
 ## Backend Shape
 

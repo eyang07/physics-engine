@@ -2,9 +2,10 @@
 
 This document is the **shared source of truth** for how the two AI agents work on
 `physics-engine` without conflicting edits, duplicated responsibilities, or
-unreviewed scope changes. It is referenced by `CLAUDE.md` and `AGENTS.md`; if
-those files and this one ever disagree on process, this file wins for *process*
-and the role files win for *responsibilities*.
+unreviewed scope changes. It should also keep small human-directed changes fast.
+It is referenced by `CLAUDE.md` and `AGENTS.md`; if those files and this one ever
+disagree on process, this file wins for *process* and the role files win for
+*responsibilities*.
 
 > **Claude defines and protects the conceptual structure. Codex executes
 > concrete repository changes against that structure.** Claude thinks broadly;
@@ -17,7 +18,7 @@ and the role files win for *responsibilities*.
 | | Claude Code | Codex |
 |---|---|---|
 | **Owns** | Architecture, research/design reasoning, specs, invariants, proof/review criteria, conceptual review | Implementation, tests/builds, small diffs, CI fixes, commits/PR-ready changes |
-| **Produces** | Task specs, invariants, explanations, review verdicts, doc/plan updates | Diffs, passing tests, cleaned TODOs, regenerated data, PR-ready branches |
+| **Produces** | Task specs, invariants, explanations, review verdicts, doc/plan updates | Diffs, focused verification, cleaned TODOs, regenerated data when needed, PR-ready branches when requested |
 | **Must not** | Write large speculative implementations; merge unreviewed scope changes | Redesign abstractions, change the manifest schema, or expand scope on its own |
 
 Detailed responsibilities live in `CLAUDE.md` and `AGENTS.md`. Neither agent may
@@ -30,25 +31,26 @@ project goals.
 
 | Worktree path | Branch | Used by | Purpose |
 |---|---|---|---|
-| `physics-engine/` (main repo) | base branch (`main`) | **neither agent edits here** | Source of truth; merge target only |
+| `physics-engine/` (main repo) | base branch (`main`) | Human-directed small edits; merge target | Source of truth |
 | `../project-claude` | `claude/planning` | Claude Code | Planning, specs, invariants, reviews, doc/plan edits |
-| `../project-codex` | `codex/task-1` (and successors) | Codex | One scoped implementation task at a time |
+| `../project-codex` | `codex/task-1` (and successors) | Codex | Optional isolated task work |
 
 Rules:
 
-- **Never edit the base branch directly.** It only receives reviewed merges.
-- **One branch and one worktree per task.** Two agents must never edit the same
-  branch/worktree at the same time.
+- Direct human requests may be implemented on the current branch, including
+  `main`, when the change is small and no separate review branch was requested.
+- Use one branch/worktree per task for Claude handoffs, concurrent-agent work,
+  larger/riskier changes, or explicit PR-style review.
 - Claude's *planning and review* work happens on `claude/planning`.
-- Codex's *implementation* work happens on task branches named by intent:
-  `codex/task-1`, `codex/fix-build`, `codex/docs-cleanup`, etc.
-- Each new Codex task gets its own branch/worktree; do not pile unrelated tasks
-  onto an existing task branch.
+- Codex task branches, when used, are named by intent: `codex/task-1`,
+  `codex/fix-build`, `codex/docs-cleanup`, etc.
+- Two agents must never edit the same branch/worktree at the same time.
+- Do not pile unrelated work onto an existing task branch.
 
 ### Creating a new Codex task worktree
 
 ```sh
-# from the main repo, branch fresh off the up-to-date base branch
+# Only when isolation/review is useful. From the main repo, branch fresh off base.
 git -C /path/to/physics-engine fetch origin
 git -C /path/to/physics-engine worktree add -b codex/<task-name> ../project-codex-<task-name> origin/main
 ```
@@ -69,13 +71,14 @@ Use `git worktree list` to confirm the current layout at any time.
 ```text
 1. Claude (on claude/planning): writes a Task Spec (see template) and commits it.
 2. Handoff: the Task Spec is given to Codex.
-3. Codex (on a codex/<task> worktree): implements exactly that spec, runs
-   verification, prepares a PR-ready branch, and reports commands + results.
+3. Codex implements exactly that spec on the named branch if isolation is
+   required, otherwise on the current branch; it runs proportionate verification
+   and reports commands + results.
 4. Claude (reviewing the diff): checks against the spec's invariants and the
    review checklist; returns APPROVE or CHANGES REQUESTED with specifics.
-5. Merge: only after Claude approves and verification is green (see merge
-   discipline). Base branch is the merge target.
-6. Cleanup: remove the task worktree/branch; start the next task fresh.
+5. Merge/cleanup: only if a separate branch was used. Use proportionate
+   verification for the parts touched; reserve full verification for broad or
+   release-style changes.
 ```
 
 If a task turns out to need a design decision mid-flight, Codex stops and hands
@@ -89,36 +92,39 @@ Claude hands off a **self-contained Task Spec** (see `docs/task-template.md`).
 A valid handoff includes all of:
 
 1. **Goal** — 1–2 sentences and which plan doc it advances (`VISION`/`BACKEND`/`FRONTEND`/`dynamics`).
-2. **Branch** — the `codex/<task>` branch to use.
+2. **Branch** — optional; name a `codex/<task>` branch only when isolation or
+   review is useful.
 3. **Files to touch** — concrete paths.
 4. **Invariants / specification** — what must remain true, with the exact
    symbolic and numerical checks and tolerances that define correctness.
 5. **Step sequence** — small, independently verifiable steps in order.
-6. **Test obligations** — exactly which tests to add or update.
-7. **Verification commands** — which commands must pass (from the list below).
+6. **Test obligations** — only tests worth adding or updating for the risk.
+7. **Verification commands** — the smallest useful commands from the list below.
 8. **Out of scope** — what Codex must not touch (e.g. "no manifest schema
    change", "no viewer physics", "no new gallery examples").
 
-A handoff missing invariants or out-of-scope bounds is not ready; Codex should
-ask for them rather than guessing.
+A handoff missing invariants or out-of-scope bounds may still be implemented if
+the intent is clear and low risk. Ask only when the missing detail blocks a safe
+small implementation.
 
 ---
 
 ## Codex Execution Checklist
 
-- [ ] Confirmed the task is in-scope for the named branch and plan doc.
-- [ ] Working in the correct `codex/<task>` worktree, branched off an up-to-date
-      base; **not** on `main` or `claude/planning`.
+- [ ] Confirmed the task is in scope for the request or plan doc.
+- [ ] Used the current branch for small direct work, or the named
+      `codex/<task>` worktree when isolation/review was useful.
 - [ ] Read target files and the nearest existing example before editing.
 - [ ] Made the smallest change that satisfies the spec; matched existing style.
 - [ ] Stayed within the spec's "Files to touch" and "Out of scope".
-- [ ] Added/updated the tests named in "Test obligations".
-- [ ] Ran `pytest -q` (and recorded the result).
-- [ ] If backend output changed: ran `python -m scripts.generate_all_examples`
-      to confirm deterministic regeneration. (Generated data is **gitignored** —
-      see "Generated data" below; do not try to commit it.)
-- [ ] If the viewer changed: ran `cd viewer && npm run build`, and
-      `npm run test:visual` when visuals changed.
+- [ ] Added/updated tests only where they protect meaningful behavior,
+      mathematical invariants, exported contracts, or regressions.
+- [ ] Ran targeted verification for the touched surface and recorded the result.
+- [ ] If backend output changed: ran the specific generator when possible; ran
+      `python -m scripts.generate_all_examples` for shared generator/export
+      changes or release-style checks. Generated data is **gitignored**.
+- [ ] If the viewer changed: ran `cd viewer && npm run build` for TypeScript or
+      bundling changes, and `npm run test:visual` only when visuals changed.
 - [ ] Did not disable/skip tests or edit expected values to force green.
 - [ ] Reported exactly what changed and every command run, with real pass/fail.
 
@@ -130,7 +136,8 @@ When reviewing a Codex diff (read-only; Claude does not rewrite the
 implementation):
 
 - [ ] Diff matches the spec's Goal and stays within "Files to touch" / scope.
-- [ ] Every invariant in the spec is actually enforced by a test or argument.
+- [ ] Every important invariant in the spec is protected by an appropriate test,
+      argument, or targeted verification result.
 - [ ] Mathematical correctness: EOM / Jacobian / divergence / conserved
       quantities / symplectic structure are right (symbolic identities simplify
       to zero; numerical residuals within stated tolerance).
@@ -148,38 +155,43 @@ implementation):
 
 ## Merge Discipline
 
-- Merges target the **base branch** only; agents never commit there directly.
-- A branch may merge only when: Claude has **APPROVED** the diff **and** full
+- Direct human-requested small edits may land on the current branch. Separate
+  task branches merge back to the base branch when review/isolation was used.
+- A branch may merge when the requested review is satisfied and proportionate
   verification is green for the parts touched (see Definition of Done).
-- Rebase/update the task branch onto the latest base before merging; resolve
-  conflicts on the task branch, never by editing `main` ad hoc.
-- One task = one branch = one logically coherent merge. Do not bundle unrelated
-  changes.
+- Rebase/update the task branch onto the latest base before merging when that
+  reduces conflicts; resolve conflicts in the task branch when one exists.
+- When using a task branch, keep it to one logically coherent change. Do not
+  bundle unrelated changes.
 - Commit/push only when asked. Prefer small, verifiable commits with messages
   that state what changed and why.
-- After merge, delete the task branch and remove its worktree.
+- After merge, delete the task branch and remove its worktree when it is no
+  longer useful.
 
 ---
 
 ## Definition of Done
 
-A task is done only when **all** hold:
+A task is done when the implementation is complete and verification is
+proportionate to the risk:
 
 1. The change satisfies the spec / invariants it was given.
-2. New behavior has tests: symbolic checks for derivations (RHS, Jacobian,
-   divergence, energy, Noether charges) and/or trajectory checks (state schema,
-   JSON export shape, invariant flatness, domain behavior).
-3. `pytest -q` passes — and it was actually run.
-4. If backend output changed: `python -m scripts.generate_all_examples` runs
-   cleanly and reproduces deterministic output. (The output is gitignored, so
-   "done" means *regenerates cleanly*, not *committed*.)
-5. If the viewer was touched: `cd viewer && npm run build` is clean, and
-   `cd viewer && npm run test:visual` passes when visuals changed.
+2. Tests are added or updated for meaningful new behavior, mathematical
+   invariants, exported contracts, or regressions likely to recur. Do not add
+   tests just to satisfy ceremony.
+3. Targeted tests/builds for the touched area pass when such checks exist.
+   `pytest -q` is for broad backend/shared changes, not every small edit.
+4. If backend output changed: run the specific generator when possible; run
+   `python -m scripts.generate_all_examples` for shared export/generator changes
+   or release-style verification.
+5. If the viewer was touched: run `cd viewer && npm run build` for TypeScript or
+   bundling changes, and `npm run test:visual` only for visual rendering/layout
+   changes.
 6. Docs/itineraries updated if a plan item was completed (only `[ ]` → `[x]` for
-   verified work).
-7. Claude has reviewed and approved the diff.
+   verified or explicitly waived work).
+7. Claude has reviewed and approved the diff when Claude review was requested.
 8. The report lists exactly what changed and every command run with real
-   pass/fail.
+   pass/fail. If heavy checks were skipped for speed, say so.
 
 ---
 
@@ -217,8 +229,8 @@ A task is done only when **all** hold:
 `.gitignore`). They are regenerated locally from code + recorded parameters via
 `python -m scripts.generate_all_examples`. Therefore:
 
-- Regenerating is a **verification step** (does output reproduce deterministically?),
-  not a commit step.
+- Regenerating is a **verification step** when backend output changed, not a
+  commit step.
 - Reproducibility lives in the *generators and specs*, which are tracked. If a
   change alters generated output, the fix belongs in the tracked code, not in a
   committed data blob.
@@ -231,7 +243,7 @@ A task is done only when **all** hold:
 # Python tests — config in pyproject.toml (testpaths=tests, pythonpath=.)
 pytest -q
 
-# Regenerate all trajectories + manifest (deterministic; output is gitignored)
+# Regenerate all trajectories + manifest when shared output changed
 python -m scripts.generate_all_examples
 
 # Viewer: install (first time), then build = type-check + bundle

@@ -46,10 +46,11 @@ agent.** Codex takes well-scoped tasks — usually a plan from Claude or a doc
 itinerary item — and turns them into concrete, verified changes. Codex:
 
 - Makes concrete code edits and completes TODOs / itinerary items.
-- Runs tests, builds, and (when relevant) visual tests; fixes failures.
-- Adds and updates tests alongside code.
+- Runs the smallest useful tests/builds for the change; fixes relevant failures.
+- Adds or updates tests when the behavior, math, or contract risk warrants it.
 - Regenerates data and manifests when backend changes require it.
-- Maintains branches/worktrees and prepares PR-quality changes.
+- Uses branches/worktrees when they help review or avoid concurrent-agent
+  conflicts; otherwise keeps small direct edits moving.
 - Reports exactly what changed and which commands were run.
 
 Codex should **avoid speculative redesign.** If a task seems to require changing
@@ -58,23 +59,22 @@ Claude / the human rather than improvising (see "How to Handle Unclear Specs").
 
 ---
 
-## Two-Agent Worktree Workflow
+## Branch / Worktree Guidance
 
-This repo runs a disciplined two-agent setup. **`docs/agent-workflow.md` is the
-shared source of truth for process**; this section is the Codex-side summary.
+This repo supports a two-agent setup, but speed matters for small incremental
+features. **`docs/agent-workflow.md` is the shared source of truth for process**;
+this section is the Codex-side summary.
 
-- **Codex works on task branches** named by intent — `codex/task-1`,
-  `codex/fix-build`, `codex/docs-cleanup`, … — each in its own worktree
-  (default `../project-codex`). **One scoped task per branch/worktree.**
-- **Codex never edits the base branch (`main`) directly** and **never edits
-  Claude's `claude/planning` worktree (`../project-claude`).** Two agents must
-  not edit the same branch/worktree at the same time.
-- Codex receives a **Task Spec** from Claude (format in `docs/task-template.md`),
-  implements exactly that spec, runs verification, and reports commands +
-  results for Claude to review. Merge to base happens only after Claude approves
-  and verification is green.
-- Start each new task from an up-to-date base in a fresh worktree:
-  `git worktree add -b codex/<task> ../project-codex-<task> origin/main`.
+- For direct human requests, Codex may work on the current branch, including
+  `main`, unless the human asks for a branch/PR or the change is risky enough to
+  isolate.
+- Use task branches/worktrees for Claude handoffs, concurrent agent work,
+  larger refactors, reviewable PR-sized changes, or anything the human wants kept
+  separate. Branches are a tool, not a default tax.
+- Do not edit Claude's `claude/planning` worktree (`../project-claude`) unless
+  explicitly asked. Two agents must not edit the same worktree at the same time.
+- If a Claude Task Spec names a `codex/<task>` branch, use it. Otherwise, prefer
+  the fastest safe path that keeps the working tree understandable.
 
 ---
 
@@ -89,14 +89,17 @@ shared source of truth for process**; this section is the Codex-side summary.
    definition) → register in `scripts/example_specs.py` → `scripts/generate_<name>.py`
    entry point → tests in `tests/test_<name>.py`.
 3. **Make the smallest change that satisfies the spec.** Match surrounding style.
-4. **Add/update tests** for the change (see "Definition of Done").
-5. **Regenerate data if backend output changed:**
-   `python -m scripts.generate_all_examples`. This is a *verification* step:
-   confirm the output reproduces deterministically. The generated outputs
-   (`data/generated/`, `viewer/public/data/*.json`) are **gitignored** — do not
-   try to commit them; reproducibility lives in the tracked generators and specs.
-6. **Verify** (see commands). Run the relevant subset for small changes; run the
-   full baseline before declaring done.
+4. **Add/update tests only when useful.** New math, export contracts, manifest
+   shape, diagnostics, or bug fixes usually deserve focused tests. Small UI copy,
+   doc edits, wiring, or obvious one-line fixes usually do not.
+5. **Regenerate data if backend output changed and the change needs it:**
+   prefer the specific generator for the touched system; use
+   `python -m scripts.generate_all_examples` for shared generator/export changes
+   or before a release-style merge. Generated outputs (`data/generated/`,
+   `viewer/public/data/*.json`) are **gitignored** — do not try to commit them.
+6. **Verify proportionally** (see commands). Run the smallest command that gives
+   signal for the touched surface. Save the full baseline for broad changes,
+   release/merge checks, or when the human asks.
 7. **Report** what changed (files + intent) and the exact commands run, with
    pass/fail. Never claim a command passed without running it.
 
@@ -130,8 +133,9 @@ Notes:
 - The viewer build (`tsc`) is the type-check gate; there is no separate ESLint
   config. A non-fatal Vite chunk-size warning on the main bundle is known and
   acceptable — do not treat it as a failure.
-- Full verification = `pytest -q` green **and** `cd viewer && npm run build`
-  clean **and** `cd viewer && npm run test:visual` passing.
+- Full verification, when warranted, is `pytest -q` green **and**
+  `cd viewer && npm run build` clean **and** `cd viewer && npm run test:visual`
+  passing. Do not run this by reflex for small localized changes.
 
 ---
 
@@ -175,9 +179,9 @@ General:
   `python -m scripts.generate_all_examples`, not from committed data blobs.
 - Use the `gh` CLI for GitHub operations. Interactive git flags (`-i`) are not
   available in this environment.
-- A PR-ready change: focused diff, tests added/updated and passing, data
-  regenerated if needed, docs/itinerary updated if a plan item was completed,
-  and a description listing exactly what changed and which commands were run.
+- A PR-ready change: focused diff, proportionate verification, data regenerated
+  if needed, docs/itinerary updated if a plan item was completed, and a
+  description listing exactly what changed and which commands were run.
 - End commit messages with the required co-authorship trailer and PR bodies with
   the generated-with trailer per the environment's git conventions.
 
@@ -220,18 +224,20 @@ General:
 
 Claude hands off self-contained specs (see `CLAUDE.md` → "How Claude Hands Off",
 and the copy-paste form in `docs/task-template.md`). A typical hand-off names:
-the goal and which plan doc it advances, the target `codex/<task>` branch, the
-files to touch, the invariants/specification with tolerances, an ordered step
-sequence, the test obligations, the verification commands, and explicit
-out-of-scope items.
+the goal and which plan doc it advances, an optional `codex/<task>` branch when
+isolation/review is useful, the files to touch, the invariants/specification
+with tolerances, an ordered step sequence, the test obligations, the verification
+commands, and explicit out-of-scope items.
 
 When you receive one:
 - Treat the **invariants/specification as the contract.** Your diff must satisfy
-  every listed check; your tests must encode them.
+  them. Encode them in tests when that is the cheapest reliable way to protect
+  behavior; otherwise report the lighter check used.
 - Respect the **out-of-scope** list literally (e.g. "no manifest schema change,"
   "no viewer physics," "no new gallery examples").
 - Execute the **steps in order**; keep each step independently verifiable.
-- Run the **listed verification commands** and report results.
+- Run the **listed verification commands** when the spec marks them required.
+  If the list is broader than the actual change, run a focused subset and say so.
 - If reality contradicts the plan (a named file/function/flag doesn't exist, an
   invariant can't hold), stop and report back rather than improvising a redesign.
 
@@ -243,15 +249,17 @@ this kind of execution.
 
 ## Execution Responsibilities
 
-- Implement well-scoped backend or frontend tasks end to end: code + tests + (for
-  backend output changes) regenerated data.
+- Implement well-scoped backend or frontend tasks end to end: code, focused
+  verification, and regenerated data only when backend output changes require it.
 - Keep `engine/` the home of reusable logic and `scripts/` thin; complete
   itinerary items like "generalize the ray-bundle export helper" by moving
   duplicated generator logic into reusable `engine/` utilities while preserving
   the existing export shape.
-- Add the symbolic and numerical regression tests the v0.2 direction calls for
-  (invariant drift, deterministic outputs, visual regression coverage).
-- Maintain branches/worktrees cleanly; keep the working tree honest about state.
+- Add symbolic and numerical regression tests where they protect nontrivial math,
+  exported contracts, or previously broken behavior. Avoid test churn for tiny
+  low-risk feature increments.
+- Maintain branches/worktrees cleanly when using them; keep the working tree
+  honest about state.
 - Run verification and report precisely.
 
 ---
@@ -275,21 +283,23 @@ this kind of execution.
 
 ## Definition of Done
 
-A task is done only when **all** of these hold:
+A task is done when the implementation is complete and the checks are
+proportionate to the risk:
 
-1. The change satisfies the spec / invariants it was given.
-2. New behavior has tests: symbolic checks for derivations (RHS, Jacobian,
-   divergence, energy, Noether charges) and/or trajectory checks (state schema,
-   JSON export shape, invariant flatness, domain behavior).
-3. `pytest -q` passes — and you ran it.
-4. If backend output changed: `python -m scripts.generate_all_examples` was run
-   and reproduces deterministic output. (The output is gitignored, so "done"
-   means *regenerates cleanly*, not *committed*.)
-5. If the viewer was touched: `cd viewer && npm run build` is clean, and
-   `cd viewer && npm run test:visual` passes when visuals changed.
+1. The change satisfies the human request or the spec/invariants it was given.
+2. Tests are added or updated only for meaningful new behavior, mathematical
+   invariants, exported contracts, or regressions that could recur.
+3. Run targeted tests/builds for the touched area when available. Use `pytest -q`
+   for broad backend/shared changes, not as a mandatory step for every small edit.
+4. If backend output changed, run the specific generator when possible; run
+   `python -m scripts.generate_all_examples` for shared export/generator changes
+   or release-style verification.
+5. If the viewer was touched, run `cd viewer && npm run build` for TypeScript or
+   bundling changes. Run `npm run test:visual` only for visual rendering/layout
+   changes or when screenshots are the fastest reliable check.
 6. Docs/itineraries are updated if a plan item was completed.
-7. Your report lists exactly what changed and every command you ran with its
-   real pass/fail outcome.
+7. Your report lists what changed and the commands you actually ran. If you skip
+   heavy verification for speed, say that explicitly.
 
 **Never fabricate results, claim tests passed without running them, or silently
 change project scope.** Honest "this still fails" beats a false green.

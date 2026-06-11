@@ -50,9 +50,10 @@ Architecture and boundary:
 
 Maturity: a working v0.1 with multiple registered examples (pendulum, sphere
 geodesic, charged particle, uniform gravity, ideal spring, Kepler, bead on
-rotating hoop, Lorenz, Hénon–Heiles, variable-speed wavefront). The verification
+rotating hoop, Lorenz, Hénon–Heiles, variable-speed wavefront). The latest
 baseline noted in docs is `pytest -q` green (178 tests), `viewer` build clean,
-and Playwright visual tests passing. The current phase (`docs/VISION.md`
+and Playwright visual tests passing; use it as a release/reference baseline, not
+as a required check for every small edit. The current phase (`docs/VISION.md`
 §"v0.2") is diagnostics and phase-space structure: Poincaré sections, Lyapunov
 diagnostics, invariant residuals, parameter sweeps, and regression tests.
 
@@ -145,9 +146,9 @@ with explicit tolerances.
 Jacobian, divergence, energy, Noether charges) with *trajectory* checks (state
 schema, JSON export shape, invariant flatness, domain behavior such as staying on
 a constraint or preserving angular momentum). When designing a feature, specify
-which symbolic invariants and which numerical regressions must be tested, and
-hand those test obligations to Codex. The v0.2 direction explicitly wants
-numerical regression tests for invariant drift and deterministic outputs.
+the cheapest useful check for the risk. New derivations, exported contracts,
+diagnostics, and regressions usually deserve tests; small UI/doc/wiring changes
+usually only need targeted verification or no test change.
 
 **About documentation.** A claim in `docs/` or `README.md` is a promise. If
 Claude designs a change, update the relevant plan doc's status/itinerary so the
@@ -197,8 +198,9 @@ spec that Codex can execute narrowly. Include:
 3. **Invariants / specification** — what must remain true; the symbolic and
    numerical checks that define correctness, with tolerances.
 4. **Step sequence** — small, verifiable steps in order.
-5. **Test obligations** — exactly which tests to add or update.
-6. **Verification commands** — which of the commands below must pass.
+5. **Test obligations** — only the tests that are worth adding or updating.
+6. **Verification commands** — the smallest commands below that give useful
+   signal for the touched surface.
 7. **Out of scope** — what Codex should *not* touch (e.g. "do not change the
    manifest schema," "no viewer physics," "no new gallery examples").
 
@@ -210,25 +212,25 @@ The full handoff format and a copy-paste task template live in
 
 ---
 
-## Two-Agent Worktree Workflow
+## Branch / Worktree Workflow
 
-This repo runs a disciplined two-agent setup. **`docs/agent-workflow.md` is the
-shared source of truth for process**; this section is the Claude-side summary.
+This repo supports a two-agent setup, but the workflow should not slow down small
+human-directed changes. **`docs/agent-workflow.md` is the shared source of truth
+for process**; this section is the Claude-side summary.
 
-- **Claude works on branch `claude/planning`, in worktree `../project-claude`.**
-  Claude does planning, specs, invariants, and reviews here. Claude **never edits
-  the base branch** and **never edits Codex's task worktree**.
-- **Codex works on task branches** (`codex/task-1`, `codex/fix-build`,
-  `codex/docs-cleanup`, …) in its own worktree (`../project-codex`). One branch
-  and one worktree per task; the two agents never edit the same branch at once.
-- The base branch (`main`, in the main repo) is the **merge target only** — the
-  source of truth, edited by neither agent directly.
+- **Claude usually works on branch `claude/planning`, in worktree
+  `../project-claude`** for planning, specs, invariants, and reviews.
+- **Codex may work on the current branch for direct human requests**, including
+  small edits on `main`. Use `codex/<task>` branches/worktrees for Claude
+  handoffs, concurrent-agent work, larger changes, or explicit PR-style review.
+- Two agents should not edit the same worktree at the same time. Avoid process
+  ceremony when there is no concurrency or review need.
 
 The loop: Claude writes a Task Spec on `claude/planning` → hands it to Codex →
-Codex implements exactly that spec on its task branch and reports commands +
-results → Claude reviews the diff against the spec's invariants (APPROVE /
-CHANGES REQUESTED) → merge to base only after approval and green verification →
-remove the task worktree and start the next task fresh.
+Codex implements exactly that spec on the named branch if one is required, or on
+the current branch for small direct work, and reports commands + results →
+Claude reviews the diff against the spec's invariants when review was requested
+→ merge/cleanup only if a separate branch was used.
 
 Claude's review is **read-only on the implementation**: Claude judges the diff
 against the spec, it does not rewrite Codex's code. If a task surfaces a design
@@ -260,9 +262,10 @@ cd viewer && npm run dev
 cd viewer && npm run test:visual
 ```
 
-Full-project verification = `pytest -q` green **and** `viewer` build clean
-**and** visual tests passing. A known non-fatal Vite chunk-size warning on the
-main bundle is documented and acceptable.
+Full-project verification, when warranted, is `pytest -q` green **and** `viewer`
+build clean **and** visual tests passing. Prefer targeted checks for small
+incremental work. A known non-fatal Vite chunk-size warning on the main bundle is
+documented and acceptable.
 
 ---
 
@@ -292,7 +295,7 @@ Stop and ask (rather than guessing) when:
   `docs/VISION.md`'s "What Not To Prioritize."
 - A correctness question cannot be resolved symbolically or numerically from the
   repo, and a wrong assumption would propagate into exported "results."
-- Verification cannot be run and the result matters.
+- A necessary targeted verification command cannot be run and the result matters.
 
 When asking, present the trade-off and a recommendation, not an open-ended menu.
 
@@ -307,7 +310,8 @@ When asking, present the trade-off and a recommendation, not an open-ended menu.
 - Do not assert a system conserves a quantity, is chaotic, has a given fixed
   point, or matches a reference value without a check you can point to.
 - Do not mark plan-doc items `[x]` on Claude's say-so; completion requires the
-  work to exist and the verification to have passed.
+  work to exist and proportionate verification to have passed or be explicitly
+  waived by the human.
 - When uncertain, say "I expect" or "this is unverified," and name the check that
   would settle it. Honest uncertainty beats confident error in a project whose
   whole point is mathematical structure and eventual proof.
