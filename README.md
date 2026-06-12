@@ -23,7 +23,9 @@ diagnostics, controlled dynamics, safety metadata, and verification artifacts.
     candidate Lyapunov/barrier functions, proof obligations, and measured
     sampling checks.
   - Backend-agnostic verification-problem IR v0 for exporting obligations for
-    external inspection/discharge. The engine does not certify or prove safety.
+    external inspection/discharge, plus a stub inspection adapter that writes
+    canonical problem JSON and a human-readable report. The engine does not
+    certify or prove safety.
 - Viewer:
   - Vite/TypeScript app with gallery navigation, playback controls, structure
     panels, invariant lanes, 2D canvas lenses, and Three.js scenes.
@@ -110,8 +112,8 @@ backend and viewer baseline for broad changes or release-style checks.
 
 ## Direction
 
-The near-term backend direction is to connect the verification IR to external
-adapter stubs and then push one controlled mechanical case study deeper through
-the safety pipeline. The near-term frontend direction is to expose exported
-diagnostics and, later, safety/certificate metadata without recomputing physics
-in TypeScript.
+The near-term backend direction is to push one controlled mechanical case study
+deeper through the safety pipeline, building on the stub inspection adapter
+that exports verification problems. The near-term frontend direction is to
+expose exported diagnostics and, later, safety/certificate metadata without
+recomputing physics in TypeScript.

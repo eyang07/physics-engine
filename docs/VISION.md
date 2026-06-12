@@ -80,9 +80,10 @@ analytical mechanics
 
 Each stage is a deliberate artifact, not a side effect. The first three stages
 exist today for several example systems. Continuous controlled dynamics,
-certificate candidates, proof obligations, and a backend-agnostic
-verification-problem IR also exist in backend form. External verification
-adapters and actual proof discharge remain roadmap items.
+certificate candidates, proof obligations, a backend-agnostic
+verification-problem IR, and a stub inspection adapter that writes problems out
+for external inspection also exist in backend form. Real external verification
+backends and actual proof discharge remain roadmap items.
 
 ## 5. Target Domain: Mechanics-Based CPS and Robotics
 
@@ -251,8 +252,9 @@ In priority order:
    actual certificate synthesis/proof discharge remains open.*
 3. **Verification-problem IR (v0).** Define and serialize the IR above, even if
    the only adapter is a stub that writes the problem out for inspection.
-   *Status: implemented backend-only (`engine/verification/`); external
-   adapters and proof discharge remain open.*
+   *Status: implemented backend-only (`engine/verification/`), including the
+   stub inspection adapter (`engine/verification/inspection_adapter.py`); real
+   external backends and proof discharge remain open.*
 4. **First serious case study (see §13).** Push one small controlled system end
    to end through the pipeline.
 5. **Frontend safety surfaces.** Safe/unsafe-set rendering, certificate-value

@@ -44,10 +44,13 @@ artifacts.
     `rigor="measured"`.
   - Backend-agnostic verification-problem IR v0 in `engine.verification`, with
     obligations labeled `rigor="external-required"`.
+  - Stub inspection adapter (`engine/verification/inspection_adapter.py`) that
+    consumes the IR and writes canonical problem JSON plus a human-readable
+    inspection report, recording no proof results.
 
-The backend does not synthesize, prove, or certify safety. External proof
-discharge, validated numerics, manifest export of safety geometry, and viewer
-safety surfaces remain future work.
+The backend does not synthesize, prove, or certify safety. Real external
+verification backends, proof discharge, validated numerics, manifest export of
+safety geometry, and viewer safety surfaces remain future work.
 
 ## Registered Viewer Examples
 
@@ -81,13 +84,14 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `225 passed`.
+Latest known result: `229 passed`.
 
 Use focused tests while iterating:
 
 ```sh
 pytest tests/test_controlled_dynamics.py -q
 pytest tests/test_safety_certificates.py tests/test_verification_ir.py -q
+pytest tests/test_inspection_adapter.py -q
 ```
 
 Regenerate data when backend output changes:
@@ -96,17 +100,22 @@ Regenerate data when backend output changes:
 python -m scripts.generate_all_examples
 ```
 
+Export verification-problem inspection artifacts (backend-only, ignored under
+`data/generated/`):
+
+```sh
+python -m scripts.export_verification_problems
+```
+
 Generated outputs under `data/generated/` and `viewer/public/data/*.json` are
 ignored and should not be committed.
 
 ## Next Work
 
-1. Add a stub external-verification adapter that consumes the verification IR and
-   writes backend-specific inspection artifacts without claiming proof discharge.
-2. Push one controlled mechanical case study deeper through the pipeline:
+1. Push one controlled mechanical case study deeper through the pipeline:
    dynamics, safe/unsafe sets, candidate certificate, proof obligations, IR
    export, and eventually viewer display.
-3. Extend parameter variants beyond Lorenz once the viewer has clear behavior
+2. Extend parameter variants beyond Lorenz once the viewer has clear behavior
    for backend-generated variants.
-4. Keep backend-only geodesic exploration outside the gallery until the viewer
+3. Keep backend-only geodesic exploration outside the gallery until the viewer
    can render the geometry honestly.

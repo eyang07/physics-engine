@@ -49,7 +49,6 @@ Implemented diagnostics include:
 
 ## Next Work
 
-- Add a stub external-verification adapter for the IR.
 - Add basin sampling or bifurcation-style diagnostics when a concrete example
   needs them.
 - Extend parameter-family exports beyond Lorenz once frontend variant behavior
