@@ -22,7 +22,8 @@ diagnostics, controlled dynamics, safety metadata, and verification artifacts.
   - Safety/certificate candidate metadata: safe and unsafe sublevel sets,
     candidate Lyapunov/barrier functions, proof obligations, and measured
     sampling checks.
-  - Backend-agnostic verification-problem IR v0 for exporting obligations for
+  - Backend-agnostic verification-problem IR v1 encoding dynamics,
+    control/disturbance channels, candidate certificates, and obligations for
     external inspection/discharge, plus a stub inspection adapter that writes
     canonical problem JSON and a human-readable report. The engine does not
     certify or prove safety.

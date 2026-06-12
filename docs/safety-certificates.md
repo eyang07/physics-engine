@@ -60,8 +60,9 @@ viewer change.
   `lie_derivative`, `grid_points`, `sample_obligation`.
 - `tests/test_safety_certificates.py` — obligations below.
 - `engine/dynamics/__init__.py` — exports.
-- `engine/verification/` — backend-agnostic verification-problem IR v0 and
-  safety adapter for serializing proof obligations without proof results.
+- `engine/verification/` — backend-agnostic verification-problem IR and
+  safety adapter for serializing proof obligations without proof results
+  (spec in `docs/verification-ir.md`).
 - `tests/test_verification_ir.py` — IR serialization and adapter checks.
 - Doc updates: `README.md`, `docs/BACKEND.md`, `docs/VISION.md` §11 item
   statuses, and test-count baselines.

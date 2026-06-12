@@ -42,8 +42,10 @@ artifacts.
   - Candidate Lyapunov and barrier functions.
   - Proof-obligation records and deterministic sampled checks labeled
     `rigor="measured"`.
-  - Backend-agnostic verification-problem IR v0 in `engine.verification`, with
-    obligations labeled `rigor="external-required"`.
+  - Backend-agnostic verification-problem IR v1 in `engine.verification`
+    (spec in `docs/verification-ir.md`): dynamics, control/disturbance
+    channels, first-class candidate certificates locked to
+    `status="candidate"`, and obligations labeled `rigor="external-required"`.
   - Stub inspection adapter (`engine/verification/inspection_adapter.py`) that
     consumes the IR and writes canonical problem JSON plus a human-readable
     inspection report, recording no proof results.
@@ -84,7 +86,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `229 passed`.
+Latest known result: `232 passed`.
 
 Use focused tests while iterating:
 

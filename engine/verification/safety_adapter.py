@@ -16,6 +16,7 @@ from engine.dynamics.safety import (
     SublevelSet,
 )
 from engine.verification.ir import (
+    CandidateSpec,
     ObligationSpec,
     ParameterSpec,
     RegionSpec,
@@ -24,6 +25,7 @@ from engine.verification.ir import (
     problem_from_parts,
 )
 from engine.verification.sympy_codec import expression_spec
+from engine.verification.system_codec import dynamics_spec_from_system
 
 _SOURCE = "engine.dynamics.safety"
 _DEFAULT_NOTE = (
@@ -76,12 +78,17 @@ def verification_problem_from_obligations(
     name: str,
     obligations: Sequence[ProofObligation],
     *,
+    system: FirstOrderSystem | None = None,
+    candidate: LyapunovCandidate | BarrierCandidate | None = None,
     specification: SafetySpecification | None = None,
     substitutions: Mapping[sp.Symbol, float] | None = None,
     metadata: Mapping[str, Any] | None = None,
 ) -> VerificationProblem:
     """Package proof obligations as a backend-agnostic verification problem.
 
+    ``system`` is the (closed-loop) model the obligations were derived along
+    and is encoded as the problem dynamics; ``candidate`` is the certificate
+    candidate that generated the obligations and is linked to all of them.
     The resulting problem records claims for external discharge; it does not
     include proof results and does not mark any obligation certified.
     """
@@ -90,6 +97,10 @@ def verification_problem_from_obligations(
     state = _state_from_obligations(obligation_tuple)
     if specification is not None and specification.state != state:
         raise ValueError("specification state must match the obligation state")
+    if system is not None and system.state != state:
+        raise ValueError("system state must match the obligation state")
+    if candidate is not None and candidate.state != state:
+        raise ValueError("candidate state must match the obligation state")
 
     variables = tuple(
         VariableSpec(name=symbol.name, latex=sp.latex(symbol))
@@ -160,6 +171,12 @@ def verification_problem_from_obligations(
         free_symbols.update(sp.sympify(obligation.expression).free_symbols)
         if obligation.region is not None:
             free_symbols.update(sp.sympify(obligation.region.expression).free_symbols)
+    if system is not None:
+        for expression in system.rhs:
+            free_symbols.update(sp.sympify(expression).free_symbols)
+        free_symbols.discard(system.time)
+    if candidate is not None:
+        free_symbols.update(sp.sympify(candidate.function).free_symbols)
     if specification is not None:
         safety_regions = [specification.safe_set, *specification.unsafe_sets]
         if specification.initial_set is not None:
@@ -186,6 +203,31 @@ def verification_problem_from_obligations(
         for symbol in parameter_symbols
     )
 
+    candidates: tuple[CandidateSpec, ...] = ()
+    if candidate is not None:
+        if isinstance(candidate, LyapunovCandidate):
+            kind = "lyapunov"
+            equilibrium = tuple(float(value) for value in candidate.equilibrium)
+            candidate_region = candidate.domain
+        else:
+            kind = "barrier"
+            equilibrium = None
+            candidate_region = candidate.candidate_region()
+        region_id = None
+        if candidate_region is not None:
+            region_id = region_ids_by_key.get(_region_key(candidate_region))
+        candidates = (
+            CandidateSpec(
+                id=_slug(candidate.name),
+                name=candidate.name,
+                kind=kind,
+                expression=expression_spec(candidate.function),
+                obligation_ids=tuple(spec.id for spec in obligation_specs),
+                equilibrium=equilibrium,
+                region_id=region_id,
+            ),
+        )
+
     return problem_from_parts(
         id=_slug(name),
         name=name,
@@ -194,6 +236,8 @@ def verification_problem_from_obligations(
         parameters=parameters,
         regions=regions,
         obligations=obligation_specs,
+        dynamics=None if system is None else dynamics_spec_from_system(system),
+        candidates=candidates,
         metadata=_metadata(metadata),
     )
 
@@ -210,6 +254,8 @@ def verification_problem_from_barrier(
     return verification_problem_from_obligations(
         name,
         candidate.proof_obligations(system, specification),
+        system=system,
+        candidate=candidate,
         specification=specification,
         substitutions=substitutions,
         metadata=metadata,
@@ -227,6 +273,8 @@ def verification_problem_from_lyapunov(
     return verification_problem_from_obligations(
         name,
         candidate.proof_obligations(system),
+        system=system,
+        candidate=candidate,
         substitutions=substitutions,
         metadata=metadata,
     )

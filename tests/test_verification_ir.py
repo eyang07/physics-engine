@@ -14,7 +14,15 @@ from engine.dynamics import (
     SublevelSet,
 )
 from engine.verification import (
+    CandidateSpec,
+    DynamicsSpec,
+    InputSpec,
+    ObligationSpec,
     SCHEMA_VERSION,
+    VariableSpec,
+    VerificationProblem,
+    dynamics_spec_from_controlled,
+    expression_spec,
     verification_problem_from_barrier,
     verification_problem_from_lyapunov,
     verification_problem_from_obligations,
@@ -83,6 +91,23 @@ def test_lyapunov_candidate_exports_verification_problem() -> None:
     encoded = json.dumps(payload)
     assert "certified" not in encoded
 
+    dynamics = payload["dynamics"]
+    assert dynamics["kind"] == "continuous"
+    assert dynamics["timeVariable"] == "t"
+    assert dynamics["state"] == ["x", "v"]
+    assert dynamics["rhs"][0]["display"] == "v"
+    assert "k*x" in dynamics["rhs"][1]["display"]
+    assert dynamics["inputs"] == []
+
+    (candidate_payload,) = payload["candidates"]
+    assert candidate_payload["kind"] == "lyapunov"
+    assert candidate_payload["status"] == "candidate"
+    assert candidate_payload["equilibrium"] == [0.0, 0.0]
+    assert candidate_payload["regionId"] == "domain-ball"
+    assert candidate_payload["obligationIds"] == [
+        obligation["id"] for obligation in obligations
+    ]
+
 
 def test_barrier_candidate_exports_specification_regions() -> None:
     closed, theta, omega = _pendulum_closed_loop()
@@ -133,6 +158,12 @@ def test_barrier_candidate_exports_specification_regions() -> None:
     assert payload["obligations"][1]["regionId"] == "initial-start-ball"
     assert payload["obligations"][2]["regionId"] == "unsafe-near-bottom"
 
+    assert payload["dynamics"]["state"] == ["theta", "omega"]
+    (candidate_payload,) = payload["candidates"]
+    assert candidate_payload["kind"] == "barrier"
+    assert candidate_payload["regionId"] == "domain-energy-barrier-region"
+    assert "equilibrium" not in candidate_payload
+
 
 def test_verification_problem_write_json_and_validation(tmp_path) -> None:
     system, x, v, _k, _c = _damped_oscillator()
@@ -158,3 +189,94 @@ def test_verification_problem_write_json_and_validation(tmp_path) -> None:
                 ProofObligation(name="second", state=(x, y), expression=x, comparison="<="),
             ),
         )
+
+
+def _minimal_problem_parts() -> tuple[tuple[VariableSpec, ...], ObligationSpec]:
+    x = sp.Symbol("x", real=True)
+    variables = (VariableSpec(name="x", latex="x"),)
+    obligation = ObligationSpec(
+        id="claim", name="claim", expression=expression_spec(x), comparison="<="
+    )
+    return variables, obligation
+
+
+def test_v1_spec_validation() -> None:
+    x = sp.Symbol("x", real=True)
+    expr = expression_spec(x)
+
+    with pytest.raises(ValueError, match="continuous"):
+        DynamicsSpec(kind="discrete", time_variable="t", state=("x",), rhs=(expr,))
+    with pytest.raises(ValueError, match="same length"):
+        DynamicsSpec(kind="continuous", time_variable="t", state=("x", "v"), rhs=(expr,))
+    with pytest.raises(ValueError, match="disjoint"):
+        DynamicsSpec(
+            kind="continuous",
+            time_variable="t",
+            state=("x",),
+            rhs=(expr,),
+            inputs=(InputSpec(name="x", latex="x", role="control"),),
+        )
+    with pytest.raises(ValueError, match="role"):
+        InputSpec(name="u", latex="u", role="actuator")
+    with pytest.raises(ValueError, match="lower bound"):
+        InputSpec(name="u", latex="u", role="control", lower=1.0, upper=-1.0)
+    with pytest.raises(ValueError, match="candidate"):
+        CandidateSpec(
+            id="c",
+            name="c",
+            kind="barrier",
+            expression=expr,
+            obligation_ids=("claim",),
+            status="accepted",
+        )
+
+
+def test_problem_validates_dynamics_and_candidate_links() -> None:
+    variables, obligation = _minimal_problem_parts()
+    expr = obligation.expression
+
+    mismatched = DynamicsSpec(
+        kind="continuous", time_variable="t", state=("y",), rhs=(expr,)
+    )
+    with pytest.raises(ValueError, match="dynamics state"):
+        VerificationProblem(
+            id="p",
+            name="p",
+            source="test",
+            variables=variables,
+            parameters=(),
+            regions=(),
+            obligations=(obligation,),
+            dynamics=mismatched,
+        )
+
+    dangling = CandidateSpec(
+        id="c",
+        name="c",
+        kind="barrier",
+        expression=expr,
+        obligation_ids=("missing",),
+    )
+    with pytest.raises(ValueError, match="candidate obligation"):
+        VerificationProblem(
+            id="p",
+            name="p",
+            source="test",
+            variables=variables,
+            parameters=(),
+            regions=(),
+            obligations=(obligation,),
+            candidates=(dangling,),
+        )
+
+
+def test_dynamics_spec_from_controlled_encodes_bounds() -> None:
+    pendulum = build_system(mass=1.0, length=1.0, gravity=9.81, damping=0.1, torque_bound=2.0)
+    spec = dynamics_spec_from_controlled(pendulum)
+
+    assert spec.kind == "continuous"
+    assert spec.state == ("theta", "omega")
+    assert len(spec.rhs) == 2
+    assert [input_spec.to_dict() for input_spec in spec.inputs] == [
+        {"name": "u", "latex": "u", "role": "control", "lower": -2.0, "upper": 2.0}
+    ]

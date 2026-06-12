@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from engine.verification.ir import (
+    CandidateSpec,
+    DynamicsSpec,
     ObligationSpec,
     RegionSpec,
     VerificationProblem,
@@ -79,6 +81,44 @@ class InspectionAdapterReport:
         }
 
 
+def _dynamics_lines(dynamics: DynamicsSpec | None) -> list[str]:
+    lines = ["## Dynamics", ""]
+    if dynamics is None:
+        lines.extend(["- not encoded in this problem", ""])
+        return lines
+    lines.append(f"- kind: {dynamics.kind} (time variable `{dynamics.time_variable}`)")
+    for name, rhs in zip(dynamics.state, dynamics.rhs, strict=True):
+        lines.append(f"- `{name}' = {rhs.display}`")
+    if dynamics.inputs:
+        for input_spec in dynamics.inputs:
+            lower = "-inf" if input_spec.lower is None else input_spec.lower
+            upper = "inf" if input_spec.upper is None else input_spec.upper
+            lines.append(
+                f"- {input_spec.role} `{input_spec.name}` in [{lower}, {upper}]"
+            )
+    else:
+        lines.append("- inputs: none (closed loop)")
+    lines.append("")
+    return lines
+
+
+def _candidate_lines(candidate: CandidateSpec) -> list[str]:
+    lines = [
+        f"### `{candidate.id}` — kind: {candidate.kind}",
+        "",
+        f"- status: {candidate.status} (not accepted by any external sound method)",
+        f"- function: `{candidate.expression.display}`",
+    ]
+    if candidate.equilibrium is not None:
+        lines.append(f"- equilibrium: {list(candidate.equilibrium)}")
+    if candidate.region_id is not None:
+        lines.append(f"- candidate region: `{candidate.region_id}`")
+    obligations = ", ".join(f"`{obligation_id}`" for obligation_id in candidate.obligation_ids)
+    lines.append(f"- proof obligations: {obligations}")
+    lines.append("")
+    return lines
+
+
 def _region_lines(region: RegionSpec) -> list[str]:
     variables = ", ".join(region.variables)
     return [
@@ -135,10 +175,18 @@ def render_inspection_markdown(problem: VerificationProblem) -> str:
             lines.append(f"- `{parameter.name}` = {value}")
     else:
         lines.append("- none")
-    lines.extend(["", "## Regions", ""])
+    lines.append("")
+    lines.extend(_dynamics_lines(problem.dynamics))
+    lines.extend(["## Regions", ""])
     if problem.regions:
         for region in problem.regions:
             lines.extend(_region_lines(region))
+    else:
+        lines.extend(["- none", ""])
+    lines.extend(["## Candidate certificates", ""])
+    if problem.candidates:
+        for candidate in problem.candidates:
+            lines.extend(_candidate_lines(candidate))
     else:
         lines.extend(["- none", ""])
     lines.extend(["## Obligations", ""])

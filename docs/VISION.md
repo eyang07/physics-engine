@@ -166,7 +166,8 @@ dynamics `dx/dt = f(t, x, u, d; θ)` with box-shaped admissible control and
 disturbance sets, closed-loop reduction, and deterministic rollouts
 (backend-only). It also implements backend-only safe/unsafe sublevel sets,
 candidate Lyapunov/barrier functions, proof obligations, measured sampled
-checks, and verification-problem IR v0. It does **not** yet implement the
+checks, and verification-problem IR v1 (dynamics, control/disturbance
+channels, candidate certificates). It does **not** yet implement the
 discrete-time analogue, real certificate synthesis, proof discharge, validated
 numerics, or frontend safety surfaces.
 
@@ -250,11 +251,14 @@ In priority order:
    *Status: candidate metadata implemented backend-only
    (`engine/dynamics/safety.py`, spec in `docs/safety-certificates.md`);
    actual certificate synthesis/proof discharge remains open.*
-3. **Verification-problem IR (v0).** Define and serialize the IR above, even if
+3. **Verification-problem IR.** Define and serialize the IR above, even if
    the only adapter is a stub that writes the problem out for inspection.
-   *Status: implemented backend-only (`engine/verification/`), including the
-   stub inspection adapter (`engine/verification/inspection_adapter.py`); real
-   external backends and proof discharge remain open.*
+   *Status: v1 implemented backend-only (`engine/verification/`, spec in
+   `docs/verification-ir.md`) with dynamics, control/disturbance channels,
+   and first-class candidate certificates, plus the stub inspection adapter
+   (`engine/verification/inspection_adapter.py`); discrete-time dynamics,
+   visualization hooks, real external backends, and proof discharge remain
+   open.*
 4. **First serious case study (see §13).** Push one small controlled system end
    to end through the pipeline.
 5. **Frontend safety surfaces.** Safe/unsafe-set rendering, certificate-value

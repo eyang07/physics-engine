@@ -83,6 +83,13 @@ def test_render_inspection_markdown_is_deterministic_and_honest() -> None:
     assert "certified" not in text
     assert "proven" not in text
 
+    assert "## Dynamics" in text
+    assert "- `x' = v`" in text
+    assert "- inputs: none (closed loop)" in text
+    assert "## Candidate certificates" in text
+    assert "kind: lyapunov" in text
+    assert "status: candidate (not accepted by any external sound method)" in text
+
 
 def test_report_rejects_discharge_claims(tmp_path) -> None:
     problem = _oscillator_problem()
