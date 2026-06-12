@@ -1,5 +1,11 @@
 """General dynamical-system helpers."""
 
+from engine.dynamics.candidates import (
+    MeasuredInfimum,
+    barrier_from_lyapunov,
+    measured_infimum_over_set,
+    quadratic_lyapunov_from_linearization,
+)
 from engine.dynamics.controlled import (
     Box,
     ControlledFirstOrderSystem,
@@ -64,6 +70,7 @@ __all__ = [
     "InverseMetricMedium",
     "LyapunovCandidate",
     "LyapunovResult",
+    "MeasuredInfimum",
     "MetricGeometry",
     "ObligationSample",
     "ProofObligation",
@@ -76,6 +83,7 @@ __all__ = [
     "SublevelSet",
     "TrajectorySafetyReport",
     "UnsafeSetReport",
+    "barrier_from_lyapunov",
     "caustic_proximity",
     "finite_time_lyapunov",
     "gaussian_lens_speed",
@@ -83,7 +91,9 @@ __all__ = [
     "invariant_residuals",
     "integrate_ray_bundle",
     "lie_derivative",
+    "measured_infimum_over_set",
     "poincare_section_crossings",
+    "quadratic_lyapunov_from_linearization",
     "ray_bundle_coordinate_bounds",
     "ray_bundle_diagnostics",
     "ray_bundle_snapshot_indices",

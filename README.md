@@ -22,6 +22,9 @@ diagnostics, controlled dynamics, safety metadata, and verification artifacts.
   - Safety/certificate candidate metadata: safe and unsafe sublevel sets,
     candidate Lyapunov/barrier functions, proof obligations, and measured
     sampling checks.
+  - Candidate generation: quadratic Lyapunov candidates from a Hurwitz
+    linearization, sublevel barrier candidates, and measured level
+    suggestions — proposals only, never certification.
   - Backend-agnostic verification-problem IR v1 encoding dynamics,
     control/disturbance channels, candidate certificates, and obligations for
     external inspection/discharge, plus a stub inspection adapter that writes

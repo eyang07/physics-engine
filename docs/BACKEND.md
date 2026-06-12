@@ -40,6 +40,11 @@ artifacts.
 - Safety and verification:
   - Safe/unsafe sublevel sets and measured trajectory safety reports.
   - Candidate Lyapunov and barrier functions.
+  - Candidate generation (`engine/dynamics/candidates.py`, spec in
+    `docs/candidate-generation.md`): quadratic Lyapunov candidates from a
+    Hurwitz linearization via the Lyapunov equation, sublevel barrier
+    candidates from Lyapunov candidates, and measured grid-infimum level
+    suggestions.
   - Proof-obligation records and deterministic sampled checks labeled
     `rigor="measured"`.
   - Backend-agnostic verification-problem IR v1 in `engine.verification`
@@ -86,14 +91,14 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `232 passed`.
+Latest known result: `239 passed`.
 
 Use focused tests while iterating:
 
 ```sh
 pytest tests/test_controlled_dynamics.py -q
 pytest tests/test_safety_certificates.py tests/test_verification_ir.py -q
-pytest tests/test_inspection_adapter.py -q
+pytest tests/test_candidate_generation.py tests/test_inspection_adapter.py -q
 ```
 
 Regenerate data when backend output changes:

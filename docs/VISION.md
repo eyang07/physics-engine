@@ -249,8 +249,11 @@ In priority order:
    *candidate* barrier / Lyapunov / invariant representations as structured data
    — candidates only, clearly labeled, not certified.
    *Status: candidate metadata implemented backend-only
-   (`engine/dynamics/safety.py`, spec in `docs/safety-certificates.md`);
-   actual certificate synthesis/proof discharge remains open.*
+   (`engine/dynamics/safety.py`, spec in `docs/safety-certificates.md`),
+   plus simple candidate generators — quadratic Lyapunov from a Hurwitz
+   linearization and sublevel barriers (`engine/dynamics/candidates.py`,
+   spec in `docs/candidate-generation.md`); SOS-style synthesis and proof
+   discharge remain open.*
 3. **Verification-problem IR.** Define and serialize the IR above, even if
    the only adapter is a stub that writes the problem out for inspection.
    *Status: v1 implemented backend-only (`engine/verification/`, spec in
