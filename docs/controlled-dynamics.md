@@ -1,8 +1,7 @@
 # Controlled Dynamics Layer — Design Spec (v0)
 
-Advances `docs/VISION.md` §11 priority 1. Drafted by Claude and implemented by
-Claude at the human's direction (no Codex handoff). Status: **implemented**
-(see Verification at the bottom).
+Advances `docs/VISION.md` §11 priority 1. Status: **implemented** (see
+Verification at the bottom).
 
 ## Goal
 
@@ -39,10 +38,11 @@ verification-problem IR. Backend-only: no manifest, gallery, or viewer change.
    torque-actuated, with damping). Smallest step from existing code; cart-pole
    or a drone point-mass can follow once safety metadata exists. Backend-only,
    not registered in the gallery.
-5. **Deferred (explicitly out of v0):** the discrete-time analogue
-   `x_{k+1} = F(x_k, u_k, d_k)`, safe/unsafe sets, obstacles, certificate
-   candidates, proof obligations, and the IR. Stochastic disturbances are out;
-   `d` is a deterministic input channel in v0.
+5. **Deferred from the controlled-dynamics layer itself:** the discrete-time
+   analogue `x_{k+1} = F(x_k, u_k, d_k)`, real certificate synthesis, and proof
+   discharge. Safe/unsafe sets, certificate candidates, proof obligations, and
+   the verification IR are handled by later backend layers. Stochastic
+   disturbances are out; `d` is a deterministic input channel in v0.
 
 ## Files
 
@@ -51,9 +51,8 @@ verification-problem IR. Backend-only: no manifest, gallery, or viewer change.
 - `systems/controlled_pendulum.py` — torque-controlled damped pendulum.
 - `tests/test_controlled_dynamics.py` — obligations below.
 - `engine/dynamics/__init__.py` — exports.
-- Doc updates: `docs/BACKEND.md`, `docs/VISION.md` §8 status note / §11,
-  `docs/task-queue.md`, `CLAUDE.md` / `AGENTS.md` dynamics descriptions,
-  test-count baselines.
+- Doc updates: `README.md`, `docs/BACKEND.md`, `docs/VISION.md` §8 status
+  note / §11, and test-count baselines.
 
 ## API sketch
 
@@ -118,10 +117,9 @@ No generator or viewer commands: nothing crosses the manifest boundary.
 
 ## Out of scope
 
-Discrete-time analogue; safe/unsafe sets and obstacles; certificate
-candidates and proof obligations; verification IR; any manifest/schema
-change; any gallery or viewer work; stochastic disturbances; control
-synthesis (LQR/MPC) beyond hand-written test laws.
+Discrete-time analogue; real certificate synthesis or proof discharge; any
+manifest/schema change; any gallery or viewer work; stochastic disturbances;
+control synthesis (LQR/MPC) beyond hand-written test laws.
 
 ## Verification record
 

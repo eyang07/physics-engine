@@ -1,97 +1,101 @@
 # physics-engine
 
-A learning-oriented analytical mechanics engine with a browser viewer. Python
-is the source of truth for the mechanics and generated data; the TypeScript
-viewer renders exported trajectories, symbolic derivations, invariants, and
-visual lenses without re-deriving the physics.
+A theory-first analytical mechanics and dynamical-systems engine with a browser
+viewer. Python is the source of mathematical truth; the TypeScript viewer renders
+exported trajectories, symbolic structure, diagnostics, and visual lenses without
+re-deriving physics.
 
-## Current Shape
+## Current Status
 
-- `engine/` contains the Python mechanics and export code.
-- `systems/` contains pure symbolic system definitions.
-- `scripts/example_specs.py` is the gallery registry for parameters, state
-  schema, projections, conserved quantities, effective potentials, and lenses.
-- `scripts/generate_all_examples.py` regenerates trajectories and the manifest.
-- `viewer/` is a Vite/TypeScript app that consumes `viewer/public/data`.
-- `data/generated/` stores the generated Python-side outputs.
+The project is a working v0.1 mechanics workbench with a growing v0.2 layer for
+diagnostics, controlled dynamics, safety metadata, and verification artifacts.
 
-## Backend Tools
+- Python backend:
+  - Lagrangian and Hamiltonian mechanics.
+  - General first-order dynamical systems.
+  - Controlled first-order systems with admissible boxes and deterministic
+    rollouts.
+  - Cotangent Hamiltonian flow, ray bundles, parameterized media, and metric
+    geometry helpers.
+  - Diagnostics for invariants, Poincare sections, finite-time Lyapunov
+    exponents, ray travel time, caustic proximity, and wavefront envelopes.
+  - Safety/certificate candidate metadata: safe and unsafe sublevel sets,
+    candidate Lyapunov/barrier functions, proof obligations, and measured
+    sampling checks.
+  - Backend-agnostic verification-problem IR v0 for exporting obligations for
+    external inspection/discharge. The engine does not certify or prove safety.
+- Viewer:
+  - Vite/TypeScript app with gallery navigation, playback controls, structure
+    panels, invariant lanes, 2D canvas lenses, and Three.js scenes.
+  - Dedicated wavefront/ray-bundle lens and fit-to-system camera reset for
+    renderer-hint-backed scenes.
 
-The engine currently supports:
+## Repository Layout
 
-- Lagrangian systems on tangent bundle charts `(q, qdot)`.
-- Hamiltonian systems on cotangent bundle charts `(q, p)`.
-- General first-order dynamical systems `dx/dt = f(t, x; params)` with
-  symbolic Jacobians, divergence, fixed points, linearization, and numerical RHS
-  generation.
-- Euler-Lagrange equations, generalized momenta, energy, Legendre transforms,
-  Hamilton equations, Poisson brackets, symplectic matrices, Hamiltonian vector
-  fields, Liouville checks, canonical-transformation checks, coordinate
-  pullbacks/pushforwards, holonomic constraints, and Noether charges.
-- Cotangent Hamiltonian flows with reusable ray-bundle integration and export,
-  parameterized media models (scalar wave speed, refractive index, inverse
-  metric), and a backend-only metric-geometry helper (Christoffel symbols,
-  geodesic equations, cogeodesic flow) for fixed-background geodesic examples.
-- Dynamics diagnostics: Poincaré sections, finite-time Lyapunov exponents,
-  invariant-residual tracking, and ray diagnostics (travel time, caustic
-  proximity, wavefront envelopes).
-- Fixed-step RK4 integration, adaptive `solve_ivp` integration, and JSON export.
-- A manifest contract that exports symbolic derivations, lens metadata,
-  parameter ranges, state schemas, projections, conserved quantities,
-  precomputed parameter variants, and effective potentials or first-order flow
-  diagnostics.
+- `engine/mechanics/` - Lagrangian/Hamiltonian mechanics, symmetries,
+  constraints, coordinates, Poisson/symplectic utilities.
+- `engine/dynamics/` - first-order, controlled, cotangent, ray, media, metric,
+  diagnostics, and safety-candidate tools.
+- `engine/verification/` - versioned verification-problem IR and adapters.
+- `engine/numerics/` - fixed-step RK4 and adaptive integration.
+- `engine/export/` - trajectory and manifest JSON contracts.
+- `systems/` - pure symbolic system definitions.
+- `scripts/` - example registry and deterministic data generators.
+- `viewer/` - TypeScript/Three.js/KaTeX viewer.
+- `tests/` - symbolic, numerical, export, and viewer-adjacent backend tests.
 
-## Current Examples
+## Examples
+
+Registered viewer examples:
 
 - Simple pendulum
 - Geodesic on a sphere
 - Charged particle in a uniform magnetic field
 - Uniform gravitational field
 - Ideal spring
-- Kepler problem with radial effective potential
+- Kepler problem
 - Bead on a rotating hoop
-- Lorenz attractor
+- Lorenz attractor, including precomputed rho variants
 - Hénon-Heiles system
 - Variable-speed wavefront propagation
 
-## Viewer
-
-The viewer renders a system gallery, playback controls, mathematical structure
-panels, invariant lanes, a 2D pendulum lens, a Kepler effective-potential lens,
-and Three.js scenes for configuration-space, phase-space, orbit, field, and
-spring views. The animation style is minimal, physical, and dynamic: dark
-stage, sparse labels, luminous live trajectories, restrained field/flow
-particles, and geometry that shows constraints, curvature, and conserved
-structure without decorative clutter.
+Backend-only examples and helpers include the controlled pendulum, metric
+geometry reference constructors, safety/certificate candidate checks, and
+verification-problem IR export.
 
 ## Development
 
-Install Python dependencies in your preferred environment, then install viewer
-dependencies:
+Install viewer dependencies once:
 
 ```sh
 cd viewer
 npm install
 ```
 
-Regenerate all examples and manifest data:
+Regenerate all trajectories and manifest data:
 
 ```sh
 python -m scripts.generate_all_examples
 ```
 
-Run the viewer:
+Run backend tests:
+
+```sh
+pytest -q
+```
+
+Build the viewer:
+
+```sh
+cd viewer
+npm run build
+```
+
+Run the viewer locally:
 
 ```sh
 cd viewer
 npm run dev
-```
-
-Run focused verification while iterating:
-
-```sh
-pytest -q                             # broad backend check
-cd viewer && npm run build             # TypeScript/build check
 ```
 
 Visual tests expect the Vite dev server at `http://127.0.0.1:5173/`:
@@ -101,14 +105,13 @@ cd viewer
 npm run test:visual
 ```
 
-For small incremental changes, run the narrowest relevant test/build instead of
-the full baseline by default.
+For small changes, run the narrowest relevant test/build first. Use the full
+backend and viewer baseline for broad changes or release-style checks.
 
 ## Direction
 
-The current phase is diagnostics and phase-space structure (see
-`docs/VISION.md`): backend diagnostics exports, frontend diagnostics surfaces,
-and parameter families — followed by controlled dynamics and verification
-artifacts — while keeping the boundary simple: Python exports structured
-physics data; TypeScript turns that data into inspectable, interactive
-visuals.
+The near-term backend direction is to connect the verification IR to external
+adapter stubs and then push one controlled mechanical case study deeper through
+the safety pipeline. The near-term frontend direction is to expose exported
+diagnostics and, later, safety/certificate metadata without recomputing physics
+in TypeScript.

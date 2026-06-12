@@ -1,73 +1,58 @@
-# Dynamical Systems Plan
+# Dynamical Systems Notes
 
-The mechanics engine should keep its Lagrangian/Hamiltonian layer, but Lorenz
-needs a parallel backend for general first-order dynamical systems. The goal is
-to support non-conservative flows, attractors, stability diagnostics, and later
-chaos/bifurcation views without forcing everything through analytical mechanics.
+The dynamics layer complements the mechanics layer. Mechanics systems can still
+be derived from Lagrangians or Hamiltonians, while `engine.dynamics` covers
+general flows, controlled systems, ray/cotangent flows, metric geometry,
+diagnostics, and safety/certificate candidates.
 
-## Minimal Lorenz Slice
+## Current Backend Shape
 
-[x] Add `engine/dynamics/first_order.py` with a `FirstOrderSystem` that carries
-state symbols, parameter symbols, RHS expressions, symbolic Jacobian,
-divergence, fixed-point solving, linearization, and `numerical_rhs(...)`.
+- `FirstOrderSystem` represents `dx/dt = f(t, x; params)` with symbolic RHS,
+  Jacobian, divergence, fixed points, linearization, and numerical RHS support.
+- `ControlledFirstOrderSystem` represents `dx/dt = f(t, x, u, d; params)` with
+  control/disturbance symbols, admissible boxes, closed-loop reduction, and
+  deterministic rollouts.
+- Cotangent Hamiltonian systems support ray/geodesic-style flow.
+- Parameterized media models cover scalar speed, refractive index, and inverse
+  metric descriptions.
+- Metric geometry helpers derive Christoffel symbols, geodesic equations, and
+  cogeodesic media for fixed-background examples.
+- Safety helpers represent safe/unsafe sets, candidate Lyapunov/barrier
+  functions, proof obligations, and measured sampled checks.
+- `engine.verification` serializes proof obligations into a backend-agnostic IR.
 
-[x] Add an adaptive integrator wrapper around `scipy.integrate.solve_ivp` with
-tolerances, max step, optional transient discard, and uniform resampling for
-viewer playback.
+## Diagnostics
 
-[x] Add `systems/lorenz_attractor.py` with parameters `sigma`, `rho`, `beta`
-and state `(x, y, z)`.
+Implemented diagnostics include:
 
-[x] Add a Lorenz generator that exports trajectory data, speed series,
-trajectory bounds, divergence, fixed points, and Jacobian eigenvalues at fixed
-points.
+- Fixed points and symbolic/numeric Jacobians.
+- Eigenvalues and stability information at equilibria.
+- Divergence and volume contraction/expansion.
+- Speed, radius, and distance-from-equilibrium series.
+- Trajectory bounds and renderer-hint framing.
+- Finite-time Lyapunov exponent estimates for Lorenz and Hénon-Heiles.
+- Poincare sections for Hénon-Heiles.
+- Invariant-residual tracking for conserved quantities.
+- Parameter variants, currently used by the Lorenz rho family.
+- Ray diagnostics: travel time, caustic proximity, and wavefront envelopes.
 
-[x] Extend the manifest/spec layer enough to register a non-mechanics
-first-order-flow example without breaking current mechanics examples.
+## Current Examples
 
-[x] Add viewer lens support for an `attractor-3d` animation: fading trajectory,
-live point, sparse vector-flow cues, fixed-point markers, and restrained
-dark-stage styling matching the current visual system.
+- Lorenz attractor exercises general first-order dynamics, adaptive integration,
+  dissipative-flow diagnostics, FTLE metadata, and attractor rendering.
+- Hénon-Heiles exercises Hamiltonian chaos diagnostics, invariant residuals,
+  FTLE metadata, and Poincare-section export.
+- Variable-speed wavefront propagation exercises cotangent flow, ray bundles,
+  parameterized media, and wavefront diagnostics.
+- Controlled pendulum exercises controlled dynamics, closed-loop reduction,
+  rollout reporting, safety metadata, and verification-problem IR export.
 
-[x] Add focused tests for Lorenz RHS, divergence, fixed points, Jacobian
-eigenvalues, adaptive integration output shape, exported metadata, and manifest
-registration.
+## Next Work
 
-## Backend Shape
-
-- `engine/dynamics/` contains general dynamical-system tools.
-- `FirstOrderSystem` represents `dx/dt = f(t, x, params)`.
-- Mechanics systems can remain in `engine/mechanics/`; when useful, they can be
-converted to first-order systems for shared flow diagnostics.
-- The export boundary should stay the same: Python exports structured state,
-series, metadata, and diagnostics; TypeScript renders them.
-
-## Diagnostics To Add Over Time
-
-- [x] Fixed points and symbolic/numeric Jacobians.
-- [x] Eigenvalues and stability classification at equilibria.
-- [x] Divergence and volume contraction/expansion.
-- [x] Speed, radius, and distance-from-equilibrium series.
-- [x] Trajectory bounds and recommended camera framing (renderer hints).
-- [x] Approximate Lyapunov exponents (finite-time, Lorenz and Hénon-Heiles).
-- [x] Poincare sections (Hénon-Heiles `y = 0` upward crossings).
-- [x] Parameter sweeps, first slice (Lorenz rho-family manifest variants);
-      bifurcation diagrams still open.
-- [x] Ray diagnostics for cotangent flows: travel time, caustic proximity,
-      wavefront envelopes (`engine/dynamics/ray_diagnostics.py`).
-- Basin sampling for multistable systems.
-
-## Viewer Lens Ideas
-
-- `attractor-3d`: trajectory ribbon/tail, live point, fixed points, sparse flow
-  particles.
-- `vector-field-3d`: local arrows or advected particles through a sampled field.
-- `time-series`: stacked coordinate traces.
-- `poincare-section`: sampled intersections with a section plane.
-- `bifurcation`: parameter sweep plot with highlighted current parameter.
-
-## First Target
-
-The first non-mechanics example should be the Lorenz attractor. It exercises the
-new first-order-system backend, adaptive integration, dissipative-flow
-diagnostics, and attractor-style rendering while staying mathematically compact.
+- Add a stub external-verification adapter for the IR.
+- Add basin sampling or bifurcation-style diagnostics when a concrete example
+  needs them.
+- Extend parameter-family exports beyond Lorenz once frontend variant behavior
+  is settled.
+- Keep advanced geometry backend-only until the viewer can represent it
+  honestly.

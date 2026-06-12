@@ -1,9 +1,8 @@
 # Safety / Certificate Metadata — Design Spec (v0)
 
 Advances `docs/VISION.md` §11 priority 2, building on the controlled-dynamics
-layer (`docs/controlled-dynamics.md`). Drafted and implemented by Claude at
-the human's direction. Status: **implemented** (see Verification at the
-bottom).
+layer (`docs/controlled-dynamics.md`). Status: **implemented** (see
+Verification at the bottom).
 
 ## Goal
 
@@ -31,9 +30,9 @@ viewer change.
    `BarrierCandidate` (B, candidate-invariant region `{B <= 0}`) generate
    `ProofObligation` records — canonical statements
    `expression <comparison> 0 on region` — via Lie derivatives along a given
-   closed-loop `FirstOrderSystem`. Obligations are the artifact a future
-   verification-problem IR will serialize; here they are structured data plus
-   sampling.
+   closed-loop `FirstOrderSystem`. Obligations are structured data plus
+   sampling evidence, and `engine.verification` serializes them into the
+   backend-agnostic verification-problem IR.
 4. **Sampling is deterministic and honestly labeled.** `grid_points` builds
    deterministic grids (no RNG); `sample_obligation` evaluates an obligation
    on points, restricted to its region, and returns an `ObligationSample`
@@ -49,9 +48,9 @@ viewer change.
    Invariant-set candidates are expressed in v0 as the sublevel form of
    `BarrierCandidate`.
 6. **Deferred (out of v0):** SOS/LP certificate synthesis, validated-numeric
-   checks (rigor level 2), the verification-problem IR serialization itself,
-   control barrier functions with class-K margins, time-varying sets,
-   manifest export of safety geometry, and any viewer rendering.
+   checks (rigor level 2), external proof discharge, control barrier functions
+   with class-K margins, time-varying sets, manifest export of safety geometry,
+   and any viewer rendering.
 
 ## Files
 
@@ -61,8 +60,11 @@ viewer change.
   `lie_derivative`, `grid_points`, `sample_obligation`.
 - `tests/test_safety_certificates.py` — obligations below.
 - `engine/dynamics/__init__.py` — exports.
-- Doc updates: `docs/BACKEND.md`, `docs/VISION.md` §11 item 2 status,
-  `docs/task-queue.md`, and test-count baselines.
+- `engine/verification/` — backend-agnostic verification-problem IR v0 and
+  safety adapter for serializing proof obligations without proof results.
+- `tests/test_verification_ir.py` — IR serialization and adapter checks.
+- Doc updates: `README.md`, `docs/BACKEND.md`, `docs/VISION.md` §11 item
+  statuses, and test-count baselines.
 
 ## Invariants / proof obligations (for this implementation)
 
@@ -94,8 +96,8 @@ viewer change.
 ## Verification commands
 
 ```sh
-pytest tests/test_safety_certificates.py -q   # targeted
-pytest -q                                     # full backend suite
+pytest tests/test_safety_certificates.py tests/test_verification_ir.py -q
+pytest -q
 ```
 
 No generator or viewer commands: nothing crosses the manifest boundary.
@@ -108,6 +110,7 @@ to the manifest/export schema and any frontend surface.
 ## Verification record
 
 Implemented and verified 2026-06-12: `pytest -q` green including
-`tests/test_safety_certificates.py` (see `docs/BACKEND.md` baseline for the
-current count). Obligations above hold with the tolerances encoded in the
-tests.
+`tests/test_safety_certificates.py` and `tests/test_verification_ir.py` (see
+`docs/BACKEND.md` baseline for the current count). Obligations above hold with
+the tolerances encoded in the tests; IR serialization records obligations for
+external discharge without proof results.

@@ -79,9 +79,10 @@ analytical mechanics
 ```
 
 Each stage is a deliberate artifact, not a side effect. The first three stages
-exist today in a partial, *autonomous* (uncontrolled) form. The later stages —
-controlled dynamics, certificate candidates, proof obligations, and backend
-adapters — are the roadmap, not current capability.
+exist today for several example systems. Continuous controlled dynamics,
+certificate candidates, proof obligations, and a backend-agnostic
+verification-problem IR also exist in backend form. External verification
+adapters and actual proof discharge remain roadmap items.
 
 ## 5. Target Domain: Mechanics-Based CPS and Robotics
 
@@ -162,9 +163,11 @@ flows, conserved quantities, invariant *diagnostics*, and — as of the
 controlled-dynamics layer (`docs/controlled-dynamics.md`) — continuous controlled
 dynamics `dx/dt = f(t, x, u, d; θ)` with box-shaped admissible control and
 disturbance sets, closed-loop reduction, and deterministic rollouts
-(backend-only). It does **not** yet implement the discrete-time analogue,
-safe/unsafe sets, obstacles, certificate candidates, proof obligations, or the
-verification-problem IR.
+(backend-only). It also implements backend-only safe/unsafe sublevel sets,
+candidate Lyapunov/barrier functions, proof obligations, measured sampled
+checks, and verification-problem IR v0. It does **not** yet implement the
+discrete-time analogue, real certificate synthesis, proof discharge, validated
+numerics, or frontend safety surfaces.
 
 A specific distinction to preserve: the existing **finite-time Lyapunov exponent**
 diagnostic (`engine/dynamics/diagnostics.py`) measures sensitive dependence /
@@ -183,11 +186,13 @@ controlled dynamics, certificate candidates, and IR export.
   Legendre transforms, Noether charges, Poisson brackets, symplectic utilities,
   constraints, coordinate transforms.
 - `engine/dynamics/` — first-order systems (symbolic Jacobian, divergence, fixed
-  points, linearization), cotangent Hamiltonian flow, ray bundles, parameterized
-  media models (scalar wave speed, refractive index, inverse metric), metric
-  geometry for fixed-background geodesics (backend-only), and diagnostics
-  (Poincaré sections, finite-time Lyapunov exponents, invariant residuals, ray
-  travel time / caustic proximity / wavefront envelopes).
+  points, linearization), controlled systems, cotangent Hamiltonian flow, ray
+  bundles, parameterized media models (scalar wave speed, refractive index,
+  inverse metric), metric geometry for fixed-background geodesics
+  (backend-only), safety/certificate candidates, and diagnostics (Poincaré
+  sections, finite-time Lyapunov exponents, invariant residuals, ray travel
+  time / caustic proximity / wavefront envelopes).
+- `engine/verification/` — backend-agnostic verification-problem IR and adapters.
 - `engine/numerics/` — fixed-step RK4 and adaptive integration.
 - `engine/export/` — `Trajectory`, the manifest contract, and JSON export.
 - `systems/` — pure symbolic system definitions (one file per system).
@@ -246,6 +251,8 @@ In priority order:
    actual certificate synthesis/proof discharge remains open.*
 3. **Verification-problem IR (v0).** Define and serialize the IR above, even if
    the only adapter is a stub that writes the problem out for inspection.
+   *Status: implemented backend-only (`engine/verification/`); external
+   adapters and proof discharge remain open.*
 4. **First serious case study (see §13).** Push one small controlled system end
    to end through the pipeline.
 5. **Frontend safety surfaces.** Safe/unsafe-set rendering, certificate-value
@@ -332,10 +339,11 @@ invariants) — not a generic RL platform. This is an extension, not the core.
 **Credibility boundaries (what the engine must not claim):**
 
 - It does **not** currently verify, certify, or prove any system. It currently
-  *simulates*, *diagnoses*, and *visualizes*, and the verification layer is
-  roadmap.
+  *simulates*, *diagnoses*, *visualizes*, and exports proof-obligation problems
+  for external discharge.
 - A finite-time Lyapunov *exponent* is a chaos diagnostic, not a Lyapunov
-  *function*; the engine has the former, not the latter.
+  *function*; the engine has both concepts, but they live in different modules
+  and serve different purposes.
 - A "certificate" produced by the engine is a **candidate** until an external
   sound method accepts it, and then only **under stated assumptions**.
 - Every emitted claim should carry its rigor level (§7), and "measured" must
