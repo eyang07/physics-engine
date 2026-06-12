@@ -43,7 +43,7 @@ diagnostics, controlled dynamics, safety metadata, and verification artifacts.
 - `engine/dynamics/` - first-order, controlled, cotangent, ray, media, metric,
   diagnostics, and safety-candidate tools.
 - `engine/verification/` - versioned verification-problem IR and adapters.
-- `engine/numerics/` - fixed-step RK4 and adaptive integration.
+- `engine/numerics/` - fixed-step RK4, adaptive, and symplectic integration.
 - `engine/export/` - trajectory and manifest JSON contracts.
 - `systems/` - pure symbolic system definitions.
 - `scripts/` - example registry and deterministic data generators.

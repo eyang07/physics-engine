@@ -15,7 +15,9 @@ artifacts.
   - First-order systems `dx/dt = f(t, x; params)`.
   - Symbolic Jacobians, divergence, fixed points, linearization, and numerical
     RHS generation.
-  - Adaptive and fixed-step integration.
+  - Adaptive and fixed-step integration, plus symplectic integration
+    (symplectic Euler, Störmer-Verlet) for separable Hamiltonians with a
+    symbolic separability check (spec in `docs/symplectic-integrators.md`).
 - Controlled dynamics:
   - Continuous controlled systems `dx/dt = f(t, x, u, d; params)`.
   - Box-shaped admissible control/disturbance sets.
@@ -91,7 +93,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `239 passed`.
+Latest known result: `247 passed`.
 
 Use focused tests while iterating:
 
@@ -99,6 +101,7 @@ Use focused tests while iterating:
 pytest tests/test_controlled_dynamics.py -q
 pytest tests/test_safety_certificates.py tests/test_verification_ir.py -q
 pytest tests/test_candidate_generation.py tests/test_inspection_adapter.py -q
+pytest tests/test_symplectic_integrators.py -q
 ```
 
 Regenerate data when backend output changes:

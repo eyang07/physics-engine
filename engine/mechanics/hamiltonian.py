@@ -65,6 +65,53 @@ class HamiltonianSystem:
             for symbol, expression in zip(qdot + pdot, self.hamilton_equations(), strict=True)
         )
 
+    def is_separable(self) -> bool:
+        """True when H = T(p) + V(q), i.e. all q-p cross derivatives vanish."""
+
+        return all(
+            sp.simplify(sp.diff(self.hamiltonian, q_i, p_j)) == 0
+            for q_i in self.q
+            for p_j in self.p
+        )
+
+    def separable_split(
+        self,
+        substitutions: Mapping[sp.Symbol, float] | None = None,
+    ):
+        """Build the split RHS ``(velocity(p), force(q))`` for symplectic steps.
+
+        Requires an autonomous separable Hamiltonian ``H = T(p) + V(q)``;
+        the result feeds ``engine.numerics.integrate_symplectic``.
+        """
+
+        hamiltonian = sp.sympify(self.hamiltonian).subs(substitutions or {})
+        if hamiltonian.has(self.time):
+            raise ValueError("separable split requires an autonomous Hamiltonian")
+        unresolved = hamiltonian.free_symbols - {*self.q, *self.p}
+        if unresolved:
+            names = ", ".join(sorted(symbol.name for symbol in unresolved))
+            raise ValueError(f"unresolved symbols in Hamiltonian: {names}")
+        for q_i in self.q:
+            for p_j in self.p:
+                if sp.simplify(sp.diff(hamiltonian, q_i, p_j)) != 0:
+                    raise ValueError(
+                        "Hamiltonian is not separable: "
+                        f"d^2H/d{q_i.name} d{p_j.name} != 0"
+                    )
+
+        velocity_exprs = [sp.diff(hamiltonian, p_i) for p_i in self.p]
+        force_exprs = [-sp.diff(hamiltonian, q_i) for q_i in self.q]
+        velocity_compiled = sp.lambdify(self.p, velocity_exprs, modules="numpy")
+        force_compiled = sp.lambdify(self.q, force_exprs, modules="numpy")
+
+        def velocity(momentum: Sequence[float]) -> np.ndarray:
+            return np.asarray(velocity_compiled(*momentum), dtype=float)
+
+        def force(position: Sequence[float]) -> np.ndarray:
+            return np.asarray(force_compiled(*position), dtype=float)
+
+        return velocity, force
+
     def numerical_rhs(
         self,
         substitutions: Mapping[sp.Symbol, float] | None = None,

@@ -195,7 +195,8 @@ controlled dynamics, certificate candidates, and IR export.
   sections, finite-time Lyapunov exponents, invariant residuals, ray travel
   time / caustic proximity / wavefront envelopes).
 - `engine/verification/` — backend-agnostic verification-problem IR and adapters.
-- `engine/numerics/` — fixed-step RK4 and adaptive integration.
+- `engine/numerics/` — fixed-step RK4, adaptive integration, and symplectic
+  integrators (symplectic Euler, Störmer–Verlet) for separable Hamiltonians.
 - `engine/export/` — `Trajectory`, the manifest contract, and JSON export.
 - `systems/` — pure symbolic system definitions (one file per system).
 - `scripts/` — generators and the `example_specs.py` registry; deterministic,
