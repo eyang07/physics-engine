@@ -10,6 +10,12 @@ from engine.dynamics.diagnostics import (
     poincare_section_crossings,
 )
 from engine.dynamics.first_order import FirstOrderSystem
+from engine.dynamics.media import (
+    InverseMetricMedium,
+    RefractiveIndexMedium,
+    ScalarSpeedMedium,
+    gaussian_lens_speed,
+)
 from engine.dynamics.ray_bundle import (
     RayBundleResult,
     integrate_ray_bundle,
@@ -21,10 +27,14 @@ __all__ = [
     "CotangentHamiltonianSystem",
     "FirstOrderSystem",
     "InvariantResidual",
+    "InverseMetricMedium",
     "LyapunovResult",
     "PoincareSection",
     "RayBundleResult",
+    "RefractiveIndexMedium",
+    "ScalarSpeedMedium",
     "finite_time_lyapunov",
+    "gaussian_lens_speed",
     "invariant_residuals",
     "integrate_ray_bundle",
     "poincare_section_crossings",

@@ -51,7 +51,7 @@ Architecture and boundary:
 Maturity: a working v0.1 with multiple registered examples (pendulum, sphere
 geodesic, charged particle, uniform gravity, ideal spring, Kepler, bead on
 rotating hoop, Lorenz, Hénon–Heiles, variable-speed wavefront). The latest
-baseline noted in docs is `pytest -q` green (178 tests), `viewer` build clean,
+baseline noted in docs is `pytest -q` green (186 tests), `viewer` build clean,
 and Playwright visual tests passing; use it as a release/reference baseline, not
 as a required check for every small edit. The current phase (`docs/VISION.md`
 §"v0.2") is diagnostics and phase-space structure: Poincaré sections, Lyapunov

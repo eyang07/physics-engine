@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sympy as sp
 
-from engine.dynamics import CotangentHamiltonianSystem
+from engine.dynamics import CotangentHamiltonianSystem, ScalarSpeedMedium, gaussian_lens_speed
 from engine.mechanics.coordinates import CoordinateChart
 
 
@@ -14,9 +14,12 @@ def wave_speed(
     lens_strength: sp.Expr | float,
     lens_width: sp.Expr | float,
 ) -> sp.Expr:
-    radius_squared = x**2 + y**2
-    lens = lens_strength * sp.exp(-radius_squared / (2 * lens_width**2))
-    return sp.simplify(base_speed * (1 - lens))
+    return gaussian_lens_speed(
+        (x, y),
+        base_speed=base_speed,
+        lens_strength=lens_strength,
+        lens_width=lens_width,
+    )
 
 
 def build_system(
@@ -32,26 +35,23 @@ def build_system(
     alpha_value = sp.Symbol("alpha", nonnegative=True) if lens_strength is None else lens_strength
     sigma_value = sp.Symbol("sigma", positive=True) if lens_width is None else lens_width
 
-    speed = wave_speed(
-        x,
-        y,
-        base_speed=c0_value,
-        lens_strength=alpha_value,
-        lens_width=sigma_value,
-    )
-    symbol = sp.simplify(speed**2 * (xi**2 + eta**2) / 2)
-
-    return CotangentHamiltonianSystem(
+    medium = ScalarSpeedMedium(
         coordinates=chart.coordinates,
-        momenta=(xi, eta),
-        symbol=symbol,
+        speed=wave_speed(
+            x,
+            y,
+            base_speed=c0_value,
+            lens_strength=alpha_value,
+            lens_width=sigma_value,
+        ),
         parameters=tuple(
             symbol
             for symbol in (c0_value, alpha_value, sigma_value)
             if isinstance(symbol, sp.Symbol)
         ),
-        time=chart.time,
     )
+
+    return medium.to_system(momenta=(xi, eta), time=chart.time)
 
 
 system = build_system()

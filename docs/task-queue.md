@@ -26,14 +26,23 @@ handoff / review / merge protocol.
   system-attached `variants`, and Lorenz exports deterministic rho-family
   variant trajectories alongside the default trajectory.
 
+- **Generalized parameterized media helpers** — implemented directly by Claude
+  on `main` at the human's request (no Codex handoff). New
+  `engine.dynamics.media` module with `ScalarSpeedMedium`,
+  `RefractiveIndexMedium`, `InverseMetricMedium` (+ `from_metric`), and a
+  reusable `gaussian_lens_speed` profile; the variable-speed wavefront system
+  delegates to it. Verified: `pytest -q` 186 passed; regenerating
+  `variable_speed_wavefront` produced byte-identical JSON outputs.
+
 ## Ready
 
 No fully specced Codex handoff is currently queued.
 
 ## Next Itinerary Candidate
 
-- **Backend:** generalize parameterized media helpers for scalar wave speed,
-  refractive index, or metric coefficients.
+- **Backend:** diagnostics for wave/ray examples (travel time, caustic
+  proximity, wavefront envelope metadata) or the GR metric helper on top of
+  `InverseMetricMedium.from_metric`.
 - **Frontend:** manifest-driven diagnostics panel for exported backend
   diagnostics. Start with Lorenz and Hénon-Heiles Lyapunov metadata plus
   Hénon-Heiles Poincare-section metadata, without recomputing dynamics in

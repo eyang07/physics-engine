@@ -31,7 +31,7 @@ variable-speed wavefront propagation.
 wavefront snapshots using cotangent Hamiltonian flow, and the viewer renders it
 with a dedicated 2D wavefront lens.
 
-[x] Reference verification baseline: `pytest -q` passes with 178 tests. Full
+[x] Reference verification baseline: `pytest -q` passes with 186 tests. Full
 project verification also includes `cd viewer && npm run build` and
 `cd viewer && npm run test:visual`, but small backend iterations should use
 targeted tests or specific generators first.
@@ -114,16 +114,23 @@ invariant residuals scoped to conserved quantities.
 now attach deterministic precomputed `variants` to a system, and Lorenz exports
 rho-family trajectories alongside the default path.
 
+[x] Generalize parameterized media helpers. `engine.dynamics.media` now provides
+reusable scalar wave-speed, refractive-index, and inverse-metric medium models
+that each build a `CotangentHamiltonianSystem`, plus a parameterized Gaussian
+slow-speed lens profile. The variable-speed wavefront system delegates to them
+without changing generated JSON outputs, and symbolic tests pin the
+refractive-index and conformal-metric reductions to the scalar-speed symbol.
+
 ## Next Best Three Items
 
-1. Generalize parameterized media helpers.
-   Extend the wave/ray backend beyond the Gaussian slow-speed lens toward
-   reusable scalar wave-speed, refractive-index, or metric-coefficient models.
-
-2. Add diagnostics for wave/ray examples.
+1. Add diagnostics for wave/ray examples.
    Extend ray-bundle exports with Hamiltonian constraint drift, caustic
    proximity, travel time, and wavefront envelope metadata where those
    quantities are mathematically defined.
+
+2. Add the GR metric helper for fixed-background geodesic examples.
+   Christoffel symbols and geodesic RHS, starting with low-dimensional or
+   symmetry-reduced metrics, building on `InverseMetricMedium.from_metric`.
 
 3. Extend parameter variants beyond Lorenz.
    Add Hénon-Heiles or another high-value system once the frontend can expose
@@ -143,8 +150,8 @@ coordinate bounds.
 
 [x] First parameterized scalar wave-speed helper for a Gaussian slow-speed lens.
 
-[ ] Generalize parameterized media helpers for scalar wave speed, refractive
-index, or metric coefficients.
+[x] Generalize parameterized media helpers for scalar wave speed, refractive
+index, or metric coefficients (`engine.dynamics.media`).
 
 [ ] GR metric helper for fixed-background geodesic examples: Christoffel symbols
 and geodesic RHS, starting with low-dimensional or symmetry-reduced metrics.
@@ -162,7 +169,7 @@ proximity, travel time, and wavefront envelope metadata.
 
 1. [x] Add invariant-residual tracking for known conserved quantities.
 2. [x] Add parameter sweep manifests for selected systems.
-3. Generalize parameterized media helpers.
+3. [x] Generalize parameterized media helpers.
 4. Decide the parameter-interactivity backend strategy.
 5. Add the next physics example after the data-contract direction is settled.
 
