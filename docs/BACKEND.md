@@ -31,7 +31,7 @@ variable-speed wavefront propagation.
 wavefront snapshots using cotangent Hamiltonian flow, and the viewer renders it
 with a dedicated 2D wavefront lens.
 
-[x] Reference verification baseline: `pytest -q` passes with 186 tests. Full
+[x] Reference verification baseline: `pytest -q` passes with 193 tests. Full
 project verification also includes `cd viewer && npm run build` and
 `cd viewer && npm run test:visual`, but small backend iterations should use
 targeted tests or specific generators first.
@@ -121,16 +121,24 @@ slow-speed lens profile. The variable-speed wavefront system delegates to them
 without changing generated JSON outputs, and symbolic tests pin the
 refractive-index and conformal-metric reductions to the scalar-speed symbol.
 
+[x] Add diagnostics for wave/ray examples. `engine.dynamics.ray_diagnostics`
+now computes per-ray travel time (the eikonal phase integral of `xi . dq`,
+with a measured residual against the exact `degree * p0 * s` model for
+homogeneous symbols), caustic proximity via adjacent-ray finite-difference
+spreading factors, and per-snapshot wavefront envelope metadata (arc length,
+spreading range, coordinate bounds). The variable-speed wavefront export
+carries these in an additive `rayDiagnostics` metadata block.
+
 ## Next Best Three Items
 
-1. Add diagnostics for wave/ray examples.
-   Extend ray-bundle exports with Hamiltonian constraint drift, caustic
-   proximity, travel time, and wavefront envelope metadata where those
-   quantities are mathematically defined.
-
-2. Add the GR metric helper for fixed-background geodesic examples.
+1. Add the GR metric helper for fixed-background geodesic examples.
    Christoffel symbols and geodesic RHS, starting with low-dimensional or
    symmetry-reduced metrics, building on `InverseMetricMedium.from_metric`.
+
+2. Design the controlled-dynamics layer (`x' = f(t, x, u, d; params)`).
+   This is `docs/VISION.md` §11 priority 1 and the prerequisite for safe
+   sets, certificate candidates, and the verification-problem IR. Design
+   spec first; implementation after the API is settled.
 
 3. Extend parameter variants beyond Lorenz.
    Add Hénon-Heiles or another high-value system once the frontend can expose
@@ -156,8 +164,9 @@ index, or metric coefficients (`engine.dynamics.media`).
 [ ] GR metric helper for fixed-background geodesic examples: Christoffel symbols
 and geodesic RHS, starting with low-dimensional or symmetry-reduced metrics.
 
-[ ] Diagnostics for wave/ray examples: Hamiltonian constraint drift, caustic
-proximity, travel time, and wavefront envelope metadata.
+[x] Diagnostics for wave/ray examples: Hamiltonian constraint drift (in the
+ray-bundle helper), caustic proximity, travel time, and wavefront envelope
+metadata (`engine.dynamics.ray_diagnostics`).
 
 ## Example Generation Notes
 

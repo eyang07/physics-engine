@@ -22,6 +22,13 @@ from engine.dynamics.ray_bundle import (
     ray_bundle_coordinate_bounds,
     ray_bundle_snapshot_indices,
 )
+from engine.dynamics.ray_diagnostics import (
+    caustic_proximity,
+    ray_bundle_diagnostics,
+    ray_spreading_factors,
+    ray_travel_times,
+    wavefront_envelope_records,
+)
 
 __all__ = [
     "CotangentHamiltonianSystem",
@@ -33,11 +40,16 @@ __all__ = [
     "RayBundleResult",
     "RefractiveIndexMedium",
     "ScalarSpeedMedium",
+    "caustic_proximity",
     "finite_time_lyapunov",
     "gaussian_lens_speed",
     "invariant_residuals",
     "integrate_ray_bundle",
     "poincare_section_crossings",
     "ray_bundle_coordinate_bounds",
+    "ray_bundle_diagnostics",
     "ray_bundle_snapshot_indices",
+    "ray_spreading_factors",
+    "ray_travel_times",
+    "wavefront_envelope_records",
 ]

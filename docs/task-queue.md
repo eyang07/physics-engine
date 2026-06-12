@@ -32,7 +32,18 @@ handoff / review / merge protocol.
   `RefractiveIndexMedium`, `InverseMetricMedium` (+ `from_metric`), and a
   reusable `gaussian_lens_speed` profile; the variable-speed wavefront system
   delegates to it. Verified: `pytest -q` 186 passed; regenerating
-  `variable_speed_wavefront` produced byte-identical JSON outputs.
+  `variable_speed_wavefront` produced byte-identical JSON outputs (verified by
+  `cmp` against a regeneration from the pre-refactor commit; note generated
+  data is gitignored, so `git diff` alone is not a valid check).
+
+- **Wave/ray diagnostics** — implemented directly by Claude on `main` at the
+  human's request. New `engine.dynamics.ray_diagnostics` module: travel time
+  (eikonal phase `int xi . dq` with residual vs the exact `degree * p0 * s`
+  model), caustic proximity (adjacent-ray spreading factors), and wavefront
+  envelope records, exported as an additive `rayDiagnostics` metadata block by
+  the wavefront generator. Verified: `pytest -q` 193 passed; regenerated JSON
+  is identical to the previous output apart from the added `rayDiagnostics`
+  key (checked by structural comparison).
 
 ## Ready
 
@@ -40,9 +51,8 @@ No fully specced Codex handoff is currently queued.
 
 ## Next Itinerary Candidate
 
-- **Backend:** diagnostics for wave/ray examples (travel time, caustic
-  proximity, wavefront envelope metadata) or the GR metric helper on top of
-  `InverseMetricMedium.from_metric`.
+- **Backend:** the GR metric helper on top of `InverseMetricMedium.from_metric`,
+  or the controlled-dynamics design spec (`docs/VISION.md` §11 priority 1).
 - **Frontend:** manifest-driven diagnostics panel for exported backend
   diagnostics. Start with Lorenz and Hénon-Heiles Lyapunov metadata plus
   Hénon-Heiles Poincare-section metadata, without recomputing dynamics in

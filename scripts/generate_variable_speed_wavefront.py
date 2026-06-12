@@ -7,7 +7,11 @@ from typing import Sequence
 import numpy as np
 import sympy as sp
 
-from engine.dynamics import integrate_ray_bundle, ray_bundle_coordinate_bounds
+from engine.dynamics import (
+    integrate_ray_bundle,
+    ray_bundle_coordinate_bounds,
+    ray_bundle_diagnostics,
+)
 from engine.export import Trajectory
 from systems.variable_speed_wavefront import build_system, wave_speed
 
@@ -120,6 +124,13 @@ def generate_variable_speed_wavefront(
             "initial": bundle.hamiltonian_initials.astype(float).tolist(),
             "maxDrift": bundle.max_hamiltonian_drift,
         },
+        # The symbol c(q)^2 |xi|^2 / 2 is homogeneous of degree 2 in xi, so the
+        # measured eikonal phase can be checked against 2 * p0 * s exactly.
+        "rayDiagnostics": ray_bundle_diagnostics(
+            bundle,
+            snapshot_stride=snapshot_stride,
+            symbol_degree=2,
+        ),
     }
 
     return Trajectory.from_arrays(
