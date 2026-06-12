@@ -31,7 +31,7 @@ variable-speed wavefront propagation.
 wavefront snapshots using cotangent Hamiltonian flow, and the viewer renders it
 with a dedicated 2D wavefront lens.
 
-[x] Reference verification baseline: `pytest -q` passes with 193 tests. Full
+[x] Reference verification baseline: `pytest -q` passes with 204 tests. Full
 project verification also includes `cd viewer && npm run build` and
 `cd viewer && npm run test:visual`, but small backend iterations should use
 targeted tests or specific generators first.
@@ -129,20 +129,32 @@ spreading factors, and per-snapshot wavefront envelope metadata (arc length,
 spreading range, coordinate bounds). The variable-speed wavefront export
 carries these in an additive `rayDiagnostics` metadata block.
 
+[x] Add the GR metric helper for fixed-background geodesic examples
+(backend-only). `engine.dynamics.metric.MetricGeometry` derives Christoffel
+symbols, a metric-compatibility residual that must vanish identically, the
+geodesic equation as a `FirstOrderSystem`, and the cogeodesic
+`InverseMetricMedium`. Reference constructors cover the round 2-sphere and the
+equatorial Schwarzschild plane. Verified symbolically against textbook
+Christoffel values, the Lagrangian route for the sphere geodesic, and the
+Legendre transform; measured: a Schwarzschild circular orbit holds its radius
+and Killing charges to 1e-12. No gallery/manifest entry until the viewer can
+render the geometry honestly.
+
 ## Next Best Three Items
 
-1. Add the GR metric helper for fixed-background geodesic examples.
-   Christoffel symbols and geodesic RHS, starting with low-dimensional or
-   symmetry-reduced metrics, building on `InverseMetricMedium.from_metric`.
-
-2. Design the controlled-dynamics layer (`x' = f(t, x, u, d; params)`).
+1. Design the controlled-dynamics layer (`x' = f(t, x, u, d; params)`).
    This is `docs/VISION.md` §11 priority 1 and the prerequisite for safe
    sets, certificate candidates, and the verification-problem IR. Design
    spec first; implementation after the API is settled.
 
-3. Extend parameter variants beyond Lorenz.
+2. Extend parameter variants beyond Lorenz.
    Add Hénon-Heiles or another high-value system once the frontend can expose
    backend-generated variants without arbitrary browser-side regeneration.
+
+3. Backend-only geodesic exploration on `MetricGeometry`.
+   For example a Schwarzschild orbit family (precession, photon-sphere
+   approach) exported as data for inspection, still outside the gallery
+   manifest pending honest lens support.
 
 ## Backend Tools To Add
 
@@ -161,8 +173,10 @@ coordinate bounds.
 [x] Generalize parameterized media helpers for scalar wave speed, refractive
 index, or metric coefficients (`engine.dynamics.media`).
 
-[ ] GR metric helper for fixed-background geodesic examples: Christoffel symbols
-and geodesic RHS, starting with low-dimensional or symmetry-reduced metrics.
+[x] GR metric helper for fixed-background geodesic examples: Christoffel symbols
+and geodesic RHS, starting with low-dimensional or symmetry-reduced metrics
+(`engine.dynamics.metric.MetricGeometry`, with 2-sphere and equatorial
+Schwarzschild reference constructors).
 
 [x] Diagnostics for wave/ray examples: Hamiltonian constraint drift (in the
 ray-bundle helper), caustic proximity, travel time, and wavefront envelope

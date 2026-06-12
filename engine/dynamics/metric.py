@@ -1,0 +1,217 @@
+"""Fixed-background metric geometry for geodesic examples.
+
+:class:`MetricGeometry` holds metric coefficients ``g_ij(q)`` on a chart
+(Riemannian or Lorentzian; the formulas do not depend on signature) and
+derives:
+
+- Christoffel symbols
+  ``Gamma^k_ij = g^kl (d_i g_jl + d_j g_il - d_l g_ij) / 2``;
+- the geodesic equation as a first-order system in ``(q, q_dot)`` with
+  ``qddot^k = -Gamma^k_ij qdot^i qdot^j``;
+- the cogeodesic Hamiltonian flow on the cotangent side, via
+  :class:`~engine.dynamics.media.InverseMetricMedium`, to which the existing
+  ray-bundle and ray-diagnostics utilities apply directly;
+- a metric-compatibility residual ``nabla g`` that must vanish identically,
+  as a self-check suitable for proof-obligation-style artifacts.
+
+This is a backend-only helper: geodesic examples built from it must not
+enter the gallery manifest until the viewer can render their geometry
+honestly (see `docs/BACKEND.md` open questions).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Sequence
+
+import sympy as sp
+
+from engine.dynamics.first_order import FirstOrderSystem
+from engine.dynamics.media import InverseMetricMedium, _detected_parameters
+from engine.mechanics.coordinates import velocity_symbol
+
+
+def _trig_simplify(expression: sp.Expr) -> sp.Expr:
+    """Simplification strong enough to cancel double-angle combinations."""
+
+    return sp.simplify(sp.expand_trig(expression))
+
+
+@dataclass(frozen=True)
+class MetricGeometry:
+    """Metric coefficients ``g_ij(q)`` on a coordinate chart."""
+
+    coordinates: tuple[sp.Symbol, ...]
+    metric: sp.Matrix
+    parameters: tuple[sp.Symbol, ...] | None = None
+
+    def __post_init__(self) -> None:
+        if not self.coordinates:
+            raise ValueError("coordinates must be non-empty")
+        matrix = sp.Matrix(self.metric)
+        object.__setattr__(self, "metric", matrix)
+        dimension = len(self.coordinates)
+        if matrix.shape != (dimension, dimension):
+            raise ValueError("metric must be a square matrix matching the coordinates")
+        if sp.simplify(matrix - matrix.T) != sp.zeros(dimension, dimension):
+            raise ValueError("metric must be symmetric")
+        if matrix.det() == 0:
+            raise ValueError("metric must be non-degenerate")
+        if self.parameters is None:
+            object.__setattr__(
+                self,
+                "parameters",
+                _detected_parameters(matrix, self.coordinates),
+            )
+
+    @property
+    def dimension(self) -> int:
+        return len(self.coordinates)
+
+    @property
+    def velocities(self) -> tuple[sp.Symbol, ...]:
+        return tuple(velocity_symbol(q) for q in self.coordinates)
+
+    def inverse_metric(self) -> sp.Matrix:
+        return sp.simplify(self.metric.inv())
+
+    def christoffel_symbols(self) -> sp.ImmutableDenseNDimArray:
+        """Second-kind Christoffel symbols indexed ``[k, i, j]``."""
+
+        n = self.dimension
+        g = self.metric
+        g_inv = self.inverse_metric()
+        q = self.coordinates
+        symbols = [
+            [
+                [
+                    sp.simplify(
+                        sum(
+                            g_inv[k, l]
+                            * (
+                                sp.diff(g[j, l], q[i])
+                                + sp.diff(g[i, l], q[j])
+                                - sp.diff(g[i, j], q[l])
+                            )
+                            for l in range(n)
+                        )
+                        / 2
+                    )
+                    for j in range(n)
+                ]
+                for i in range(n)
+            ]
+            for k in range(n)
+        ]
+        return sp.ImmutableDenseNDimArray(symbols)
+
+    def metric_compatibility_residual(self) -> sp.ImmutableDenseNDimArray:
+        """The covariant derivative ``nabla_k g_ij``; identically zero iff
+        the Christoffel symbols are the Levi-Civita connection of ``g``."""
+
+        n = self.dimension
+        g = self.metric
+        q = self.coordinates
+        gamma = self.christoffel_symbols()
+        residual = [
+            [
+                [
+                    _trig_simplify(
+                        sp.diff(g[i, j], q[k])
+                        - sum(gamma[l, k, i] * g[l, j] for l in range(n))
+                        - sum(gamma[l, k, j] * g[i, l] for l in range(n))
+                    )
+                    for j in range(n)
+                ]
+                for i in range(n)
+            ]
+            for k in range(n)
+        ]
+        return sp.ImmutableDenseNDimArray(residual)
+
+    def geodesic_accelerations(self) -> tuple[sp.Expr, ...]:
+        """``qddot^k = -Gamma^k_ij qdot^i qdot^j`` in the chart velocities."""
+
+        n = self.dimension
+        gamma = self.christoffel_symbols()
+        v = self.velocities
+        return tuple(
+            sp.simplify(
+                -sum(gamma[k, i, j] * v[i] * v[j] for i in range(n) for j in range(n))
+            )
+            for k in range(n)
+        )
+
+    def geodesic_system(self) -> FirstOrderSystem:
+        """The geodesic equation as a first-order system in ``(q, q_dot)``.
+
+        The independent variable is the affine parameter of the geodesic.
+        """
+
+        return FirstOrderSystem(
+            state=(*self.coordinates, *self.velocities),
+            rhs=(*self.velocities, *self.geodesic_accelerations()),
+            parameters=tuple(self.parameters or ()),
+            time=sp.Symbol("s", real=True),
+        )
+
+    def kinetic_energy(self) -> sp.Expr:
+        """``g_ij qdot^i qdot^j / 2``, conserved along geodesics."""
+
+        v = sp.Matrix(self.velocities)
+        return sp.simplify((v.T * self.metric * v)[0, 0] / 2)
+
+    def cogeodesic_medium(self) -> InverseMetricMedium:
+        """The cotangent-side medium whose flow is the cogeodesic flow."""
+
+        return InverseMetricMedium(
+            coordinates=tuple(self.coordinates),
+            inverse_metric=self.inverse_metric(),
+            parameters=tuple(self.parameters or ()),
+        )
+
+
+def schwarzschild_equatorial_metric(
+    schwarzschild_radius: sp.Expr | float | None = None,
+) -> MetricGeometry:
+    """Equatorial-plane Schwarzschild metric in coordinates ``(t, r, phi)``.
+
+    ``ds^2 = -(1 - rs/r) dt^2 + dr^2 / (1 - rs/r) + r^2 dphi^2``
+    with geometrized units ``G = c = 1`` and ``theta = pi/2`` fixed by the
+    spherical symmetry.
+    """
+
+    rs = (
+        sp.Symbol("r_s", positive=True)
+        if schwarzschild_radius is None
+        else schwarzschild_radius
+    )
+    t = sp.Symbol("t", real=True)
+    r = sp.Symbol("r", positive=True)
+    phi = sp.Symbol("phi", real=True)
+    factor = 1 - rs / r
+    return MetricGeometry(
+        coordinates=(t, r, phi),
+        metric=sp.diag(-factor, 1 / factor, r**2),
+        parameters=(rs,) if isinstance(rs, sp.Symbol) else (),
+    )
+
+
+def two_sphere_metric(radius: sp.Expr | float | None = None) -> MetricGeometry:
+    """Round-sphere metric ``ds^2 = R^2 (dtheta^2 + sin(theta)^2 dphi^2)``."""
+
+    radius_value = sp.Symbol("R", positive=True) if radius is None else radius
+    theta = sp.Symbol("theta", real=True)
+    phi = sp.Symbol("phi", real=True)
+    return MetricGeometry(
+        coordinates=(theta, phi),
+        metric=sp.diag(radius_value**2, radius_value**2 * sp.sin(theta) ** 2),
+        parameters=(radius_value,) if isinstance(radius_value, sp.Symbol) else (),
+    )
+
+
+__all__ = [
+    "MetricGeometry",
+    "schwarzschild_equatorial_metric",
+    "two_sphere_metric",
+]

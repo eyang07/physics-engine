@@ -16,6 +16,11 @@ from engine.dynamics.media import (
     ScalarSpeedMedium,
     gaussian_lens_speed,
 )
+from engine.dynamics.metric import (
+    MetricGeometry,
+    schwarzschild_equatorial_metric,
+    two_sphere_metric,
+)
 from engine.dynamics.ray_bundle import (
     RayBundleResult,
     integrate_ray_bundle,
@@ -36,6 +41,7 @@ __all__ = [
     "InvariantResidual",
     "InverseMetricMedium",
     "LyapunovResult",
+    "MetricGeometry",
     "PoincareSection",
     "RayBundleResult",
     "RefractiveIndexMedium",
@@ -51,5 +57,7 @@ __all__ = [
     "ray_bundle_snapshot_indices",
     "ray_spreading_factors",
     "ray_travel_times",
+    "schwarzschild_equatorial_metric",
+    "two_sphere_metric",
     "wavefront_envelope_records",
 ]

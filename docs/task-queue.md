@@ -45,14 +45,24 @@ handoff / review / merge protocol.
   is identical to the previous output apart from the added `rayDiagnostics`
   key (checked by structural comparison).
 
+- **GR metric helper (backend-only)** — implemented directly by Claude on
+  `main` at the human's request. `engine.dynamics.metric.MetricGeometry`:
+  Christoffel symbols, metric-compatibility residual, geodesic
+  `FirstOrderSystem`, cogeodesic `InverseMetricMedium`, plus
+  `two_sphere_metric` and `schwarzschild_equatorial_metric` reference
+  constructors. Verified: `pytest -q` 204 passed; symbolic checks against
+  textbook Christoffels, the sphere-geodesic Lagrangian route, and the
+  Legendre transform; Schwarzschild circular-orbit radius and Killing charges
+  conserved to 1e-12. No manifest/gallery changes.
+
 ## Ready
 
 No fully specced Codex handoff is currently queued.
 
 ## Next Itinerary Candidate
 
-- **Backend:** the GR metric helper on top of `InverseMetricMedium.from_metric`,
-  or the controlled-dynamics design spec (`docs/VISION.md` §11 priority 1).
+- **Backend:** the controlled-dynamics design spec
+  (`docs/VISION.md` §11 priority 1).
 - **Frontend:** manifest-driven diagnostics panel for exported backend
   diagnostics. Start with Lorenz and Hénon-Heiles Lyapunov metadata plus
   Hénon-Heiles Poincare-section metadata, without recomputing dynamics in
