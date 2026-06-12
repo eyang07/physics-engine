@@ -241,6 +241,9 @@ In priority order:
 2. **Safety / certificate metadata.** Add safe/unsafe sets, obstacles, and
    *candidate* barrier / Lyapunov / invariant representations as structured data
    — candidates only, clearly labeled, not certified.
+   *Status: candidate metadata implemented backend-only
+   (`engine/dynamics/safety.py`, spec in `docs/safety-certificates.md`);
+   actual certificate synthesis/proof discharge remains open.*
 3. **Verification-problem IR (v0).** Define and serialize the IR above, even if
    the only adapter is a stub that writes the problem out for inspection.
 4. **First serious case study (see §13).** Push one small controlled system end

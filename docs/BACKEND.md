@@ -31,7 +31,7 @@ variable-speed wavefront propagation.
 wavefront snapshots using cotangent Hamiltonian flow, and the viewer renders it
 with a dedicated 2D wavefront lens.
 
-[x] Reference verification baseline: `pytest -q` passes with 213 tests. Full
+[x] Reference verification baseline: `pytest -q` passes with 222 tests. Full
 project verification also includes `cd viewer && npm run build` and
 `cd viewer && npm run test:visual`, but small backend iterations should use
 targeted tests or specific generators first.
@@ -150,12 +150,21 @@ deterministic rollouts under numeric control laws. Anchor system: the
 torque-actuated damped pendulum (`systems/controlled_pendulum.py`, not in the
 gallery). The discrete-time analogue is deferred.
 
+[x] Add safety / certificate metadata (backend-only), per the design spec in
+`docs/safety-certificates.md`. `engine.dynamics.safety` provides sublevel
+safe/unsafe sets, measured trajectory safety reports, candidate barrier and
+Lyapunov functions, symbolic Lie derivatives, proof-obligation records, and
+deterministic sampled obligation checks labeled `rigor="measured"`. This is
+candidate metadata and counterexample-finding support only; sound certificate
+synthesis, proof discharge, validated numerics, IR serialization, manifest
+export, and viewer surfaces remain deferred.
+
 ## Next Best Three Items
 
-1. Design safety / certificate metadata (`docs/VISION.md` §11 priority 2).
-   Safe/unsafe sets, obstacles, and candidate barrier / Lyapunov / invariant
-   representations as structured data — candidates only, clearly labeled,
-   building on the controlled-dynamics layer.
+1. Define verification-problem IR v0 (`docs/VISION.md` §11 priority 3).
+   Serialize the proof obligations emitted by safety/certificate metadata as a
+   backend-agnostic inspection artifact, with no claim that obligations are
+   discharged locally.
 
 2. Extend parameter variants beyond Lorenz.
    Add Hénon-Heiles or another high-value system once the frontend can expose

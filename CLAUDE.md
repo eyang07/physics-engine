@@ -56,11 +56,12 @@ Architecture and boundary:
 Maturity: a working v0.1 with multiple registered examples (pendulum, sphere
 geodesic, charged particle, uniform gravity, ideal spring, Kepler, bead on
 rotating hoop, Lorenz, Hénon–Heiles, variable-speed wavefront). The latest
-baseline noted in docs is `pytest -q` green (213 tests), `viewer` build clean,
-and Playwright visual tests passing; use it as a release/reference baseline, not
-as a required check for every small edit. The current phase (`docs/VISION.md`
-§"v0.2") is diagnostics and phase-space structure: Poincaré sections, Lyapunov
-diagnostics, invariant residuals, parameter sweeps, and regression tests.
+backend baseline noted in docs is `pytest -q` green (222 tests); the latest
+release-style baseline also includes `viewer` build clean and Playwright visual
+tests passing. Use the release/reference baseline when warranted, not as a
+required check for every small edit. The current phase (`docs/VISION.md`
+§"v0.2") is diagnostics, phase-space structure, controlled dynamics, and
+candidate safety/certificate metadata.
 
 The living planning docs are `docs/VISION.md`, `docs/BACKEND.md`,
 `docs/FRONTEND.md`, and `docs/dynamics.md`. Treat them as authoritative for scope

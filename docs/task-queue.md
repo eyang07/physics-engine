@@ -67,16 +67,28 @@ handoff / review / merge protocol.
   stabilization and bound-violation reporting measured. Discrete analogue
   deferred.
 
+- **Safety / certificate metadata (backend-only)** — designed and implemented
+  directly by Claude on `main` at the human's request, then status-doc cleanup
+  completed by Codex; design spec in `docs/safety-certificates.md`.
+  `engine.dynamics.safety`: sublevel safe/unsafe sets, measured trajectory
+  safety reports, candidate barrier and Lyapunov functions, symbolic Lie
+  derivatives, proof-obligation records, and deterministic sampled checks
+  labeled `rigor="measured"`. Verified: `pytest -q` 222 passed, with
+  `tests/test_safety_certificates.py` covering margins, Lie derivatives,
+  candidate obligations, counterexamples, rollout safety reports, deterministic
+  grids, and validation errors. This is not real certification; synthesis,
+  proof discharge, validated numerics, IR serialization, manifest export, and
+  viewer surfaces are deferred.
+
 ## Ready
 
 No fully specced Codex handoff is currently queued.
 
 ## Next Itinerary Candidate
 
-- **Backend:** design safety / certificate metadata (`docs/VISION.md` §11
-  priority 2): safe/unsafe sets, obstacles, and candidate barrier / Lyapunov /
-  invariant representations as structured data, on top of the
-  controlled-dynamics layer.
+- **Backend:** define verification-problem IR v0 (`docs/VISION.md` §11
+  priority 3): serialize safety proof obligations as backend-agnostic
+  inspection artifacts, with no local proof-discharge claim.
 - **Frontend:** manifest-driven diagnostics panel for exported backend
   diagnostics. Start with Lorenz and Hénon-Heiles Lyapunov metadata plus
   Hénon-Heiles Poincare-section metadata, without recomputing dynamics in
