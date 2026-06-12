@@ -36,6 +36,8 @@ Architecture and boundary:
     coordinate transforms, Noether charges.
   - `engine/dynamics/` — general first-order systems `dx/dt = f(t, x; params)`
     (symbolic Jacobian, divergence, fixed points, linearization, numerical RHS),
+    controlled systems `dx/dt = f(t, x, u, d; params)` with admissible boxes,
+    closed-loop reduction, and rollouts,
     cotangent Hamiltonian flow, ray bundles, parameterized media models,
     metric geometry (Christoffel symbols, geodesic flow), and diagnostics
     (Poincaré sections, finite-time Lyapunov exponents, invariant residuals,
@@ -54,7 +56,7 @@ Architecture and boundary:
 Maturity: a working v0.1 with multiple registered examples (pendulum, sphere
 geodesic, charged particle, uniform gravity, ideal spring, Kepler, bead on
 rotating hoop, Lorenz, Hénon–Heiles, variable-speed wavefront). The latest
-baseline noted in docs is `pytest -q` green (204 tests), `viewer` build clean,
+baseline noted in docs is `pytest -q` green (213 tests), `viewer` build clean,
 and Playwright visual tests passing; use it as a release/reference baseline, not
 as a required check for every small edit. The current phase (`docs/VISION.md`
 §"v0.2") is diagnostics and phase-space structure: Poincaré sections, Lyapunov

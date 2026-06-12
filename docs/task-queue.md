@@ -55,14 +55,28 @@ handoff / review / merge protocol.
   Legendre transform; Schwarzschild circular-orbit radius and Killing charges
   conserved to 1e-12. No manifest/gallery changes.
 
+- **Controlled-dynamics layer (backend-only)** — designed and implemented
+  directly by Claude on `main` at the human's request; design spec in
+  `docs/controlled-dynamics.md`. `engine.dynamics.controlled`:
+  `ControlledFirstOrderSystem`, `Box` admissible sets (violations measured,
+  never silently clipped), closed-loop reduction to `FirstOrderSystem`, and
+  deterministic `rollout`; anchor system `systems/controlled_pendulum.py`
+  (not in the gallery). Verified: `pytest -q` 213 passed; closed-loop
+  reduction, control Jacobian, undamped energy conservation, and the
+  gravity-compensation equilibrium family proven symbolically; PD upright
+  stabilization and bound-violation reporting measured. Discrete analogue
+  deferred.
+
 ## Ready
 
 No fully specced Codex handoff is currently queued.
 
 ## Next Itinerary Candidate
 
-- **Backend:** the controlled-dynamics design spec
-  (`docs/VISION.md` §11 priority 1).
+- **Backend:** design safety / certificate metadata (`docs/VISION.md` §11
+  priority 2): safe/unsafe sets, obstacles, and candidate barrier / Lyapunov /
+  invariant representations as structured data, on top of the
+  controlled-dynamics layer.
 - **Frontend:** manifest-driven diagnostics panel for exported backend
   diagnostics. Start with Lorenz and Hénon-Heiles Lyapunov metadata plus
   Hénon-Heiles Poincare-section metadata, without recomputing dynamics in

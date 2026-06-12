@@ -1,5 +1,11 @@
 """General dynamical-system helpers."""
 
+from engine.dynamics.controlled import (
+    Box,
+    ControlledFirstOrderSystem,
+    RolloutResult,
+    rollout,
+)
 from engine.dynamics.cotangent import CotangentHamiltonianSystem
 from engine.dynamics.diagnostics import (
     InvariantResidual,
@@ -36,6 +42,8 @@ from engine.dynamics.ray_diagnostics import (
 )
 
 __all__ = [
+    "Box",
+    "ControlledFirstOrderSystem",
     "CotangentHamiltonianSystem",
     "FirstOrderSystem",
     "InvariantResidual",
@@ -45,6 +53,7 @@ __all__ = [
     "PoincareSection",
     "RayBundleResult",
     "RefractiveIndexMedium",
+    "RolloutResult",
     "ScalarSpeedMedium",
     "caustic_proximity",
     "finite_time_lyapunov",
@@ -57,6 +66,7 @@ __all__ = [
     "ray_bundle_snapshot_indices",
     "ray_spreading_factors",
     "ray_travel_times",
+    "rollout",
     "schwarzschild_equatorial_metric",
     "two_sphere_metric",
     "wavefront_envelope_records",

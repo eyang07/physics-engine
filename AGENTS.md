@@ -20,10 +20,11 @@ engine with a browser viewer. The architecture has a hard boundary:
 
 - **Python is the source of mathematical truth** and lives in:
   - `engine/mechanics/` — Lagrangian/Hamiltonian mechanics and related tools.
-  - `engine/dynamics/` — first-order systems, cotangent Hamiltonian flow, ray
-    bundles, parameterized media models, metric geometry, and diagnostics
-    (Poincaré sections, finite-time Lyapunov exponents, invariant residuals,
-    ray diagnostics).
+  - `engine/dynamics/` — first-order systems, controlled systems with
+    admissible boxes and rollouts, cotangent Hamiltonian flow, ray bundles,
+    parameterized media models, metric geometry, and diagnostics (Poincaré
+    sections, finite-time Lyapunov exponents, invariant residuals, ray
+    diagnostics).
   - `engine/numerics/` — RK4 and adaptive integration.
   - `engine/export/` — `Trajectory`, manifest contract, JSON export.
   - `systems/` — pure symbolic system definitions (one file per system).

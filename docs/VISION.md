@@ -158,10 +158,13 @@ The conceptual schema the engine is organized around:
 
 **Status note (honesty):** today the engine implements configuration/state/phase
 space, Lagrangian/Hamiltonian systems, constraints, potentials, vector fields and
-flows, conserved quantities, and invariant *diagnostics*. It does **not** yet
-implement controls `u`, disturbances `d`, safe/unsafe sets, obstacles, certificate
-candidates, proof obligations, or the verification-problem IR. The dynamics layer
-is currently autonomous (`dx/dt = f(t, x; θ)`).
+flows, conserved quantities, invariant *diagnostics*, and — as of the
+controlled-dynamics layer (`docs/controlled-dynamics.md`) — continuous controlled
+dynamics `dx/dt = f(t, x, u, d; θ)` with box-shaped admissible control and
+disturbance sets, closed-loop reduction, and deterministic rollouts
+(backend-only). It does **not** yet implement the discrete-time analogue,
+safe/unsafe sets, obstacles, certificate candidates, proof obligations, or the
+verification-problem IR.
 
 A specific distinction to preserve: the existing **finite-time Lyapunov exponent**
 diagnostic (`engine/dynamics/diagnostics.py`) measures sensitive dependence /
@@ -232,6 +235,9 @@ In priority order:
 1. **Controlled dynamics.** Extend the dynamics layer to `x' = f(x, u, d; θ)`
    (and a discrete analogue), with admissible-control and disturbance sets. This
    is the prerequisite for any honest notion of "safety."
+   *Status: continuous case implemented backend-only
+   (`engine/dynamics/controlled.py`, spec in `docs/controlled-dynamics.md`);
+   the discrete analogue is still open.*
 2. **Safety / certificate metadata.** Add safe/unsafe sets, obstacles, and
    *candidate* barrier / Lyapunov / invariant representations as structured data
    — candidates only, clearly labeled, not certified.

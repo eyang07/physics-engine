@@ -31,7 +31,7 @@ variable-speed wavefront propagation.
 wavefront snapshots using cotangent Hamiltonian flow, and the viewer renders it
 with a dedicated 2D wavefront lens.
 
-[x] Reference verification baseline: `pytest -q` passes with 204 tests. Full
+[x] Reference verification baseline: `pytest -q` passes with 213 tests. Full
 project verification also includes `cd viewer && npm run build` and
 `cd viewer && npm run test:visual`, but small backend iterations should use
 targeted tests or specific generators first.
@@ -140,12 +140,22 @@ Legendre transform; measured: a Schwarzschild circular orbit holds its radius
 and Killing charges to 1e-12. No gallery/manifest entry until the viewer can
 render the geometry honestly.
 
+[x] Add the controlled-dynamics layer (backend-only), per the design spec in
+`docs/controlled-dynamics.md`. `engine.dynamics.controlled` provides
+`ControlledFirstOrderSystem` (`x' = f(t, x, u, d; params)`) with state/control/
+disturbance Jacobians, equilibrium residuals, closed-loop reduction to
+`FirstOrderSystem` (so all existing diagnostics apply unchanged), box-shaped
+admissible sets that are measured and reported — never silently clipped — and
+deterministic rollouts under numeric control laws. Anchor system: the
+torque-actuated damped pendulum (`systems/controlled_pendulum.py`, not in the
+gallery). The discrete-time analogue is deferred.
+
 ## Next Best Three Items
 
-1. Design the controlled-dynamics layer (`x' = f(t, x, u, d; params)`).
-   This is `docs/VISION.md` §11 priority 1 and the prerequisite for safe
-   sets, certificate candidates, and the verification-problem IR. Design
-   spec first; implementation after the API is settled.
+1. Design safety / certificate metadata (`docs/VISION.md` §11 priority 2).
+   Safe/unsafe sets, obstacles, and candidate barrier / Lyapunov / invariant
+   representations as structured data — candidates only, clearly labeled,
+   building on the controlled-dynamics layer.
 
 2. Extend parameter variants beyond Lorenz.
    Add Hénon-Heiles or another high-value system once the frontend can expose
@@ -181,6 +191,10 @@ Schwarzschild reference constructors).
 [x] Diagnostics for wave/ray examples: Hamiltonian constraint drift (in the
 ray-bundle helper), caustic proximity, travel time, and wavefront envelope
 metadata (`engine.dynamics.ray_diagnostics`).
+
+[x] Controlled first-order dynamics with admissible boxes, closed-loop
+reduction, and deterministic rollouts (`engine.dynamics.controlled`; design
+spec in `docs/controlled-dynamics.md`).
 
 ## Example Generation Notes
 
