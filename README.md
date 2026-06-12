@@ -14,7 +14,9 @@ diagnostics, controlled dynamics, safety metadata, and verification artifacts.
   - Lagrangian and Hamiltonian mechanics.
   - General first-order dynamical systems.
   - Controlled first-order systems with admissible boxes and deterministic
-    rollouts.
+    rollouts, plus their discrete-time analogue
+    `x_{k+1} = F(k, x_k, u_k, d_k)` with Euler discretization of autonomous
+    continuous systems.
   - Cotangent Hamiltonian flow, ray bundles, parameterized media, and metric
     geometry helpers.
   - Diagnostics for invariants, Poincare sections, finite-time Lyapunov

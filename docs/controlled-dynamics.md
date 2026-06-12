@@ -38,11 +38,13 @@ verification-problem IR. Backend-only: no manifest, gallery, or viewer change.
    torque-actuated, with damping). Smallest step from existing code; cart-pole
    or a drone point-mass can follow once safety metadata exists. Backend-only,
    not registered in the gallery.
-5. **Deferred from the controlled-dynamics layer itself:** the discrete-time
-   analogue `x_{k+1} = F(x_k, u_k, d_k)`, real certificate synthesis, and proof
-   discharge. Safe/unsafe sets, certificate candidates, proof obligations, and
-   the verification IR are handled by later backend layers. Stochastic
-   disturbances are out; `d` is a deterministic input channel in v0.
+5. **Deferred from the controlled-dynamics layer itself:** real certificate
+   synthesis and proof discharge. The discrete-time analogue
+   `x_{k+1} = F(x_k, u_k, d_k)`, originally deferred here, is now implemented
+   (`docs/discrete-dynamics.md`). Safe/unsafe sets, certificate candidates,
+   proof obligations, and the verification IR are handled by later backend
+   layers. Stochastic disturbances are out; `d` is a deterministic input
+   channel in v0.
 
 ## Files
 
@@ -117,9 +119,10 @@ No generator or viewer commands: nothing crosses the manifest boundary.
 
 ## Out of scope
 
-Discrete-time analogue; real certificate synthesis or proof discharge; any
-manifest/schema change; any gallery or viewer work; stochastic disturbances;
-control synthesis (LQR/MPC) beyond hand-written test laws.
+Real certificate synthesis or proof discharge; any manifest/schema change;
+any gallery or viewer work; stochastic disturbances; control synthesis
+(LQR/MPC) beyond hand-written test laws. (The discrete-time analogue, out of
+scope here, has since been implemented: `docs/discrete-dynamics.md`.)
 
 ## Verification record
 

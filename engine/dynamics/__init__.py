@@ -13,6 +13,13 @@ from engine.dynamics.controlled import (
     rollout,
 )
 from engine.dynamics.cotangent import CotangentHamiltonianSystem
+from engine.dynamics.discrete import (
+    ControlledDiscreteSystem,
+    DiscreteRolloutResult,
+    DiscreteSystem,
+    discrete_rollout,
+    euler_discretization,
+)
 from engine.dynamics.diagnostics import (
     InvariantResidual,
     LyapunovResult,
@@ -63,8 +70,11 @@ from engine.dynamics.safety import (
 __all__ = [
     "BarrierCandidate",
     "Box",
+    "ControlledDiscreteSystem",
     "ControlledFirstOrderSystem",
     "CotangentHamiltonianSystem",
+    "DiscreteRolloutResult",
+    "DiscreteSystem",
     "FirstOrderSystem",
     "InvariantResidual",
     "InverseMetricMedium",
@@ -85,6 +95,8 @@ __all__ = [
     "UnsafeSetReport",
     "barrier_from_lyapunov",
     "caustic_proximity",
+    "discrete_rollout",
+    "euler_discretization",
     "finite_time_lyapunov",
     "gaussian_lens_speed",
     "grid_points",

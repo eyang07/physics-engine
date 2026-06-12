@@ -167,9 +167,12 @@ disturbance sets, closed-loop reduction, and deterministic rollouts
 (backend-only). It also implements backend-only safe/unsafe sublevel sets,
 candidate Lyapunov/barrier functions, proof obligations, measured sampled
 checks, and verification-problem IR v1 (dynamics, control/disturbance
-channels, candidate certificates). It does **not** yet implement the
-discrete-time analogue, real certificate synthesis, proof discharge, validated
-numerics, or frontend safety surfaces.
+channels, candidate certificates). The discrete-time analogue
+`x_{k+1} = F(k, x_k, u_k, d_k; θ)` now exists backend-only
+(`engine/dynamics/discrete.py`, spec in `docs/discrete-dynamics.md`) with
+closed-loop reduction, deterministic rollouts, and Euler discretization of
+autonomous continuous systems. It does **not** yet implement real certificate
+synthesis, proof discharge, validated numerics, or frontend safety surfaces.
 
 A specific distinction to preserve: the existing **finite-time Lyapunov exponent**
 diagnostic (`engine/dynamics/diagnostics.py`) measures sensitive dependence /
@@ -245,7 +248,8 @@ In priority order:
    is the prerequisite for any honest notion of "safety."
    *Status: continuous case implemented backend-only
    (`engine/dynamics/controlled.py`, spec in `docs/controlled-dynamics.md`);
-   the discrete analogue is still open.*
+   discrete analogue implemented backend-only (`engine/dynamics/discrete.py`,
+   spec in `docs/discrete-dynamics.md`).*
 2. **Safety / certificate metadata.** Add safe/unsafe sets, obstacles, and
    *candidate* barrier / Lyapunov / invariant representations as structured data
    — candidates only, clearly labeled, not certified.

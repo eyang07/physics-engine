@@ -20,8 +20,11 @@ artifacts.
     symbolic separability check (spec in `docs/symplectic-integrators.md`).
 - Controlled dynamics:
   - Continuous controlled systems `dx/dt = f(t, x, u, d; params)`.
+  - Discrete-time controlled systems `x_{k+1} = F(k, x_k, u_k, d_k; params)`
+    (spec in `docs/discrete-dynamics.md`), including forward-Euler
+    discretization of autonomous continuous systems.
   - Box-shaped admissible control/disturbance sets.
-  - Closed-loop reduction to `FirstOrderSystem`.
+  - Closed-loop reduction to `FirstOrderSystem` / `DiscreteSystem`.
   - Deterministic rollouts with measured bound violations, never silent
     clipping.
 - Geometry and rays:
@@ -93,12 +96,12 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `247 passed`.
+Latest known result: `254 passed`.
 
 Use focused tests while iterating:
 
 ```sh
-pytest tests/test_controlled_dynamics.py -q
+pytest tests/test_controlled_dynamics.py tests/test_discrete_dynamics.py -q
 pytest tests/test_safety_certificates.py tests/test_verification_ir.py -q
 pytest tests/test_candidate_generation.py tests/test_inspection_adapter.py -q
 pytest tests/test_symplectic_integrators.py -q
