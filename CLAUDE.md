@@ -36,7 +36,10 @@ Architecture and boundary:
     coordinate transforms, Noether charges.
   - `engine/dynamics/` — general first-order systems `dx/dt = f(t, x; params)`
     (symbolic Jacobian, divergence, fixed points, linearization, numerical RHS),
-    cotangent Hamiltonian flow, ray bundles.
+    cotangent Hamiltonian flow, ray bundles, parameterized media models,
+    metric geometry (Christoffel symbols, geodesic flow), and diagnostics
+    (Poincaré sections, finite-time Lyapunov exponents, invariant residuals,
+    ray travel time / caustic proximity / wavefront envelopes).
   - `engine/numerics/` — fixed-step RK4 and adaptive `solve_ivp` integration.
   - `engine/export/` — `Trajectory`, manifest contract, JSON export.
   - `systems/` — pure symbolic system definitions (one file per system).

@@ -28,10 +28,18 @@ The engine currently supports:
   Hamilton equations, Poisson brackets, symplectic matrices, Hamiltonian vector
   fields, Liouville checks, canonical-transformation checks, coordinate
   pullbacks/pushforwards, holonomic constraints, and Noether charges.
+- Cotangent Hamiltonian flows with reusable ray-bundle integration and export,
+  parameterized media models (scalar wave speed, refractive index, inverse
+  metric), and a backend-only metric-geometry helper (Christoffel symbols,
+  geodesic equations, cogeodesic flow) for fixed-background geodesic examples.
+- Dynamics diagnostics: Poincaré sections, finite-time Lyapunov exponents,
+  invariant-residual tracking, and ray diagnostics (travel time, caustic
+  proximity, wavefront envelopes).
 - Fixed-step RK4 integration, adaptive `solve_ivp` integration, and JSON export.
 - A manifest contract that exports symbolic derivations, lens metadata,
-  parameter ranges, state schemas, projections, conserved quantities, and
-  effective potentials or first-order flow diagnostics.
+  parameter ranges, state schemas, projections, conserved quantities,
+  precomputed parameter variants, and effective potentials or first-order flow
+  diagnostics.
 
 ## Current Examples
 
@@ -98,6 +106,9 @@ the full baseline by default.
 
 ## Direction
 
-The next phase is to add more examples and improve the existing visual lenses
-while keeping the boundary simple: Python exports structured physics data;
-TypeScript turns that data into inspectable, interactive visuals.
+The current phase is diagnostics and phase-space structure (see
+`docs/VISION.md`): backend diagnostics exports, frontend diagnostics surfaces,
+and parameter families — followed by controlled dynamics and verification
+artifacts — while keeping the boundary simple: Python exports structured
+physics data; TypeScript turns that data into inspectable, interactive
+visuals.

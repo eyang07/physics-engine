@@ -180,9 +180,11 @@ controlled dynamics, certificate candidates, and IR export.
   Legendre transforms, Noether charges, Poisson brackets, symplectic utilities,
   constraints, coordinate transforms.
 - `engine/dynamics/` — first-order systems (symbolic Jacobian, divergence, fixed
-  points, linearization), cotangent Hamiltonian flow, ray bundles, and
-  diagnostics (Poincaré sections, finite-time Lyapunov exponents,
-  invariant residuals).
+  points, linearization), cotangent Hamiltonian flow, ray bundles, parameterized
+  media models (scalar wave speed, refractive index, inverse metric), metric
+  geometry for fixed-background geodesics (backend-only), and diagnostics
+  (Poincaré sections, finite-time Lyapunov exponents, invariant residuals, ray
+  travel time / caustic proximity / wavefront envelopes).
 - `engine/numerics/` — fixed-step RK4 and adaptive integration.
 - `engine/export/` — `Trajectory`, the manifest contract, and JSON export.
 - `systems/` — pure symbolic system definitions (one file per system).
@@ -273,9 +275,11 @@ charged particle in a magnetic field, uniform gravity, ideal spring, Kepler
 problem, bead on a rotating hoop, Lorenz attractor, Hénon–Heiles, and a
 variable-speed wavefront. These exercise symbolic mechanics, conserved
 quantities, Poincaré sections, finite-time Lyapunov *exponents*, invariant
-residuals, a first parameter-sweep manifest slice (Lorenz ρ-family), and
-ray-bundle / cotangent-Hamiltonian export. They remain valuable as the structural
-and diagnostic backbone.
+residuals, a first parameter-sweep manifest slice (Lorenz ρ-family), ray-bundle /
+cotangent-Hamiltonian export with travel-time, caustic-proximity, and
+wavefront-envelope diagnostics, reusable parameterized media models, and a
+backend-only metric-geometry helper (2-sphere, equatorial Schwarzschild). They
+remain valuable as the structural and diagnostic backbone.
 
 **Controlled systems (first serious target).** Choose **one** small controlled
 mechanical system — controlled pendulum, cart-pole, or a drone point-mass model —

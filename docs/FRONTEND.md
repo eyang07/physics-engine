@@ -11,12 +11,13 @@ interactive visuals.
 gallery, playback controls, structure panels, invariant lanes, 2D canvas lenses,
 potential/effective-potential lenses, and Three.js views.
 
-[x] Reference verification after the wavefront lens addition: `pytest -q` passes
-with 178 tests, `cd viewer && npm run build` passes, and `cd viewer && npm run
-test:visual` passes with desktop/mobile coverage. Use this as the full baseline
-for broad/release-style checks; small frontend iterations should prefer
-`npm run build` or a focused visual check only when relevant. The viewer build
-emits a non-fatal Vite chunk-size warning for the main JavaScript bundle.
+[x] Reference verification after the wavefront lens addition: `pytest -q`
+passed (178 tests at the time; the backend suite has since grown to 204 with
+backend-only additions), `cd viewer && npm run build` passes, and `cd viewer &&
+npm run test:visual` passes with desktop/mobile coverage. Use this as the full
+baseline for broad/release-style checks; small frontend iterations should
+prefer `npm run build` or a focused visual check only when relevant. The viewer
+build emits a non-fatal Vite chunk-size warning for the main JavaScript bundle.
 
 ## Scope
 
@@ -97,8 +98,10 @@ after the camera reset on desktop and mobile.
 4. Keep visual polish focused on diagnostic readability before adding new
    frontend surfaces.
 
-Latest reference baseline: `pytest -q` (178 tests), `cd viewer && npm run
-build`, and the Playwright visual suite (4 tests: all-examples desktop/mobile
-and fit-to-system desktop/mobile) all pass after adding the fit-to-system
-camera-reset regression. Do not treat the full visual suite as mandatory for
-every small frontend edit.
+Latest reference baseline: `cd viewer && npm run build` and the Playwright
+visual suite (4 tests: all-examples desktop/mobile and fit-to-system
+desktop/mobile) last verified green after the fit-to-system camera-reset
+regression; the backend suite is now `pytest -q` with 204 tests (media models,
+ray diagnostics, and metric geometry were added backend-only, so the viewer
+build and visual suite were not re-run for them). Do not treat the full visual
+suite as mandatory for every small frontend edit.

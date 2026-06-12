@@ -44,14 +44,17 @@ series, metadata, and diagnostics; TypeScript renders them.
 
 ## Diagnostics To Add Over Time
 
-- Fixed points and symbolic/numeric Jacobians.
-- Eigenvalues and stability classification at equilibria.
-- Divergence and volume contraction/expansion.
-- Speed, radius, and distance-from-equilibrium series.
-- Trajectory bounds and recommended camera framing.
-- Approximate Lyapunov exponents.
-- Poincare sections.
-- Parameter sweeps and bifurcation diagrams.
+- [x] Fixed points and symbolic/numeric Jacobians.
+- [x] Eigenvalues and stability classification at equilibria.
+- [x] Divergence and volume contraction/expansion.
+- [x] Speed, radius, and distance-from-equilibrium series.
+- [x] Trajectory bounds and recommended camera framing (renderer hints).
+- [x] Approximate Lyapunov exponents (finite-time, Lorenz and Hénon-Heiles).
+- [x] Poincare sections (Hénon-Heiles `y = 0` upward crossings).
+- [x] Parameter sweeps, first slice (Lorenz rho-family manifest variants);
+      bifurcation diagrams still open.
+- [x] Ray diagnostics for cotangent flows: travel time, caustic proximity,
+      wavefront envelopes (`engine/dynamics/ray_diagnostics.py`).
 - Basin sampling for multistable systems.
 
 ## Viewer Lens Ideas
