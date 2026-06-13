@@ -16,6 +16,7 @@ from engine.dynamics import BarrierCandidate, SafetySpecification, SublevelSet
 from engine.verification import (
     VerificationProblem,
     scalar_field_region_geometries,
+    sampled_region_proof_statuses,
     verification_problem_from_barrier,
     write_inspection_artifacts,
 )
@@ -76,7 +77,8 @@ def upright_pendulum_problem() -> VerificationProblem:
         y_range=(-3.0, 3.0),
         samples=(91, 91),
     )
-    return replace(problem, region_geometry=geometry)
+    problem = replace(problem, region_geometry=geometry)
+    return replace(problem, proof_statuses=sampled_region_proof_statuses(problem))
 
 
 def main(argv: list[str] | None = None) -> None:

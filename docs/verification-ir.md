@@ -20,7 +20,10 @@ from. v3 adds viewer-facing cross-links and sampled region geometry: a
 top-level `system` id matching a manifest system id, plus `regionGeometry`
 scalar-field grids and boundary polylines so TypeScript can render
 safe/unsafe/initial/domain regions without evaluating symbolic inequalities.
-The engine still **proposes and
+The current v3 export also adds measured candidate diagnostics for the concrete
+pendulum pair: trajectory JSON carries time-aligned candidate value and
+flow-derivative series, and the verification problem carries sampled
+`proofStatuses` for obligation-region grids. The engine still **proposes and
 organizes; external tools dispose**: nothing in the IR stores proof results.
 
 ## Design decisions
@@ -84,16 +87,30 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    `omega -> theta_dot`, and renders the verification regions on the pendulum
    `phase` projection. This is a render aid only; it does not prove region
    containment or invariance.
-9. **Deferred (out of v3):** richer
+9. **Measured certificate diagnostics are separate from obligations.**
+   The linked pendulum trajectory exports additional scalar `series` entries
+   for `certificate_energy_barrier_value` (`B(x(t))`) and
+   `certificate_energy_barrier_flow_derivative` (`dB/dt` evaluated from the
+   verification dynamics at the trajectory samples). The join table lives in
+   trajectory `metadata.certificateSeries`, with `problemId`, `candidateId`,
+   `obligationIds`, comparison baselines, and `rigor="measured"`.
+   Verification-problem JSON exports `proofStatuses` records, one per sampled
+   obligation surface in the current concrete slice. Each record links
+   `obligationId`, `candidateId`, `regionId`, the sampled evaluation source
+   such as `regionGeometry:<regionId>`, sample count, worst sampled value, and
+   a machine-readable status (`measured-holds`, `measured-violated`, or
+   `external-required`). These records are measured evidence only and keep
+   `externalStatus="external-required"` distinct from the sampled status.
+10. **Deferred (out of v3):** richer
    assumption languages beyond scalar expression comparisons, boundary
-   polyline extraction, real external backends, and any proof-result storage.
-10. **Adapter diagnostics are outcomes, not proofs.** Verification adapters
+   topology guarantees, real external backends, and any proof-result storage.
+11. **Adapter diagnostics are outcomes, not proofs.** Verification adapters
    report normalized diagnostics through `VerificationDiagnostic` with
    statuses such as `not-attempted`, `externally-required`, `unsupported`,
    and `malformed`. The inspection stub writes these diagnostics to a
    machine-readable outcome artifact; it still cannot record success,
    discharge, proof, or certification.
-11. **Adapter capability checks are explicit.** `engine.verification`
+12. **Adapter capability checks are explicit.** `engine.verification`
    classifies each obligation into a target family such as
    `continuous-lyapunov`, `discrete-barrier`, or `obligation-only`.
    Adapters advertise discharge capabilities separately from inspection
@@ -103,7 +120,7 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    mixed-candidate ownership and candidate obligations without encoded
    dynamics, are classified as malformed adapter targets rather than as
    unsupported proof attempts.
-12. **Target-specific prechecks are structural only.** The SOS-polynomial
+13. **Target-specific prechecks are structural only.** The SOS-polynomial
    requirement checker verifies that certificate targets have polynomial
    dynamics, regions, candidate expressions, and obligation expressions before
    a future SOS-style adapter could attempt them. It emits only unsupported or
@@ -126,8 +143,11 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
   requirement diagnostics, currently an SOS-polynomial precheck.
 - `engine/verification/region_geometry.py` — deterministic scalar-field grid
   sampling and boundary-polyline extraction for region render metadata.
+- `engine/verification/measured.py` — measured candidate series and sampled
+  proof-status records for viewer diagnostics, with no proof discharge.
 - `engine/export/verification_contract.py` — manifest/verification cross-link
-  validation used before writing viewer verification data.
+  validation used before writing viewer verification data, including sampled
+  proof-status state-axis mappings.
 - `engine/verification/system_codec.py` — `dynamics_spec_from_system`,
   `dynamics_spec_from_controlled`, `dynamics_spec_from_discrete`,
   `dynamics_spec_from_controlled_discrete`.
@@ -175,7 +195,14 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    `rigor="measured"` plus the original level/convention. They are render
    metadata, not certificates. Boundary polylines are extracted from those
    measured grids and carry the same rigor.
-9. **Diagnostic honesty (proven by construction).** Inspection outcomes use
+9. **Measured certificate diagnostics (measured).** The pendulum trajectory
+   exports candidate value and flow-derivative series aligned to its time grid,
+   with `metadata.certificateSeries` linking each series back to the
+   verification problem, candidate, obligations, and comparison baselines.
+   The upright-pendulum verification problem exports sampled region-grid
+   `proofStatuses` for each obligation, all with `rigor="measured"` and
+   `externalStatus="external-required"`.
+10. **Diagnostic honesty (proven by construction).** Inspection outcomes use
    only non-success statuses (`not-attempted`, `externally-required`,
    `unsupported`, `malformed`) and every obligation receives an
    `externally-required` diagnostic until a real backend exists. Each such
@@ -183,7 +210,7 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    The inspection stub also emits target-level `unsupported` diagnostics for
    well-formed obligations it cannot discharge and `malformed` diagnostics for
    ambiguous or incomplete target shapes.
-10. **SOS-polynomial requirements (proven on examples).** A polynomial damped
+11. **SOS-polynomial requirements (proven on examples).** A polynomial damped
    oscillator Lyapunov problem and a controlled-discrete polynomial Lyapunov
    export emit no requirement failures, while the trigonometric pendulum
    barrier and a non-polynomial open-loop controlled export emit `unsupported`
@@ -193,7 +220,7 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
 ## Verification commands
 
 ```sh
-pytest tests/test_verification_ir.py tests/test_inspection_adapter.py -q
+pytest tests/test_verification_ir.py tests/test_inspection_adapter.py tests/test_pendulum_workflow.py -q
 pytest -q
 python -m scripts.export_verification_problems
 ```
@@ -233,3 +260,7 @@ diagnostics and does not attempt proof discharge.
 Updated again on 2026-06-13: the SOS-polynomial checker now validates preserved
 open-loop controlled dynamics and treats declared control/disturbance inputs as
 known symbols.
+Updated again on 2026-06-13: added measured candidate trajectory series for
+the linked pendulum run and measured region-grid `proofStatuses` for the
+upright-pendulum safety obligations. These records remain sampled evidence and
+do not change obligation rigor from `external-required`.

@@ -7,7 +7,9 @@ from typing import Sequence
 import numpy as np
 
 from engine.export import Trajectory
+from engine.verification import certificate_series_for_trajectory
 from scripts.example_specs import PENDULUM
+from scripts.export_verification_problems import upright_pendulum_problem
 from scripts.generation import (
     generate_lagrangian_trajectory,
     potential_plot_metadata,
@@ -41,6 +43,14 @@ def generate_pendulum_trajectory(
         physical_parameters=physical_parameters,
     )
     assert trajectory.series is not None
+    verification_problem = upright_pendulum_problem()
+    certificate_diagnostics = certificate_series_for_trajectory(
+        verification_problem,
+        time=trajectory.time,
+        states=trajectory.states,
+        state_names=trajectory.state_names,
+        variable_to_state_axis={"theta": "theta", "omega": "theta_dot"},
+    )
     metadata = dict(trajectory.metadata or {})
     metadata["potentialPlots"] = [
         potential_plot_metadata(
@@ -52,12 +62,17 @@ def generate_pendulum_trajectory(
             energy_series=trajectory.series["H"],
         )
     ]
+    metadata["certificateSeries"] = list(certificate_diagnostics.metadata)
+    series = {
+        **trajectory.series,
+        **certificate_diagnostics.series,
+    }
     return Trajectory.from_arrays(
         time=trajectory.time,
         states=trajectory.states,
         state_names=trajectory.state_names,
         metadata=metadata,
-        series=trajectory.series,
+        series=series,
     )
 
 

@@ -16,6 +16,7 @@ SCHEMA_VERSION = "verification-problem/v3"
 
 _ORDER_COMPARISONS = ("<=", "<", ">=", ">")
 _ASSUMPTION_COMPARISONS = (*_ORDER_COMPARISONS, "=", "!=")
+_PROOF_STATUSES = ("external-required", "measured-holds", "measured-violated")
 
 
 @dataclass(frozen=True)
@@ -371,6 +372,112 @@ class ObligationSpec:
 
 
 @dataclass(frozen=True)
+class ProofStatusSpec:
+    """A measured status record for one obligation evaluation surface.
+
+    This is sampled evidence only. It records where a backend evaluation was
+    performed and whether the sampled values satisfied the obligation
+    comparison there; it never certifies or proves the obligation.
+    """
+
+    id: str
+    obligation_id: str
+    status: str
+    evaluation_kind: str
+    sample_count: int
+    comparison: str
+    rhs: float = 0.0
+    candidate_id: str | None = None
+    region_id: str | None = None
+    system: str | None = None
+    variables: tuple[str, ...] = ()
+    state_axes: tuple[str, ...] = ()
+    variable_to_state_axis: Mapping[str, str] | None = None
+    source: str = ""
+    worst_value: float | None = None
+    worst_point: tuple[float, ...] | None = None
+    worst_time: float | None = None
+    rigor: str = "measured"
+    external_status: str = "external-required"
+    note: str = (
+        "Measured sampled check only; a clean sample is evidence, not a proof "
+        "or certificate."
+    )
+
+    def __post_init__(self) -> None:
+        if self.status not in _PROOF_STATUSES:
+            raise ValueError("proof status must be external-required or measured")
+        if self.external_status != "external-required":
+            raise ValueError("proof status external_status must stay external-required")
+        if self.comparison not in _ORDER_COMPARISONS:
+            raise ValueError("proof status comparison must be one of <=, <, >=, >")
+        if self.status == "external-required":
+            if self.rigor != "external-required":
+                raise ValueError("external-required proof status must use matching rigor")
+        elif self.rigor != "measured":
+            raise ValueError("measured proof status must use rigor='measured'")
+        if self.sample_count < 0:
+            raise ValueError("proof status sample count must be nonnegative")
+        if self.status != "external-required" and self.sample_count == 0:
+            raise ValueError("measured proof status needs at least one sample")
+        if self.worst_point is not None and self.variables:
+            if len(self.worst_point) != len(self.variables):
+                raise ValueError("proof status worst point must match variables")
+        if self.variable_to_state_axis is not None:
+            missing = set(self.variables) - set(self.variable_to_state_axis)
+            if missing:
+                raise ValueError(
+                    "proof status missing variable-to-state-axis mappings: "
+                    f"{sorted(missing)}"
+                )
+            expected_axes = tuple(self.variable_to_state_axis[name] for name in self.variables)
+            if self.state_axes and expected_axes != self.state_axes:
+                raise ValueError("proof status state axes must match variable mapping")
+
+    def to_dict(self) -> dict[str, Any]:
+        evaluation: dict[str, Any] = {
+            "kind": self.evaluation_kind,
+            "sampleCount": self.sample_count,
+        }
+        if self.system is not None:
+            evaluation["system"] = self.system
+        if self.source:
+            evaluation["source"] = self.source
+        if self.variables:
+            evaluation["variables"] = list(self.variables)
+        if self.state_axes:
+            evaluation["stateAxes"] = list(self.state_axes)
+        if self.variable_to_state_axis is not None:
+            evaluation["variableToStateAxis"] = dict(self.variable_to_state_axis)
+
+        payload: dict[str, Any] = {
+            "id": self.id,
+            "obligationId": self.obligation_id,
+            "status": self.status,
+            "rigor": self.rigor,
+            "externalStatus": self.external_status,
+            "evaluation": evaluation,
+            "comparison": self.comparison,
+            "rhs": self.rhs,
+            "note": self.note,
+        }
+        if self.candidate_id is not None:
+            payload["candidateId"] = self.candidate_id
+        if self.region_id is not None:
+            payload["regionId"] = self.region_id
+        if self.worst_value is not None or self.worst_point is not None:
+            worst: dict[str, Any] = {}
+            if self.worst_value is not None:
+                worst["value"] = self.worst_value
+            if self.worst_point is not None:
+                worst["point"] = list(self.worst_point)
+            if self.worst_time is not None:
+                worst["time"] = self.worst_time
+            payload["worst"] = worst
+        return payload
+
+
+@dataclass(frozen=True)
 class VerificationProblem:
     """A portable verification problem for inspection or external adapters."""
 
@@ -387,6 +494,7 @@ class VerificationProblem:
     candidates: tuple[CandidateSpec, ...] = ()
     system: str | None = None
     region_geometry: tuple[RegionGeometrySpec, ...] = ()
+    proof_statuses: tuple[ProofStatusSpec, ...] = ()
     metadata: Mapping[str, Any] | None = None
     schema_version: str = SCHEMA_VERSION
 
@@ -489,6 +597,7 @@ class VerificationProblem:
                 self.variables
             ):
                 raise ValueError("candidate equilibrium must match the variable dimension")
+        known_candidates = set(candidate_ids)
         region_roles = {region.id: region.role for region in self.regions}
         for geometry in self.region_geometry:
             if geometry.region_id not in known_regions:
@@ -499,6 +608,21 @@ class VerificationProblem:
             if unknown_variables:
                 raise ValueError(
                     f"unknown region geometry variables: {sorted(unknown_variables)}"
+                )
+        proof_status_ids = [status.id for status in self.proof_statuses]
+        if len(set(proof_status_ids)) != len(proof_status_ids):
+            raise ValueError("proof status ids must be unique")
+        for status in self.proof_statuses:
+            if status.obligation_id not in known_obligations:
+                raise ValueError(f"unknown proof status obligation id: {status.obligation_id}")
+            if status.candidate_id is not None and status.candidate_id not in known_candidates:
+                raise ValueError(f"unknown proof status candidate id: {status.candidate_id}")
+            if status.region_id is not None and status.region_id not in known_regions:
+                raise ValueError(f"unknown proof status region id: {status.region_id}")
+            unknown_variables = set(status.variables) - known_variables
+            if unknown_variables:
+                raise ValueError(
+                    f"unknown proof status variables: {sorted(unknown_variables)}"
                 )
 
     def to_dict(self) -> dict[str, Any]:
@@ -515,6 +639,7 @@ class VerificationProblem:
             "obligations": [obligation.to_dict() for obligation in self.obligations],
             "candidates": [candidate.to_dict() for candidate in self.candidates],
             "regionGeometry": [geometry.to_dict() for geometry in self.region_geometry],
+            "proofStatuses": [status.to_dict() for status in self.proof_statuses],
         }
         if self.dynamics is not None:
             payload["dynamics"] = self.dynamics.to_dict()
@@ -545,6 +670,7 @@ def problem_from_parts(
     open_loop_dynamics: DynamicsSpec | None = None,
     candidates: Sequence[CandidateSpec] = (),
     region_geometry: Sequence[RegionGeometrySpec] = (),
+    proof_statuses: Sequence[ProofStatusSpec] = (),
     metadata: Mapping[str, Any] | None = None,
 ) -> VerificationProblem:
     return VerificationProblem(
@@ -561,5 +687,6 @@ def problem_from_parts(
         open_loop_dynamics=open_loop_dynamics,
         candidates=tuple(candidates),
         region_geometry=tuple(region_geometry),
+        proof_statuses=tuple(proof_statuses),
         metadata=metadata,
     )

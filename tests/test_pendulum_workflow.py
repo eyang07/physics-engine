@@ -29,6 +29,47 @@ def test_generated_pendulum_trajectory_has_small_energy_drift():
     assert np.max(np.abs(energy - energy[0])) < 1e-7
 
 
+def test_pendulum_exports_certificate_series_for_linked_verification_problem():
+    trajectory = generate_pendulum_trajectory(t_span=(0.0, 0.05), dt=0.01)
+    assert trajectory.series is not None
+    assert trajectory.metadata is not None
+
+    value_series = trajectory.series["certificate_energy_barrier_value"]
+    derivative_series = trajectory.series["certificate_energy_barrier_flow_derivative"]
+    assert np.asarray(value_series, dtype=float).shape == trajectory.time.shape
+    assert np.asarray(derivative_series, dtype=float).shape == trajectory.time.shape
+
+    records = trajectory.metadata["certificateSeries"]
+    records_by_kind = {record["kind"]: record for record in records}
+    assert set(records_by_kind) == {"candidate-value", "flow-derivative"}
+
+    value_record = records_by_kind["candidate-value"]
+    assert value_record["problemId"] == "upright-pendulum-safety"
+    assert value_record["candidateId"] == "energy-barrier"
+    assert value_record["series"] == "certificate_energy_barrier_value"
+    assert value_record["rigor"] == "measured"
+    assert value_record["obligationIds"] == [
+        "energy-barrier-initial-containment",
+        "energy-barrier-excludes-near-bottom",
+    ]
+    assert {baseline["comparison"] for baseline in value_record["comparisonBaselines"]} == {
+        "<=",
+        ">",
+    }
+
+    derivative_record = records_by_kind["flow-derivative"]
+    assert derivative_record["series"] == "certificate_energy_barrier_flow_derivative"
+    assert derivative_record["obligationIds"] == ["energy-barrier-non-increase"]
+    assert derivative_record["comparisonBaselines"] == [
+        {
+            "obligationId": "energy-barrier-non-increase",
+            "comparison": "<=",
+            "rhs": 0.0,
+            "regionId": "domain-energy-barrier-region",
+        }
+    ]
+
+
 def test_generate_pendulum_script_writes_primary_and_viewer_outputs(tmp_path):
     output = tmp_path / "data" / "pendulum.json"
     viewer_output = tmp_path / "viewer" / "public" / "data" / "pendulum.json"
@@ -46,4 +87,3 @@ def test_generate_pendulum_script_writes_primary_and_viewer_outputs(tmp_path):
         viewer_output.read_text(encoding="utf-8")
     )
     assert len(trajectory.time) == 6
-

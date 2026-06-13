@@ -26,6 +26,7 @@ from engine.verification import (
     OBLIGATION_TARGETS,
     ObligationSpec,
     ParameterSpec,
+    ProofStatusSpec,
     SCHEMA_VERSION,
     RegionGeometrySpec,
     RegionSpec,
@@ -318,6 +319,36 @@ def test_ir_spec_validation() -> None:
             convention="expression <= level",
             boundary_polylines=(((0.0, 0.0),),),
         )
+    with pytest.raises(ValueError, match="proof status"):
+        ProofStatusSpec(
+            id="s",
+            obligation_id="claim",
+            status="proved",
+            evaluation_kind="region-grid",
+            sample_count=1,
+            comparison="<=",
+        )
+    with pytest.raises(ValueError, match="at least one sample"):
+        ProofStatusSpec(
+            id="s",
+            obligation_id="claim",
+            status="measured-holds",
+            evaluation_kind="region-grid",
+            sample_count=0,
+            comparison="<=",
+        )
+    assert (
+        ProofStatusSpec(
+            id="s",
+            obligation_id="claim",
+            status="external-required",
+            rigor="external-required",
+            evaluation_kind="region-grid",
+            sample_count=0,
+            comparison="<=",
+        ).to_dict()["status"]
+        == "external-required"
+    )
 
 
 def test_problem_validates_dynamics_and_candidate_links() -> None:
@@ -579,6 +610,33 @@ def test_problem_validates_names_and_region_variables() -> None:
         ).region_geometry
         == (valid_geometry,)
     )
+
+    valid_status = ProofStatusSpec(
+        id="claim-region-grid",
+        obligation_id="claim",
+        candidate_id="c",
+        region_id="domain",
+        status="measured-holds",
+        evaluation_kind="region-grid",
+        sample_count=4,
+        comparison="<=",
+        variables=("x", "v"),
+        state_axes=("x", "x_dot"),
+        variable_to_state_axis={"x": "x", "v": "x_dot"},
+        worst_value=-1.0,
+        worst_point=(0.0, 0.0),
+    )
+    with pytest.raises(ValueError, match="candidate id"):
+        VerificationProblem(
+            id="p",
+            name="p",
+            source="test",
+            variables=variables_2d,
+            parameters=(),
+            regions=(region_2d,),
+            obligations=(obligation_2d,),
+            proof_statuses=(valid_status,),
+        )
 
 
 def test_obligation_classification_tracks_backend_targets() -> None:

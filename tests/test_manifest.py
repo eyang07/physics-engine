@@ -109,6 +109,23 @@ def test_verification_contract_rejects_bad_region_geometry_mapping() -> None:
         validate_viewer_verification_contract(SPECS, (bad_problem,))
 
 
+def test_verification_contract_rejects_bad_proof_status_mapping() -> None:
+    problem = upright_pendulum_problem()
+    status = problem.proof_statuses[0]
+    bad_status = replace(
+        status,
+        state_axes=("theta", "omega"),
+        variable_to_state_axis={"theta": "theta", "omega": "omega"},
+    )
+    bad_problem = replace(
+        problem,
+        proof_statuses=(bad_status, *problem.proof_statuses[1:]),
+    )
+
+    with pytest.raises(ValueError, match="unknown state axes"):
+        validate_viewer_verification_contract(SPECS, (bad_problem,))
+
+
 def test_registered_lens_requirements_match_system_specs() -> None:
     lenses_by_id = {lens.id: lens for lens in LENSES}
 

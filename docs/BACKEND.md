@@ -75,6 +75,18 @@ artifacts.
     `theta_dot` on the `phase` projection.
   - Viewer verification generation validates manifest/problem cross-links and
     region-geometry projection/state-axis mappings before writing JSON.
+  - Measured certificate diagnostics for the viewer
+    (`engine/verification/measured.py`), all `rigor="measured"`: the linked
+    pendulum trajectory exports time-aligned candidate value (`B(x(t))`) and
+    flow-derivative (`dB/dt` from the verification dynamics) `series`, joined
+    back to the problem through trajectory `metadata.certificateSeries`
+    (`problemId`, `candidateId`, `obligationIds`, comparison baselines). The
+    verification problem exports sampled region-grid `proofStatuses`, one per
+    obligation surface, each with a machine-readable status
+    (`measured-holds` / `measured-violated` / `external-required`), evaluation
+    source, sample count, and worst sampled value/point. These are sampled
+    evidence only and keep `externalStatus="external-required"` distinct from
+    the sampled status — never a proof or certificate.
   - Adapter capability declarations and target-specific obligation
     classification for future verification backends; the inspection stub
     advertises no discharge capability and records required target support in
@@ -127,7 +139,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `273 passed`.
+Latest known result: `290 passed`.
 
 Use focused tests while iterating:
 

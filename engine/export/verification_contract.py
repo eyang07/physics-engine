@@ -49,6 +49,7 @@ def validate_viewer_verification_contract(
             )
 
         _validate_region_geometry(system, problem)
+        _validate_proof_statuses(system, problem)
 
 
 def _validate_region_geometry(
@@ -88,4 +89,31 @@ def _validate_region_geometry(
             raise ValueError(
                 f"region geometry {geometry.region_id!r} uses unknown problem variables: "
                 f"{sorted(unknown_variables)}"
+            )
+
+
+def _validate_proof_statuses(
+    system: SystemSpec,
+    problem: VerificationProblem,
+) -> None:
+    state_names = {state.name for state in system.state}
+    problem_variable_names = {variable.name for variable in problem.variables}
+
+    for status in problem.proof_statuses:
+        if status.system is not None and status.system != system.id:
+            raise ValueError(
+                f"proof status {status.id!r} names system {status.system!r}, "
+                f"expected {system.id!r}"
+            )
+        unknown_variables = set(status.variables) - problem_variable_names
+        if unknown_variables:
+            raise ValueError(
+                f"proof status {status.id!r} uses unknown problem variables: "
+                f"{sorted(unknown_variables)}"
+            )
+        unknown_axes = set(status.state_axes) - state_names
+        if unknown_axes:
+            raise ValueError(
+                f"proof status {status.id!r} maps to unknown state axes: "
+                f"{sorted(unknown_axes)}"
             )

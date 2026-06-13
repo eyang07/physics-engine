@@ -34,11 +34,17 @@ from engine.verification.ir import (
     InputSpec,
     ObligationSpec,
     ParameterSpec,
+    ProofStatusSpec,
     RegionSpec,
     RegionGeometrySpec,
     SCHEMA_VERSION,
     VariableSpec,
     VerificationProblem,
+)
+from engine.verification.measured import (
+    CertificateTrajectoryDiagnostics,
+    certificate_series_for_trajectory,
+    sampled_region_proof_statuses,
 )
 from engine.verification.region_geometry import (
     scalar_field_region_geometries,
@@ -87,6 +93,7 @@ __all__ = [
     "ObligationClassification",
     "ObligationSpec",
     "ParameterSpec",
+    "ProofStatusSpec",
     "REPORT_STATUS",
     "RegionGeometrySpec",
     "RegionSpec",
@@ -96,6 +103,8 @@ __all__ = [
     "VerificationDiagnostic",
     "VerificationProblem",
     "PolynomialRequirementReport",
+    "CertificateTrajectoryDiagnostics",
+    "certificate_series_for_trajectory",
     "classifications_by_obligation",
     "dynamics_spec_from_controlled",
     "dynamics_spec_from_controlled_discrete",
@@ -107,6 +116,7 @@ __all__ = [
     "render_inspection_markdown",
     "scalar_field_region_geometries",
     "scalar_field_region_geometry",
+    "sampled_region_proof_statuses",
     "sos_polynomial_requirement_diagnostics",
     "verification_problem_from_barrier",
     "verification_problem_from_controlled_discrete_barrier",

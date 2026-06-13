@@ -318,6 +318,7 @@ def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
     assert payload["metadata"]["system"] == "pendulum"
     assert payload["metadata"]["verificationModel"] == "controlled-pendulum-closed-loop"
     assert len(payload["regionGeometry"]) == len(payload["regions"])
+    assert len(payload["proofStatuses"]) == len(payload["obligations"])
 
     geometry_by_region = {
         geometry["regionId"]: geometry for geometry in payload["regionGeometry"]
@@ -357,6 +358,29 @@ def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
         key=lambda index: abs(safe_geometry["grid"]["y"][index]),
     )
     assert safe_geometry["grid"]["values"][omega_zero_index][center_index] < 0.01
+    statuses_by_obligation = {
+        status["obligationId"]: status for status in payload["proofStatuses"]
+    }
+    assert set(statuses_by_obligation) == {
+        "energy-barrier-non-increase",
+        "energy-barrier-initial-containment",
+        "energy-barrier-excludes-near-bottom",
+    }
+    non_increase_status = statuses_by_obligation["energy-barrier-non-increase"]
+    assert non_increase_status["status"] == "measured-holds"
+    assert non_increase_status["rigor"] == "measured"
+    assert non_increase_status["externalStatus"] == "external-required"
+    assert non_increase_status["candidateId"] == "energy-barrier"
+    assert non_increase_status["regionId"] == "domain-energy-barrier-region"
+    assert non_increase_status["comparison"] == "<="
+    assert non_increase_status["evaluation"]["kind"] == "region-grid"
+    assert non_increase_status["evaluation"]["system"] == "pendulum"
+    assert non_increase_status["evaluation"]["sampleCount"] > 0
+    assert non_increase_status["evaluation"]["variableToStateAxis"] == {
+        "theta": "theta",
+        "omega": "theta_dot",
+    }
+    assert "worst" in non_increase_status
 
     main(["--output-dir", str(tmp_path)])
     captured = capsys.readouterr()
@@ -383,6 +407,12 @@ def test_generate_verification_problems_writes_cross_linked_index(tmp_path) -> N
 
     assert payload["system"] == "pendulum"
     assert payload["regionGeometry"]
+    assert payload["proofStatuses"]
+    assert {status["status"] for status in payload["proofStatuses"]} <= {
+        "measured-holds",
+        "measured-violated",
+        "external-required",
+    }
     assert index["problems"][0]["system"] == "pendulum"
     assert index["problems"][0]["dataPath"] == (
         "/data/verification/upright-pendulum-safety.json"
