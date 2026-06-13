@@ -91,9 +91,12 @@ class InputSpec:
 class DynamicsSpec:
     """The model the obligations were derived along.
 
-    ``state`` lists variable names in order; ``rhs[i]`` is the time
-    derivative of ``state[i]``. Inputs are open control/disturbance
-    channels; a closed-loop system has none.
+    ``state`` lists variable names in order. For ``kind="continuous"``,
+    ``rhs[i]`` is the time derivative of ``state[i]`` and ``time_variable``
+    is the time symbol. For ``kind="discrete"``, ``rhs[i]`` is the update
+    expression for ``state[i]`` and ``time_variable`` is the step symbol.
+    Inputs are open control/disturbance channels; a closed-loop system has
+    none.
     """
 
     kind: str
@@ -103,24 +106,31 @@ class DynamicsSpec:
     inputs: tuple[InputSpec, ...] = ()
 
     def __post_init__(self) -> None:
-        if self.kind != "continuous":
-            raise ValueError("v1 dynamics must have kind='continuous'")
+        if self.kind not in ("continuous", "discrete"):
+            raise ValueError("v2 dynamics must have kind 'continuous' or 'discrete'")
         if not self.state:
             raise ValueError("dynamics state must be non-empty")
         if len(self.state) != len(self.rhs):
-            raise ValueError("dynamics state and rhs must have the same length")
+            raise ValueError("dynamics state and expressions must have the same length")
         names = [self.time_variable, *self.state, *(spec.name for spec in self.inputs)]
         if len(names) != len(set(names)):
-            raise ValueError("dynamics time, state, and input names must be disjoint")
+            raise ValueError(
+                "dynamics independent variable, state, and input names must be disjoint"
+            )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "kind": self.kind,
-            "timeVariable": self.time_variable,
             "state": list(self.state),
-            "rhs": [expression.to_dict() for expression in self.rhs],
             "inputs": [input_spec.to_dict() for input_spec in self.inputs],
         }
+        if self.kind == "continuous":
+            payload["timeVariable"] = self.time_variable
+            payload["rhs"] = [expression.to_dict() for expression in self.rhs]
+        else:
+            payload["stepVariable"] = self.time_variable
+            payload["update"] = [expression.to_dict() for expression in self.rhs]
+        return payload
 
 
 @dataclass(frozen=True)

@@ -31,6 +31,8 @@ from engine.verification.safety_adapter import (
 from engine.verification.sympy_codec import expression_spec
 from engine.verification.system_codec import (
     dynamics_spec_from_controlled,
+    dynamics_spec_from_controlled_discrete,
+    dynamics_spec_from_discrete,
     dynamics_spec_from_system,
 )
 
@@ -53,6 +55,8 @@ __all__ = [
     "VariableSpec",
     "VerificationProblem",
     "dynamics_spec_from_controlled",
+    "dynamics_spec_from_controlled_discrete",
+    "dynamics_spec_from_discrete",
     "dynamics_spec_from_system",
     "expression_spec",
     "render_inspection_markdown",

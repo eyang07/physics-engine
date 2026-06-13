@@ -28,11 +28,12 @@ diagnostics, controlled dynamics, safety metadata, and verification artifacts.
   - Candidate generation: quadratic Lyapunov candidates from a Hurwitz
     linearization, sublevel barrier candidates, and measured level
     suggestions — proposals only, never certification.
-  - Backend-agnostic verification-problem IR v2 encoding dynamics,
-    control/disturbance channels, explicit assumptions, candidate
-    certificates, and obligations for external inspection/discharge, plus a
-    stub inspection adapter that writes canonical problem JSON and a
-    human-readable report. The engine does not certify or prove safety.
+  - Backend-agnostic verification-problem IR v2 encoding continuous and
+    discrete dynamics, control/disturbance channels, explicit assumptions,
+    candidate certificates, and obligations for external
+    inspection/discharge, plus a stub inspection adapter that writes canonical
+    problem JSON and a human-readable report. The engine does not certify or
+    prove safety.
 - Viewer:
   - Vite/TypeScript app with gallery navigation, playback controls, structure
     panels, invariant lanes, 2D canvas lenses, and Three.js scenes.

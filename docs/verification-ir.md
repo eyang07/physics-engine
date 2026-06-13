@@ -10,11 +10,11 @@ Make exported verification problems genuinely dischargeable by an external
 tool. IR v0 carried variables, parameters, regions, and obligations, but the
 obligations arrived as pre-computed Lie-derivative expressions — the model
 itself was lost, so no reachability, SOS, or deductive backend could actually
-verify anything. v1 added the dynamics, open control/disturbance channels, and
-first-class candidate-certificate records. v2 adds explicit assumptions and
-links obligations to the assumptions they require. The engine still **proposes
-and organizes; external tools dispose**: nothing in the IR stores proof
-results.
+verify anything. v1 added continuous dynamics, open control/disturbance
+channels, and first-class candidate-certificate records. v2 adds explicit
+assumptions, links obligations to the assumptions they require, and encodes
+discrete-time dynamics. The engine still **proposes and organizes; external
+tools dispose**: nothing in the IR stores proof results.
 
 ## Design decisions
 
@@ -23,17 +23,19 @@ results.
    (nothing under `data/generated/` is committed), so old payloads are simply
    regenerated; the IR does not read or migrate old files.
 2. **Dynamics are the model obligations were derived along.** `DynamicsSpec`
-   records `kind="continuous"` (the discrete analogue is future work), the
-   time variable, the state names in problem-variable order, and one
-   `ExpressionSpec` per state derivative. The safety adapters encode the
-   *closed-loop* system, because that is what the Lie derivatives were taken
-   along; `dynamics` stays optional for obligation-only problems.
+   records either `kind="continuous"` with `timeVariable` and one `rhs`
+   expression per state derivative, or `kind="discrete"` with `stepVariable`
+   and one `update` expression per next-state component. The safety adapters
+   encode the *closed-loop* continuous system, because that is what the Lie
+   derivatives were taken along; `dynamics` stays optional for
+   obligation-only problems.
 3. **Inputs are named, optionally interval-bounded channels.** `InputSpec`
    carries a role (`control` or `disturbance`) and optional lower/upper
-   bounds. `dynamics_spec_from_controlled` encodes an open-loop
-   `ControlledFirstOrderSystem` with its admissible `Box` bounds;
-   `dynamics_spec_from_system` encodes a closed-loop `FirstOrderSystem` with
-   no inputs.
+   bounds. `dynamics_spec_from_controlled` and
+   `dynamics_spec_from_controlled_discrete` encode open-loop controlled
+   systems with their admissible `Box` bounds; `dynamics_spec_from_system`
+   and `dynamics_spec_from_discrete` encode closed-loop systems with no
+   inputs.
 4. **Candidates are first-class and link to their obligations.**
    `CandidateSpec` records kind (`lyapunov` or `barrier`), the certificate
    expression, the Lyapunov equilibrium, the candidate region, and the ids of
@@ -55,9 +57,9 @@ results.
    equilibria of the wrong dimension. Parameters now also collect free symbols
    from the dynamics RHS (excluding state and time) and the candidate
    expression.
-7. **Deferred (out of v2):** discrete-time dynamics, richer assumption
-   languages beyond scalar expression comparisons, visualization hooks, real
-   external backends, and any proof-result storage.
+7. **Deferred (out of v2):** discrete-time safety obligations, richer
+   assumption languages beyond scalar expression comparisons, visualization
+   hooks, real external backends, and any proof-result storage.
 
 ## Files
 
@@ -65,7 +67,8 @@ results.
   `AssumptionSpec`, `CandidateSpec`, extended `VerificationProblem`, schema
   bump.
 - `engine/verification/system_codec.py` — `dynamics_spec_from_system`,
-  `dynamics_spec_from_controlled`.
+  `dynamics_spec_from_controlled`, `dynamics_spec_from_discrete`,
+  `dynamics_spec_from_controlled_discrete`.
 - `engine/verification/safety_adapter.py` — adapters now pass the system and
   candidate through; `verification_problem_from_obligations` accepts optional
   `system` and `candidate` keywords.
@@ -75,9 +78,9 @@ results.
 
 ## Invariants / proof obligations (for this implementation)
 
-1. **Model fidelity (proven on examples).** The encoded RHS of the
-   closed-loop pendulum and damped oscillator match the symbolic systems the
-   obligations were derived along.
+1. **Model fidelity (proven on examples).** The encoded RHS/update
+   expressions of continuous and discrete systems match the symbolic systems
+   they were derived from.
 2. **Honest labeling (proven by construction).** `CandidateSpec` cannot be
    constructed with any status other than `"candidate"`; obligations keep
    `rigor="external-required"`; nothing in the IR can record a proof result.
@@ -109,6 +112,6 @@ manifest/export schema and any frontend surface.
 
 Implemented and verified 2026-06-12 as IR v1 with dynamics and candidate
 certificates. Updated 2026-06-13: IR v2 adds explicit `AssumptionSpec`
-records and obligation-level `assumptionIds`; focused
-verification/inspection tests pass with
+records, obligation-level `assumptionIds`, and discrete-time dynamics
+encoding; focused verification/inspection tests pass with
 `pytest tests/test_verification_ir.py tests/test_inspection_adapter.py -q`.

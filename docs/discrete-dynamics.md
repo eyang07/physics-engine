@@ -39,16 +39,21 @@ natively discrete-time. Backend-only: no manifest, gallery, or viewer change.
    not), carrying admissible boxes through and turning a symbolic `dt` into
    a parameter. The map approximates the sampled flow to first order; it is
    not the flow, and the docstring says so. Time-dependent systems raise.
-6. **Deferred (out of v0):** exact/zero-order-hold discretization, discrete
-   safety obligations (`V(F(x)) - V(x) <= 0` analogues), discrete dynamics
-   in the verification IR (`DynamicsSpec` is continuous-only in v1),
-   stochastic disturbances, and discrete control synthesis.
+6. **Verification IR encoding.** `engine.verification.system_codec` can now
+   encode `DiscreteSystem` and `ControlledDiscreteSystem` as
+   `DynamicsSpec(kind="discrete")` with `stepVariable`, `update`, and the
+   same control/disturbance input records used by continuous dynamics.
+7. **Deferred (out of v0):** exact/zero-order-hold discretization, discrete
+   safety obligations (`V(F(x)) - V(x) <= 0` analogues), stochastic
+   disturbances, and discrete control synthesis.
 
 ## Files
 
 - `engine/dynamics/discrete.py` — `DiscreteSystem`,
   `ControlledDiscreteSystem`, `DiscreteRolloutResult`, `discrete_rollout`,
   `euler_discretization`, `DiscreteControlLaw`.
+- `engine/verification/system_codec.py` — verification-IR codecs for
+  closed-loop and controlled discrete systems.
 - `engine/dynamics/__init__.py` — exports.
 - `tests/test_discrete_dynamics.py` — obligations below.
 
@@ -70,6 +75,9 @@ natively discrete-time. Backend-only: no manifest, gallery, or viewer change.
    second at `dt = 1e-3`; bounds carry through discretization; symbolic `dt`
    becomes a parameter; non-autonomous systems raise.
 5. **Determinism (measured).** Repeated iterations are bit-identical.
+6. **IR encoding (proven on examples).** Closed-loop and open-loop discrete
+   systems serialize with `kind="discrete"`, `stepVariable`, update
+   expressions, and admissible control/disturbance bounds.
 
 ## Verification commands
 
@@ -90,3 +98,8 @@ and frontend surfaces.
 Implemented and verified 2026-06-12: `pytest -q` green including
 `tests/test_discrete_dynamics.py` (see `docs/BACKEND.md` baseline for the
 current count).
+
+Updated 2026-06-13: discrete-time dynamics can be encoded in the verification
+IR through `dynamics_spec_from_discrete` and
+`dynamics_spec_from_controlled_discrete`; focused tests pass with
+`pytest tests/test_verification_ir.py tests/test_inspection_adapter.py tests/test_discrete_dynamics.py -q`.

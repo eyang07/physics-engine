@@ -59,9 +59,9 @@ artifacts.
   - Proof-obligation records and deterministic sampled checks labeled
     `rigor="measured"`.
   - Backend-agnostic verification-problem IR v2 in `engine.verification`
-    (spec in `docs/verification-ir.md`): dynamics, control/disturbance
-    channels, explicit assumptions, first-class candidate certificates locked
-    to `status="candidate"`, and obligations labeled
+    (spec in `docs/verification-ir.md`): continuous and discrete dynamics,
+    control/disturbance channels, explicit assumptions, first-class candidate
+    certificates locked to `status="candidate"`, and obligations labeled
     `rigor="external-required"`.
   - Stub inspection adapter (`engine/verification/inspection_adapter.py`) that
     consumes the IR and writes canonical problem JSON plus a human-readable

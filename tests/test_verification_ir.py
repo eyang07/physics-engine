@@ -7,6 +7,9 @@ import sympy as sp
 
 from engine.dynamics import (
     BarrierCandidate,
+    Box,
+    ControlledDiscreteSystem,
+    DiscreteSystem,
     FirstOrderSystem,
     LyapunovCandidate,
     ProofObligation,
@@ -23,6 +26,8 @@ from engine.verification import (
     VariableSpec,
     VerificationProblem,
     dynamics_spec_from_controlled,
+    dynamics_spec_from_controlled_discrete,
+    dynamics_spec_from_discrete,
     expression_spec,
     verification_problem_from_barrier,
     verification_problem_from_lyapunov,
@@ -215,8 +220,8 @@ def test_v2_spec_validation() -> None:
     x = sp.Symbol("x", real=True)
     expr = expression_spec(x)
 
-    with pytest.raises(ValueError, match="continuous"):
-        DynamicsSpec(kind="discrete", time_variable="t", state=("x",), rhs=(expr,))
+    with pytest.raises(ValueError, match="continuous.*discrete"):
+        DynamicsSpec(kind="hybrid", time_variable="t", state=("x",), rhs=(expr,))
     with pytest.raises(ValueError, match="same length"):
         DynamicsSpec(kind="continuous", time_variable="t", state=("x", "v"), rhs=(expr,))
     with pytest.raises(ValueError, match="disjoint"):
@@ -395,4 +400,59 @@ def test_dynamics_spec_from_controlled_encodes_bounds() -> None:
     assert len(spec.rhs) == 2
     assert [input_spec.to_dict() for input_spec in spec.inputs] == [
         {"name": "u", "latex": "u", "role": "control", "lower": -2.0, "upper": 2.0}
+    ]
+
+
+def test_dynamics_spec_from_discrete_encodes_update_map() -> None:
+    x = sp.Symbol("x", real=True)
+    r = sp.Symbol("r", positive=True)
+    system = DiscreteSystem(state=(x,), update=(r * x * (1 - x),), parameters=(r,))
+
+    spec = dynamics_spec_from_discrete(system)
+    payload = spec.to_dict()
+
+    assert payload["kind"] == "discrete"
+    assert payload["stepVariable"] == "k"
+    assert payload["state"] == ["x"]
+    assert "timeVariable" not in payload
+    assert "rhs" not in payload
+    assert payload["update"][0]["display"] == "r*x*(1 - x)"
+    assert payload["inputs"] == []
+
+
+def test_dynamics_spec_from_controlled_discrete_encodes_inputs() -> None:
+    x, v = sp.symbols("x v", real=True)
+    u, d = sp.symbols("u d", real=True)
+    h = sp.Symbol("h", positive=True)
+    step = sp.Symbol("n", integer=True, nonnegative=True)
+    system = ControlledDiscreteSystem(
+        state=(x, v),
+        controls=(u,),
+        update=(x + h * v, v + h * (u + d)),
+        disturbances=(d,),
+        parameters=(h,),
+        step=step,
+        control_bounds=Box(lower=(-1.0,), upper=(1.0,)),
+        disturbance_bounds=Box(lower=(-0.1,), upper=(0.1,)),
+    )
+
+    spec = dynamics_spec_from_controlled_discrete(system)
+    payload = spec.to_dict()
+
+    assert payload["kind"] == "discrete"
+    assert payload["stepVariable"] == "n"
+    assert payload["state"] == ["x", "v"]
+    assert [entry["display"] for entry in payload["update"]] == [
+        "h*v + x",
+        "h*(d + u) + v",
+    ]
+    assert payload["inputs"] == [
+        {"name": "u", "latex": "u", "role": "control", "lower": -1.0, "upper": 1.0},
+        {
+            "name": "d",
+            "latex": "d",
+            "role": "disturbance",
+            "lower": -0.1,
+            "upper": 0.1,
+        },
     ]

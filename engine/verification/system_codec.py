@@ -5,6 +5,7 @@ from __future__ import annotations
 import sympy as sp
 
 from engine.dynamics.controlled import Box, ControlledFirstOrderSystem
+from engine.dynamics.discrete import ControlledDiscreteSystem, DiscreteSystem
 from engine.dynamics.first_order import FirstOrderSystem
 from engine.verification.ir import DynamicsSpec, InputSpec
 from engine.verification.sympy_codec import expression_spec
@@ -48,5 +49,32 @@ def dynamics_spec_from_controlled(system: ControlledFirstOrderSystem) -> Dynamic
         time_variable=system.time.name,
         state=tuple(symbol.name for symbol in system.state),
         rhs=tuple(expression_spec(expression) for expression in system.rhs),
+        inputs=inputs,
+    )
+
+
+def dynamics_spec_from_discrete(system: DiscreteSystem) -> DynamicsSpec:
+    """Encode a closed-loop discrete-time system; no open inputs."""
+
+    return DynamicsSpec(
+        kind="discrete",
+        time_variable=system.step.name,
+        state=tuple(symbol.name for symbol in system.state),
+        rhs=tuple(expression_spec(expression) for expression in system.update),
+    )
+
+
+def dynamics_spec_from_controlled_discrete(
+    system: ControlledDiscreteSystem,
+) -> DynamicsSpec:
+    """Encode an open-loop controlled discrete-time system with admissible boxes."""
+
+    inputs = _input_specs(system.controls, system.control_bounds, "control")
+    inputs += _input_specs(system.disturbances, system.disturbance_bounds, "disturbance")
+    return DynamicsSpec(
+        kind="discrete",
+        time_variable=system.step.name,
+        state=tuple(symbol.name for symbol in system.state),
+        rhs=tuple(expression_spec(expression) for expression in system.update),
         inputs=inputs,
     )

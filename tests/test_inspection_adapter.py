@@ -5,7 +5,7 @@ import json
 import pytest
 import sympy as sp
 
-from engine.dynamics import FirstOrderSystem, LyapunovCandidate, SublevelSet
+from engine.dynamics import DiscreteSystem, FirstOrderSystem, LyapunovCandidate, SublevelSet
 from engine.verification import (
     ADAPTER_NAME,
     ARTIFACT_PROBLEM_JSON,
@@ -14,6 +14,11 @@ from engine.verification import (
     InspectionArtifact,
     REPORT_STATUS,
     VerificationProblem,
+    ObligationSpec,
+    ParameterSpec,
+    VariableSpec,
+    dynamics_spec_from_discrete,
+    expression_spec,
     render_inspection_markdown,
     verification_problem_from_lyapunov,
     write_inspection_artifacts,
@@ -93,6 +98,35 @@ def test_render_inspection_markdown_is_deterministic_and_honest() -> None:
     assert "kind: lyapunov" in text
     assert "status: candidate (not accepted by any external sound method)" in text
     assert "- assumptions: `parameter-c-positive`, `parameter-k-positive`" in text
+
+
+def test_render_inspection_markdown_handles_discrete_dynamics() -> None:
+    x = sp.Symbol("x", real=True)
+    r = sp.Symbol("r", positive=True)
+    system = DiscreteSystem(state=(x,), update=(r * x * (1 - x),), parameters=(r,))
+    problem = VerificationProblem(
+        id="logistic-map",
+        name="logistic map",
+        source="test",
+        variables=(VariableSpec(name="x", latex="x"),),
+        parameters=(ParameterSpec(name="r", latex="r"),),
+        regions=(),
+        obligations=(
+            ObligationSpec(
+                id="bounded",
+                name="bounded",
+                expression=expression_spec(x),
+                comparison="<=",
+                rhs=1.0,
+            ),
+        ),
+        dynamics=dynamics_spec_from_discrete(system),
+    )
+
+    text = render_inspection_markdown(problem)
+
+    assert "- kind: discrete (step variable `k`)" in text
+    assert "- `x_next = r*x*(1 - x)`" in text
 
 
 def test_report_rejects_discharge_claims(tmp_path) -> None:

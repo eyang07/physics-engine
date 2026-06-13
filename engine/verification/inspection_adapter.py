@@ -87,9 +87,14 @@ def _dynamics_lines(dynamics: DynamicsSpec | None) -> list[str]:
     if dynamics is None:
         lines.extend(["- not encoded in this problem", ""])
         return lines
-    lines.append(f"- kind: {dynamics.kind} (time variable `{dynamics.time_variable}`)")
-    for name, rhs in zip(dynamics.state, dynamics.rhs, strict=True):
-        lines.append(f"- `{name}' = {rhs.display}`")
+    if dynamics.kind == "continuous":
+        lines.append(f"- kind: continuous (time variable `{dynamics.time_variable}`)")
+        for name, rhs in zip(dynamics.state, dynamics.rhs, strict=True):
+            lines.append(f"- `{name}' = {rhs.display}`")
+    else:
+        lines.append(f"- kind: discrete (step variable `{dynamics.time_variable}`)")
+        for name, update in zip(dynamics.state, dynamics.rhs, strict=True):
+            lines.append(f"- `{name}_next = {update.display}`")
     if dynamics.inputs:
         for input_spec in dynamics.inputs:
             lower = "-inf" if input_spec.lower is None else input_spec.lower
