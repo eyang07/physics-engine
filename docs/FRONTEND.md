@@ -35,6 +35,14 @@ and trajectory data; it must not re-derive physics.
   exported `(x, p_x)` crossings on the `y = 0` surface; crossings accrete as
   playback reaches each backend-located crossing time. Reads
   `metadata.poincareSections` only — no browser-side section finding.
+- Systems↔Verification cross-linking. A system with a linked verification
+  problem (manifest `verificationProblems`) shows a jump button to that problem,
+  and the verification document links back to its system (`system`). On the
+  pendulum's phase lens a "Show safety regions" toggle overlays the IR's
+  safe/unsafe/initial/domain set geometry — the backend-sampled
+  `regionGeometry` scalar fields, color-coded by role and honoring each set's
+  `convention` — beneath the trajectory. The viewer shades the exported grids
+  only; it never evaluates the symbolic sets.
 - Three.js scenes for configuration-space, phase-space, orbit, field, spring,
   and attractor views.
 - Renderer-hint-based camera framing and a fit-to-system reset control.
@@ -71,8 +79,5 @@ The Vite main-bundle chunk-size warning is known and non-fatal.
 
 ## Next Work
 
-1. Cross-link the domains: jump from a controlled system in Systems to its
-   verification problem, and render the IR's safe/unsafe-set geometry on a stage
-   alongside the trajectory.
-2. Later, add candidate certificate values along trajectories and a proof-status
+1. Later, add candidate certificate values along trajectories and a proof-status
    surface once backend metadata is exported through the manifest.

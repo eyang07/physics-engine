@@ -141,6 +141,8 @@ export interface SystemManifest {
   systemKind?: "mechanics" | "first-order-flow" | string;
   parameters: ManifestParameter[];
   variants?: ManifestParameterVariant[];
+  /** Ids of verification problems whose IR is derived along this system. */
+  verificationProblems?: string[];
   state: ManifestStateVar[];
   projections: Record<string, string[]>;
   conserved: ManifestConserved[];

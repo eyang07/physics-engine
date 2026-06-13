@@ -35,6 +35,9 @@
           <div class="panel__header">
             <p class="eyebrow">Selected System</p>
             <h1 id="systemTitle">Simple Pendulum</h1>
+            <button id="verificationLink" class="panel-link" type="button" hidden>
+              View safety verification →
+            </button>
           </div>
           <label class="select-field">
             <span>system</span>
@@ -43,6 +46,12 @@
           <div>
             <p class="control-label">visualization</p>
             <div id="visualizationModes" class="mode-switch" aria-label="Visualization mode"></div>
+          </div>
+          <div id="safetyToggleSection" class="panel-toggle" hidden>
+            <label class="toggle-field">
+              <input id="safetyRegionsToggle" type="checkbox" />
+              <span>Show safety regions</span>
+            </label>
           </div>
           <div id="variantSection" class="panel-variants" hidden>
             <p class="control-label">parameter family</p>

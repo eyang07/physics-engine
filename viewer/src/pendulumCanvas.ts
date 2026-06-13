@@ -6,7 +6,21 @@
  */
 import { theme } from "./design/theme";
 import type { Trajectory } from "./data/trajectory";
+import type { RegionGeometry } from "./data/verification";
 import type { Sample } from "./playback";
+
+// Region fill colors keyed by role, matching the Verification panel's role
+// badges (accent = safe, danger = unsafe, cool = initial, muted = domain).
+const ROLE_RGB: Record<string, string> = {
+  safe: "240, 180, 106",
+  unsafe: "201, 92, 78",
+  initial: "111, 182, 201",
+  domain: "138, 148, 166",
+};
+
+// Paint order: broad context (domain) underneath, the safety-critical sets on
+// top, so an unsafe pocket is never hidden by the domain wash.
+const ROLE_DRAW_ORDER = ["domain", "safe", "initial", "unsafe"];
 
 export type Bounds = {
   minTheta: number;
@@ -127,6 +141,64 @@ function drawFadingPath(ctx: CanvasRenderingContext2D, points: Point2D[], width:
   ctx.restore();
 }
 
+// True when a sampled field value lies inside the region, per the exported
+// convention. Sets are sublevel by default ("expression <= level"); a ">"/">="
+// convention flips the inside to the superlevel side.
+function isInsideRegion(value: number, level: number, convention: string | null): boolean {
+  if (!Number.isFinite(value)) {
+    return false;
+  }
+  if (convention && /(^|[^<])>=?/.test(convention)) {
+    return value >= level;
+  }
+  return value <= level;
+}
+
+// Shade the exported region fields onto the phase plane, clipped to the plot
+// rect. Pure rendering of measured geometry the backend sampled — the viewer
+// never evaluates the symbolic set itself.
+function drawRegionOverlay(
+  ctx: CanvasRenderingContext2D,
+  regions: RegionGeometry[],
+  mapX: (value: number) => number,
+  mapY: (value: number) => number,
+  clip: { left: number; right: number; top: number; bottom: number },
+): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(clip.left, clip.top, clip.right - clip.left, clip.bottom - clip.top);
+  ctx.clip();
+
+  const byRole = (role: string) => regions.filter((region) => region.role === role);
+  const ordered = [
+    ...ROLE_DRAW_ORDER.flatMap(byRole),
+    ...regions.filter((region) => !ROLE_DRAW_ORDER.includes(region.role)),
+  ];
+
+  ordered.forEach((region) => {
+    const { x, y, values } = region.grid;
+    if (x.length < 2 || y.length < 2 || values.length === 0) {
+      return;
+    }
+    const level = region.level ?? 0;
+    ctx.fillStyle = `rgba(${ROLE_RGB[region.role] ?? ROLE_RGB.domain}, 0.18)`;
+    for (let row = 0; row < y.length - 1 && row < values.length; row += 1) {
+      const valueRow = values[row];
+      for (let col = 0; col < x.length - 1 && col < valueRow.length; col += 1) {
+        if (!isInsideRegion(valueRow[col], level, region.convention)) {
+          continue;
+        }
+        const x0 = mapX(x[col]);
+        const x1 = mapX(x[col + 1]);
+        const y0 = mapY(y[row]);
+        const y1 = mapY(y[row + 1]);
+        ctx.fillRect(x0, Math.min(y0, y1), Math.max(1, x1 - x0), Math.max(1, Math.abs(y0 - y1)));
+      }
+    }
+  });
+  ctx.restore();
+}
+
 function drawPhasePortrait(
   ctx: CanvasRenderingContext2D,
   data: Trajectory,
@@ -135,6 +207,7 @@ function drawPhasePortrait(
   theta: number,
   omega: number,
   area: DOMRect,
+  regions: RegionGeometry[] | null,
 ): void {
   const pad = 38;
   const left = area.x + pad;
@@ -146,6 +219,10 @@ function drawPhasePortrait(
     left + ((value - bounds.minTheta) / (bounds.maxTheta - bounds.minTheta)) * (right - left);
   const mapY = (value: number) =>
     bottom - ((value - bounds.minOmega) / (bounds.maxOmega - bounds.minOmega)) * (bottom - top);
+
+  if (regions && regions.length > 0) {
+    drawRegionOverlay(ctx, regions, mapX, mapY, { left, right, top, bottom });
+  }
 
   ctx.save();
   ctx.strokeStyle = theme.hairlineStrong;
@@ -201,6 +278,7 @@ export function drawPendulumScene(
   sample: Sample,
   width: number,
   height: number,
+  regions: RegionGeometry[] | null = null,
 ): void {
   drawStageBackground(ctx, width, height);
   drawPendulum(ctx, sample.state[0], width, height);
@@ -213,6 +291,7 @@ export function drawPendulumScene(
       sample.state[0],
       sample.state[1],
       new DOMRect(width * 0.53, height * 0.17, width * 0.39, height * 0.62),
+      regions,
     );
   }
 }

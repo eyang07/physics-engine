@@ -25,6 +25,7 @@ import { VerificationPanel } from "./verificationPanel";
 import {
   loadVerificationIndex,
   loadVerificationProblem,
+  type RegionGeometry,
   type VerificationProblemSummary,
 } from "./data/verification";
 import "./styles.css";
@@ -96,6 +97,9 @@ const parametersPanel = requireElement<HTMLElement>("#parameters");
 const loopPhaseArc = requireElement<SVGCircleElement>("#loopPhaseArc");
 const diagnosticsSection = requireElement<HTMLElement>("#diagnosticsSection");
 const diagnosticsPanel_ = requireElement<HTMLElement>("#diagnostics");
+const safetyToggleSection = requireElement<HTMLElement>("#safetyToggleSection");
+const safetyRegionsToggle = requireElement<HTMLInputElement>("#safetyRegionsToggle");
+const verificationLink = requireElement<HTMLButtonElement>("#verificationLink");
 
 const context = canvas.getContext("2d");
 if (!context) {
@@ -123,6 +127,12 @@ let pendulumBounds: Bounds | null = null;
 let loadToken = 0;
 let verificationProblems: VerificationProblemSummary[] = [];
 let selectedProblemId: string | null = null;
+// The linked verification problem's exported region geometry for the active
+// system, and whether the phase-plane overlay is toggled on. Cached per problem
+// id so re-selecting a system doesn't refetch.
+let regionGeometries: RegionGeometry[] | null = null;
+let showSafetyRegions = false;
+const regionGeometryCache = new Map<string, RegionGeometry[]>();
 
 function syncPlayButton() {
   const duration = trajectory ? trajectoryDuration(trajectory) : 0;
@@ -166,6 +176,26 @@ aboutClose.addEventListener("click", () => {
 systemSelect.addEventListener("change", () => {
   void selectExample(systemSelect.value);
 });
+
+safetyRegionsToggle.addEventListener("change", () => {
+  showSafetyRegions = safetyRegionsToggle.checked;
+});
+
+// Cross-link Systems -> Verification: open the system's linked problem.
+verificationLink.addEventListener("click", () => {
+  const problemId = selectedExample?.verificationProblems?.[0];
+  if (!problemId) {
+    return;
+  }
+  setDomain("verification");
+  void selectVerificationProblem(problemId);
+});
+
+// Cross-link Verification -> Systems: open a problem's linked example.
+verificationPanel.onOpenSystem = (systemId: string) => {
+  setDomain("systems");
+  void selectExample(systemId);
+};
 
 function isCanvasMode(id: string): id is CanvasMode {
   return CANVAS_MODE_IDS.has(id);
@@ -285,6 +315,7 @@ function renderVisualizationButtons() {
       selectedVisualization = visualization;
       applyVisualization();
       renderVisualizationButtons();
+      updateSafetyControls();
     });
     visualizationModes.append(button);
   });
@@ -386,6 +417,47 @@ function applyVisualization() {
   }
 }
 
+// Show the safety-region overlay toggle only when the active system has linked
+// region geometry and the active lens is the (θ, θ̇) phase view it overlays; show
+// the cross-link button whenever the system has a linked verification problem.
+function updateSafetyControls() {
+  const hasGeometry = regionGeometries !== null && regionGeometries.length > 0;
+  const onPhaseLens = selectedVisualization?.id === "pendulumMotionPhase";
+  safetyToggleSection.hidden = !(hasGeometry && onPhaseLens);
+  verificationLink.hidden = (selectedExample?.verificationProblems?.length ?? 0) === 0;
+}
+
+// Load the exported region geometry for the system's first linked verification
+// problem. Cached per problem id; a stale load (the user switched systems) is
+// dropped instead of overwriting the newer selection.
+async function loadRegionGeometry(example: SystemManifest) {
+  const problemId = example.verificationProblems?.[0];
+  const summary = problemId
+    ? verificationProblems.find((problem) => problem.id === problemId)
+    : undefined;
+  if (!summary) {
+    return;
+  }
+  const cached = regionGeometryCache.get(summary.id);
+  if (cached) {
+    if (selectedExample?.id === example.id) {
+      regionGeometries = cached;
+      updateSafetyControls();
+    }
+    return;
+  }
+  try {
+    const problem = await loadVerificationProblem(summary.dataPath);
+    regionGeometryCache.set(summary.id, problem.regionGeometry);
+    if (selectedExample?.id === example.id) {
+      regionGeometries = problem.regionGeometry;
+      updateSafetyControls();
+    }
+  } catch (error) {
+    console.warn("Region geometry unavailable:", error);
+  }
+}
+
 async function selectExample(exampleId: string) {
   const nextExample = examples.find((example) => example.id === exampleId) ?? examples[0];
   if (!nextExample) {
@@ -396,9 +468,15 @@ async function selectExample(exampleId: string) {
   selectedVariant = defaultVariant(nextExample);
   systemTitle.textContent = nextExample.title;
   systemSelect.value = nextExample.id;
+  // Reset the overlay for the new system; geometry (if any) loads asynchronously.
+  regionGeometries = null;
+  showSafetyRegions = false;
+  safetyRegionsToggle.checked = false;
   updateCatalogActive();
   renderVisualizationButtons();
   renderVariantButtons();
+  updateSafetyControls();
+  void loadRegionGeometry(nextExample);
   await loadAndRender();
 }
 
@@ -471,7 +549,15 @@ function render(now: number) {
   const current = sampleTrajectory(trajectory, time);
   if (selectedVisualization.id === "pendulumMotionPhase") {
     resize2dCanvas();
-    drawPendulumScene(ctx, trajectory, pendulumBounds, current, canvas.clientWidth, canvas.clientHeight);
+    drawPendulumScene(
+      ctx,
+      trajectory,
+      pendulumBounds,
+      current,
+      canvas.clientWidth,
+      canvas.clientHeight,
+      showSafetyRegions ? regionGeometries : null,
+    );
   } else if (selectedVisualization.id === "effectivePotential") {
     drawEffectivePotentialScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else if (selectedExample && isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "configuration-phase") {
@@ -504,6 +590,9 @@ async function initialize() {
     selectedVisualization = selectedExample ? lensFor(selectedExample.lenses[0]) : null;
     populateSystemSelect();
     renderSystemCatalog();
+    // Load the verification index before the first system render so a system's
+    // linked-problem cross-link and region geometry resolve on first paint.
+    await initializeVerification();
     // Boot straight into the workbench: render the first system's stage
     // immediately instead of waiting behind a splash gate.
     if (selectedExample) {
@@ -512,8 +601,6 @@ async function initialize() {
   } catch (error) {
     console.warn("Manifest preload failed:", error);
   }
-
-  await initializeVerification();
 }
 
 async function initializeVerification() {

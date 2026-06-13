@@ -45,6 +45,41 @@ export interface IrRegion {
   convention: string | null;
 }
 
+/**
+ * Measured visualization geometry for one region: the region's defining
+ * function sampled over a deterministic 2-D grid on a named projection. The
+ * symbolic region in `IrRegion` remains the verification claim; this exists only
+ * so the viewer can shade the set without re-evaluating symbolic inequalities.
+ * `convention` (e.g. "expression <= level") says which side of `level` is inside.
+ */
+export interface RegionGeometryPlane {
+  /** The region's own variable names, e.g. ["theta", "omega"]. */
+  variables: string[];
+  /** The trajectory state axes those variables map onto, e.g. ["theta", "theta_dot"]. */
+  stateAxes: string[];
+  variableToStateAxis: Record<string, string>;
+}
+
+export interface RegionGeometryGrid {
+  /** Sample coordinates along the first plane variable. */
+  x: number[];
+  /** Sample coordinates along the second plane variable. */
+  y: number[];
+  /** Field values indexed [yIndex][xIndex]. */
+  values: number[][];
+}
+
+export interface RegionGeometry {
+  regionId: string;
+  role: RegionRole;
+  kind: string;
+  projection: string;
+  plane: RegionGeometryPlane;
+  grid: RegionGeometryGrid;
+  level: number | null;
+  convention: string | null;
+}
+
 export interface IrObligation {
   id: string;
   name: string;
@@ -96,9 +131,12 @@ export interface VerificationProblem {
   id: string;
   name: string;
   source: string | null;
+  /** The manifest system id this problem is derived along, when linked. */
+  system: string | null;
   variables: IrVariable[];
   parameters: IrParameter[];
   regions: IrRegion[];
+  regionGeometry: RegionGeometry[];
   assumptions: IrAssumption[];
   obligations: IrObligation[];
   candidates: IrCandidate[];
@@ -143,6 +181,24 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+function asNumberArray(value: unknown): number[] {
+  return Array.isArray(value) ? value.filter((item): item is number => typeof item === "number") : [];
+}
+
+function asStringRecord(value: unknown): Record<string, string> {
+  const record = asRecord(value);
+  if (!record) {
+    return {};
+  }
+  const result: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(record)) {
+    if (typeof raw === "string") {
+      result[key] = raw;
+    }
+  }
+  return result;
+}
+
 // An IR expression carries `display` and `latex`; we prefer `latex` for KaTeX
 // but never fail if only one is present.
 function parseExpression(value: unknown): IrExpression | null {
@@ -178,6 +234,34 @@ function parseRegion(value: unknown): IrRegion | null {
     role: asString(record.role, "domain"),
     variables: asStringArray(record.variables),
     expression: parseExpression(record.expression),
+    level: asOptionalNumber(record.level),
+    convention: asOptionalString(record.convention),
+  };
+}
+
+function parseRegionGeometry(value: unknown): RegionGeometry | null {
+  const record = asRecord(value);
+  if (!record || typeof record.regionId !== "string") {
+    return null;
+  }
+  const plane = asRecord(record.plane) ?? {};
+  const grid = asRecord(record.grid) ?? {};
+  const values = Array.isArray(grid.values) ? grid.values.map(asNumberArray) : [];
+  return {
+    regionId: record.regionId,
+    role: asString(record.role, "domain"),
+    kind: asString(record.kind),
+    projection: asString(record.projection),
+    plane: {
+      variables: asStringArray(plane.variables),
+      stateAxes: asStringArray(plane.stateAxes),
+      variableToStateAxis: asStringRecord(plane.variableToStateAxis),
+    },
+    grid: {
+      x: asNumberArray(grid.x),
+      y: asNumberArray(grid.y),
+      values,
+    },
     level: asOptionalNumber(record.level),
     convention: asOptionalString(record.convention),
   };
@@ -282,9 +366,11 @@ export function parseVerificationProblem(raw: unknown): VerificationProblem {
     id: asString(record.id, "problem"),
     name: asString(record.name, asString(record.id, "Verification problem")),
     source: asOptionalString(record.source),
+    system: asOptionalString(record.system),
     variables: parseArray(record.variables, parseVariable),
     parameters: parseArray(record.parameters, parseVariable),
     regions: parseArray(record.regions, parseRegion),
+    regionGeometry: parseArray(record.regionGeometry, parseRegionGeometry),
     assumptions: parseArray(record.assumptions, parseAssumption),
     obligations: parseArray(record.obligations, parseObligation),
     candidates: parseArray(record.candidates, parseCandidate),

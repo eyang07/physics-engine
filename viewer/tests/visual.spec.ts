@@ -80,6 +80,16 @@ for (const viewport of [
     // the diagnostics panel shows a conservation-drift lane on boot.
     await expect(page.locator("#diagnostics .diagnostic__residual").first()).toBeVisible();
 
+    // The pendulum links to a verification problem: the cross-link button is
+    // present and the safety-region overlay toggle rides on its phase lens.
+    await expect(page.locator("#verificationLink")).toBeVisible();
+    await expect(page.locator("#safetyToggleSection")).toBeVisible();
+    await page.locator("#safetyRegionsToggle").check();
+    await page.waitForTimeout(400);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-pendulum-safety-regions.png`) });
+    await page.locator("#safetyRegionsToggle").uncheck();
+
     await page.getByRole("button", { name: "Hamiltonian Flow" }).click();
     await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
     await page.waitForTimeout(800);
@@ -245,5 +255,25 @@ for (const viewport of [
       await page.locator("#systemSelect").selectOption(systemId);
       await expectFitToSystemKeepsSceneRendered(page);
     }
+  });
+
+  test(`cross-links Systems and Verification at ${viewport.name}`, async ({ page }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.waitForSelector("#scene.stage__canvas--active");
+
+    // Systems -> Verification: the pendulum's link opens its safety problem.
+    await page.locator("#verificationLink").click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationContent .verif-doc");
+    await expect(
+      page.getByRole("heading", { name: /upright pendulum safety/i }),
+    ).toBeVisible();
+
+    // Verification -> Systems: the "Open system" link returns to the pendulum.
+    await page.getByRole("button", { name: /open system/i }).click();
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await expect(page.locator("#systemTitle")).toHaveText("Simple Pendulum");
   });
 }
