@@ -108,6 +108,9 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    dynamics, regions, candidate expressions, and obligation expressions before
    a future SOS-style adapter could attempt them. It emits only unsupported or
    malformed diagnostics; it records no success, proof, or certificate result.
+   When a controlled export includes `openLoopDynamics`, the checker validates
+   that preserved model too and treats declared control/disturbance channels as
+   known input symbols.
 
 ## Files
 
@@ -181,10 +184,11 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    well-formed obligations it cannot discharge and `malformed` diagnostics for
    ambiguous or incomplete target shapes.
 10. **SOS-polynomial requirements (proven on examples).** A polynomial damped
-   oscillator Lyapunov problem emits no requirement failures, while the
-   trigonometric pendulum barrier emits `unsupported` diagnostics for
-   non-polynomial dynamics/candidate expressions. Generic non-certificate
-   claims are rejected as unsupported targets.
+   oscillator Lyapunov problem and a controlled-discrete polynomial Lyapunov
+   export emit no requirement failures, while the trigonometric pendulum
+   barrier and a non-polynomial open-loop controlled export emit `unsupported`
+   diagnostics for non-polynomial dynamics/candidate expressions. Generic
+   non-certificate claims are rejected as unsupported targets.
 
 ## Verification commands
 
@@ -226,3 +230,6 @@ JSON.
 Updated again on 2026-06-13: added an SOS-polynomial structural requirement
 checker for future certificate adapters. It emits only unsupported/malformed
 diagnostics and does not attempt proof discharge.
+Updated again on 2026-06-13: the SOS-polynomial checker now validates preserved
+open-loop controlled dynamics and treats declared control/disturbance inputs as
+known symbols.

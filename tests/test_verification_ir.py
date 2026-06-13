@@ -800,6 +800,69 @@ def test_sos_polynomial_requirements_reject_generic_claims() -> None:
     assert diagnostic.obligation_id == "claim"
 
 
+def test_sos_polynomial_requirements_accept_controlled_polynomial_exports() -> None:
+    x = sp.Symbol("x", real=True)
+    u = sp.Symbol("u", real=True)
+    a = sp.Symbol("a", positive=True)
+    system = ControlledDiscreteSystem(
+        state=(x,),
+        controls=(u,),
+        update=(a * x + u,),
+        parameters=(a,),
+        control_bounds=Box(lower=(-1.0,), upper=(1.0,)),
+    )
+    candidate = LyapunovCandidate(
+        state=(x,),
+        function=x**2,
+        equilibrium=(0.0,),
+        name="controlled-polynomial-lyapunov",
+    )
+
+    problem = verification_problem_from_controlled_discrete_lyapunov(
+        "controlled polynomial lyapunov",
+        system,
+        {u: -x / 2},
+        candidate,
+    )
+
+    assert problem.open_loop_dynamics is not None
+    assert problem.open_loop_dynamics.inputs[0].name == "u"
+    assert sos_polynomial_requirement_diagnostics(problem) == ()
+
+
+def test_sos_polynomial_requirements_check_open_loop_inputs() -> None:
+    x = sp.Symbol("x", real=True)
+    u = sp.Symbol("u", real=True)
+    system = ControlledDiscreteSystem(
+        state=(x,),
+        controls=(u,),
+        update=(x + sp.sin(u),),
+        control_bounds=Box(lower=(-1.0,), upper=(1.0,)),
+    )
+    candidate = LyapunovCandidate(
+        state=(x,),
+        function=x**2,
+        equilibrium=(0.0,),
+        name="closed-loop-polynomial-lyapunov",
+    )
+
+    problem = verification_problem_from_controlled_discrete_lyapunov(
+        "non polynomial open loop",
+        system,
+        {u: 0},
+        candidate,
+    )
+    diagnostics = sos_polynomial_requirement_diagnostics(problem)
+
+    assert diagnostics
+    assert any(
+        "openLoopDynamics.update.0"
+        in diagnostic.details["requirement"]["nonPolynomialFields"]
+        for diagnostic in diagnostics
+        if diagnostic.details is not None
+    )
+
+
 def test_explicit_assumptions_are_serialized_and_linked_to_obligations() -> None:
     x = sp.Symbol("x", real=True)
     h = sp.Symbol("h", real=True)

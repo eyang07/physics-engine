@@ -145,9 +145,23 @@ def _polynomial_requirement_report(
 ) -> PolynomialRequirementReport:
     failures: list[str] = []
     if problem.dynamics is not None:
-        failures.extend(_non_polynomial_dynamics(problem.dynamics, known_symbol_names))
+        failures.extend(
+            _non_polynomial_dynamics(
+                problem.dynamics,
+                known_symbol_names,
+                prefix="dynamics",
+            )
+        )
     else:
         failures.append("dynamics")
+    if problem.open_loop_dynamics is not None:
+        failures.extend(
+            _non_polynomial_dynamics(
+                problem.open_loop_dynamics,
+                known_symbol_names,
+                prefix="openLoopDynamics",
+            )
+        )
 
     if not _is_polynomial(obligation.expression, known_symbol_names):
         failures.append(f"obligations.{obligation.id}.expression")
@@ -172,12 +186,14 @@ def _polynomial_requirement_report(
 def _non_polynomial_dynamics(
     dynamics: DynamicsSpec,
     known_symbol_names: set[str],
+    *,
+    prefix: str,
 ) -> tuple[str, ...]:
     fields = []
     label = "rhs" if dynamics.kind == "continuous" else "update"
     for index, expression in enumerate(dynamics.rhs):
         if not _is_polynomial(expression, known_symbol_names):
-            fields.append(f"dynamics.{label}.{index}")
+            fields.append(f"{prefix}.{label}.{index}")
     return tuple(fields)
 
 
@@ -211,8 +227,10 @@ def _known_symbol_names(problem: VerificationProblem) -> set[str]:
     names.update(parameter.name for parameter in problem.parameters)
     if problem.dynamics is not None:
         names.add(problem.dynamics.time_variable)
+        names.update(input_spec.name for input_spec in problem.dynamics.inputs)
     if problem.open_loop_dynamics is not None:
         names.add(problem.open_loop_dynamics.time_variable)
+        names.update(input_spec.name for input_spec in problem.open_loop_dynamics.inputs)
     return names
 
 
