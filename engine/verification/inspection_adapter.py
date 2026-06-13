@@ -42,6 +42,8 @@ _NOTE = (
 _DIAGNOSTIC_PROOF_NOT_ATTEMPTED = "inspection.proof_not_attempted"
 _DIAGNOSTIC_CAPABILITY_CHECK = "inspection.capability_check"
 _DIAGNOSTIC_DYNAMICS_MISSING = "inspection.dynamics_missing"
+_DIAGNOSTIC_TARGET_UNSUPPORTED = "inspection.target_unsupported"
+_DIAGNOSTIC_TARGET_MALFORMED = "inspection.target_malformed"
 _DIAGNOSTIC_EXTERNAL_DISCHARGE_REQUIRED = (
     "inspection.external_discharge_required"
 )
@@ -165,6 +167,37 @@ def inspection_diagnostics(
         )
     for obligation in problem.obligations:
         classification = classifications[obligation.id]
+        classification_details = {
+            "classification": classification.to_dict(),
+            "adapterSupportsTarget": ADAPTER_CAPABILITIES.supports(classification),
+        }
+        if classification.malformed_reason is not None:
+            diagnostics.append(
+                VerificationDiagnostic(
+                    code=_DIAGNOSTIC_TARGET_MALFORMED,
+                    severity="error",
+                    status="malformed",
+                    message=classification.malformed_reason,
+                    location=f"obligations.{obligation.id}",
+                    obligation_id=obligation.id,
+                    details=classification_details,
+                )
+            )
+        elif not ADAPTER_CAPABILITIES.supports(classification):
+            diagnostics.append(
+                VerificationDiagnostic(
+                    code=_DIAGNOSTIC_TARGET_UNSUPPORTED,
+                    severity="warning",
+                    status="unsupported",
+                    message=(
+                        "The inspection adapter cannot discharge this "
+                        "obligation target."
+                    ),
+                    location=f"obligations.{obligation.id}",
+                    obligation_id=obligation.id,
+                    details=classification_details,
+                )
+            )
         diagnostics.append(
             VerificationDiagnostic(
                 code=_DIAGNOSTIC_EXTERNAL_DISCHARGE_REQUIRED,
@@ -177,10 +210,7 @@ def inspection_diagnostics(
                     "comparison": obligation.comparison,
                     "rigor": obligation.rigor,
                     "assumptionIds": list(obligation.assumption_ids),
-                    "classification": classification.to_dict(),
-                    "adapterSupportsTarget": ADAPTER_CAPABILITIES.supports(
-                        classification
-                    ),
+                    **classification_details,
                 },
             )
         )

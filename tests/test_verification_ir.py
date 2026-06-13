@@ -22,6 +22,7 @@ from engine.verification import (
     CandidateSpec,
     DynamicsSpec,
     InputSpec,
+    MALFORMED_OBLIGATION_TARGETS,
     OBLIGATION_TARGETS,
     ObligationSpec,
     ParameterSpec,
@@ -514,6 +515,61 @@ def test_obligation_classification_tracks_backend_targets() -> None:
     assert generic_classification.target == "obligation-only"
     assert generic_classification.candidate_kind is None
 
+    candidate_without_dynamics = VerificationProblem(
+        id="candidate-without-dynamics",
+        name="candidate without dynamics",
+        source="test",
+        variables=variables,
+        parameters=(),
+        regions=(),
+        obligations=(obligation,),
+        candidates=(
+            CandidateSpec(
+                id="lyapunov-candidate",
+                name="lyapunov candidate",
+                kind="lyapunov",
+                expression=obligation.expression,
+                obligation_ids=(obligation.id,),
+                equilibrium=(0.0,),
+            ),
+        ),
+    )
+    (candidate_classification,) = obligation_classifications(candidate_without_dynamics)
+    assert candidate_classification.target == "candidate-without-dynamics"
+    assert candidate_classification.candidate_kind == "lyapunov"
+    assert candidate_classification.malformed_reason is not None
+
+    mixed_candidate = VerificationProblem(
+        id="mixed-candidate",
+        name="mixed candidate",
+        source="test",
+        variables=variables,
+        parameters=(),
+        regions=(),
+        obligations=(obligation,),
+        candidates=(
+            CandidateSpec(
+                id="lyapunov-candidate",
+                name="lyapunov candidate",
+                kind="lyapunov",
+                expression=obligation.expression,
+                obligation_ids=(obligation.id,),
+                equilibrium=(0.0,),
+            ),
+            CandidateSpec(
+                id="barrier-candidate",
+                name="barrier candidate",
+                kind="barrier",
+                expression=obligation.expression,
+                obligation_ids=(obligation.id,),
+            ),
+        ),
+    )
+    (mixed_classification,) = obligation_classifications(mixed_candidate)
+    assert mixed_classification.target == "mixed-candidate"
+    assert mixed_classification.candidate_kind == "mixed"
+    assert mixed_classification.malformed_reason is not None
+
     capability = AdapterCapabilities(
         adapter="test-certificate-adapter",
         supported_targets=("continuous-lyapunov",),
@@ -528,6 +584,13 @@ def test_obligation_classification_tracks_backend_targets() -> None:
             adapter="bad",
             supported_targets=("continuous-lyapunov",),
         )
+    with pytest.raises(ValueError, match="malformed targets"):
+        AdapterCapabilities(
+            adapter="bad",
+            supported_targets=("mixed-candidate",),
+            supports_discharge=True,
+        )
+    assert set(MALFORMED_OBLIGATION_TARGETS) <= set(OBLIGATION_TARGETS)
 
 
 def test_explicit_assumptions_are_serialized_and_linked_to_obligations() -> None:

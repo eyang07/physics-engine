@@ -14,7 +14,12 @@ OBLIGATION_TARGETS = (
     "discrete-barrier",
     "generic-continuous",
     "generic-discrete",
+    "candidate-without-dynamics",
     "obligation-only",
+    "mixed-candidate",
+)
+MALFORMED_OBLIGATION_TARGETS = (
+    "candidate-without-dynamics",
     "mixed-candidate",
 )
 
@@ -28,6 +33,7 @@ class ObligationClassification:
     dynamics_kind: str | None
     candidate_kind: str | None
     required_capability: str
+    malformed_reason: str | None = None
 
     def __post_init__(self) -> None:
         if self.target not in OBLIGATION_TARGETS:
@@ -38,15 +44,22 @@ class ObligationClassification:
             raise ValueError("candidate_kind must be lyapunov, barrier, mixed, or None")
         if not self.required_capability:
             raise ValueError("required_capability must be non-empty")
+        if self.target in MALFORMED_OBLIGATION_TARGETS and not self.malformed_reason:
+            raise ValueError("malformed targets must include a reason")
+        if self.target not in MALFORMED_OBLIGATION_TARGETS and self.malformed_reason:
+            raise ValueError("well-formed targets must not include a malformed reason")
 
     def to_dict(self) -> dict[str, str | None]:
-        return {
+        payload = {
             "obligationId": self.obligation_id,
             "target": self.target,
             "dynamicsKind": self.dynamics_kind,
             "candidateKind": self.candidate_kind,
             "requiredCapability": self.required_capability,
         }
+        if self.malformed_reason is not None:
+            payload["malformedReason"] = self.malformed_reason
+        return payload
 
 
 @dataclass(frozen=True)
@@ -63,12 +76,16 @@ class AdapterCapabilities:
         unknown = set(self.supported_targets) - set(OBLIGATION_TARGETS)
         if unknown:
             raise ValueError(f"unknown supported obligation targets: {sorted(unknown)}")
+        malformed = set(self.supported_targets) & set(MALFORMED_OBLIGATION_TARGETS)
+        if malformed:
+            raise ValueError(f"malformed targets cannot be supported: {sorted(malformed)}")
         if self.supported_targets and not self.supports_discharge:
             raise ValueError("non-discharging adapters must not advertise targets")
 
     def supports(self, classification: ObligationClassification) -> bool:
         return (
             self.supports_discharge
+            and classification.malformed_reason is None
             and classification.target in self.supported_targets
         )
 
@@ -127,10 +144,26 @@ def _classify_obligation(
             dynamics_kind=dynamics_kind,
             candidate_kind="mixed",
             required_capability="discharge:mixed-candidate",
+            malformed_reason=(
+                "Obligation is linked to multiple candidate kinds; split or "
+                "disambiguate candidate ownership before discharge."
+            ),
         )
 
     candidate_kind = next(iter(candidate_kinds), None)
     if dynamics_kind is None:
+        if candidate_kind is not None:
+            return ObligationClassification(
+                obligation_id=obligation_id,
+                target="candidate-without-dynamics",
+                dynamics_kind=None,
+                candidate_kind=candidate_kind,
+                required_capability="discharge:candidate-without-dynamics",
+                malformed_reason=(
+                    "Candidate obligation has no dynamics model; certificate "
+                    "discharge requires the model used to derive it."
+                ),
+            )
         return ObligationClassification(
             obligation_id=obligation_id,
             target="obligation-only",

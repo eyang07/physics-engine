@@ -1,6 +1,7 @@
 """Backend-agnostic verification problem IR."""
 
 from engine.verification.capabilities import (
+    MALFORMED_OBLIGATION_TARGETS,
     OBLIGATION_TARGETS,
     AdapterCapabilities,
     ObligationClassification,
@@ -71,6 +72,7 @@ __all__ = [
     "InputSpec",
     "InspectionAdapterReport",
     "InspectionArtifact",
+    "MALFORMED_OBLIGATION_TARGETS",
     "OBLIGATION_TARGETS",
     "ObligationClassification",
     "ObligationSpec",

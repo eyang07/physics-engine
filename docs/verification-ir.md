@@ -82,7 +82,10 @@ nothing in the IR stores proof results.
    Adapters advertise discharge capabilities separately from inspection
    support, and diagnostics include both the target classification and whether
    the adapter supports that target. The inspection stub advertises no
-   discharge capabilities.
+   discharge capabilities. Ambiguous or incomplete target shapes, currently
+   mixed-candidate ownership and candidate obligations without encoded
+   dynamics, are classified as malformed adapter targets rather than as
+   unsupported proof attempts.
 
 ## Files
 
@@ -139,6 +142,9 @@ nothing in the IR stores proof results.
    `unsupported`, `malformed`) and every obligation receives an
    `externally-required` diagnostic until a real backend exists. Each such
    diagnostic carries its obligation target and required discharge capability.
+   The inspection stub also emits target-level `unsupported` diagnostics for
+   well-formed obligations it cannot discharge and `malformed` diagnostics for
+   ambiguous or incomplete target shapes.
 
 ## Verification commands
 
@@ -165,3 +171,6 @@ encoding; focused verification/inspection tests pass with
 Updated later on 2026-06-13: added adapter capability declarations,
 target-specific obligation classification, and stricter IR validation for
 duplicate names and region variables.
+Updated again on 2026-06-13: inspection diagnostics now distinguish
+well-formed-but-unsupported targets from malformed target shapes such as
+candidate obligations without dynamics and mixed candidate ownership.

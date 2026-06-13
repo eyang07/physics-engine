@@ -18,6 +18,7 @@ from engine.verification import (
     ARTIFACT_INSPECTION_OUTCOME_JSON,
     ARTIFACT_PROBLEM_JSON,
     ARTIFACT_REPORT_MARKDOWN,
+    CandidateSpec,
     InspectionAdapterReport,
     InspectionArtifact,
     REPORT_STATUS,
@@ -92,7 +93,12 @@ def test_write_inspection_artifacts_round_trips_problem(tmp_path) -> None:
     }
     assert {
         diagnostic["status"] for diagnostic in outcome_payload["diagnostics"]
-    } == {"not-attempted", "externally-required"}
+    } == {"not-attempted", "unsupported", "externally-required"}
+    assert [
+        diagnostic["obligationId"]
+        for diagnostic in outcome_payload["diagnostics"]
+        if diagnostic["code"] == "inspection.target_unsupported"
+    ] == list(report.obligation_ids)
     assert [
         diagnostic["obligationId"]
         for diagnostic in outcome_payload["diagnostics"]
@@ -206,6 +212,7 @@ def test_inspection_diagnostics_mark_missing_dynamics_unsupported() -> None:
         "not-attempted",
         "not-attempted",
         "unsupported",
+        "unsupported",
         "externally-required",
     ]
     assert diagnostics[1].code == "inspection.capability_check"
@@ -217,8 +224,56 @@ def test_inspection_diagnostics_mark_missing_dynamics_unsupported() -> None:
     }
     assert diagnostics[2].code == "inspection.dynamics_missing"
     assert diagnostics[2].severity == "warning"
+    assert diagnostics[3].code == "inspection.target_unsupported"
     assert diagnostics[3].details is not None
     assert diagnostics[3].details["classification"]["target"] == "obligation-only"
+    assert diagnostics[4].details is not None
+    assert diagnostics[4].details["classification"]["target"] == "obligation-only"
+
+
+def test_inspection_diagnostics_mark_malformed_targets() -> None:
+    x = sp.Symbol("x", real=True)
+    obligation = ObligationSpec(
+        id="candidate-claim",
+        name="candidate claim",
+        expression=expression_spec(x),
+        comparison="<=",
+    )
+    problem = VerificationProblem(
+        id="candidate-without-dynamics",
+        name="candidate without dynamics",
+        source="test",
+        variables=(VariableSpec(name="x", latex="x"),),
+        parameters=(),
+        regions=(),
+        obligations=(obligation,),
+        candidates=(
+            CandidateSpec(
+                id="candidate",
+                name="candidate",
+                kind="lyapunov",
+                expression=expression_spec(x),
+                obligation_ids=("candidate-claim",),
+                equilibrium=(0.0,),
+            ),
+        ),
+    )
+
+    diagnostics = inspection_diagnostics(problem)
+
+    malformed = [
+        diagnostic
+        for diagnostic in diagnostics
+        if diagnostic.code == "inspection.target_malformed"
+    ]
+    assert len(malformed) == 1
+    assert malformed[0].status == "malformed"
+    assert malformed[0].severity == "error"
+    assert malformed[0].details is not None
+    assert malformed[0].details["classification"]["target"] == (
+        "candidate-without-dynamics"
+    )
+    assert "dynamics model" in malformed[0].message
 
 
 def test_report_rejects_discharge_claims(tmp_path) -> None:
