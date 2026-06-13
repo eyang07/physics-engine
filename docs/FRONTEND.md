@@ -25,6 +25,10 @@ and trajectory data; it must not re-derive physics.
   place — no browser-side regeneration.
 - Mathematical structure panels for symbolic backend exports.
 - Invariant lanes and sampled series display.
+- Diagnostics panel for exported phase-space structure: the finite-time Lyapunov
+  estimate, Poincaré-section crossings, and per-invariant conservation-drift
+  lanes (the measured `invariantResiduals`), all shown qualitatively with no raw
+  decimals.
 - 2D canvas lenses for pendulum, effective-potential views, and wavefront/ray
   bundles.
 - Three.js scenes for configuration-space, phase-space, orbit, field, spring,
@@ -65,9 +69,8 @@ The Vite main-bundle chunk-size warning is known and non-fatal.
 
 1. Promote the Poincaré section from the diagnostics panel to a focused
    full-stage lens for Hénon-Heiles using the exported `(x, p_x)` points.
-2. Surface the exported invariant-residual diagnostics in the diagnostics panel.
-3. Cross-link the domains: jump from a controlled system in Systems to its
+2. Cross-link the domains: jump from a controlled system in Systems to its
    verification problem, and render the IR's safe/unsafe-set geometry on a stage
    alongside the trajectory.
-4. Later, add candidate certificate values along trajectories and a proof-status
+3. Later, add candidate certificate values along trajectories and a proof-status
    surface once backend metadata is exported through the manifest.

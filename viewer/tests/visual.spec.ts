@@ -76,6 +76,10 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-pendulum.png`) });
 
+    // The pendulum exports an invariant-residual diagnostic (energy drift), so
+    // the diagnostics panel shows a conservation-drift lane on boot.
+    await expect(page.locator("#diagnostics .diagnostic__residual").first()).toBeVisible();
+
     await page.getByRole("button", { name: "Hamiltonian Flow" }).click();
     await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
     await page.waitForTimeout(800);

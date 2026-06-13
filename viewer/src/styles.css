@@ -926,6 +926,12 @@ input[type="range"]::-moz-range-thumb {
   height: 48px;
 }
 
+.diagnostic__residual {
+  display: block;
+  width: 100%;
+  height: 36px;
+}
+
 .diagnostic__section {
   display: block;
   width: 100%;

@@ -20,8 +20,10 @@ import katex from "katex";
 import { theme } from "./design/theme";
 import { magma } from "./design/colormaps";
 import {
+  invariantResiduals,
   lyapunovDiagnostic,
   poincareSections,
+  type InvariantResidual,
   type PoincareSection,
   type Trajectory,
 } from "./data/trajectory";
@@ -33,6 +35,14 @@ type LyapunovLane = {
   series: number[];
   domainMin: number;
   domainMax: number;
+};
+
+type ResidualLane = {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  // The drift r(t) = q(t) - reference, computed once from exported data.
+  residual: number[];
+  amplitude: number;
 };
 
 type SectionPlot = {
@@ -57,6 +67,40 @@ function constantLatex(value: number): string {
     .replace(/\.?0+$/, "");
 }
 
+const GREEK_TO_LATEX: Record<string, string> = {
+  ell: "\\ell",
+  phi: "\\phi",
+  theta: "\\theta",
+  psi: "\\psi",
+  omega: "\\omega",
+};
+
+// The conserved-quantity name as LaTeX (the trajectory metadata carries only the
+// identifier, not the manifest's LaTeX): split a `base_sub` and translate Greek
+// words, so `p_phi` -> p_{\phi} and `ell` -> \ell.
+function invariantSymbolLatex(name: string): string {
+  const split = name.match(/^([A-Za-z]+)_([A-Za-z0-9]+)$/);
+  if (split) {
+    const base = GREEK_TO_LATEX[split[1]] ?? split[1];
+    const sub = GREEK_TO_LATEX[split[2]] ?? split[2];
+    return `${base}_{${sub}}`;
+  }
+  return GREEK_TO_LATEX[name] ?? name;
+}
+
+// The conservation quality as an order of magnitude only — never a precise
+// decimal. `Delta H <~ 10^-8` reads as "deviates by at most about that, relative
+// to its scale", which is honest measured evidence of integrator quality.
+function residualMagnitudeLatex(residual: InvariantResidual, amplitude: number): string {
+  const relative =
+    residual.maxRelative ??
+    (residual.scale && residual.scale !== 0 ? amplitude / Math.abs(residual.scale) : undefined);
+  if (relative === undefined || !Number.isFinite(relative) || relative <= 0) {
+    return "\\text{conserved}";
+  }
+  return `\\lesssim 10^{${Math.floor(Math.log10(relative))}}`;
+}
+
 // A robust display window for the running estimate: clip the brief initial
 // transient with 2nd/98th percentiles, but always keep the neutral baseline
 // (λ = 0) in view so "settles above zero" vs "hugs zero" reads honestly.
@@ -78,6 +122,7 @@ function robustDomain(series: number[]): { min: number; max: number } {
 export class DiagnosticsPanel {
   private lyapunovLane: LyapunovLane | null = null;
   private sectionPlots: SectionPlot[] = [];
+  private residualLanes: ResidualLane[] = [];
 
   constructor(
     private readonly section: HTMLElement,
@@ -88,21 +133,71 @@ export class DiagnosticsPanel {
     this.content.replaceChildren();
     this.lyapunovLane = null;
     this.sectionPlots = [];
+    this.residualLanes = [];
     this.section.hidden = true;
   }
 
   show(data: Trajectory): void {
     this.clear();
     this.renderLyapunov(data);
+    this.renderResiduals(data);
     this.renderSections(data);
-    this.section.hidden = this.lyapunovLane === null && this.sectionPlots.length === 0;
+    this.section.hidden =
+      this.lyapunovLane === null &&
+      this.sectionPlots.length === 0 &&
+      this.residualLanes.length === 0;
   }
 
   update(phase: number): void {
     if (this.lyapunovLane) {
       drawLyapunovLane(this.lyapunovLane, phase);
     }
+    this.residualLanes.forEach((lane) => drawResidualLane(lane, phase));
     this.sectionPlots.forEach((plot) => drawSectionPlot(plot, phase));
+  }
+
+  // The measured conservation drift of each invariant: r(t) = q(t) - reference,
+  // drawn against a zero baseline (perfect conservation). The curve is
+  // auto-scaled to its own tiny amplitude so its *shape* — flat, oscillating, or
+  // drifting — is legible; the caption gives the order of magnitude only.
+  private renderResiduals(data: Trajectory): void {
+    invariantResiduals(data).forEach((residual) => this.buildResidualRow(residual, data));
+  }
+
+  private buildResidualRow(residual: InvariantResidual, data: Trajectory): void {
+    const series = residual.series ? data.series?.[residual.series] : undefined;
+    if (!series || series.length === 0) {
+      return;
+    }
+    const reference = residual.reference ?? series[0];
+    const drift = series.map((value) => value - reference);
+    let amplitude = 0;
+    for (const value of drift) {
+      amplitude = Math.max(amplitude, Math.abs(value));
+    }
+
+    const row = document.createElement("div");
+    row.className = "diagnostic";
+
+    const head = document.createElement("div");
+    head.className = "diagnostic__head";
+    const symbol = document.createElement("span");
+    symbol.className = "diagnostic__symbol";
+    renderLatex(symbol, `\\Delta ${invariantSymbolLatex(residual.name)}`);
+    const caption = document.createElement("span");
+    caption.className = "diagnostic__caption";
+    renderLatex(caption, residualMagnitudeLatex(residual, amplitude));
+    head.append(symbol, caption);
+
+    const lane = document.createElement("canvas");
+    lane.className = "diagnostic__residual";
+    row.append(head, lane);
+    this.content.append(row);
+
+    const laneCtx = lane.getContext("2d");
+    if (laneCtx) {
+      this.residualLanes.push({ canvas: lane, ctx: laneCtx, residual: drift, amplitude });
+    }
   }
 
   private renderLyapunov(data: Trajectory): void {
@@ -319,6 +414,60 @@ function drawLyapunovLane(lane: LyapunovLane, phase: number): void {
   ctx.shadowBlur = 8;
   ctx.beginPath();
   ctx.arc(clamp(phase, 0, 1) * width, yOf(series[playIndex]), 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+// The conservation drift Δq(t) about a zero baseline. The lane auto-scales to
+// the drift's own (tiny) amplitude, so a flat line reads "conserved" and any
+// oscillation or secular trend is visible without a printed number.
+function drawResidualLane(lane: ResidualLane, phase: number): void {
+  const { canvas, ctx, residual, amplitude } = lane;
+  const { width, height } = prepareCanvas(canvas, ctx);
+
+  const count = residual.length;
+  if (count === 0) {
+    return;
+  }
+  const pad = 5;
+  const amp = amplitude > 0 ? amplitude : 1;
+  const mid = height / 2;
+  const yOf = (value: number) =>
+    clamp(mid - (value / amp) * (height / 2 - pad), pad, height - pad);
+  const xOf = (index: number) => (count <= 1 ? 0 : (index / (count - 1)) * width);
+  const step = Math.max(1, Math.floor(count / 320));
+
+  // Zero baseline = perfect conservation, faint and dashed, no label.
+  ctx.save();
+  ctx.setLineDash([3, 4]);
+  ctx.strokeStyle = theme.hairlineStrong;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, mid);
+  ctx.lineTo(width, mid);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.strokeStyle = theme.cool;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let index = 0; index < count; index += step) {
+    const x = xOf(index);
+    const y = yOf(residual[index]);
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  ctx.stroke();
+
+  const playIndex = clamp(Math.round(phase * (count - 1)), 0, count - 1);
+  ctx.fillStyle = theme.cool;
+  ctx.shadowColor = theme.cool;
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(clamp(phase, 0, 1) * width, yOf(residual[playIndex]), 3.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.shadowBlur = 0;
 }

@@ -152,8 +152,34 @@ export type PoincareSection = {
   points: PoincarePoint[];
 };
 
+/**
+ * The measured conservation quality of one invariant, exported in
+ * `metadata.invariantResiduals`. Python compares the conserved-quantity series
+ * against a reference value and reports the deviation; `series` names the column
+ * in `trajectory.series` so the viewer can draw the drift shape without
+ * recomputing anything. The numbers are measured evidence of integrator quality,
+ * not a proof of conservation.
+ */
+export type InvariantResidual = {
+  name: string;
+  /** Series key in `trajectory.series` for the conserved quantity q(t). */
+  series?: string;
+  /** The reference value the residual is measured against (e.g. q(t0)). */
+  reference?: number;
+  referenceKind?: string;
+  maxAbs?: number;
+  rms?: number;
+  maxRelative?: number;
+  /** Characteristic magnitude used to normalize the relative residual. */
+  scale?: number;
+};
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+}
+
+function asNumber(value: unknown): number | undefined {
+  return typeof value === "number" ? value : undefined;
 }
 
 /** Read the Lyapunov diagnostic Python attached to the trajectory metadata. */
@@ -177,6 +203,32 @@ export function lyapunovDiagnostic(trajectory: Trajectory): LyapunovDiagnostic |
     timeWindow,
     sampleCount: typeof raw.sampleCount === "number" ? raw.sampleCount : undefined,
   };
+}
+
+/** Read the invariant-residual diagnostics Python attached to the trajectory. */
+export function invariantResiduals(trajectory: Trajectory): InvariantResidual[] {
+  const raw = trajectory.metadata?.invariantResiduals;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.flatMap((item) => {
+    const record = asRecord(item);
+    if (!record || typeof record.name !== "string") {
+      return [];
+    }
+    return [
+      {
+        name: record.name,
+        series: typeof record.series === "string" ? record.series : undefined,
+        reference: asNumber(record.reference),
+        referenceKind: typeof record.referenceKind === "string" ? record.referenceKind : undefined,
+        maxAbs: asNumber(record.maxAbs),
+        rms: asNumber(record.rms),
+        maxRelative: asNumber(record.maxRelative),
+        scale: asNumber(record.scale),
+      },
+    ];
+  });
 }
 
 // Resolve one section axis (e.g. "x", "p_x") to its exported value for a single
