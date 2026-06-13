@@ -301,6 +301,21 @@ def test_ir_spec_validation() -> None:
             level=0.0,
             convention="expression <= level",
         )
+    with pytest.raises(ValueError, match="at least two points"):
+        RegionGeometrySpec(
+            region_id="r",
+            role="safe",
+            projection="phase",
+            plane_variables=("x", "v"),
+            state_axes=("x", "x_dot"),
+            variable_to_state_axis={"x": "x", "v": "x_dot"},
+            x_values=(0.0, 1.0),
+            y_values=(0.0, 1.0),
+            values=((0.0, 1.0), (1.0, 2.0)),
+            level=0.0,
+            convention="expression <= level",
+            boundary_polylines=(((0.0, 0.0),),),
+        )
 
 
 def test_problem_validates_dynamics_and_candidate_links() -> None:

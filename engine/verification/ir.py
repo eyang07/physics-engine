@@ -223,6 +223,7 @@ class RegionGeometrySpec:
     values: tuple[tuple[float, ...], ...]
     level: float
     convention: str
+    boundary_polylines: tuple[tuple[tuple[float, float], ...], ...] = ()
     kind: str = "scalar-field-grid"
     rigor: str = "measured"
     note: str = (
@@ -256,6 +257,12 @@ class RegionGeometrySpec:
         row_widths = {len(row) for row in self.values}
         if row_widths != {len(self.x_values)}:
             raise ValueError("region geometry column count must match x_values")
+        for polyline in self.boundary_polylines:
+            if len(polyline) < 2:
+                raise ValueError("region geometry boundary polylines need at least two points")
+            for point in polyline:
+                if len(point) != 2:
+                    raise ValueError("region geometry boundary points must be 2-D")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -273,6 +280,10 @@ class RegionGeometrySpec:
                 "y": list(self.y_values),
                 "values": [list(row) for row in self.values],
             },
+            "boundaryPolylines": [
+                [list(point) for point in polyline]
+                for polyline in self.boundary_polylines
+            ],
             "level": self.level,
             "convention": self.convention,
             "rigor": self.rigor,

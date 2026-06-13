@@ -67,7 +67,8 @@ artifacts.
     certificates locked to `status="candidate"`, and obligations labeled
     `rigor="external-required"`. Viewer-facing exports now include a
     top-level manifest `system` cross-reference and measured `regionGeometry`
-    scalar-field grids for safe/unsafe/initial/domain regions.
+    scalar-field grids plus boundary polylines for safe/unsafe/initial/domain
+    regions.
   - The first viewer-renderable verification pair is
     `upright-pendulum-safety` linked to manifest system `pendulum`; the
     geometry export maps IR variable `omega` to manifest state axis

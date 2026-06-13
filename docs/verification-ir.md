@@ -18,8 +18,9 @@ discrete-time dynamics. The v2 payload can also carry optional
 exports preserve the admissible input channels the controller was derived
 from. v3 adds viewer-facing cross-links and sampled region geometry: a
 top-level `system` id matching a manifest system id, plus `regionGeometry`
-scalar-field grids so TypeScript can render safe/unsafe/initial/domain regions
-without evaluating symbolic inequalities. The engine still **proposes and
+scalar-field grids and boundary polylines so TypeScript can render
+safe/unsafe/initial/domain regions without evaluating symbolic inequalities.
+The engine still **proposes and
 organizes; external tools dispose**: nothing in the IR stores proof results.
 
 ## Design decisions
@@ -73,8 +74,8 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
 8. **Viewer geometry is sampled metadata, not verification.** `regionGeometry`
    entries carry a named manifest projection, two IR plane variables, explicit
    IR-variable-to-manifest-state-axis mappings, the sampled scalar field of the
-   defining region expression, the original level/convention, and
-   `rigor="measured"`. For the first concrete export,
+   defining region expression, sampled boundary polylines from that grid, the
+   original level/convention, and `rigor="measured"`. For the first concrete export,
    `upright-pendulum-safety` links to manifest system `pendulum`, maps
    `omega -> theta_dot`, and renders the verification regions on the pendulum
    `phase` projection. This is a render aid only; it does not prove region
@@ -110,7 +111,7 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
 - `engine/verification/capabilities.py` — adapter capability declarations and
   deterministic obligation-target classification.
 - `engine/verification/region_geometry.py` — deterministic scalar-field grid
-  sampling for region render metadata.
+  sampling and boundary-polyline extraction for region render metadata.
 - `engine/verification/system_codec.py` — `dynamics_spec_from_system`,
   `dynamics_spec_from_controlled`, `dynamics_spec_from_discrete`,
   `dynamics_spec_from_controlled_discrete`.
@@ -154,7 +155,8 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
 8. **Viewer-region geometry (measured).** Region geometry grids sample the
    symbolic region expression exactly at deterministic grid points and carry
    `rigor="measured"` plus the original level/convention. They are render
-   metadata, not certificates.
+   metadata, not certificates. Boundary polylines are extracted from those
+   measured grids and carry the same rigor.
 9. **Diagnostic honesty (proven by construction).** Inspection outcomes use
    only non-success statuses (`not-attempted`, `externally-required`,
    `unsupported`, `malformed`) and every obligation receives an
@@ -196,3 +198,5 @@ candidate obligations without dynamics and mixed candidate ownership.
 Updated again on 2026-06-13: IR v3 adds top-level manifest system cross-links
 and measured `regionGeometry` scalar-field grids for viewer rendering. The
 pendulum manifest entry links back to `upright-pendulum-safety`.
+Updated again on 2026-06-13: `regionGeometry` now includes sampled boundary
+polylines extracted from the scalar grids for direct viewer contour rendering.

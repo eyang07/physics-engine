@@ -339,6 +339,15 @@ def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
     assert len(safe_geometry["grid"]["y"]) == 91
     assert len(safe_geometry["grid"]["values"]) == 91
     assert len(safe_geometry["grid"]["values"][0]) == 91
+    assert safe_geometry["boundaryPolylines"]
+    assert all(len(polyline) >= 2 for polyline in safe_geometry["boundaryPolylines"])
+    boundary_x_values = [
+        point[0]
+        for polyline in safe_geometry["boundaryPolylines"]
+        for point in polyline
+    ]
+    assert min(abs(value - (float(sp.pi) - 0.5)) for value in boundary_x_values) < 1e-3
+    assert min(abs(value - (float(sp.pi) + 0.5)) for value in boundary_x_values) < 1e-3
     center_index = min(
         range(len(safe_geometry["grid"]["x"])),
         key=lambda index: abs(safe_geometry["grid"]["x"][index] - float(sp.pi)),
