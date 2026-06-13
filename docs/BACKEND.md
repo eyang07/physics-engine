@@ -79,6 +79,9 @@ artifacts.
     classification for future verification backends; the inspection stub
     advertises no discharge capability and records required target support in
     diagnostics.
+  - SOS-polynomial structural requirement diagnostics for future certificate
+    adapters. These check polynomial compatibility only; they do not attempt or
+    record proof discharge.
   - Controlled-discrete Lyapunov/barrier verification exports that derive
     obligations on the closed-loop map while preserving the original
     open-loop controlled dynamics, admissible input bounds, and symbolic

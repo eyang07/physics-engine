@@ -103,6 +103,11 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    mixed-candidate ownership and candidate obligations without encoded
    dynamics, are classified as malformed adapter targets rather than as
    unsupported proof attempts.
+12. **Target-specific prechecks are structural only.** The SOS-polynomial
+   requirement checker verifies that certificate targets have polynomial
+   dynamics, regions, candidate expressions, and obligation expressions before
+   a future SOS-style adapter could attempt them. It emits only unsupported or
+   malformed diagnostics; it records no success, proof, or certificate result.
 
 ## Files
 
@@ -114,6 +119,8 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
   integrations.
 - `engine/verification/capabilities.py` — adapter capability declarations and
   deterministic obligation-target classification.
+- `engine/verification/target_requirements.py` — target-specific structural
+  requirement diagnostics, currently an SOS-polynomial precheck.
 - `engine/verification/region_geometry.py` — deterministic scalar-field grid
   sampling and boundary-polyline extraction for region render metadata.
 - `engine/export/verification_contract.py` — manifest/verification cross-link
@@ -173,6 +180,11 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    The inspection stub also emits target-level `unsupported` diagnostics for
    well-formed obligations it cannot discharge and `malformed` diagnostics for
    ambiguous or incomplete target shapes.
+10. **SOS-polynomial requirements (proven on examples).** A polynomial damped
+   oscillator Lyapunov problem emits no requirement failures, while the
+   trigonometric pendulum barrier emits `unsupported` diagnostics for
+   non-polynomial dynamics/candidate expressions. Generic non-certificate
+   claims are rejected as unsupported targets.
 
 ## Verification commands
 
@@ -211,3 +223,6 @@ polylines extracted from the scalar grids for direct viewer contour rendering.
 Updated again on 2026-06-13: viewer verification generation validates manifest
 cross-links and region-geometry projection/state-axis mappings before writing
 JSON.
+Updated again on 2026-06-13: added an SOS-polynomial structural requirement
+checker for future certificate adapters. It emits only unsupported/malformed
+diagnostics and does not attempt proof discharge.

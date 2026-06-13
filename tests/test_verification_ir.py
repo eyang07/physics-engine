@@ -29,6 +29,7 @@ from engine.verification import (
     SCHEMA_VERSION,
     RegionGeometrySpec,
     RegionSpec,
+    SOS_POLYNOMIAL_ADAPTER,
     VariableSpec,
     VerificationProblem,
     dynamics_spec_from_controlled,
@@ -36,6 +37,7 @@ from engine.verification import (
     dynamics_spec_from_discrete,
     expression_spec,
     obligation_classifications,
+    sos_polynomial_requirement_diagnostics,
     verification_problem_from_barrier,
     verification_problem_from_controlled_discrete_barrier,
     verification_problem_from_controlled_discrete_lyapunov,
@@ -709,6 +711,93 @@ def test_obligation_classification_tracks_backend_targets() -> None:
             supports_discharge=True,
         )
     assert set(MALFORMED_OBLIGATION_TARGETS) <= set(OBLIGATION_TARGETS)
+
+
+def test_sos_polynomial_requirements_accept_polynomial_certificate_targets() -> None:
+    system, x, v, _k, _c = _damped_oscillator()
+    candidate = LyapunovCandidate(
+        state=(x, v),
+        function=(x**2 + v**2) / 2,
+        equilibrium=(0.0, 0.0),
+        domain=SublevelSet(
+            state=(x, v),
+            expression=x**2 + v**2,
+            level=4.0,
+            name="ball",
+        ),
+    )
+
+    problem = verification_problem_from_lyapunov(
+        "polynomial lyapunov",
+        system,
+        candidate,
+    )
+
+    assert SOS_POLYNOMIAL_ADAPTER.supports(obligation_classifications(problem)[0])
+    assert sos_polynomial_requirement_diagnostics(problem) == ()
+
+
+def test_sos_polynomial_requirements_reject_non_polynomial_targets() -> None:
+    closed, theta, omega = _pendulum_closed_loop()
+    d = theta - sp.pi
+    specification = SafetySpecification(
+        state=(theta, omega),
+        safe_set=SublevelSet(
+            state=(theta, omega),
+            expression=d**2,
+            level=0.25,
+            name="corridor",
+        ),
+    )
+    barrier = BarrierCandidate(
+        state=(theta, omega),
+        function=omega**2 + sp.cos(d),
+        name="trig-barrier",
+    )
+
+    problem = verification_problem_from_barrier(
+        "non polynomial barrier",
+        closed,
+        barrier,
+        specification=specification,
+    )
+    diagnostics = sos_polynomial_requirement_diagnostics(problem)
+
+    assert diagnostics
+    assert {diagnostic.code for diagnostic in diagnostics} == {
+        "sos.polynomial_requirement"
+    }
+    assert {diagnostic.status for diagnostic in diagnostics} == {"unsupported"}
+    assert any(
+        "dynamics.rhs.1" in diagnostic.details["requirement"]["nonPolynomialFields"]
+        for diagnostic in diagnostics
+        if diagnostic.details is not None
+    )
+    assert any(
+        "candidates.trig-barrier.expression"
+        in diagnostic.details["requirement"]["nonPolynomialFields"]
+        for diagnostic in diagnostics
+        if diagnostic.details is not None
+    )
+
+
+def test_sos_polynomial_requirements_reject_generic_claims() -> None:
+    variables, obligation = _minimal_problem_parts()
+    problem = VerificationProblem(
+        id="generic",
+        name="generic",
+        source="test",
+        variables=variables,
+        parameters=(),
+        regions=(),
+        obligations=(obligation,),
+    )
+
+    (diagnostic,) = sos_polynomial_requirement_diagnostics(problem)
+
+    assert diagnostic.code == "sos.target_unsupported"
+    assert diagnostic.status == "unsupported"
+    assert diagnostic.obligation_id == "claim"
 
 
 def test_explicit_assumptions_are_serialized_and_linked_to_obligations() -> None:

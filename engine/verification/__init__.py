@@ -60,6 +60,11 @@ from engine.verification.system_codec import (
     dynamics_spec_from_discrete,
     dynamics_spec_from_system,
 )
+from engine.verification.target_requirements import (
+    SOS_POLYNOMIAL_ADAPTER,
+    PolynomialRequirementReport,
+    sos_polynomial_requirement_diagnostics,
+)
 
 __all__ = [
     "ADAPTER_NAME",
@@ -86,9 +91,11 @@ __all__ = [
     "RegionGeometrySpec",
     "RegionSpec",
     "SCHEMA_VERSION",
+    "SOS_POLYNOMIAL_ADAPTER",
     "VariableSpec",
     "VerificationDiagnostic",
     "VerificationProblem",
+    "PolynomialRequirementReport",
     "classifications_by_obligation",
     "dynamics_spec_from_controlled",
     "dynamics_spec_from_controlled_discrete",
@@ -100,6 +107,7 @@ __all__ = [
     "render_inspection_markdown",
     "scalar_field_region_geometries",
     "scalar_field_region_geometry",
+    "sos_polynomial_requirement_diagnostics",
     "verification_problem_from_barrier",
     "verification_problem_from_controlled_discrete_barrier",
     "verification_problem_from_controlled_discrete_lyapunov",
