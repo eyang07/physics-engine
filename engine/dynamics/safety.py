@@ -19,12 +19,13 @@ Conventions:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import Callable, Mapping, Sequence
 
 import numpy as np
 import sympy as sp
 
 from engine.dynamics.first_order import FirstOrderSystem
+from engine.numerics.integrators import integrate_with_events
 
 _MEASURED_NOTE = (
     "sampled check only: a clean sample is evidence, not a certificate; "
@@ -53,6 +54,30 @@ def _evaluator(
         if result.shape == ():
             return np.full(array.shape[0], float(result))
         return result.reshape(array.shape[0])
+
+    return evaluate
+
+
+def _scalar_evaluator(
+    state: tuple[sp.Symbol, ...],
+    expression: sp.Expr,
+    substitutions: Mapping[sp.Symbol, float] | None,
+) -> Callable[[Sequence[float]], float]:
+    """Compile ``expression`` to a scalar function of one state vector.
+
+    Used for event functions handed to the integrator's root-finder, which
+    evaluates at a single state at a time rather than over a sample batch.
+    """
+
+    resolved = sp.sympify(expression).subs(substitutions or {})
+    unresolved = resolved.free_symbols - set(state)
+    if unresolved:
+        names = ", ".join(sorted(symbol.name for symbol in unresolved))
+        raise ValueError(f"unresolved symbols: {names}")
+    compiled = sp.lambdify(state, resolved, modules="numpy")
+
+    def evaluate(values: Sequence[float]) -> float:
+        return float(compiled(*values))
 
     return evaluate
 
@@ -119,6 +144,32 @@ class TrajectorySafetyReport:
 
 
 @dataclass(frozen=True)
+class UnsafeEntryEvent:
+    """Event-located first entry into one unsafe set along a trajectory.
+
+    ``first_entry_time``/``entry_state`` come from the integrator's
+    root-finder (sharp to integration tolerance) unless the trajectory
+    *starts* inside the set, in which case they are the initial time/state.
+    """
+
+    name: str
+    entered: bool
+    first_entry_time: float | None
+    entry_state: tuple[float, ...] | None
+    started_inside: bool
+
+
+@dataclass(frozen=True)
+class EventEntryReport:
+    """Measured (rigor level 1) event-located unsafe-set entry summary."""
+
+    rigor: str
+    entered_any: bool
+    unsafe_sets: tuple[UnsafeEntryEvent, ...]
+    note: str
+
+
+@dataclass(frozen=True)
 class SafetySpecification:
     """Safe set, unsafe sets/obstacles, and optional initial set, as data."""
 
@@ -176,6 +227,106 @@ class SafetySpecification:
             min_safe_margin_time=float(time_array[worst_index]),
             stayed_safe=stayed_safe,
             unsafe_sets=tuple(unsafe_reports),
+            note=_MEASURED_NOTE,
+        )
+
+    def event_entry_report(
+        self,
+        rhs: Callable[[float, Sequence[float]], np.ndarray],
+        initial_state: Sequence[float],
+        t_span: tuple[float, float],
+        substitutions: Mapping[sp.Symbol, float] | None = None,
+        *,
+        rtol: float = 1e-9,
+        atol: float = 1e-12,
+        max_step: float = np.inf,
+    ) -> EventEntryReport:
+        """Locate unsafe-set entry times by event root-finding, not sampling.
+
+        Integrates ``rhs`` from ``initial_state`` over ``t_span`` and treats
+        each unsafe set's signed margin as an event function. A rising zero
+        crossing (margin going nonnegative) is an entry, so the entry time
+        comes from the integrator's root-finder and is sharp to integration
+        tolerance rather than snapped to a sample grid. A trajectory already
+        inside an unsafe set at ``t0`` is reported as entering at ``t0`` with
+        ``started_inside=True`` — the root-finder only sees crossings, not
+        memberships, so that case is checked directly.
+
+        The result stays rigor level 1: sharper entry times are still measured
+        evidence, not validated numerics. A located entry is a genuine witness
+        that the trajectory reaches the unsafe set; a clean run over this
+        horizon and this initial state is evidence only.
+        """
+
+        if not self.unsafe_sets:
+            raise ValueError("specification has no unsafe sets to detect")
+
+        t0, _t1 = t_span
+        margin_fns = [
+            _scalar_evaluator(self.state, region.margin_expression(), substitutions)
+            for region in self.unsafe_sets
+        ]
+        initial = np.asarray(initial_state, dtype=float)
+        started_inside = [margin(initial) >= 0.0 for margin in margin_fns]
+
+        # Rising crossings of the margin (negative -> nonnegative) are entries.
+        events = [
+            (lambda t, y, margin=margin: margin(y)) for margin in margin_fns
+        ]
+        result = integrate_with_events(
+            rhs,
+            initial_state,
+            t_span,
+            events=events,
+            directions=[1.0] * len(self.unsafe_sets),
+            rtol=rtol,
+            atol=atol,
+            max_step=max_step,
+        )
+
+        entries = []
+        for region, inside_start, times, states in zip(
+            self.unsafe_sets,
+            started_inside,
+            result.event_times,
+            result.event_states,
+            strict=True,
+        ):
+            if inside_start:
+                entries.append(
+                    UnsafeEntryEvent(
+                        name=region.name,
+                        entered=True,
+                        first_entry_time=float(t0),
+                        entry_state=tuple(float(value) for value in initial),
+                        started_inside=True,
+                    )
+                )
+            elif times.size > 0:
+                entries.append(
+                    UnsafeEntryEvent(
+                        name=region.name,
+                        entered=True,
+                        first_entry_time=float(times[0]),
+                        entry_state=tuple(float(value) for value in states[0]),
+                        started_inside=False,
+                    )
+                )
+            else:
+                entries.append(
+                    UnsafeEntryEvent(
+                        name=region.name,
+                        entered=False,
+                        first_entry_time=None,
+                        entry_state=None,
+                        started_inside=False,
+                    )
+                )
+
+        return EventEntryReport(
+            rigor="measured",
+            entered_any=any(entry.entered for entry in entries),
+            unsafe_sets=tuple(entries),
             note=_MEASURED_NOTE,
         )
 
@@ -426,12 +577,14 @@ class BarrierCandidate:
 
 __all__ = [
     "BarrierCandidate",
+    "EventEntryReport",
     "LyapunovCandidate",
     "ObligationSample",
     "ProofObligation",
     "SafetySpecification",
     "SublevelSet",
     "TrajectorySafetyReport",
+    "UnsafeEntryEvent",
     "UnsafeSetReport",
     "grid_points",
     "lie_derivative",

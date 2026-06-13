@@ -44,6 +44,12 @@ artifacts.
     precomputed variants.
 - Safety and verification:
   - Safe/unsafe sublevel sets and measured trajectory safety reports.
+  - Event-based unsafe-set entry detection
+    (`SafetySpecification.event_entry_report`, spec in
+    `docs/event-detection.md`): entry times located by integrator
+    root-finding on the unsafe margin, sharp to integration tolerance rather
+    than snapped to a sample grid, built on the reusable
+    `integrate_with_events` primitive. Still measured, not validated numerics.
   - Candidate Lyapunov and barrier functions.
   - Candidate generation (`engine/dynamics/candidates.py`, spec in
     `docs/candidate-generation.md`): quadratic Lyapunov candidates from a
@@ -96,13 +102,14 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `254 passed`.
+Latest known result: `261 passed`.
 
 Use focused tests while iterating:
 
 ```sh
 pytest tests/test_controlled_dynamics.py tests/test_discrete_dynamics.py -q
 pytest tests/test_safety_certificates.py tests/test_verification_ir.py -q
+pytest tests/test_event_detection.py -q
 pytest tests/test_candidate_generation.py tests/test_inspection_adapter.py -q
 pytest tests/test_symplectic_integrators.py -q
 ```

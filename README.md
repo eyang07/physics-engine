@@ -23,7 +23,8 @@ diagnostics, controlled dynamics, safety metadata, and verification artifacts.
     exponents, ray travel time, caustic proximity, and wavefront envelopes.
   - Safety/certificate candidate metadata: safe and unsafe sublevel sets,
     candidate Lyapunov/barrier functions, proof obligations, and measured
-    sampling checks.
+    sampling checks, plus event-based unsafe-set entry detection with
+    integrator-located (not grid-snapped) entry times.
   - Candidate generation: quadratic Lyapunov candidates from a Hurwitz
     linearization, sublevel barrier candidates, and measured level
     suggestions — proposals only, never certification.
@@ -45,7 +46,8 @@ diagnostics, controlled dynamics, safety metadata, and verification artifacts.
 - `engine/dynamics/` - first-order, controlled, cotangent, ray, media, metric,
   diagnostics, and safety-candidate tools.
 - `engine/verification/` - versioned verification-problem IR and adapters.
-- `engine/numerics/` - fixed-step RK4, adaptive, and symplectic integration.
+- `engine/numerics/` - fixed-step RK4, adaptive, symplectic, and
+  event-located integration.
 - `engine/export/` - trajectory and manifest JSON contracts.
 - `systems/` - pure symbolic system definitions.
 - `scripts/` - example registry and deterministic data generators.

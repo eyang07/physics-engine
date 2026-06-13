@@ -257,8 +257,11 @@ In priority order:
    (`engine/dynamics/safety.py`, spec in `docs/safety-certificates.md`),
    plus simple candidate generators — quadratic Lyapunov from a Hurwitz
    linearization and sublevel barriers (`engine/dynamics/candidates.py`,
-   spec in `docs/candidate-generation.md`); SOS-style synthesis and proof
-   discharge remain open.*
+   spec in `docs/candidate-generation.md`), and event-based unsafe-set entry
+   detection with integrator-located entry times
+   (`SafetySpecification.event_entry_report`, spec in
+   `docs/event-detection.md`); SOS-style synthesis and proof discharge remain
+   open.*
 3. **Verification-problem IR.** Define and serialize the IR above, even if
    the only adapter is a stub that writes the problem out for inspection.
    *Status: v1 implemented backend-only (`engine/verification/`, spec in

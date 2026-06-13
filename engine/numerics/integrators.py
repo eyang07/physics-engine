@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Callable, Sequence
 
 import numpy as np
@@ -47,6 +48,87 @@ def integrate_fixed_step(
         states[index + 1] = rk4_step(rhs, times[index], states[index], step_dt)
 
     return times, states
+
+
+@dataclass(frozen=True)
+class EventIntegrationResult:
+    """Adaptive integration output with located event crossings.
+
+    ``event_times[i]``/``event_states[i]`` hold every detected zero crossing
+    of ``events[i]``, in time order; empty arrays mean no crossing.
+    """
+
+    time: np.ndarray
+    states: np.ndarray
+    event_times: tuple[np.ndarray, ...]
+    event_states: tuple[np.ndarray, ...]
+
+
+def integrate_with_events(
+    rhs: Rhs,
+    initial_state: Sequence[float],
+    t_span: tuple[float, float],
+    *,
+    events: Sequence[Callable[[float, Sequence[float]], float]],
+    directions: Sequence[float] | None = None,
+    terminal: Sequence[bool] | None = None,
+    rtol: float = 1e-9,
+    atol: float = 1e-12,
+    max_step: float = np.inf,
+) -> EventIntegrationResult:
+    """Integrate adaptively and locate zero crossings of event functions.
+
+    ``directions[i]`` restricts which crossings of ``events[i]`` count:
+    ``+1`` rising, ``-1`` falling, ``0`` (default) both. Terminal events stop
+    the integration at their first crossing. Crossing times come from the
+    solver's root-finding, so they are sharp to integration tolerance — but
+    still measured evidence, not validated numerics.
+    """
+
+    if not events:
+        raise ValueError("at least one event function is required")
+    t0, t1 = t_span
+    if t1 <= t0:
+        raise ValueError("t_span must satisfy t1 > t0")
+    direction_values = tuple(directions) if directions is not None else (0.0,) * len(events)
+    terminal_values = tuple(terminal) if terminal is not None else (False,) * len(events)
+    if len(direction_values) != len(events) or len(terminal_values) != len(events):
+        raise ValueError("directions and terminal flags must match the event count")
+
+    wrapped_events = []
+    for event, direction, is_terminal in zip(
+        events, direction_values, terminal_values, strict=True
+    ):
+
+        def wrapper(t: float, y: np.ndarray, event=event) -> float:
+            return float(event(t, y))
+
+        wrapper.direction = direction
+        wrapper.terminal = is_terminal
+        wrapped_events.append(wrapper)
+
+    solution = solve_ivp(
+        rhs,
+        (t0, t1),
+        np.asarray(initial_state, dtype=float),
+        method="DOP853",
+        events=wrapped_events,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+    )
+    if not solution.success:
+        raise RuntimeError(f"event integration failed: {solution.message}")
+
+    return EventIntegrationResult(
+        time=solution.t,
+        states=solution.y.T,
+        event_times=tuple(np.asarray(times, dtype=float) for times in solution.t_events),
+        event_states=tuple(
+            np.asarray(states, dtype=float).reshape(-1, len(solution.y))
+            for states in solution.y_events
+        ),
+    )
 
 
 def symplectic_euler_step(
