@@ -14,6 +14,7 @@ from engine.dynamics import (
     SublevelSet,
 )
 from engine.verification import (
+    AssumptionSpec,
     CandidateSpec,
     DynamicsSpec,
     InputSpec,
@@ -69,6 +70,13 @@ def test_lyapunov_candidate_exports_verification_problem() -> None:
     assert [parameter["name"] for parameter in payload["parameters"]] == ["c", "k"]
     assert payload["parameters"][0]["value"] == 0.5
     assert payload["parameters"][1]["value"] == 4.0
+    assert [assumption["id"] for assumption in payload["assumptions"]] == [
+        "parameter-c-positive",
+        "parameter-k-positive",
+    ]
+    assert payload["assumptions"][0]["role"] == "parameter-domain"
+    assert payload["assumptions"][0]["comparison"] == ">"
+    assert payload["assumptions"][0]["variables"] == ["c"]
     assert payload["metadata"]["status"] == "candidate"
     assert "external sound discharge" in payload["metadata"]["note"]
 
@@ -85,6 +93,9 @@ def test_lyapunov_candidate_exports_verification_problem() -> None:
     ]
     assert obligations[1]["regionId"] == "domain-ball"
     assert obligations[1]["excludedPoints"] == [[0.0, 0.0]]
+    assert {tuple(obligation["assumptionIds"]) for obligation in obligations} == {
+        ("parameter-c-positive", "parameter-k-positive")
+    }
     assert {obligation["rigor"] for obligation in obligations} == {"external-required"}
     assert obligations[2]["expression"]["format"] == "sympy-srepr"
 
@@ -200,7 +211,7 @@ def _minimal_problem_parts() -> tuple[tuple[VariableSpec, ...], ObligationSpec]:
     return variables, obligation
 
 
-def test_v1_spec_validation() -> None:
+def test_v2_spec_validation() -> None:
     x = sp.Symbol("x", real=True)
     expr = expression_spec(x)
 
@@ -228,6 +239,21 @@ def test_v1_spec_validation() -> None:
             expression=expr,
             obligation_ids=("claim",),
             status="accepted",
+        )
+    with pytest.raises(ValueError, match="assumption comparison"):
+        AssumptionSpec(
+            id="a",
+            name="a",
+            expression=expr,
+            comparison="approximately",
+        )
+    with pytest.raises(ValueError, match="assumption role"):
+        AssumptionSpec(
+            id="a",
+            name="a",
+            expression=expr,
+            comparison=">",
+            role="evidence",
         )
 
 
@@ -268,6 +294,96 @@ def test_problem_validates_dynamics_and_candidate_links() -> None:
             obligations=(obligation,),
             candidates=(dangling,),
         )
+
+    assumption = AssumptionSpec(
+        id="a",
+        name="x nonnegative",
+        expression=expr,
+        comparison=">=",
+        variables=("x",),
+    )
+    linked = ObligationSpec(
+        id="linked",
+        name="linked",
+        expression=expr,
+        comparison="<=",
+        assumption_ids=("missing",),
+    )
+    with pytest.raises(ValueError, match="unknown obligation assumption"):
+        VerificationProblem(
+            id="p",
+            name="p",
+            source="test",
+            variables=variables,
+            parameters=(),
+            regions=(),
+            assumptions=(assumption,),
+            obligations=(linked,),
+        )
+
+    with pytest.raises(ValueError, match="assumption ids"):
+        VerificationProblem(
+            id="p",
+            name="p",
+            source="test",
+            variables=variables,
+            parameters=(),
+            regions=(),
+            assumptions=(assumption, assumption),
+            obligations=(obligation,),
+        )
+
+    bad_variable = AssumptionSpec(
+        id="bad-var",
+        name="bad variable",
+        expression=expr,
+        comparison=">=",
+        variables=("z",),
+    )
+    with pytest.raises(ValueError, match="unknown assumption variables"):
+        VerificationProblem(
+            id="p",
+            name="p",
+            source="test",
+            variables=variables,
+            parameters=(),
+            regions=(),
+            assumptions=(bad_variable,),
+            obligations=(obligation,),
+        )
+
+
+def test_explicit_assumptions_are_serialized_and_linked_to_obligations() -> None:
+    x = sp.Symbol("x", real=True)
+    h = sp.Symbol("h", real=True)
+    system = FirstOrderSystem(state=(x,), rhs=(-h * x,), parameters=(h,))
+    assumption = AssumptionSpec(
+        id="time-step-positive",
+        name="time step is positive",
+        role="model",
+        expression=expression_spec(h),
+        comparison=">",
+        rhs=0.0,
+        variables=("h",),
+        description="External verifier may assume the model time step is positive.",
+    )
+    obligation = ProofObligation(
+        name="decay",
+        state=(x,),
+        expression=-h * x**2,
+        comparison="<=",
+    )
+
+    problem = verification_problem_from_obligations(
+        "explicit assumptions",
+        (obligation,),
+        system=system,
+        assumptions=(assumption,),
+    )
+    payload = problem.to_dict()
+
+    assert payload["assumptions"] == [assumption.to_dict()]
+    assert payload["obligations"][0]["assumptionIds"] == ["time-step-positive"]
 
 
 def test_dynamics_spec_from_controlled_encodes_bounds() -> None:

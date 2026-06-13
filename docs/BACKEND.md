@@ -58,10 +58,11 @@ artifacts.
     suggestions.
   - Proof-obligation records and deterministic sampled checks labeled
     `rigor="measured"`.
-  - Backend-agnostic verification-problem IR v1 in `engine.verification`
+  - Backend-agnostic verification-problem IR v2 in `engine.verification`
     (spec in `docs/verification-ir.md`): dynamics, control/disturbance
-    channels, first-class candidate certificates locked to
-    `status="candidate"`, and obligations labeled `rigor="external-required"`.
+    channels, explicit assumptions, first-class candidate certificates locked
+    to `status="candidate"`, and obligations labeled
+    `rigor="external-required"`.
   - Stub inspection adapter (`engine/verification/inspection_adapter.py`) that
     consumes the IR and writes canonical problem JSON plus a human-readable
     inspection report, recording no proof results.
@@ -132,9 +133,9 @@ ignored and should not be committed.
 
 ## Next Work
 
-1. Push one controlled mechanical case study deeper through the pipeline:
-   dynamics, safe/unsafe sets, candidate certificate, proof obligations, IR
-   export, and eventually viewer display.
+1. Harden backend verification foundations: explicit assumptions, IR
+   cross-reference validation, deterministic inspection artifacts, and focused
+   robustness tests before adding more case-study breadth.
 2. Extend parameter variants beyond Lorenz once the viewer has clear behavior
    for backend-generated variants.
 3. Keep backend-only geodesic exploration outside the gallery until the viewer

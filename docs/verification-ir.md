@@ -1,4 +1,4 @@
-# Verification-Problem IR — Design Spec (v1)
+# Verification-Problem IR — Design Spec (v2)
 
 Advances `docs/VISION.md` §10/§11 priority 3, building on the
 safety/certificate layer (`docs/safety-certificates.md`). Status:
@@ -10,15 +10,17 @@ Make exported verification problems genuinely dischargeable by an external
 tool. IR v0 carried variables, parameters, regions, and obligations, but the
 obligations arrived as pre-computed Lie-derivative expressions — the model
 itself was lost, so no reachability, SOS, or deductive backend could actually
-verify anything. v1 adds the dynamics, open control/disturbance channels, and
-first-class candidate-certificate records. The engine still **proposes and
-organizes; external tools dispose**: nothing in the IR stores proof results.
+verify anything. v1 added the dynamics, open control/disturbance channels, and
+first-class candidate-certificate records. v2 adds explicit assumptions and
+links obligations to the assumptions they require. The engine still **proposes
+and organizes; external tools dispose**: nothing in the IR stores proof
+results.
 
 ## Design decisions
 
 1. **Schema bump, no migration.** `SCHEMA_VERSION` is now
-   `verification-problem/v1`. Artifacts are deterministic and regenerable
-   (nothing under `data/generated/` is committed), so v0 payloads are simply
+   `verification-problem/v2`. Artifacts are deterministic and regenerable
+   (nothing under `data/generated/` is committed), so old payloads are simply
    regenerated; the IR does not read or migrate old files.
 2. **Dynamics are the model obligations were derived along.** `DynamicsSpec`
    records `kind="continuous"` (the discrete analogue is future work), the
@@ -39,27 +41,36 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    anything. `status` is locked to `"candidate"` in `__post_init__`, the same
    construction-level honesty used for `ObligationSpec.rigor` and the stub
    adapter's report status.
-5. **Cross-references are validated at the problem level.**
+5. **Assumptions are first-class preconditions, not results.**
+   `AssumptionSpec` records model/domain/regularity facts in canonical
+   expression-comparison form. Obligations reference required assumptions by
+   id through `assumptionIds`. The safety adapter makes SymPy parameter-domain
+   facts such as `k > 0` explicit for external backends instead of relying on
+   implicit symbol assumptions.
+6. **Cross-references are validated at the problem level.**
    `VerificationProblem` rejects dynamics whose state does not match the
    problem variables in order, candidate links to unknown obligation or
-   region ids, duplicate candidate ids, and equilibria of the wrong
-   dimension. Parameters now also collect free symbols from the dynamics RHS
-   (excluding state and time) and the candidate expression.
-6. **Deferred (out of v1):** discrete-time dynamics, domain-assumption
-   records beyond regions, visualization hooks, real external backends, and
-   any proof-result storage.
+   region ids, obligation links to unknown assumption ids, duplicate candidate
+   or assumption ids, assumption variables unknown to the problem, and
+   equilibria of the wrong dimension. Parameters now also collect free symbols
+   from the dynamics RHS (excluding state and time) and the candidate
+   expression.
+7. **Deferred (out of v2):** discrete-time dynamics, richer assumption
+   languages beyond scalar expression comparisons, visualization hooks, real
+   external backends, and any proof-result storage.
 
 ## Files
 
-- `engine/verification/ir.py` — `DynamicsSpec`, `InputSpec`, `CandidateSpec`,
-  extended `VerificationProblem`, schema bump.
+- `engine/verification/ir.py` — `DynamicsSpec`, `InputSpec`,
+  `AssumptionSpec`, `CandidateSpec`, extended `VerificationProblem`, schema
+  bump.
 - `engine/verification/system_codec.py` — `dynamics_spec_from_system`,
   `dynamics_spec_from_controlled`.
 - `engine/verification/safety_adapter.py` — adapters now pass the system and
   candidate through; `verification_problem_from_obligations` accepts optional
   `system` and `candidate` keywords.
-- `engine/verification/inspection_adapter.py` — renders Dynamics and
-  Candidate certificates report sections.
+- `engine/verification/inspection_adapter.py` — renders Dynamics,
+  Assumptions, and Candidate certificates report sections.
 - `tests/test_verification_ir.py`, `tests/test_inspection_adapter.py`.
 
 ## Invariants / proof obligations (for this implementation)
@@ -70,9 +81,13 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
 2. **Honest labeling (proven by construction).** `CandidateSpec` cannot be
    constructed with any status other than `"candidate"`; obligations keep
    `rigor="external-required"`; nothing in the IR can record a proof result.
-3. **Referential integrity (proven).** Mismatched dynamics state, dangling
-   candidate-obligation ids, and wrong-dimension equilibria raise.
-4. **Determinism (measured).** Serialization remains bit-identical across
+3. **Assumption explicitness (proven on examples).** Positive SymPy
+   parameter-domain facts are serialized as `AssumptionSpec` records, and
+   exported obligations link to those records by id.
+4. **Referential integrity (proven).** Mismatched dynamics state, dangling
+   candidate-obligation ids, dangling obligation-assumption ids, unknown
+   assumption variables, and wrong-dimension equilibria raise.
+5. **Determinism (measured).** Serialization remains bit-identical across
    runs; the inspection report renders the new sections deterministically.
 
 ## Verification commands
@@ -92,7 +107,8 @@ manifest/export schema and any frontend surface.
 
 ## Verification record
 
-Implemented and verified 2026-06-12: `pytest -q` green (see `docs/BACKEND.md`
-baseline for the current count); the exported controlled-pendulum artifact
-carries closed-loop dynamics, the barrier candidate, and its three linked
-obligations under `verification-problem/v1`.
+Implemented and verified 2026-06-12 as IR v1 with dynamics and candidate
+certificates. Updated 2026-06-13: IR v2 adds explicit `AssumptionSpec`
+records and obligation-level `assumptionIds`; focused
+verification/inspection tests pass with
+`pytest tests/test_verification_ir.py tests/test_inspection_adapter.py -q`.

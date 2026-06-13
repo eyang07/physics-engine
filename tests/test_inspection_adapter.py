@@ -86,9 +86,13 @@ def test_render_inspection_markdown_is_deterministic_and_honest() -> None:
     assert "## Dynamics" in text
     assert "- `x' = v`" in text
     assert "- inputs: none (closed loop)" in text
+    assert "## Assumptions" in text
+    assert "`parameter-c-positive`" in text
+    assert "`parameter-k-positive`" in text
     assert "## Candidate certificates" in text
     assert "kind: lyapunov" in text
     assert "status: candidate (not accepted by any external sound method)" in text
+    assert "- assumptions: `parameter-c-positive`, `parameter-k-positive`" in text
 
 
 def test_report_rejects_discharge_claims(tmp_path) -> None:

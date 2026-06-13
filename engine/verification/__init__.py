@@ -11,6 +11,7 @@ from engine.verification.inspection_adapter import (
     write_inspection_artifacts,
 )
 from engine.verification.ir import (
+    AssumptionSpec,
     CandidateSpec,
     DynamicsSpec,
     ExpressionSpec,
@@ -37,6 +38,7 @@ __all__ = [
     "ADAPTER_NAME",
     "ARTIFACT_PROBLEM_JSON",
     "ARTIFACT_REPORT_MARKDOWN",
+    "AssumptionSpec",
     "CandidateSpec",
     "DynamicsSpec",
     "ExpressionSpec",

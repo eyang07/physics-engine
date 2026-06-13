@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from engine.verification.ir import (
+    AssumptionSpec,
     CandidateSpec,
     DynamicsSpec,
     ObligationSpec,
@@ -130,6 +131,22 @@ def _region_lines(region: RegionSpec) -> list[str]:
     ]
 
 
+def _assumption_lines(assumption: AssumptionSpec) -> list[str]:
+    lines = [
+        f"### `{assumption.id}` — role: {assumption.role}",
+        "",
+        f"- name: {assumption.name}",
+        f"- claim: `{assumption.expression.display} {assumption.comparison} {assumption.rhs}`",
+    ]
+    if assumption.variables:
+        variables = ", ".join(f"`{name}`" for name in assumption.variables)
+        lines.append(f"- variables: {variables}")
+    if assumption.description:
+        lines.append(f"- description: {assumption.description}")
+    lines.append("")
+    return lines
+
+
 def _obligation_lines(obligation: ObligationSpec) -> list[str]:
     lines = [
         f"### `{obligation.id}` — {obligation.name}",
@@ -142,6 +159,13 @@ def _obligation_lines(obligation: ObligationSpec) -> list[str]:
     if obligation.excluded_points:
         points = "; ".join(str(list(point)) for point in obligation.excluded_points)
         lines.append(f"- excluded points: {points}")
+    if obligation.assumption_ids:
+        assumptions = ", ".join(
+            f"`{assumption_id}`" for assumption_id in obligation.assumption_ids
+        )
+        lines.append(f"- assumptions: {assumptions}")
+    else:
+        lines.append("- assumptions: none")
     if obligation.description:
         lines.append(f"- description: {obligation.description}")
     lines.append(f"- rigor: {obligation.rigor} (awaiting external discharge)")
@@ -181,6 +205,12 @@ def render_inspection_markdown(problem: VerificationProblem) -> str:
     if problem.regions:
         for region in problem.regions:
             lines.extend(_region_lines(region))
+    else:
+        lines.extend(["- none", ""])
+    lines.extend(["## Assumptions", ""])
+    if problem.assumptions:
+        for assumption in problem.assumptions:
+            lines.extend(_assumption_lines(assumption))
     else:
         lines.extend(["- none", ""])
     lines.extend(["## Candidate certificates", ""])

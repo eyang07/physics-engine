@@ -16,6 +16,7 @@ from engine.dynamics.safety import (
     SublevelSet,
 )
 from engine.verification.ir import (
+    AssumptionSpec,
     CandidateSpec,
     ObligationSpec,
     ParameterSpec,
@@ -74,6 +75,53 @@ def _state_from_obligations(obligations: Sequence[ProofObligation]) -> tuple[sp.
     return state
 
 
+def _assumption_from_parameter(symbol: sp.Symbol) -> AssumptionSpec | None:
+    comparison: str | None = None
+    label: str | None = None
+    if symbol.is_positive:
+        comparison = ">"
+        label = "positive"
+    elif symbol.is_nonnegative:
+        comparison = ">="
+        label = "nonnegative"
+    elif symbol.is_negative:
+        comparison = "<"
+        label = "negative"
+    elif symbol.is_nonpositive:
+        comparison = "<="
+        label = "nonpositive"
+    elif symbol.is_nonzero:
+        comparison = "!="
+        label = "nonzero"
+
+    if comparison is None or label is None:
+        return None
+    return AssumptionSpec(
+        id=_slug(f"parameter-{symbol.name}-{label}"),
+        name=f"{symbol.name} is {label}",
+        role="parameter-domain",
+        expression=expression_spec(symbol),
+        comparison=comparison,
+        rhs=0.0,
+        variables=(symbol.name,),
+        description="Parameter-domain assumption made explicit for external discharge.",
+    )
+
+
+def _parameter_assumptions(
+    symbols: Sequence[sp.Symbol],
+    explicit: Sequence[AssumptionSpec],
+) -> tuple[AssumptionSpec, ...]:
+    assumptions = list(explicit)
+    used = {assumption.id for assumption in assumptions}
+    for symbol in symbols:
+        assumption = _assumption_from_parameter(symbol)
+        if assumption is not None and assumption.id not in used:
+            assumptions.append(assumption)
+            used.add(assumption.id)
+    return tuple(assumptions)
+
+
 def verification_problem_from_obligations(
     name: str,
     obligations: Sequence[ProofObligation],
@@ -82,6 +130,7 @@ def verification_problem_from_obligations(
     candidate: LyapunovCandidate | BarrierCandidate | None = None,
     specification: SafetySpecification | None = None,
     substitutions: Mapping[sp.Symbol, float] | None = None,
+    assumptions: Sequence[AssumptionSpec] = (),
     metadata: Mapping[str, Any] | None = None,
 ) -> VerificationProblem:
     """Package proof obligations as a backend-agnostic verification problem.
@@ -143,29 +192,6 @@ def verification_problem_from_obligations(
         if obligation.region is not None:
             register_region(obligation.region, "domain")
 
-    used_obligation_ids: set[str] = set()
-    obligation_specs = []
-    for obligation in obligation_tuple:
-        region_id = None
-        if obligation.region is not None:
-            region_id = region_ids_by_key[_region_key(obligation.region)]
-        obligation_specs.append(
-            ObligationSpec(
-                id=_unique_slug(obligation.name, used_obligation_ids),
-                name=obligation.name,
-                expression=expression_spec(obligation.expression),
-                comparison=obligation.comparison,
-                rhs=0.0,
-                region_id=region_id,
-                excluded_points=(
-                    (tuple(float(value) for value in obligation.excluded_point),)
-                    if obligation.excluded_point is not None
-                    else ()
-                ),
-                description=obligation.description,
-            )
-        )
-
     free_symbols: set[sp.Symbol] = set()
     for obligation in obligation_tuple:
         free_symbols.update(sp.sympify(obligation.expression).free_symbols)
@@ -202,6 +228,32 @@ def verification_problem_from_obligations(
         )
         for symbol in parameter_symbols
     )
+    assumption_specs = _parameter_assumptions(parameter_symbols, assumptions)
+    assumption_ids = tuple(assumption.id for assumption in assumption_specs)
+
+    used_obligation_ids: set[str] = set()
+    obligation_specs = []
+    for obligation in obligation_tuple:
+        region_id = None
+        if obligation.region is not None:
+            region_id = region_ids_by_key[_region_key(obligation.region)]
+        obligation_specs.append(
+            ObligationSpec(
+                id=_unique_slug(obligation.name, used_obligation_ids),
+                name=obligation.name,
+                expression=expression_spec(obligation.expression),
+                comparison=obligation.comparison,
+                rhs=0.0,
+                region_id=region_id,
+                excluded_points=(
+                    (tuple(float(value) for value in obligation.excluded_point),)
+                    if obligation.excluded_point is not None
+                    else ()
+                ),
+                assumption_ids=assumption_ids,
+                description=obligation.description,
+            )
+        )
 
     candidates: tuple[CandidateSpec, ...] = ()
     if candidate is not None:
@@ -236,6 +288,7 @@ def verification_problem_from_obligations(
         parameters=parameters,
         regions=regions,
         obligations=obligation_specs,
+        assumptions=assumption_specs,
         dynamics=None if system is None else dynamics_spec_from_system(system),
         candidates=candidates,
         metadata=_metadata(metadata),
@@ -249,6 +302,7 @@ def verification_problem_from_barrier(
     *,
     specification: SafetySpecification | None = None,
     substitutions: Mapping[sp.Symbol, float] | None = None,
+    assumptions: Sequence[AssumptionSpec] = (),
     metadata: Mapping[str, Any] | None = None,
 ) -> VerificationProblem:
     return verification_problem_from_obligations(
@@ -258,6 +312,7 @@ def verification_problem_from_barrier(
         candidate=candidate,
         specification=specification,
         substitutions=substitutions,
+        assumptions=assumptions,
         metadata=metadata,
     )
 
@@ -268,6 +323,7 @@ def verification_problem_from_lyapunov(
     candidate: LyapunovCandidate,
     *,
     substitutions: Mapping[sp.Symbol, float] | None = None,
+    assumptions: Sequence[AssumptionSpec] = (),
     metadata: Mapping[str, Any] | None = None,
 ) -> VerificationProblem:
     return verification_problem_from_obligations(
@@ -276,5 +332,6 @@ def verification_problem_from_lyapunov(
         system=system,
         candidate=candidate,
         substitutions=substitutions,
+        assumptions=assumptions,
         metadata=metadata,
     )

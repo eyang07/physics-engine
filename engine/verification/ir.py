@@ -12,7 +12,10 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-SCHEMA_VERSION = "verification-problem/v1"
+SCHEMA_VERSION = "verification-problem/v2"
+
+_ORDER_COMPARISONS = ("<=", "<", ">=", ">")
+_ASSUMPTION_COMPARISONS = (*_ORDER_COMPARISONS, "=", "!=")
 
 
 @dataclass(frozen=True)
@@ -192,6 +195,44 @@ class RegionSpec:
 
 
 @dataclass(frozen=True)
+class AssumptionSpec:
+    """A precondition an external verifier may assume while discharging claims."""
+
+    id: str
+    name: str
+    expression: ExpressionSpec
+    comparison: str
+    rhs: float = 0.0
+    variables: tuple[str, ...] = ()
+    role: str = "domain"
+    description: str = ""
+
+    def __post_init__(self) -> None:
+        if self.comparison not in _ASSUMPTION_COMPARISONS:
+            raise ValueError(
+                "assumption comparison must be one of "
+                + ", ".join(_ASSUMPTION_COMPARISONS)
+            )
+        if self.role not in ("domain", "parameter-domain", "regularity", "model"):
+            raise ValueError(
+                "assumption role must be one of domain, parameter-domain, "
+                "regularity, or model"
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "role": self.role,
+            "expression": self.expression.to_dict(),
+            "comparison": self.comparison,
+            "rhs": self.rhs,
+            "variables": list(self.variables),
+            "description": self.description,
+        }
+
+
+@dataclass(frozen=True)
 class ObligationSpec:
     """A single claim, in canonical form ``expression comparison rhs``."""
 
@@ -202,11 +243,12 @@ class ObligationSpec:
     rhs: float = 0.0
     region_id: str | None = None
     excluded_points: tuple[tuple[float, ...], ...] = ()
+    assumption_ids: tuple[str, ...] = ()
     description: str = ""
     rigor: str = "external-required"
 
     def __post_init__(self) -> None:
-        if self.comparison not in ("<=", "<", ">=", ">"):
+        if self.comparison not in _ORDER_COMPARISONS:
             raise ValueError("comparison must be one of <=, <, >=, >")
         if self.rigor != "external-required":
             raise ValueError("verification obligations must require external discharge")
@@ -222,6 +264,7 @@ class ObligationSpec:
             "comparison": self.comparison,
             "rhs": self.rhs,
             "excludedPoints": [list(point) for point in self.excluded_points],
+            "assumptionIds": list(self.assumption_ids),
             "description": self.description,
             "rigor": self.rigor,
         }
@@ -241,6 +284,7 @@ class VerificationProblem:
     parameters: tuple[ParameterSpec, ...]
     regions: tuple[RegionSpec, ...]
     obligations: tuple[ObligationSpec, ...]
+    assumptions: tuple[AssumptionSpec, ...] = ()
     dynamics: DynamicsSpec | None = None
     candidates: tuple[CandidateSpec, ...] = ()
     metadata: Mapping[str, Any] | None = None
@@ -260,11 +304,20 @@ class VerificationProblem:
         obligation_ids = [obligation.id for obligation in self.obligations]
         if len(set(obligation_ids)) != len(obligation_ids):
             raise ValueError("obligation ids must be unique")
+        assumption_ids = [assumption.id for assumption in self.assumptions]
+        if len(set(assumption_ids)) != len(assumption_ids):
+            raise ValueError("assumption ids must be unique")
 
         known_regions = set(region_ids)
+        known_assumptions = set(assumption_ids)
         for obligation in self.obligations:
             if obligation.region_id is not None and obligation.region_id not in known_regions:
                 raise ValueError(f"unknown obligation region id: {obligation.region_id}")
+            unknown_assumptions = set(obligation.assumption_ids) - known_assumptions
+            if unknown_assumptions:
+                raise ValueError(
+                    f"unknown obligation assumption ids: {sorted(unknown_assumptions)}"
+                )
             for point in obligation.excluded_points:
                 if len(point) != len(self.variables):
                     raise ValueError("excluded points must match the variable dimension")
@@ -272,6 +325,20 @@ class VerificationProblem:
         variable_names = tuple(variable.name for variable in self.variables)
         if self.dynamics is not None and self.dynamics.state != variable_names:
             raise ValueError("dynamics state must match the problem variables in order")
+        parameter_names = tuple(parameter.name for parameter in self.parameters)
+        input_names = (
+            tuple(input_spec.name for input_spec in self.dynamics.inputs)
+            if self.dynamics is not None
+            else ()
+        )
+        time_names = ((self.dynamics.time_variable,) if self.dynamics is not None else ())
+        known_names = {*variable_names, *parameter_names, *input_names, *time_names}
+        for assumption in self.assumptions:
+            unknown_variables = set(assumption.variables) - known_names
+            if unknown_variables:
+                raise ValueError(
+                    f"unknown assumption variables: {sorted(unknown_variables)}"
+                )
 
         known_obligations = set(obligation_ids)
         candidate_ids = [candidate.id for candidate in self.candidates]
@@ -297,6 +364,7 @@ class VerificationProblem:
             "variables": [variable.to_dict() for variable in self.variables],
             "parameters": [parameter.to_dict() for parameter in self.parameters],
             "regions": [region.to_dict() for region in self.regions],
+            "assumptions": [assumption.to_dict() for assumption in self.assumptions],
             "obligations": [obligation.to_dict() for obligation in self.obligations],
             "candidates": [candidate.to_dict() for candidate in self.candidates],
         }
@@ -321,6 +389,7 @@ def problem_from_parts(
     parameters: Sequence[ParameterSpec],
     regions: Sequence[RegionSpec],
     obligations: Sequence[ObligationSpec],
+    assumptions: Sequence[AssumptionSpec] = (),
     dynamics: DynamicsSpec | None = None,
     candidates: Sequence[CandidateSpec] = (),
     metadata: Mapping[str, Any] | None = None,
@@ -333,6 +402,7 @@ def problem_from_parts(
         parameters=tuple(parameters),
         regions=tuple(regions),
         obligations=tuple(obligations),
+        assumptions=tuple(assumptions),
         dynamics=dynamics,
         candidates=tuple(candidates),
         metadata=metadata,

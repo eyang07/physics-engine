@@ -166,8 +166,8 @@ dynamics `dx/dt = f(t, x, u, d; θ)` with box-shaped admissible control and
 disturbance sets, closed-loop reduction, and deterministic rollouts
 (backend-only). It also implements backend-only safe/unsafe sublevel sets,
 candidate Lyapunov/barrier functions, proof obligations, measured sampled
-checks, and verification-problem IR v1 (dynamics, control/disturbance
-channels, candidate certificates). The discrete-time analogue
+checks, and verification-problem IR v2 (dynamics, control/disturbance
+channels, explicit assumptions, candidate certificates). The discrete-time analogue
 `x_{k+1} = F(k, x_k, u_k, d_k; θ)` now exists backend-only
 (`engine/dynamics/discrete.py`, spec in `docs/discrete-dynamics.md`) with
 closed-loop reduction, deterministic rollouts, and Euler discretization of
@@ -264,14 +264,15 @@ In priority order:
    open.*
 3. **Verification-problem IR.** Define and serialize the IR above, even if
    the only adapter is a stub that writes the problem out for inspection.
-   *Status: v1 implemented backend-only (`engine/verification/`, spec in
+   *Status: v2 implemented backend-only (`engine/verification/`, spec in
    `docs/verification-ir.md`) with dynamics, control/disturbance channels,
-   and first-class candidate certificates, plus the stub inspection adapter
-   (`engine/verification/inspection_adapter.py`); discrete-time dynamics,
-   visualization hooks, real external backends, and proof discharge remain
-   open.*
-4. **First serious case study (see §13).** Push one small controlled system end
-   to end through the pipeline.
+   explicit assumptions, and first-class candidate certificates, plus the stub
+   inspection adapter (`engine/verification/inspection_adapter.py`);
+   discrete-time dynamics, visualization hooks, real external backends, and
+   proof discharge remain open.*
+4. **Backend robustness before deeper case studies.** Keep strengthening the
+   IR, assumptions, safety metadata, deterministic exports, and validation so a
+   future controlled case study is mostly composition rather than invention.
 5. **Frontend safety surfaces.** Safe/unsafe-set rendering, certificate-value
    display, and a proof-status panel that respects the rigor ladder (showing
    "candidate" / "measured" honestly).
