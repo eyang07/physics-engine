@@ -73,6 +73,8 @@ artifacts.
     `upright-pendulum-safety` linked to manifest system `pendulum`; the
     geometry export maps IR variable `omega` to manifest state axis
     `theta_dot` on the `phase` projection.
+  - Viewer verification generation validates manifest/problem cross-links and
+    region-geometry projection/state-axis mappings before writing JSON.
   - Adapter capability declarations and target-specific obligation
     classification for future verification backends; the inspection stub
     advertises no discharge capability and records required target support in

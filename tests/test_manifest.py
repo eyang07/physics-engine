@@ -7,12 +7,16 @@ editing a system can't silently desync the viewer.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
+from engine.export import validate_viewer_verification_contract
 from engine.export.manifest import build_manifest, system_entry
 from engine.dynamics import CotangentHamiltonianSystem
 from engine.mechanics.lagrangian import LagrangianSystem
 from scripts.example_specs import LENSES, SPECS
+from scripts.export_verification_problems import upright_pendulum_problem
 
 
 @pytest.fixture(scope="module")
@@ -44,6 +48,65 @@ def test_manifest_carries_verification_problem_links(manifest) -> None:
         problems = entry.get("verificationProblems", [])
         assert len(problems) == len(set(problems)), system_id
         assert all(isinstance(problem_id, str) and problem_id for problem_id in problems)
+
+
+def test_verification_problem_links_match_manifest_specs() -> None:
+    validate_viewer_verification_contract(SPECS, (upright_pendulum_problem(),))
+
+
+def test_verification_contract_rejects_bad_system_link() -> None:
+    base = upright_pendulum_problem()
+    problem = replace(
+        base,
+        system="missing",
+        metadata={**dict(base.metadata or {}), "system": "missing"},
+    )
+
+    with pytest.raises(ValueError, match="unknown manifest system"):
+        validate_viewer_verification_contract(SPECS, (problem,))
+
+
+def test_verification_contract_rejects_missing_manifest_backlink() -> None:
+    problem = upright_pendulum_problem()
+    specs = tuple(
+        replace(spec, verification_problems=())
+        if spec.id == problem.system
+        else spec
+        for spec in SPECS
+    )
+
+    with pytest.raises(ValueError, match="not linked back"):
+        validate_viewer_verification_contract(specs, (problem,))
+
+
+def test_verification_contract_rejects_bad_region_geometry_projection() -> None:
+    problem = upright_pendulum_problem()
+    geometry = problem.region_geometry[0]
+    bad_geometry = replace(geometry, projection="unknown")
+    bad_problem = replace(
+        problem,
+        region_geometry=(bad_geometry, *problem.region_geometry[1:]),
+    )
+
+    with pytest.raises(ValueError, match="unknown projection"):
+        validate_viewer_verification_contract(SPECS, (bad_problem,))
+
+
+def test_verification_contract_rejects_bad_region_geometry_mapping() -> None:
+    problem = upright_pendulum_problem()
+    geometry = problem.region_geometry[0]
+    bad_geometry = replace(
+        geometry,
+        state_axes=("theta", "theta"),
+        variable_to_state_axis={"theta": "theta", "omega": "theta"},
+    )
+    bad_problem = replace(
+        problem,
+        region_geometry=(bad_geometry, *problem.region_geometry[1:]),
+    )
+
+    with pytest.raises(ValueError, match="state axes"):
+        validate_viewer_verification_contract(SPECS, (bad_problem,))
 
 
 def test_registered_lens_requirements_match_system_specs() -> None:

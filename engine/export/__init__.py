@@ -12,6 +12,7 @@ from engine.export.manifest import (
     write_manifest,
 )
 from engine.export.trajectory import Trajectory
+from engine.export.verification_contract import validate_viewer_verification_contract
 
 __all__ = [
     "Conserved",
@@ -23,5 +24,6 @@ __all__ = [
     "Trajectory",
     "build_manifest",
     "system_entry",
+    "validate_viewer_verification_contract",
     "write_manifest",
 ]

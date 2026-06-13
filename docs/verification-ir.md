@@ -71,6 +71,10 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    of the wrong dimension. Parameters now also collect free symbols from the
    dynamics RHS/update (excluding state and time/step) and the candidate
    expression.
+   Viewer export additionally validates that each problem's top-level `system`
+   id exists in the manifest, that the manifest links back to the problem id,
+   and that every `regionGeometry` projection/state-axis mapping matches the
+   linked manifest system.
 8. **Viewer geometry is sampled metadata, not verification.** `regionGeometry`
    entries carry a named manifest projection, two IR plane variables, explicit
    IR-variable-to-manifest-state-axis mappings, the sampled scalar field of the
@@ -112,6 +116,8 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
   deterministic obligation-target classification.
 - `engine/verification/region_geometry.py` — deterministic scalar-field grid
   sampling and boundary-polyline extraction for region render metadata.
+- `engine/export/verification_contract.py` — manifest/verification cross-link
+  validation used before writing viewer verification data.
 - `engine/verification/system_codec.py` — `dynamics_spec_from_system`,
   `dynamics_spec_from_controlled`, `dynamics_spec_from_discrete`,
   `dynamics_spec_from_controlled_discrete`.
@@ -149,7 +155,9 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    assumption variables, mismatched open-loop dynamics state, and
    wrong-dimension equilibria raise. Duplicate variables/parameters,
    parameter names shadowing state variables, and unknown region variables also
-   raise.
+   raise. Viewer verification export also rejects missing manifest systems,
+   missing manifest back-links, unknown geometry projections, and geometry
+   state axes that do not match the manifest projection.
 7. **Determinism (measured).** Serialization remains bit-identical across
    runs; the inspection report renders the new sections deterministically.
 8. **Viewer-region geometry (measured).** Region geometry grids sample the
@@ -200,3 +208,6 @@ and measured `regionGeometry` scalar-field grids for viewer rendering. The
 pendulum manifest entry links back to `upright-pendulum-safety`.
 Updated again on 2026-06-13: `regionGeometry` now includes sampled boundary
 polylines extracted from the scalar grids for direct viewer contour rendering.
+Updated again on 2026-06-13: viewer verification generation validates manifest
+cross-links and region-geometry projection/state-axis mappings before writing
+JSON.

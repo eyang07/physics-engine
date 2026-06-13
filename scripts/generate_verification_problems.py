@@ -18,7 +18,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from engine.export import validate_viewer_verification_contract
 from engine.verification import VerificationProblem
+from scripts.example_specs import SPECS
 from scripts.export_verification_problems import upright_pendulum_problem
 
 DEFAULT_GENERATED_DIR = Path("data/generated/verification")
@@ -53,6 +55,7 @@ def write_verification_problems(
     """Serialize every viewer verification problem and its index. Returns ids."""
 
     problems: list[VerificationProblem] = [upright_pendulum_problem()]
+    validate_viewer_verification_contract(SPECS, problems)
     generated_dir.mkdir(parents=True, exist_ok=True)
     viewer_dir.mkdir(parents=True, exist_ok=True)
 
