@@ -76,6 +76,13 @@ nothing in the IR stores proof results.
    and `malformed`. The inspection stub writes these diagnostics to a
    machine-readable outcome artifact; it still cannot record success,
    discharge, proof, or certification.
+10. **Adapter capability checks are explicit.** `engine.verification`
+   classifies each obligation into a target family such as
+   `continuous-lyapunov`, `discrete-barrier`, or `obligation-only`.
+   Adapters advertise discharge capabilities separately from inspection
+   support, and diagnostics include both the target classification and whether
+   the adapter supports that target. The inspection stub advertises no
+   discharge capabilities.
 
 ## Files
 
@@ -85,6 +92,8 @@ nothing in the IR stores proof results.
 - `engine/verification/diagnostics.py` — typed adapter diagnostics with a
   small status/severity vocabulary for inspection and future backend
   integrations.
+- `engine/verification/capabilities.py` — adapter capability declarations and
+  deterministic obligation-target classification.
 - `engine/verification/system_codec.py` — `dynamics_spec_from_system`,
   `dynamics_spec_from_controlled`, `dynamics_spec_from_discrete`,
   `dynamics_spec_from_controlled_discrete`.
@@ -120,13 +129,16 @@ nothing in the IR stores proof results.
 6. **Referential integrity (proven).** Mismatched dynamics state, dangling
    candidate-obligation ids, dangling obligation-assumption ids, unknown
    assumption variables, mismatched open-loop dynamics state, and
-   wrong-dimension equilibria raise.
+   wrong-dimension equilibria raise. Duplicate variables/parameters,
+   parameter names shadowing state variables, and unknown region variables also
+   raise.
 7. **Determinism (measured).** Serialization remains bit-identical across
    runs; the inspection report renders the new sections deterministically.
 8. **Diagnostic honesty (proven by construction).** Inspection outcomes use
    only non-success statuses (`not-attempted`, `externally-required`,
    `unsupported`, `malformed`) and every obligation receives an
-   `externally-required` diagnostic until a real backend exists.
+   `externally-required` diagnostic until a real backend exists. Each such
+   diagnostic carries its obligation target and required discharge capability.
 
 ## Verification commands
 
@@ -150,3 +162,6 @@ certificates. Updated 2026-06-13: IR v2 adds explicit `AssumptionSpec`
 records, obligation-level `assumptionIds`, and discrete-time dynamics
 encoding; focused verification/inspection tests pass with
 `pytest tests/test_verification_ir.py tests/test_inspection_adapter.py -q`.
+Updated later on 2026-06-13: added adapter capability declarations,
+target-specific obligation classification, and stricter IR validation for
+duplicate names and region variables.

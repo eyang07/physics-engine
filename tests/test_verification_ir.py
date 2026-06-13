@@ -18,17 +18,22 @@ from engine.dynamics import (
 )
 from engine.verification import (
     AssumptionSpec,
+    AdapterCapabilities,
     CandidateSpec,
     DynamicsSpec,
     InputSpec,
+    OBLIGATION_TARGETS,
     ObligationSpec,
+    ParameterSpec,
     SCHEMA_VERSION,
+    RegionSpec,
     VariableSpec,
     VerificationProblem,
     dynamics_spec_from_controlled,
     dynamics_spec_from_controlled_discrete,
     dynamics_spec_from_discrete,
     expression_spec,
+    obligation_classifications,
     verification_problem_from_barrier,
     verification_problem_from_controlled_discrete_barrier,
     verification_problem_from_controlled_discrete_lyapunov,
@@ -370,6 +375,158 @@ def test_problem_validates_dynamics_and_candidate_links() -> None:
             regions=(),
             assumptions=(bad_variable,),
             obligations=(obligation,),
+        )
+
+
+def test_problem_validates_names_and_region_variables() -> None:
+    x = sp.Symbol("x", real=True)
+    variables, obligation = _minimal_problem_parts()
+    expr = obligation.expression
+
+    with pytest.raises(ValueError, match="variable names"):
+        VerificationProblem(
+            id="p",
+            name="p",
+            source="test",
+            variables=(variables[0], variables[0]),
+            parameters=(),
+            regions=(),
+            obligations=(obligation,),
+        )
+
+    with pytest.raises(ValueError, match="parameter names"):
+        VerificationProblem(
+            id="p",
+            name="p",
+            source="test",
+            variables=variables,
+            parameters=(
+                ParameterSpec(name="k", latex="k"),
+                ParameterSpec(name="k", latex="k"),
+            ),
+            regions=(),
+            obligations=(obligation,),
+        )
+
+    with pytest.raises(ValueError, match="shadow variables"):
+        VerificationProblem(
+            id="p",
+            name="p",
+            source="test",
+            variables=variables,
+            parameters=(ParameterSpec(name="x", latex="x"),),
+            regions=(),
+            obligations=(obligation,),
+        )
+
+    region = RegionSpec(
+        id="bad-region",
+        name="bad region",
+        kind="sublevel",
+        role="domain",
+        variables=("z",),
+        expression=expr,
+        level=1.0,
+    )
+    with pytest.raises(ValueError, match="unknown region variables"):
+        VerificationProblem(
+            id="p",
+            name="p",
+            source="test",
+            variables=variables,
+            parameters=(),
+            regions=(region,),
+            obligations=(obligation,),
+        )
+
+    valid_region = RegionSpec(
+        id="domain",
+        name="domain",
+        kind="sublevel",
+        role="domain",
+        variables=("x",),
+        expression=expression_spec(x),
+        level=1.0,
+    )
+    problem = VerificationProblem(
+        id="p",
+        name="p",
+        source="test",
+        variables=variables,
+        parameters=(),
+        regions=(valid_region,),
+        obligations=(obligation,),
+    )
+    assert problem.regions == (valid_region,)
+
+
+def test_obligation_classification_tracks_backend_targets() -> None:
+    system, x, v, _k, _c = _damped_oscillator()
+    candidate = LyapunovCandidate(
+        state=(x, v),
+        function=(x**2 + v**2) / 2,
+        equilibrium=(0.0, 0.0),
+    )
+    continuous = verification_problem_from_lyapunov(
+        "continuous target",
+        system,
+        candidate,
+    )
+
+    targets = {
+        classification.target
+        for classification in obligation_classifications(continuous)
+    }
+    assert targets == {"continuous-lyapunov"}
+
+    xd = sp.Symbol("x", real=True)
+    discrete = DiscreteSystem(state=(xd,), update=(xd / 2,))
+    discrete_candidate = LyapunovCandidate(
+        state=(xd,),
+        function=xd**2,
+        equilibrium=(0.0,),
+    )
+    discrete_problem = verification_problem_from_discrete_lyapunov(
+        "discrete target",
+        discrete,
+        discrete_candidate,
+    )
+
+    (classification,) = {
+        classification
+        for classification in obligation_classifications(discrete_problem)
+        if classification.obligation_id.endswith("decrease")
+    }
+    assert classification.target == "discrete-lyapunov"
+    assert classification.required_capability == "discharge:discrete-lyapunov"
+
+    variables, obligation = _minimal_problem_parts()
+    generic = VerificationProblem(
+        id="generic",
+        name="generic",
+        source="test",
+        variables=variables,
+        parameters=(),
+        regions=(),
+        obligations=(obligation,),
+    )
+    (generic_classification,) = obligation_classifications(generic)
+    assert generic_classification.target == "obligation-only"
+    assert generic_classification.candidate_kind is None
+
+    capability = AdapterCapabilities(
+        adapter="test-certificate-adapter",
+        supported_targets=("continuous-lyapunov",),
+        supports_discharge=True,
+    )
+    assert capability.supports(obligation_classifications(continuous)[0])
+    assert not capability.supports(generic_classification)
+    assert "continuous-lyapunov" in OBLIGATION_TARGETS
+
+    with pytest.raises(ValueError, match="non-discharging"):
+        AdapterCapabilities(
+            adapter="bad",
+            supported_targets=("continuous-lyapunov",),
         )
 
 

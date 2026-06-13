@@ -13,6 +13,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from engine.verification.capabilities import (
+    AdapterCapabilities,
+    classifications_by_obligation,
+)
 from engine.verification.diagnostics import VerificationDiagnostic
 from engine.verification.ir import (
     AssumptionSpec,
@@ -25,6 +29,7 @@ from engine.verification.ir import (
 
 ADAPTER_NAME = "inspection-stub"
 REPORT_STATUS = "exported-for-inspection"
+ADAPTER_CAPABILITIES = AdapterCapabilities(adapter=ADAPTER_NAME)
 
 ARTIFACT_PROBLEM_JSON = "verification-problem-json"
 ARTIFACT_REPORT_MARKDOWN = "inspection-report-markdown"
@@ -35,6 +40,7 @@ _NOTE = (
     "discharged; external sound discharge is still required."
 )
 _DIAGNOSTIC_PROOF_NOT_ATTEMPTED = "inspection.proof_not_attempted"
+_DIAGNOSTIC_CAPABILITY_CHECK = "inspection.capability_check"
 _DIAGNOSTIC_DYNAMICS_MISSING = "inspection.dynamics_missing"
 _DIAGNOSTIC_EXTERNAL_DISCHARGE_REQUIRED = (
     "inspection.external_discharge_required"
@@ -111,6 +117,7 @@ def inspection_diagnostics(
 ) -> tuple[VerificationDiagnostic, ...]:
     """Return deterministic diagnostics for the inspection-only adapter."""
 
+    classifications = classifications_by_obligation(problem)
     diagnostics = [
         VerificationDiagnostic(
             code=_DIAGNOSTIC_PROOF_NOT_ATTEMPTED,
@@ -122,6 +129,25 @@ def inspection_diagnostics(
             ),
             location="problem",
             details={"adapter": ADAPTER_NAME},
+        ),
+        VerificationDiagnostic(
+            code=_DIAGNOSTIC_CAPABILITY_CHECK,
+            severity="info",
+            status="not-attempted",
+            message=(
+                "Adapter capabilities were checked; this adapter can inspect "
+                "artifacts but cannot discharge obligations."
+            ),
+            location="adapter",
+            details={
+                **ADAPTER_CAPABILITIES.to_dict(),
+                "classifiedTargets": sorted(
+                    {
+                        classification.target
+                        for classification in classifications.values()
+                    }
+                ),
+            },
         )
     ]
     if problem.dynamics is None:
@@ -138,6 +164,7 @@ def inspection_diagnostics(
             )
         )
     for obligation in problem.obligations:
+        classification = classifications[obligation.id]
         diagnostics.append(
             VerificationDiagnostic(
                 code=_DIAGNOSTIC_EXTERNAL_DISCHARGE_REQUIRED,
@@ -150,6 +177,10 @@ def inspection_diagnostics(
                     "comparison": obligation.comparison,
                     "rigor": obligation.rigor,
                     "assumptionIds": list(obligation.assumption_ids),
+                    "classification": classification.to_dict(),
+                    "adapterSupportsTarget": ADAPTER_CAPABILITIES.supports(
+                        classification
+                    ),
                 },
             )
         )

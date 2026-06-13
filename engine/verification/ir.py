@@ -309,6 +309,18 @@ class VerificationProblem:
         if not self.obligations:
             raise ValueError("verification problem must have obligations")
 
+        variable_names = tuple(variable.name for variable in self.variables)
+        if len(set(variable_names)) != len(variable_names):
+            raise ValueError("variable names must be unique")
+        parameter_names = tuple(parameter.name for parameter in self.parameters)
+        if len(set(parameter_names)) != len(parameter_names):
+            raise ValueError("parameter names must be unique")
+        duplicate_names = set(variable_names) & set(parameter_names)
+        if duplicate_names:
+            raise ValueError(
+                f"parameters must not shadow variables: {sorted(duplicate_names)}"
+            )
+
         region_ids = [region.id for region in self.regions]
         if len(set(region_ids)) != len(region_ids):
             raise ValueError("region ids must be unique")
@@ -321,6 +333,13 @@ class VerificationProblem:
 
         known_regions = set(region_ids)
         known_assumptions = set(assumption_ids)
+        known_variables = set(variable_names)
+        for region in self.regions:
+            unknown_region_variables = set(region.variables) - known_variables
+            if unknown_region_variables:
+                raise ValueError(
+                    f"unknown region variables: {sorted(unknown_region_variables)}"
+                )
         for obligation in self.obligations:
             if obligation.region_id is not None and obligation.region_id not in known_regions:
                 raise ValueError(f"unknown obligation region id: {obligation.region_id}")
@@ -333,7 +352,6 @@ class VerificationProblem:
                 if len(point) != len(self.variables):
                     raise ValueError("excluded points must match the variable dimension")
 
-        variable_names = tuple(variable.name for variable in self.variables)
         if self.dynamics is not None and self.dynamics.state != variable_names:
             raise ValueError("dynamics state must match the problem variables in order")
         if (
@@ -343,7 +361,6 @@ class VerificationProblem:
             raise ValueError(
                 "open-loop dynamics state must match the problem variables in order"
             )
-        parameter_names = tuple(parameter.name for parameter in self.parameters)
         dynamics_specs = tuple(
             spec for spec in (self.dynamics, self.open_loop_dynamics) if spec is not None
         )

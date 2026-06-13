@@ -1,7 +1,15 @@
 """Backend-agnostic verification problem IR."""
 
+from engine.verification.capabilities import (
+    OBLIGATION_TARGETS,
+    AdapterCapabilities,
+    ObligationClassification,
+    classifications_by_obligation,
+    obligation_classifications,
+)
 from engine.verification.inspection_adapter import (
     ADAPTER_NAME,
+    ADAPTER_CAPABILITIES,
     ARTIFACT_INSPECTION_OUTCOME_JSON,
     ARTIFACT_PROBLEM_JSON,
     ARTIFACT_REPORT_MARKDOWN,
@@ -49,9 +57,11 @@ from engine.verification.system_codec import (
 
 __all__ = [
     "ADAPTER_NAME",
+    "ADAPTER_CAPABILITIES",
     "ARTIFACT_INSPECTION_OUTCOME_JSON",
     "ARTIFACT_PROBLEM_JSON",
     "ARTIFACT_REPORT_MARKDOWN",
+    "AdapterCapabilities",
     "AssumptionSpec",
     "CandidateSpec",
     "DIAGNOSTIC_SEVERITIES",
@@ -61,6 +71,8 @@ __all__ = [
     "InputSpec",
     "InspectionAdapterReport",
     "InspectionArtifact",
+    "OBLIGATION_TARGETS",
+    "ObligationClassification",
     "ObligationSpec",
     "ParameterSpec",
     "REPORT_STATUS",
@@ -69,12 +81,14 @@ __all__ = [
     "VariableSpec",
     "VerificationDiagnostic",
     "VerificationProblem",
+    "classifications_by_obligation",
     "dynamics_spec_from_controlled",
     "dynamics_spec_from_controlled_discrete",
     "dynamics_spec_from_discrete",
     "dynamics_spec_from_system",
     "expression_spec",
     "inspection_diagnostics",
+    "obligation_classifications",
     "render_inspection_markdown",
     "verification_problem_from_barrier",
     "verification_problem_from_controlled_discrete_barrier",

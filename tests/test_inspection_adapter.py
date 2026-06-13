@@ -83,6 +83,13 @@ def test_write_inspection_artifacts_round_trips_problem(tmp_path) -> None:
     outcome_payload = json.loads(outcome_path.read_text(encoding="utf-8"))
     assert outcome_payload == report.to_dict()
     assert outcome_payload["diagnostics"][0]["status"] == "not-attempted"
+    assert outcome_payload["diagnostics"][1]["code"] == "inspection.capability_check"
+    assert outcome_payload["diagnostics"][1]["details"] == {
+        "adapter": ADAPTER_NAME,
+        "supportsDischarge": False,
+        "supportedTargets": [],
+        "classifiedTargets": ["continuous-lyapunov"],
+    }
     assert {
         diagnostic["status"] for diagnostic in outcome_payload["diagnostics"]
     } == {"not-attempted", "externally-required"}
@@ -91,6 +98,14 @@ def test_write_inspection_artifacts_round_trips_problem(tmp_path) -> None:
         for diagnostic in outcome_payload["diagnostics"]
         if diagnostic["status"] == "externally-required"
     ] == list(report.obligation_ids)
+    for diagnostic in outcome_payload["diagnostics"]:
+        if diagnostic["status"] != "externally-required":
+            continue
+        assert diagnostic["details"]["classification"]["target"] == "continuous-lyapunov"
+        assert diagnostic["details"]["classification"]["requiredCapability"] == (
+            "discharge:continuous-lyapunov"
+        )
+        assert diagnostic["details"]["adapterSupportsTarget"] is False
 
     encoded = json.dumps(report.to_dict())
     assert "external" in encoded
@@ -189,11 +204,21 @@ def test_inspection_diagnostics_mark_missing_dynamics_unsupported() -> None:
 
     assert [diagnostic.status for diagnostic in diagnostics] == [
         "not-attempted",
+        "not-attempted",
         "unsupported",
         "externally-required",
     ]
-    assert diagnostics[1].code == "inspection.dynamics_missing"
-    assert diagnostics[1].severity == "warning"
+    assert diagnostics[1].code == "inspection.capability_check"
+    assert diagnostics[1].details == {
+        "adapter": ADAPTER_NAME,
+        "supportsDischarge": False,
+        "supportedTargets": [],
+        "classifiedTargets": ["obligation-only"],
+    }
+    assert diagnostics[2].code == "inspection.dynamics_missing"
+    assert diagnostics[2].severity == "warning"
+    assert diagnostics[3].details is not None
+    assert diagnostics[3].details["classification"]["target"] == "obligation-only"
 
 
 def test_report_rejects_discharge_claims(tmp_path) -> None:

@@ -66,6 +66,10 @@ artifacts.
     control/disturbance channels, explicit assumptions, first-class candidate
     certificates locked to `status="candidate"`, and obligations labeled
     `rigor="external-required"`.
+  - Adapter capability declarations and target-specific obligation
+    classification for future verification backends; the inspection stub
+    advertises no discharge capability and records required target support in
+    diagnostics.
   - Controlled-discrete Lyapunov/barrier verification exports that derive
     obligations on the closed-loop map while preserving the original
     open-loop controlled dynamics, admissible input bounds, and symbolic
@@ -141,9 +145,8 @@ ignored and should not be committed.
 
 ## Next Work
 
-1. Harden backend verification foundations: adapter capability checks,
-   target-specific obligation classification, and focused robustness tests
-   before adding more case-study breadth.
+1. Continue hardening backend verification foundations: richer target-specific
+   adapter checks and robustness tests before adding more case-study breadth.
 2. Extend parameter variants beyond Lorenz once the viewer has clear behavior
    for backend-generated variants.
 3. Keep backend-only geodesic exploration outside the gallery until the viewer
