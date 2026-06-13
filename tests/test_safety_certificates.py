@@ -6,11 +6,13 @@ import sympy as sp
 
 from engine.dynamics import (
     BarrierCandidate,
+    DiscreteSystem,
     FirstOrderSystem,
     LyapunovCandidate,
     ProofObligation,
     SafetySpecification,
     SublevelSet,
+    discrete_difference,
     grid_points,
     lie_derivative,
     rollout,
@@ -97,6 +99,71 @@ def test_broken_lyapunov_candidate_yields_counterexample() -> None:
     # dV/dt = +0.5 v^2 is maximal at |v| = 2 on this grid.
     assert sample.worst_value == pytest.approx(2.0)
     assert abs(sample.worst_point[1]) == pytest.approx(2.0)
+
+
+def test_discrete_lyapunov_candidate_obligations_hold_for_stable_map() -> None:
+    x = sp.Symbol("x", real=True)
+    system = DiscreteSystem(state=(x,), update=(sp.Rational(1, 2) * x,))
+    candidate = LyapunovCandidate(
+        state=(x,),
+        function=x**2,
+        equilibrium=(0.0,),
+        domain=SublevelSet(state=(x,), expression=x**2, level=4.0, name="interval"),
+    )
+
+    assert (
+        sp.simplify(discrete_difference(x**2, system) + sp.Rational(3, 4) * x**2)
+        == 0
+    )
+    assert candidate.discrete_difference_along(system) == -sp.Rational(3, 4) * x**2
+
+    points = grid_points([(-2.0, 2.0)], [21])
+    for obligation in candidate.discrete_proof_obligations(system):
+        sample = sample_obligation(obligation, points)
+        assert sample.satisfied, obligation.name
+        assert sample.rigor == "measured"
+
+
+def test_broken_discrete_lyapunov_candidate_yields_counterexample() -> None:
+    x = sp.Symbol("x", real=True)
+    unstable = DiscreteSystem(state=(x,), update=(2 * x,))
+    candidate = LyapunovCandidate(state=(x,), function=x**2, equilibrium=(0.0,))
+
+    decrease = candidate.discrete_proof_obligations(unstable)[2]
+    sample = sample_obligation(decrease, grid_points([(-2.0, 2.0)], [21]))
+
+    assert not sample.satisfied
+    assert sample.worst_value == pytest.approx(12.0)
+    assert abs(sample.worst_point[0]) == pytest.approx(2.0)
+
+
+def test_discrete_barrier_candidate_obligations_hold_on_samples() -> None:
+    x = sp.Symbol("x", real=True)
+    system = DiscreteSystem(state=(x,), update=(sp.Rational(1, 2) * x,))
+    barrier = BarrierCandidate(state=(x,), function=x**2 - 1, name="unit-interval")
+    specification = SafetySpecification(
+        state=(x,),
+        safe_set=SublevelSet(state=(x,), expression=x**2, level=1.0, name="safe"),
+        initial_set=SublevelSet(state=(x,), expression=x**2, level=0.25, name="initial"),
+        unsafe_sets=(
+            SublevelSet(state=(x,), expression=-(x - 2), level=0.0, name="right-wall"),
+        ),
+    )
+
+    obligations = barrier.discrete_proof_obligations(system, specification)
+    assert [obligation.name for obligation in obligations] == [
+        "unit-interval:non-increase",
+        "unit-interval:initial-containment",
+        "unit-interval:excludes:right-wall",
+    ]
+    assert sp.simplify(
+        barrier.discrete_difference_along(system) + sp.Rational(3, 4) * x**2
+    ) == 0
+
+    points = grid_points([(-1.0, 2.0)], [61])
+    for obligation in obligations:
+        sample = sample_obligation(obligation, points)
+        assert sample.satisfied, obligation.name
 
 
 def test_theta_only_corridor_barrier_fails_non_increase() -> None:

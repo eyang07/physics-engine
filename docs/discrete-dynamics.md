@@ -43,9 +43,15 @@ natively discrete-time. Backend-only: no manifest, gallery, or viewer change.
    encode `DiscreteSystem` and `ControlledDiscreteSystem` as
    `DynamicsSpec(kind="discrete")` with `stepVariable`, `update`, and the
    same control/disturbance input records used by continuous dynamics.
-7. **Deferred (out of v0):** exact/zero-order-hold discretization, discrete
-   safety obligations (`V(F(x)) - V(x) <= 0` analogues), stochastic
-   disturbances, and discrete control synthesis.
+7. **Discrete safety obligations are symbolic candidates.**
+   `engine.dynamics.safety.discrete_difference` builds
+   `V(k+1, F(k, x)) - V(k, x)`, and Lyapunov/barrier candidates can emit the
+   discrete non-increase obligations `V(F) - V <= 0` and `B(F) - B <= 0`.
+   These remain external-required proof obligations; sampling them is still
+   measured evidence only.
+8. **Deferred (out of v0):** exact/zero-order-hold discretization,
+   stochastic disturbances, discrete control synthesis, validated numerics,
+   and proof discharge.
 
 ## Files
 
@@ -54,6 +60,8 @@ natively discrete-time. Backend-only: no manifest, gallery, or viewer change.
   `euler_discretization`, `DiscreteControlLaw`.
 - `engine/verification/system_codec.py` — verification-IR codecs for
   closed-loop and controlled discrete systems.
+- `engine/dynamics/safety.py` — discrete one-step differences and candidate
+  proof obligations.
 - `engine/dynamics/__init__.py` — exports.
 - `tests/test_discrete_dynamics.py` — obligations below.
 
@@ -78,6 +86,9 @@ natively discrete-time. Backend-only: no manifest, gallery, or viewer change.
 6. **IR encoding (proven on examples).** Closed-loop and open-loop discrete
    systems serialize with `kind="discrete"`, `stepVariable`, update
    expressions, and admissible control/disturbance bounds.
+7. **Discrete safety obligations (proven + measured).** The stable map
+   `x_{k+1} = x_k/2` yields nonpositive one-step Lyapunov/barrier changes on
+   sampled regions, while `x_{k+1} = 2 x_k` yields a counterexample.
 
 ## Verification commands
 
@@ -103,3 +114,8 @@ Updated 2026-06-13: discrete-time dynamics can be encoded in the verification
 IR through `dynamics_spec_from_discrete` and
 `dynamics_spec_from_controlled_discrete`; focused tests pass with
 `pytest tests/test_verification_ir.py tests/test_inspection_adapter.py tests/test_discrete_dynamics.py -q`.
+
+Updated 2026-06-13: discrete-time Lyapunov/barrier proof obligations are
+available through `LyapunovCandidate.discrete_proof_obligations` and
+`BarrierCandidate.discrete_proof_obligations`; focused tests pass with
+`pytest tests/test_safety_certificates.py tests/test_verification_ir.py tests/test_discrete_dynamics.py -q`.

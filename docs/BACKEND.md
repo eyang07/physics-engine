@@ -51,6 +51,9 @@ artifacts.
     than snapped to a sample grid, built on the reusable
     `integrate_with_events` primitive. Still measured, not validated numerics.
   - Candidate Lyapunov and barrier functions.
+  - Continuous and discrete Lyapunov/barrier proof obligations:
+    `dV/dt <= 0`, `dB/dt <= 0`, and one-step analogues
+    `V(F(k, x)) - V(k, x) <= 0`, `B(F(k, x)) - B(k, x) <= 0`.
   - Candidate generation (`engine/dynamics/candidates.py`, spec in
     `docs/candidate-generation.md`): quadratic Lyapunov candidates from a
     Hurwitz linearization via the Lyapunov equation, sublevel barrier
@@ -103,7 +106,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `261 passed`.
+Latest known result: `270 passed`.
 
 Use focused tests while iterating:
 

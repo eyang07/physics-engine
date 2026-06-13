@@ -22,9 +22,9 @@ diagnostics, controlled dynamics, safety metadata, and verification artifacts.
   - Diagnostics for invariants, Poincare sections, finite-time Lyapunov
     exponents, ray travel time, caustic proximity, and wavefront envelopes.
   - Safety/certificate candidate metadata: safe and unsafe sublevel sets,
-    candidate Lyapunov/barrier functions, proof obligations, and measured
-    sampling checks, plus event-based unsafe-set entry detection with
-    integrator-located (not grid-snapped) entry times.
+    candidate Lyapunov/barrier functions, continuous and discrete proof
+    obligations, and measured sampling checks, plus event-based unsafe-set
+    entry detection with integrator-located (not grid-snapped) entry times.
   - Candidate generation: quadratic Lyapunov candidates from a Hurwitz
     linearization, sublevel barrier candidates, and measured level
     suggestions — proposals only, never certification.

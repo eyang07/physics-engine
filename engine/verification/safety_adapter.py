@@ -7,6 +7,7 @@ from typing import Any, Mapping, Sequence
 
 import sympy as sp
 
+from engine.dynamics.discrete import DiscreteSystem
 from engine.dynamics.first_order import FirstOrderSystem
 from engine.dynamics.safety import (
     BarrierCandidate,
@@ -26,7 +27,10 @@ from engine.verification.ir import (
     problem_from_parts,
 )
 from engine.verification.sympy_codec import expression_spec
-from engine.verification.system_codec import dynamics_spec_from_system
+from engine.verification.system_codec import (
+    dynamics_spec_from_discrete,
+    dynamics_spec_from_system,
+)
 
 _SOURCE = "engine.dynamics.safety"
 _DEFAULT_NOTE = (
@@ -122,11 +126,32 @@ def _parameter_assumptions(
     return tuple(assumptions)
 
 
+def _dynamics_spec(system: FirstOrderSystem | DiscreteSystem):
+    if isinstance(system, DiscreteSystem):
+        return dynamics_spec_from_discrete(system)
+    return dynamics_spec_from_system(system)
+
+
+def _system_free_symbols(system: FirstOrderSystem | DiscreteSystem) -> set[sp.Symbol]:
+    if isinstance(system, DiscreteSystem):
+        free: set[sp.Symbol] = set()
+        for expression in system.update:
+            free.update(sp.sympify(expression).free_symbols)
+        free.discard(system.step)
+        return free
+
+    free = set()
+    for expression in system.rhs:
+        free.update(sp.sympify(expression).free_symbols)
+    free.discard(system.time)
+    return free
+
+
 def verification_problem_from_obligations(
     name: str,
     obligations: Sequence[ProofObligation],
     *,
-    system: FirstOrderSystem | None = None,
+    system: FirstOrderSystem | DiscreteSystem | None = None,
     candidate: LyapunovCandidate | BarrierCandidate | None = None,
     specification: SafetySpecification | None = None,
     substitutions: Mapping[sp.Symbol, float] | None = None,
@@ -198,9 +223,7 @@ def verification_problem_from_obligations(
         if obligation.region is not None:
             free_symbols.update(sp.sympify(obligation.region.expression).free_symbols)
     if system is not None:
-        for expression in system.rhs:
-            free_symbols.update(sp.sympify(expression).free_symbols)
-        free_symbols.discard(system.time)
+        free_symbols.update(_system_free_symbols(system))
     if candidate is not None:
         free_symbols.update(sp.sympify(candidate.function).free_symbols)
     if specification is not None:
@@ -289,7 +312,7 @@ def verification_problem_from_obligations(
         regions=regions,
         obligations=obligation_specs,
         assumptions=assumption_specs,
-        dynamics=None if system is None else dynamics_spec_from_system(system),
+        dynamics=None if system is None else _dynamics_spec(system),
         candidates=candidates,
         metadata=_metadata(metadata),
     )
@@ -317,6 +340,28 @@ def verification_problem_from_barrier(
     )
 
 
+def verification_problem_from_discrete_barrier(
+    name: str,
+    system: DiscreteSystem,
+    candidate: BarrierCandidate,
+    *,
+    specification: SafetySpecification | None = None,
+    substitutions: Mapping[sp.Symbol, float] | None = None,
+    assumptions: Sequence[AssumptionSpec] = (),
+    metadata: Mapping[str, Any] | None = None,
+) -> VerificationProblem:
+    return verification_problem_from_obligations(
+        name,
+        candidate.discrete_proof_obligations(system, specification),
+        system=system,
+        candidate=candidate,
+        specification=specification,
+        substitutions=substitutions,
+        assumptions=assumptions,
+        metadata=metadata,
+    )
+
+
 def verification_problem_from_lyapunov(
     name: str,
     system: FirstOrderSystem,
@@ -329,6 +374,26 @@ def verification_problem_from_lyapunov(
     return verification_problem_from_obligations(
         name,
         candidate.proof_obligations(system),
+        system=system,
+        candidate=candidate,
+        substitutions=substitutions,
+        assumptions=assumptions,
+        metadata=metadata,
+    )
+
+
+def verification_problem_from_discrete_lyapunov(
+    name: str,
+    system: DiscreteSystem,
+    candidate: LyapunovCandidate,
+    *,
+    substitutions: Mapping[sp.Symbol, float] | None = None,
+    assumptions: Sequence[AssumptionSpec] = (),
+    metadata: Mapping[str, Any] | None = None,
+) -> VerificationProblem:
+    return verification_problem_from_obligations(
+        name,
+        candidate.discrete_proof_obligations(system),
         system=system,
         candidate=candidate,
         substitutions=substitutions,

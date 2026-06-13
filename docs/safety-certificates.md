@@ -30,7 +30,8 @@ viewer change.
    `BarrierCandidate` (B, candidate-invariant region `{B <= 0}`) generate
    `ProofObligation` records — canonical statements
    `expression <comparison> 0 on region` — via Lie derivatives along a given
-   closed-loop `FirstOrderSystem`. Obligations are structured data plus
+   closed-loop `FirstOrderSystem` or one-step differences along a given
+   closed-loop `DiscreteSystem`. Obligations are structured data plus
    sampling evidence, and `engine.verification` serializes them into the
    backend-agnostic verification-problem IR.
 4. **Sampling is deterministic and honestly labeled.** `grid_points` builds
@@ -41,10 +42,11 @@ viewer change.
    contrast, *is* a genuine counterexample.
 5. **Conventions.** Barrier convention: the candidate-safe/invariant region
    is `{B <= 0}`; obligations are `B <= 0` on the initial set, `B > 0` on
-   each unsafe set, and `dB/dt <= 0` on `{B <= 0}` (a sufficient,
-   stronger-than-boundary condition; noted in the docstring). Lyapunov
-   obligations: `V = 0` at the equilibrium (symbolic identity), `V > 0` on
-   the domain excluding the equilibrium, `dV/dt <= 0` on the domain.
+   each unsafe set, and `dB/dt <= 0` or `B(F(k, x)) - B(k, x) <= 0` on
+   `{B <= 0}` (sufficient, stronger-than-boundary conditions; noted in the
+   docstrings). Lyapunov obligations: `V = 0` at the equilibrium (symbolic
+   identity), `V > 0` on the domain excluding the equilibrium, and either
+   `dV/dt <= 0` or `V(F(k, x)) - V(k, x) <= 0` on the domain.
    Invariant-set candidates are expressed in v0 as the sublevel form of
    `BarrierCandidate`.
 6. **Deferred (out of v0):** SOS/LP certificate synthesis, validated-numeric
@@ -57,7 +59,8 @@ viewer change.
 - `engine/dynamics/safety.py` — `SublevelSet`, `SafetySpecification`,
   `TrajectorySafetyReport` / `UnsafeSetReport`, `ProofObligation`,
   `ObligationSample`, `LyapunovCandidate`, `BarrierCandidate`,
-  `lie_derivative`, `grid_points`, `sample_obligation`.
+  `lie_derivative`, `discrete_difference`, `grid_points`,
+  `sample_obligation`.
 - `tests/test_safety_certificates.py` — obligations below.
 - `engine/dynamics/__init__.py` — exports.
 - `engine/verification/` — backend-agnostic verification-problem IR and
@@ -87,11 +90,15 @@ viewer change.
    measured in the implementation run; the rollout's trajectory report shows
    a positive worst-case safe margin and no unsafe-set entry, and a
    deliberately tight corridor reports first entry at `t = 0`.
-5. **Honest labeling (proven by construction).** Every `ObligationSample`
+5. **Discrete candidates (proven + measured).** For the stable map
+   `x_{k+1} = x_k/2`, the one-step change of `V = x^2` simplifies to
+   `-3 x^2 / 4`, sampled Lyapunov and barrier obligations pass, and the
+   unstable map `x_{k+1} = 2 x_k` yields a sampled counterexample.
+6. **Honest labeling (proven by construction).** Every `ObligationSample`
    and `TrajectorySafetyReport` carries `rigor="measured"`; a satisfied
    sample's note states it is not a certificate. Nothing in this module can
    emit "certified" or "proved".
-6. **Determinism (measured).** `grid_points` and repeated samples are
+7. **Determinism (measured).** `grid_points` and repeated samples are
    bit-identical.
 
 ## Verification commands
@@ -115,3 +122,7 @@ Implemented and verified 2026-06-12: `pytest -q` green including
 `docs/BACKEND.md` baseline for the current count). Obligations above hold with
 the tolerances encoded in the tests; IR serialization records obligations for
 external discharge without proof results.
+
+Updated 2026-06-13: discrete-time Lyapunov/barrier obligations and verification
+IR export helpers are implemented; focused tests pass with
+`pytest tests/test_safety_certificates.py tests/test_verification_ir.py tests/test_discrete_dynamics.py -q`.

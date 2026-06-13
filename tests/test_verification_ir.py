@@ -30,6 +30,8 @@ from engine.verification import (
     dynamics_spec_from_discrete,
     expression_spec,
     verification_problem_from_barrier,
+    verification_problem_from_discrete_barrier,
+    verification_problem_from_discrete_lyapunov,
     verification_problem_from_lyapunov,
     verification_problem_from_obligations,
 )
@@ -456,3 +458,82 @@ def test_dynamics_spec_from_controlled_discrete_encodes_inputs() -> None:
             "upper": 0.1,
         },
     ]
+
+
+def test_discrete_lyapunov_candidate_exports_verification_problem() -> None:
+    x = sp.Symbol("x", real=True)
+    a = sp.Symbol("a", positive=True)
+    system = DiscreteSystem(state=(x,), update=(a * x,), parameters=(a,))
+    candidate = LyapunovCandidate(
+        state=(x,),
+        function=x**2,
+        equilibrium=(0.0,),
+        domain=SublevelSet(state=(x,), expression=x**2, level=4.0, name="interval"),
+        name="contractive-map-lyapunov",
+    )
+
+    problem = verification_problem_from_discrete_lyapunov(
+        "contractive map lyapunov",
+        system,
+        candidate,
+        substitutions={a: 0.5},
+    )
+    payload = problem.to_dict()
+
+    assert payload["dynamics"]["kind"] == "discrete"
+    assert payload["dynamics"]["stepVariable"] == "k"
+    assert payload["dynamics"]["update"][0]["display"] == "a*x"
+    assert [assumption["id"] for assumption in payload["assumptions"]] == [
+        "parameter-a-positive"
+    ]
+    assert [obligation["id"] for obligation in payload["obligations"]] == [
+        "contractive-map-lyapunov-equilibrium-value",
+        "contractive-map-lyapunov-positivity",
+        "contractive-map-lyapunov-decrease",
+    ]
+    assert payload["obligations"][2]["regionId"] == "domain-interval"
+    assert payload["obligations"][2]["assumptionIds"] == ["parameter-a-positive"]
+    (candidate_payload,) = payload["candidates"]
+    assert candidate_payload["kind"] == "lyapunov"
+    assert candidate_payload["obligationIds"] == [
+        obligation["id"] for obligation in payload["obligations"]
+    ]
+
+
+def test_discrete_barrier_candidate_exports_verification_problem() -> None:
+    x = sp.Symbol("x", real=True)
+    system = DiscreteSystem(state=(x,), update=(sp.Rational(1, 2) * x,))
+    barrier = BarrierCandidate(state=(x,), function=x**2 - 1, name="unit-interval")
+    specification = SafetySpecification(
+        state=(x,),
+        safe_set=SublevelSet(state=(x,), expression=x**2, level=1.0, name="safe"),
+        initial_set=SublevelSet(state=(x,), expression=x**2, level=0.25, name="initial"),
+        unsafe_sets=(
+            SublevelSet(state=(x,), expression=-(x - 2), level=0.0, name="right-wall"),
+        ),
+    )
+
+    problem = verification_problem_from_discrete_barrier(
+        "unit interval discrete safety",
+        system,
+        barrier,
+        specification=specification,
+    )
+    payload = problem.to_dict()
+
+    assert payload["dynamics"]["kind"] == "discrete"
+    assert [region["role"] for region in payload["regions"]] == [
+        "safe",
+        "initial",
+        "unsafe",
+        "domain",
+    ]
+    assert [obligation["name"] for obligation in payload["obligations"]] == [
+        "unit-interval:non-increase",
+        "unit-interval:initial-containment",
+        "unit-interval:excludes:right-wall",
+    ]
+    assert payload["obligations"][0]["regionId"] == "domain-unit-interval-region"
+    (candidate_payload,) = payload["candidates"]
+    assert candidate_payload["kind"] == "barrier"
+    assert candidate_payload["regionId"] == "domain-unit-interval-region"

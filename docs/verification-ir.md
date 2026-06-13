@@ -71,7 +71,8 @@ tools dispose**: nothing in the IR stores proof results.
   `dynamics_spec_from_controlled_discrete`.
 - `engine/verification/safety_adapter.py` — adapters now pass the system and
   candidate through; `verification_problem_from_obligations` accepts optional
-  `system` and `candidate` keywords.
+  `system` and `candidate` keywords, with discrete Lyapunov/barrier adapter
+  entry points for `DiscreteSystem` obligations.
 - `engine/verification/inspection_adapter.py` — renders Dynamics,
   Assumptions, and Candidate certificates report sections.
 - `tests/test_verification_ir.py`, `tests/test_inspection_adapter.py`.
@@ -87,10 +88,13 @@ tools dispose**: nothing in the IR stores proof results.
 3. **Assumption explicitness (proven on examples).** Positive SymPy
    parameter-domain facts are serialized as `AssumptionSpec` records, and
    exported obligations link to those records by id.
-4. **Referential integrity (proven).** Mismatched dynamics state, dangling
+4. **Discrete safety export (proven on examples).** Discrete Lyapunov and
+   barrier candidate obligations serialize with `kind="discrete"` dynamics
+   and linked candidate records.
+5. **Referential integrity (proven).** Mismatched dynamics state, dangling
    candidate-obligation ids, dangling obligation-assumption ids, unknown
    assumption variables, and wrong-dimension equilibria raise.
-5. **Determinism (measured).** Serialization remains bit-identical across
+6. **Determinism (measured).** Serialization remains bit-identical across
    runs; the inspection report renders the new sections deterministically.
 
 ## Verification commands

@@ -24,6 +24,7 @@ from typing import Callable, Mapping, Sequence
 import numpy as np
 import sympy as sp
 
+from engine.dynamics.discrete import DiscreteSystem
 from engine.dynamics.first_order import FirstOrderSystem
 from engine.numerics.integrators import integrate_with_events
 
@@ -348,6 +349,22 @@ def lie_derivative(function: sp.Expr, system: FirstOrderSystem) -> sp.Expr:
     )
 
 
+def discrete_difference(function: sp.Expr, system: DiscreteSystem) -> sp.Expr:
+    """One-step change ``function(k+1, F(k, x)) - function(k, x)``."""
+
+    expression = sp.sympify(function)
+    extra = expression.free_symbols - set(system.state) - set(system.parameters) - {system.step}
+    if extra:
+        names = ", ".join(sorted(symbol.name for symbol in extra))
+        raise ValueError(f"function has symbols outside the system: {names}")
+    replacements = {
+        **dict(zip(system.state, system.update, strict=True)),
+        system.step: system.step + 1,
+    }
+    next_value = expression.subs(replacements, simultaneous=True)
+    return sp.simplify(next_value - expression)
+
+
 @dataclass(frozen=True)
 class ProofObligation:
     """The claim ``expression <comparison> 0`` on ``region`` (or everywhere).
@@ -475,6 +492,11 @@ class LyapunovCandidate:
             raise ValueError("system state must match the candidate state")
         return lie_derivative(self.function, system)
 
+    def discrete_difference_along(self, system: DiscreteSystem) -> sp.Expr:
+        if system.state != self.state:
+            raise ValueError("system state must match the candidate state")
+        return discrete_difference(self.function, system)
+
     def proof_obligations(self, system: FirstOrderSystem) -> tuple[ProofObligation, ...]:
         return (
             ProofObligation(
@@ -505,6 +527,39 @@ class LyapunovCandidate:
             ),
         )
 
+    def discrete_proof_obligations(
+        self,
+        system: DiscreteSystem,
+    ) -> tuple[ProofObligation, ...]:
+        return (
+            ProofObligation(
+                name=f"{self.name}:equilibrium-value",
+                state=self.state,
+                expression=self.value_at_equilibrium(),
+                comparison="<=",
+                description="V vanishes at the equilibrium (with >= 0 nearby, "
+                "checked via the positivity obligation); here V(x*) <= 0 "
+                "combined with positivity off the equilibrium forces V(x*) = 0",
+            ),
+            ProofObligation(
+                name=f"{self.name}:positivity",
+                state=self.state,
+                expression=-sp.sympify(self.function),
+                comparison="<",
+                region=self.domain,
+                excluded_point=tuple(self.equilibrium),
+                description="V > 0 on the domain away from the equilibrium",
+            ),
+            ProofObligation(
+                name=f"{self.name}:decrease",
+                state=self.state,
+                expression=self.discrete_difference_along(system),
+                comparison="<=",
+                region=self.domain,
+                description="V(F(k, x)) - V(k, x) <= 0 along the closed-loop map",
+            ),
+        )
+
 
 @dataclass(frozen=True)
 class BarrierCandidate:
@@ -531,6 +586,11 @@ class BarrierCandidate:
         if system.state != self.state:
             raise ValueError("system state must match the candidate state")
         return lie_derivative(self.function, system)
+
+    def discrete_difference_along(self, system: DiscreteSystem) -> sp.Expr:
+        if system.state != self.state:
+            raise ValueError("system state must match the candidate state")
+        return discrete_difference(self.function, system)
 
     def proof_obligations(
         self,
@@ -574,6 +634,49 @@ class BarrierCandidate:
                 )
         return tuple(obligations)
 
+    def discrete_proof_obligations(
+        self,
+        system: DiscreteSystem,
+        specification: SafetySpecification | None = None,
+    ) -> tuple[ProofObligation, ...]:
+        obligations = [
+            ProofObligation(
+                name=f"{self.name}:non-increase",
+                state=self.state,
+                expression=self.discrete_difference_along(system),
+                comparison="<=",
+                region=self.candidate_region(),
+                description="B(F(k, x)) - B(k, x) <= 0 on {B <= 0} "
+                "(sufficient for invariance)",
+            )
+        ]
+        if specification is not None:
+            if specification.state != self.state:
+                raise ValueError("specification state must match the candidate state")
+            if specification.initial_set is not None:
+                obligations.append(
+                    ProofObligation(
+                        name=f"{self.name}:initial-containment",
+                        state=self.state,
+                        expression=sp.sympify(self.function),
+                        comparison="<=",
+                        region=specification.initial_set,
+                        description="B <= 0 on the initial set",
+                    )
+                )
+            for region in specification.unsafe_sets:
+                obligations.append(
+                    ProofObligation(
+                        name=f"{self.name}:excludes:{region.name}",
+                        state=self.state,
+                        expression=sp.sympify(self.function),
+                        comparison=">",
+                        region=region,
+                        description="B > 0 on the unsafe set",
+                    )
+                )
+        return tuple(obligations)
+
 
 __all__ = [
     "BarrierCandidate",
@@ -586,6 +689,7 @@ __all__ = [
     "TrajectorySafetyReport",
     "UnsafeEntryEvent",
     "UnsafeSetReport",
+    "discrete_difference",
     "grid_points",
     "lie_derivative",
     "sample_obligation",

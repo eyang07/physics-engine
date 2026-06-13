@@ -261,8 +261,9 @@ In priority order:
    spec in `docs/candidate-generation.md`), and event-based unsafe-set entry
    detection with integrator-located entry times
    (`SafetySpecification.event_entry_report`, spec in
-   `docs/event-detection.md`); SOS-style synthesis and proof discharge remain
-   open.*
+   `docs/event-detection.md`). Continuous and discrete Lyapunov/barrier
+   proof obligations are implemented; SOS-style synthesis and proof discharge
+   remain open.*
 3. **Verification-problem IR.** Define and serialize the IR above, even if
    the only adapter is a stub that writes the problem out for inspection.
    *Status: v2 implemented backend-only (`engine/verification/`, spec in
