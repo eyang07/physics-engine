@@ -70,12 +70,21 @@ nothing in the IR stores proof results.
 8. **Deferred (out of v2):** richer
    assumption languages beyond scalar expression comparisons, visualization
    hooks, real external backends, and any proof-result storage.
+9. **Adapter diagnostics are outcomes, not proofs.** Verification adapters
+   report normalized diagnostics through `VerificationDiagnostic` with
+   statuses such as `not-attempted`, `externally-required`, `unsupported`,
+   and `malformed`. The inspection stub writes these diagnostics to a
+   machine-readable outcome artifact; it still cannot record success,
+   discharge, proof, or certification.
 
 ## Files
 
 - `engine/verification/ir.py` — `DynamicsSpec`, `InputSpec`,
   `AssumptionSpec`, `CandidateSpec`, extended `VerificationProblem`, schema
   bump.
+- `engine/verification/diagnostics.py` — typed adapter diagnostics with a
+  small status/severity vocabulary for inspection and future backend
+  integrations.
 - `engine/verification/system_codec.py` — `dynamics_spec_from_system`,
   `dynamics_spec_from_controlled`, `dynamics_spec_from_discrete`,
   `dynamics_spec_from_controlled_discrete`.
@@ -85,7 +94,9 @@ nothing in the IR stores proof results.
   Lyapunov/barrier adapter entry points for both `DiscreteSystem` obligations
   and controlled-discrete feedback exports.
 - `engine/verification/inspection_adapter.py` — renders Dynamics,
-  Open-loop dynamics, Assumptions, and Candidate certificates report sections.
+  Open-loop dynamics, Assumptions, and Candidate certificates report sections;
+  writes canonical problem JSON, human inspection markdown, and
+  machine-readable inspection outcome JSON.
 - `tests/test_verification_ir.py`, `tests/test_inspection_adapter.py`.
 
 ## Invariants / proof obligations (for this implementation)
@@ -112,6 +123,10 @@ nothing in the IR stores proof results.
    wrong-dimension equilibria raise.
 7. **Determinism (measured).** Serialization remains bit-identical across
    runs; the inspection report renders the new sections deterministically.
+8. **Diagnostic honesty (proven by construction).** Inspection outcomes use
+   only non-success statuses (`not-attempted`, `externally-required`,
+   `unsupported`, `malformed`) and every obligation receives an
+   `externally-required` diagnostic until a real backend exists.
 
 ## Verification commands
 

@@ -2,13 +2,20 @@
 
 from engine.verification.inspection_adapter import (
     ADAPTER_NAME,
+    ARTIFACT_INSPECTION_OUTCOME_JSON,
     ARTIFACT_PROBLEM_JSON,
     ARTIFACT_REPORT_MARKDOWN,
     InspectionAdapterReport,
     InspectionArtifact,
     REPORT_STATUS,
+    inspection_diagnostics,
     render_inspection_markdown,
     write_inspection_artifacts,
+)
+from engine.verification.diagnostics import (
+    DIAGNOSTIC_SEVERITIES,
+    DIAGNOSTIC_STATUSES,
+    VerificationDiagnostic,
 )
 from engine.verification.ir import (
     AssumptionSpec,
@@ -42,10 +49,13 @@ from engine.verification.system_codec import (
 
 __all__ = [
     "ADAPTER_NAME",
+    "ARTIFACT_INSPECTION_OUTCOME_JSON",
     "ARTIFACT_PROBLEM_JSON",
     "ARTIFACT_REPORT_MARKDOWN",
     "AssumptionSpec",
     "CandidateSpec",
+    "DIAGNOSTIC_SEVERITIES",
+    "DIAGNOSTIC_STATUSES",
     "DynamicsSpec",
     "ExpressionSpec",
     "InputSpec",
@@ -57,12 +67,14 @@ __all__ = [
     "RegionSpec",
     "SCHEMA_VERSION",
     "VariableSpec",
+    "VerificationDiagnostic",
     "VerificationProblem",
     "dynamics_spec_from_controlled",
     "dynamics_spec_from_controlled_discrete",
     "dynamics_spec_from_discrete",
     "dynamics_spec_from_system",
     "expression_spec",
+    "inspection_diagnostics",
     "render_inspection_markdown",
     "verification_problem_from_barrier",
     "verification_problem_from_controlled_discrete_barrier",

@@ -71,8 +71,9 @@ artifacts.
     open-loop controlled dynamics, admissible input bounds, and symbolic
     feedback law metadata.
   - Stub inspection adapter (`engine/verification/inspection_adapter.py`) that
-    consumes the IR and writes canonical problem JSON plus a human-readable
-    inspection report, recording no proof results.
+    consumes the IR and writes canonical problem JSON, a human-readable
+    inspection report, and a machine-readable inspection outcome JSON with
+    typed diagnostics. It records no proof results.
 
 The backend does not synthesize, prove, or certify safety. Real external
 verification backends, proof discharge, validated numerics, manifest export of
@@ -110,7 +111,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `272 passed`.
+Latest known result: `273 passed`.
 
 Use focused tests while iterating:
 
@@ -140,9 +141,9 @@ ignored and should not be committed.
 
 ## Next Work
 
-1. Harden backend verification foundations: typed verification-backend
-   diagnostics, machine-readable inspection outcomes, and focused robustness
-   tests before adding more case-study breadth.
+1. Harden backend verification foundations: adapter capability checks,
+   target-specific obligation classification, and focused robustness tests
+   before adding more case-study breadth.
 2. Extend parameter variants beyond Lorenz once the viewer has clear behavior
    for backend-generated variants.
 3. Keep backend-only geodesic exploration outside the gallery until the viewer

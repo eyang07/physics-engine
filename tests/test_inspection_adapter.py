@@ -15,11 +15,13 @@ from engine.dynamics import (
 )
 from engine.verification import (
     ADAPTER_NAME,
+    ARTIFACT_INSPECTION_OUTCOME_JSON,
     ARTIFACT_PROBLEM_JSON,
     ARTIFACT_REPORT_MARKDOWN,
     InspectionAdapterReport,
     InspectionArtifact,
     REPORT_STATUS,
+    VerificationDiagnostic,
     VerificationProblem,
     ObligationSpec,
     ParameterSpec,
@@ -27,6 +29,7 @@ from engine.verification import (
     dynamics_spec_from_controlled_discrete,
     dynamics_spec_from_discrete,
     expression_spec,
+    inspection_diagnostics,
     render_inspection_markdown,
     verification_problem_from_lyapunov,
     write_inspection_artifacts,
@@ -66,14 +69,28 @@ def test_write_inspection_artifacts_round_trips_problem(tmp_path) -> None:
     assert [artifact.kind for artifact in report.artifacts] == [
         ARTIFACT_PROBLEM_JSON,
         ARTIFACT_REPORT_MARKDOWN,
+        ARTIFACT_INSPECTION_OUTCOME_JSON,
     ]
 
-    json_path, markdown_path = (artifact.path for artifact in report.artifacts)
+    json_path, markdown_path, outcome_path = (
+        artifact.path for artifact in report.artifacts
+    )
     payload = json.loads(json_path.read_text(encoding="utf-8"))
     assert payload == problem.to_dict()
     assert markdown_path.read_text(encoding="utf-8") == render_inspection_markdown(
         problem
     )
+    outcome_payload = json.loads(outcome_path.read_text(encoding="utf-8"))
+    assert outcome_payload == report.to_dict()
+    assert outcome_payload["diagnostics"][0]["status"] == "not-attempted"
+    assert {
+        diagnostic["status"] for diagnostic in outcome_payload["diagnostics"]
+    } == {"not-attempted", "externally-required"}
+    assert [
+        diagnostic["obligationId"]
+        for diagnostic in outcome_payload["diagnostics"]
+        if diagnostic["status"] == "externally-required"
+    ] == list(report.obligation_ids)
 
     encoded = json.dumps(report.to_dict())
     assert "external" in encoded
@@ -148,6 +165,37 @@ def test_render_inspection_markdown_handles_discrete_dynamics() -> None:
     assert "- control `u` in [-1.0, 1.0]" in text
 
 
+def test_inspection_diagnostics_mark_missing_dynamics_unsupported() -> None:
+    x = sp.Symbol("x", real=True)
+    problem = VerificationProblem(
+        id="obligation-only",
+        name="obligation only",
+        source="test",
+        variables=(VariableSpec(name="x", latex="x"),),
+        parameters=(),
+        regions=(),
+        obligations=(
+            ObligationSpec(
+                id="nonpositive",
+                name="nonpositive",
+                expression=expression_spec(x),
+                comparison="<=",
+                rhs=0.0,
+            ),
+        ),
+    )
+
+    diagnostics = inspection_diagnostics(problem)
+
+    assert [diagnostic.status for diagnostic in diagnostics] == [
+        "not-attempted",
+        "unsupported",
+        "externally-required",
+    ]
+    assert diagnostics[1].code == "inspection.dynamics_missing"
+    assert diagnostics[1].severity == "warning"
+
+
 def test_report_rejects_discharge_claims(tmp_path) -> None:
     problem = _oscillator_problem()
     report = write_inspection_artifacts(problem, tmp_path)
@@ -159,10 +207,23 @@ def test_report_rejects_discharge_claims(tmp_path) -> None:
             schema_version=report.schema_version,
             obligation_ids=report.obligation_ids,
             artifacts=report.artifacts,
+            diagnostics=report.diagnostics,
             status="discharged",
         )
     with pytest.raises(ValueError, match="artifact kind"):
         InspectionArtifact(kind="proof-result", path=tmp_path / "x")
+    with pytest.raises(ValueError, match="diagnostic code"):
+        VerificationDiagnostic(
+            code="Bad Code",
+            status="not-attempted",
+            message="bad",
+        )
+    with pytest.raises(ValueError, match="diagnostic status"):
+        VerificationDiagnostic(
+            code="inspection.bad",
+            status="certified",
+            message="bad",
+        )
 
 
 def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
@@ -174,3 +235,4 @@ def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
     assert "wrote" in captured.out
     assert (tmp_path / "upright-pendulum-safety.verification-problem.json").exists()
     assert (tmp_path / "upright-pendulum-safety.inspection.md").exists()
+    assert (tmp_path / "upright-pendulum-safety.inspection-outcome.json").exists()

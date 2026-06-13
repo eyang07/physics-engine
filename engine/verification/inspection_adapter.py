@@ -8,10 +8,12 @@ records, or claims proof discharge; every obligation it touches remains
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from engine.verification.diagnostics import VerificationDiagnostic
 from engine.verification.ir import (
     AssumptionSpec,
     CandidateSpec,
@@ -26,10 +28,16 @@ REPORT_STATUS = "exported-for-inspection"
 
 ARTIFACT_PROBLEM_JSON = "verification-problem-json"
 ARTIFACT_REPORT_MARKDOWN = "inspection-report-markdown"
+ARTIFACT_INSPECTION_OUTCOME_JSON = "inspection-outcome-json"
 
 _NOTE = (
     "Inspection artifacts only: no obligation has been attempted or "
     "discharged; external sound discharge is still required."
+)
+_DIAGNOSTIC_PROOF_NOT_ATTEMPTED = "inspection.proof_not_attempted"
+_DIAGNOSTIC_DYNAMICS_MISSING = "inspection.dynamics_missing"
+_DIAGNOSTIC_EXTERNAL_DISCHARGE_REQUIRED = (
+    "inspection.external_discharge_required"
 )
 
 
@@ -41,7 +49,11 @@ class InspectionArtifact:
     path: Path
 
     def __post_init__(self) -> None:
-        if self.kind not in (ARTIFACT_PROBLEM_JSON, ARTIFACT_REPORT_MARKDOWN):
+        if self.kind not in (
+            ARTIFACT_PROBLEM_JSON,
+            ARTIFACT_REPORT_MARKDOWN,
+            ARTIFACT_INSPECTION_OUTCOME_JSON,
+        ):
             raise ValueError(f"unknown inspection artifact kind: {self.kind!r}")
 
     def to_dict(self) -> dict[str, str]:
@@ -57,6 +69,7 @@ class InspectionAdapterReport:
     schema_version: str
     obligation_ids: tuple[str, ...]
     artifacts: tuple[InspectionArtifact, ...]
+    diagnostics: tuple[VerificationDiagnostic, ...]
     status: str = REPORT_STATUS
     note: str = _NOTE
 
@@ -69,6 +82,16 @@ class InspectionAdapterReport:
             raise ValueError("adapter report must list obligation ids")
         if not self.artifacts:
             raise ValueError("adapter report must list written artifacts")
+        if not self.diagnostics:
+            raise ValueError("adapter report must list diagnostics")
+        diagnostic_obligation_ids = {
+            diagnostic.obligation_id
+            for diagnostic in self.diagnostics
+            if diagnostic.obligation_id is not None
+        }
+        unknown = diagnostic_obligation_ids - set(self.obligation_ids)
+        if unknown:
+            raise ValueError(f"unknown diagnostic obligation ids: {sorted(unknown)}")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -79,7 +102,58 @@ class InspectionAdapterReport:
             "note": self.note,
             "obligationIds": list(self.obligation_ids),
             "artifacts": [artifact.to_dict() for artifact in self.artifacts],
+            "diagnostics": [diagnostic.to_dict() for diagnostic in self.diagnostics],
         }
+
+
+def inspection_diagnostics(
+    problem: VerificationProblem,
+) -> tuple[VerificationDiagnostic, ...]:
+    """Return deterministic diagnostics for the inspection-only adapter."""
+
+    diagnostics = [
+        VerificationDiagnostic(
+            code=_DIAGNOSTIC_PROOF_NOT_ATTEMPTED,
+            severity="info",
+            status="not-attempted",
+            message=(
+                "The inspection adapter exported artifacts only; no proof "
+                "backend was invoked."
+            ),
+            location="problem",
+            details={"adapter": ADAPTER_NAME},
+        )
+    ]
+    if problem.dynamics is None:
+        diagnostics.append(
+            VerificationDiagnostic(
+                code=_DIAGNOSTIC_DYNAMICS_MISSING,
+                severity="warning",
+                status="unsupported",
+                message=(
+                    "No dynamics model is encoded; backends that require a "
+                    "model cannot discharge this problem directly."
+                ),
+                location="dynamics",
+            )
+        )
+    for obligation in problem.obligations:
+        diagnostics.append(
+            VerificationDiagnostic(
+                code=_DIAGNOSTIC_EXTERNAL_DISCHARGE_REQUIRED,
+                severity="info",
+                status="externally-required",
+                message="Obligation still requires sound external discharge.",
+                location=f"obligations.{obligation.id}",
+                obligation_id=obligation.id,
+                details={
+                    "comparison": obligation.comparison,
+                    "rigor": obligation.rigor,
+                    "assumptionIds": list(obligation.assumption_ids),
+                },
+            )
+        )
+    return tuple(diagnostics)
 
 
 def _dynamics_lines(
@@ -256,8 +330,9 @@ def write_inspection_artifacts(
     problem.write_json(problem_path)
     report_path = output_dir / f"{problem.id}.inspection.md"
     report_path.write_text(render_inspection_markdown(problem), encoding="utf-8")
+    outcome_path = output_dir / f"{problem.id}.inspection-outcome.json"
 
-    return InspectionAdapterReport(
+    report = InspectionAdapterReport(
         adapter=ADAPTER_NAME,
         problem_id=problem.id,
         schema_version=problem.schema_version,
@@ -265,5 +340,15 @@ def write_inspection_artifacts(
         artifacts=(
             InspectionArtifact(kind=ARTIFACT_PROBLEM_JSON, path=problem_path),
             InspectionArtifact(kind=ARTIFACT_REPORT_MARKDOWN, path=report_path),
+            InspectionArtifact(
+                kind=ARTIFACT_INSPECTION_OUTCOME_JSON,
+                path=outcome_path,
+            ),
         ),
+        diagnostics=inspection_diagnostics(problem),
     )
+    outcome_path.write_text(
+        json.dumps(report.to_dict(), indent=2),
+        encoding="utf-8",
+    )
+    return report
