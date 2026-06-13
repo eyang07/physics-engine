@@ -3,6 +3,11 @@ import json
 import numpy as np
 import sympy as sp
 
+from engine.verification import certificate_series_for_trajectory
+from scripts.export_verification_problems import (
+    upright_pendulum_problem,
+    upright_pendulum_trajectory,
+)
 from scripts.generate_pendulum import generate_pendulum_trajectory, write_pendulum_trajectory
 from systems.pendulum import build_system
 
@@ -29,18 +34,33 @@ def test_generated_pendulum_trajectory_has_small_energy_drift():
     assert np.max(np.abs(energy - energy[0])) < 1e-7
 
 
-def test_pendulum_exports_certificate_series_for_linked_verification_problem():
+def test_gallery_pendulum_is_pure_physics():
+    # The Systems-world pendulum carries no verification coupling: just energy.
     trajectory = generate_pendulum_trajectory(t_span=(0.0, 0.05), dt=0.01)
     assert trajectory.series is not None
-    assert trajectory.metadata is not None
+    assert set(trajectory.series) == {"H"}
+    assert "certificateSeries" not in (trajectory.metadata or {})
 
-    value_series = trajectory.series["certificate_energy_barrier_value"]
-    derivative_series = trajectory.series["certificate_energy_barrier_flow_derivative"]
-    assert np.asarray(value_series, dtype=float).shape == trajectory.time.shape
-    assert np.asarray(derivative_series, dtype=float).shape == trajectory.time.shape
 
-    records = trajectory.metadata["certificateSeries"]
-    records_by_kind = {record["kind"]: record for record in records}
+def test_controlled_pendulum_exports_certificate_series():
+    # The Verification world evaluates the candidate certificate along the
+    # controlled trajectory it is derived for — not the gallery pendulum.
+    problem = upright_pendulum_problem()
+    time, states = upright_pendulum_trajectory(t_span=(0.0, 0.05), dt=0.01)
+    diagnostics = certificate_series_for_trajectory(
+        problem,
+        time=time,
+        states=states,
+        state_names=[variable.name for variable in problem.variables],
+        variable_to_state_axis={"theta": "theta", "omega": "omega"},
+    )
+
+    value_series = diagnostics.series["certificate_energy_barrier_value"]
+    derivative_series = diagnostics.series["certificate_energy_barrier_flow_derivative"]
+    assert np.asarray(value_series, dtype=float).shape == time.shape
+    assert np.asarray(derivative_series, dtype=float).shape == time.shape
+
+    records_by_kind = {record["kind"]: record for record in diagnostics.metadata}
     assert set(records_by_kind) == {"candidate-value", "flow-derivative"}
 
     value_record = records_by_kind["candidate-value"]

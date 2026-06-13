@@ -262,7 +262,6 @@ PENDULUM = SystemSpec(
     conserved=(Conserved("H", "H", "time translation", generator=_time_translation),),
     lenses=("pendulumMotionPhase", "pendulumHamiltonian", "pendulumPotential"),
     data_path="/data/pendulum.json",
-    verification_problems=("upright-pendulum-safety",),
 )
 
 

@@ -11,7 +11,7 @@ from dataclasses import replace
 
 import pytest
 
-from engine.export import validate_viewer_verification_contract
+from engine.export import validate_viewer_verification_problems
 from engine.export.manifest import build_manifest, system_entry
 from engine.dynamics import CotangentHamiltonianSystem
 from engine.mechanics.lagrangian import LagrangianSystem
@@ -40,90 +40,32 @@ def test_system_lenses_are_registered() -> None:
         assert set(spec.lenses) <= registered
 
 
-def test_manifest_carries_verification_problem_links(manifest) -> None:
-    entries = {entry["id"]: entry for entry in manifest["systems"]}
-
-    assert entries["pendulum"]["verificationProblems"] == ["upright-pendulum-safety"]
-    for system_id, entry in entries.items():
-        problems = entry.get("verificationProblems", [])
-        assert len(problems) == len(set(problems)), system_id
-        assert all(isinstance(problem_id, str) and problem_id for problem_id in problems)
+def test_manifest_has_no_verification_coupling(manifest) -> None:
+    # The Systems and Verification worlds are separate: no gallery system carries
+    # a verification cross-link, so the manifest stays pure physics.
+    for entry in manifest["systems"]:
+        assert entry.get("verificationProblems", []) == [], entry["id"]
 
 
-def test_verification_problem_links_match_manifest_specs() -> None:
-    validate_viewer_verification_contract(SPECS, (upright_pendulum_problem(),))
+def test_verification_problems_validate_standalone() -> None:
+    validate_viewer_verification_problems((upright_pendulum_problem(),))
 
 
-def test_verification_contract_rejects_bad_system_link() -> None:
-    base = upright_pendulum_problem()
-    problem = replace(
-        base,
-        system="missing",
-        metadata={**dict(base.metadata or {}), "system": "missing"},
-    )
-
-    with pytest.raises(ValueError, match="unknown manifest system"):
-        validate_viewer_verification_contract(SPECS, (problem,))
-
-
-def test_verification_contract_rejects_missing_manifest_backlink() -> None:
+def test_verification_problem_is_self_contained() -> None:
+    # The verification world does not depend on any gallery system.
     problem = upright_pendulum_problem()
-    specs = tuple(
-        replace(spec, verification_problems=())
-        if spec.id == problem.system
-        else spec
-        for spec in SPECS
-    )
-
-    with pytest.raises(ValueError, match="not linked back"):
-        validate_viewer_verification_contract(specs, (problem,))
-
-
-def test_verification_contract_rejects_bad_region_geometry_projection() -> None:
-    problem = upright_pendulum_problem()
+    assert problem.system is None
     geometry = problem.region_geometry[0]
-    bad_geometry = replace(geometry, projection="unknown")
-    bad_problem = replace(
-        problem,
-        region_geometry=(bad_geometry, *problem.region_geometry[1:]),
-    )
-
-    with pytest.raises(ValueError, match="unknown projection"):
-        validate_viewer_verification_contract(SPECS, (bad_problem,))
+    assert geometry.variable_to_state_axis == {"theta": "theta", "omega": "omega"}
 
 
-def test_verification_contract_rejects_bad_region_geometry_mapping() -> None:
+def test_verification_contract_rejects_incomplete_region_geometry() -> None:
     problem = upright_pendulum_problem()
-    geometry = problem.region_geometry[0]
-    bad_geometry = replace(
-        geometry,
-        state_axes=("theta", "theta"),
-        variable_to_state_axis={"theta": "theta", "omega": "theta"},
-    )
-    bad_problem = replace(
-        problem,
-        region_geometry=(bad_geometry, *problem.region_geometry[1:]),
-    )
+    # Drop one region's geometry so it no longer covers every region.
+    bad_problem = replace(problem, region_geometry=problem.region_geometry[1:])
 
-    with pytest.raises(ValueError, match="state axes"):
-        validate_viewer_verification_contract(SPECS, (bad_problem,))
-
-
-def test_verification_contract_rejects_bad_proof_status_mapping() -> None:
-    problem = upright_pendulum_problem()
-    status = problem.proof_statuses[0]
-    bad_status = replace(
-        status,
-        state_axes=("theta", "omega"),
-        variable_to_state_axis={"theta": "theta", "omega": "omega"},
-    )
-    bad_problem = replace(
-        problem,
-        proof_statuses=(bad_status, *problem.proof_statuses[1:]),
-    )
-
-    with pytest.raises(ValueError, match="unknown state axes"):
-        validate_viewer_verification_contract(SPECS, (bad_problem,))
+    with pytest.raises(ValueError, match="must cover every region"):
+        validate_viewer_verification_problems((bad_problem,))
 
 
 def test_registered_lens_requirements_match_system_specs() -> None:

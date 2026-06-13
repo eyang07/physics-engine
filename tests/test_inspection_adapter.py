@@ -310,12 +310,13 @@ def test_report_rejects_discharge_claims(tmp_path) -> None:
 def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
     problem = upright_pendulum_problem()
     assert problem.id == "upright-pendulum-safety"
-    assert problem.system == "pendulum"
+    # Self-contained: the verification world names no gallery system.
+    assert problem.system is None
 
     payload = problem.to_dict()
     assert payload["schemaVersion"] == "verification-problem/v3"
-    assert payload["system"] == "pendulum"
-    assert payload["metadata"]["system"] == "pendulum"
+    assert payload["system"] is None
+    assert "system" not in payload["metadata"]
     assert payload["metadata"]["verificationModel"] == "controlled-pendulum-closed-loop"
     assert len(payload["regionGeometry"]) == len(payload["regions"])
     assert len(payload["proofStatuses"]) == len(payload["obligations"])
@@ -329,8 +330,8 @@ def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
     assert safe_geometry["projection"] == "phase"
     assert safe_geometry["plane"] == {
         "variables": ["theta", "omega"],
-        "stateAxes": ["theta", "theta_dot"],
-        "variableToStateAxis": {"theta": "theta", "omega": "theta_dot"},
+        "stateAxes": ["theta", "omega"],
+        "variableToStateAxis": {"theta": "theta", "omega": "omega"},
     }
     assert safe_geometry["kind"] == "scalar-field-grid"
     assert safe_geometry["rigor"] == "measured"
@@ -374,11 +375,11 @@ def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
     assert non_increase_status["regionId"] == "domain-energy-barrier-region"
     assert non_increase_status["comparison"] == "<="
     assert non_increase_status["evaluation"]["kind"] == "region-grid"
-    assert non_increase_status["evaluation"]["system"] == "pendulum"
+    assert "system" not in non_increase_status["evaluation"]
     assert non_increase_status["evaluation"]["sampleCount"] > 0
     assert non_increase_status["evaluation"]["variableToStateAxis"] == {
         "theta": "theta",
-        "omega": "theta_dot",
+        "omega": "omega",
     }
     assert "worst" in non_increase_status
 
@@ -390,7 +391,7 @@ def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
     assert (tmp_path / "upright-pendulum-safety.inspection-outcome.json").exists()
 
 
-def test_generate_verification_problems_writes_cross_linked_index(tmp_path) -> None:
+def test_generate_verification_problems_writes_self_contained_index(tmp_path) -> None:
     generated_dir = tmp_path / "generated"
     viewer_dir = tmp_path / "viewer"
 
@@ -405,7 +406,7 @@ def test_generate_verification_problems_writes_cross_linked_index(tmp_path) -> N
     )
     index = json.loads((viewer_dir / "index.json").read_text(encoding="utf-8"))
 
-    assert payload["system"] == "pendulum"
+    assert payload["system"] is None
     assert payload["regionGeometry"]
     assert payload["proofStatuses"]
     assert {status["status"] for status in payload["proofStatuses"]} <= {
@@ -413,7 +414,26 @@ def test_generate_verification_problems_writes_cross_linked_index(tmp_path) -> N
         "measured-violated",
         "external-required",
     }
-    assert index["problems"][0]["system"] == "pendulum"
+
+    # The embedded controlled trajectory the Verification world animates, with
+    # candidate-certificate series along the same system the obligations describe.
+    trajectory = payload["trajectory"]
+    assert trajectory["stateNames"] == ["theta", "omega"]
+    assert len(trajectory["time"]) == len(trajectory["states"]) > 0
+    assert set(trajectory["series"]) == {
+        "certificate_energy_barrier_value",
+        "certificate_energy_barrier_flow_derivative",
+    }
+    assert {record["kind"] for record in trajectory["certificateSeries"]} == {
+        "candidate-value",
+        "flow-derivative",
+    }
+    # Starts near upright (theta = pi) inside the initial set and the controller
+    # holds it there, so the path never approaches the unsafe bottom.
+    assert abs(trajectory["states"][0][0] - float(sp.pi)) < 0.3
+    assert abs(trajectory["states"][-1][0] - float(sp.pi)) < 0.05
+
+    assert index["problems"][0]["model"] == "controlled-pendulum-closed-loop"
     assert index["problems"][0]["dataPath"] == (
         "/data/verification/upright-pendulum-safety.json"
     )
