@@ -19,6 +19,12 @@ import { drawPhaseScene, drawPotentialContourScene, drawPotentialScene } from ".
 import { StructurePanel } from "./structurePanel";
 import { DiagnosticsPanel } from "./diagnosticsPanel";
 import { drawWavefrontScene } from "./wavefrontCanvas";
+import { VerificationPanel } from "./verificationPanel";
+import {
+  loadVerificationIndex,
+  loadVerificationProblem,
+  type VerificationProblemSummary,
+} from "./data/verification";
 import "./styles.css";
 
 type CanvasMode =
@@ -68,6 +74,8 @@ const aboutButton = requireElement<HTMLButtonElement>("#aboutButton");
 const aboutDialog = requireElement<HTMLDialogElement>("#aboutDialog");
 const aboutClose = requireElement<HTMLButtonElement>("#aboutClose");
 const systemCatalog = requireElement<HTMLElement>("#systemCatalog");
+const verificationCatalog = requireElement<HTMLElement>("#verificationCatalog");
+const verificationContent = requireElement<HTMLElement>("#verificationContent");
 const canvas = requireElement<HTMLCanvasElement>("#scene");
 const threeCanvas = requireElement<HTMLCanvasElement>("#hamiltonianScene");
 const systemTitle = requireElement<HTMLElement>("#systemTitle");
@@ -93,6 +101,7 @@ const threeScene = new ThreeScene(threeCanvas);
 const trajectorySource = new StaticSource();
 const structurePanel = new StructurePanel(principlesPanel, invariantsPanel, parametersPanel, loopPhaseArc);
 const diagnosticsPanel = new DiagnosticsPanel(diagnosticsSection, diagnosticsPanel_);
+const verificationPanel = new VerificationPanel(verificationContent);
 const clock = new PlaybackClock();
 
 type Domain = "systems" | "verification";
@@ -103,6 +112,8 @@ let selectedExample: SystemManifest | null = null;
 let selectedVisualization: ManifestLens | null = null;
 let trajectory: Trajectory | null = null;
 let pendulumBounds: Bounds | null = null;
+let verificationProblems: VerificationProblemSummary[] = [];
+let selectedProblemId: string | null = null;
 
 function syncPlayButton() {
   const duration = trajectory ? trajectoryDuration(trajectory) : 0;
@@ -202,6 +213,53 @@ function updateCatalogActive() {
   });
 }
 
+function renderVerificationCatalog() {
+  verificationCatalog.replaceChildren();
+  verificationProblems.forEach((problem) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "catalog-item";
+    button.dataset.problemId = problem.id;
+    button.classList.toggle("catalog-item--active", problem.id === selectedProblemId);
+    const subtitle = problem.system ?? problem.status;
+    button.innerHTML = `
+      <span class="catalog-item__category">${subtitle}</span>
+      <strong>${problem.name}</strong>
+    `;
+    button.addEventListener("click", () => {
+      void selectVerificationProblem(problem.id);
+    });
+    verificationCatalog.append(button);
+  });
+}
+
+function updateVerificationCatalogActive() {
+  verificationCatalog.querySelectorAll<HTMLButtonElement>(".catalog-item").forEach((item) => {
+    item.classList.toggle("catalog-item--active", item.dataset.problemId === selectedProblemId);
+  });
+}
+
+async function selectVerificationProblem(problemId: string) {
+  const summary = verificationProblems.find((problem) => problem.id === problemId);
+  if (!summary) {
+    return;
+  }
+  selectedProblemId = summary.id;
+  updateVerificationCatalogActive();
+  try {
+    const problem = await loadVerificationProblem(summary.dataPath);
+    // A stale click (the user moved on) should not overwrite the newer problem.
+    if (selectedProblemId === summary.id) {
+      verificationPanel.render(problem);
+    }
+  } catch (error) {
+    console.warn("Verification problem unavailable:", error);
+    verificationPanel.renderEmpty(
+      `Could not load ${summary.name}. Regenerate with "python -m scripts.generate_verification_problems".`,
+    );
+  }
+}
+
 function renderVisualizationButtons() {
   visualizationModes.replaceChildren();
   if (!selectedExample || !selectedVisualization) {
@@ -257,6 +315,9 @@ function setDomain(domain: Domain) {
   if (systemsActive) {
     resize2dCanvas();
     threeScene.resize();
+  } else if (selectedProblemId === null && verificationProblems.length > 0) {
+    // Lazily load the first problem the first time the domain is opened.
+    void selectVerificationProblem(verificationProblems[0].id);
   }
 }
 
@@ -378,6 +439,19 @@ async function initialize() {
     }
   } catch (error) {
     console.warn("Manifest preload failed:", error);
+  }
+
+  await initializeVerification();
+}
+
+async function initializeVerification() {
+  const index = await loadVerificationIndex();
+  verificationProblems = index.problems;
+  renderVerificationCatalog();
+  if (verificationProblems.length === 0) {
+    verificationPanel.renderEmpty(
+      'No verification problems found. Generate them with "python -m scripts.generate_verification_problems".',
+    );
   }
 }
 

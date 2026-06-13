@@ -202,9 +202,15 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-variable-speed-wavefront.png`) });
 
-    // The hard top-level domain menu swaps to the Verification workbench and back.
+    // The hard top-level domain menu swaps to the Verification workbench, which
+    // renders the exported verification-problem IR read-only.
     await page.getByRole("button", { name: "Verification" }).click();
     await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationContent .verif-doc");
+    await expect(
+      page.getByRole("heading", { name: /upright pendulum safety/i }),
+    ).toBeVisible();
+    await expect(page.getByText("external-required").first()).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification.png`) });
     await page.getByRole("button", { name: "Systems" }).click();
     await page.waitForSelector("#systemsDomain.domain--active");

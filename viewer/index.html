@@ -77,18 +77,13 @@
       </section>
 
       <section id="verificationDomain" class="domain" aria-label="Verification workbench" hidden>
-        <div class="domain-stub">
-          <p class="eyebrow">Verification</p>
-          <h1>Proof obligations &amp; certificate candidates</h1>
-          <p class="domain-stub__copy">
-            The backend now generates controlled dynamics, safe/unsafe sets,
-            Lyapunov and barrier certificate candidates, and backend-agnostic
-            proof obligations. A read-only inspector for these verification
-            problems — model, control and disturbance channels, candidate
-            certificates, and their linked obligations, each labeled honestly by
-            rigor — lands here next.
-          </p>
-        </div>
+        <aside class="catalog" aria-label="Verification problems">
+          <p class="control-label">problems</p>
+          <div id="verificationCatalog" class="system-catalog"></div>
+        </aside>
+        <section class="verif-stage" aria-label="Verification problem">
+          <div id="verificationContent" class="verif-content"></div>
+        </section>
       </section>
     </main>
 

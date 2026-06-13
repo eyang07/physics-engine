@@ -7,6 +7,7 @@ build/
 
 data/generated/
 viewer/public/data/*.json
+viewer/public/data/verification/
 viewer/node_modules/
 viewer/dist/
 viewer/test-results/
