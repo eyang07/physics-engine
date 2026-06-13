@@ -80,6 +80,10 @@ for (const viewport of [
     // the diagnostics panel shows a conservation-drift lane on boot.
     await expect(page.locator("#diagnostics .diagnostic__residual").first()).toBeVisible();
 
+    // It also links a barrier candidate, so the diagnostics panel shows the
+    // candidate value and flow-derivative certificate lanes sampled along the run.
+    await expect(page.locator("#diagnostics .diagnostic__certificate")).toHaveCount(2);
+
     // The pendulum links to a verification problem: the cross-link button is
     // present and the safety-region overlay toggle rides on its phase lens.
     await expect(page.locator("#verificationLink")).toBeVisible();
@@ -270,6 +274,11 @@ for (const viewport of [
     await expect(
       page.getByRole("heading", { name: /upright pendulum safety/i }),
     ).toBeVisible();
+
+    // The measured proof-status surface renders sampled obligation outcomes,
+    // honestly labeled (a clean sample is evidence, never a discharge).
+    await expect(page.getByRole("heading", { name: /measured status/i })).toBeVisible();
+    await expect(page.locator(".verif-status").first()).toBeVisible();
 
     // Verification -> Systems: the "Open system" link returns to the pendulum.
     await page.getByRole("button", { name: /open system/i }).click();

@@ -174,6 +174,39 @@ export type InvariantResidual = {
   scale?: number;
 };
 
+/**
+ * One obligation threshold a candidate series is read against, exported in each
+ * `metadata.certificateSeries[].comparisonBaselines` entry. The comparison and
+ * rhs come straight from the verification obligation; the viewer draws the
+ * threshold but renders no pass/fail verdict here (that is the proof-status
+ * surface's measured job).
+ */
+export type CertificateComparisonBaseline = {
+  obligationId: string;
+  comparison: string;
+  rhs: number;
+  regionId?: string;
+};
+
+/**
+ * A candidate certificate sampled along the trajectory, exported in
+ * `metadata.certificateSeries`. `series` names the column in `trajectory.series`
+ * (the value `B(x(t))` or its flow derivative). The numbers are measured
+ * evidence along one run — never a proof; the engine keeps obligations
+ * `external-required`.
+ */
+export type CertificateSeries = {
+  problemId?: string;
+  candidateId?: string;
+  /** "candidate-value" | "flow-derivative". */
+  kind: string;
+  label?: string;
+  /** Series key in `trajectory.series`. */
+  series: string;
+  obligationIds: string[];
+  comparisonBaselines: CertificateComparisonBaseline[];
+};
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
 }
@@ -226,6 +259,54 @@ export function invariantResiduals(trajectory: Trajectory): InvariantResidual[] 
         rms: asNumber(record.rms),
         maxRelative: asNumber(record.maxRelative),
         scale: asNumber(record.scale),
+      },
+    ];
+  });
+}
+
+/** Read the candidate-certificate series Python attached to the trajectory. */
+export function certificateSeries(trajectory: Trajectory): CertificateSeries[] {
+  const raw = trajectory.metadata?.certificateSeries;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.flatMap((item) => {
+    const record = asRecord(item);
+    if (!record || typeof record.series !== "string") {
+      return [];
+    }
+    const baselines = Array.isArray(record.comparisonBaselines)
+      ? record.comparisonBaselines.flatMap((entry) => {
+          const baseline = asRecord(entry);
+          if (
+            !baseline ||
+            typeof baseline.obligationId !== "string" ||
+            typeof baseline.comparison !== "string" ||
+            typeof baseline.rhs !== "number"
+          ) {
+            return [];
+          }
+          return [
+            {
+              obligationId: baseline.obligationId,
+              comparison: baseline.comparison,
+              rhs: baseline.rhs,
+              regionId: typeof baseline.regionId === "string" ? baseline.regionId : undefined,
+            },
+          ];
+        })
+      : [];
+    return [
+      {
+        problemId: typeof record.problemId === "string" ? record.problemId : undefined,
+        candidateId: typeof record.candidateId === "string" ? record.candidateId : undefined,
+        kind: typeof record.kind === "string" ? record.kind : "candidate-value",
+        label: typeof record.label === "string" ? record.label : undefined,
+        series: record.series,
+        obligationIds: Array.isArray(record.obligationIds)
+          ? record.obligationIds.filter((id): id is string => typeof id === "string")
+          : [],
+        comparisonBaselines: baselines,
       },
     ];
   });

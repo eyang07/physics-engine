@@ -43,6 +43,16 @@ and trajectory data; it must not re-derive physics.
   `regionGeometry` scalar fields, color-coded by role and honoring each set's
   `convention` — beneath the trajectory. The viewer shades the exported grids
   only; it never evaluates the symbolic sets.
+- Measured certificate diagnostics. When a system links a verification problem,
+  the diagnostics panel adds candidate-certificate lanes — the barrier/Lyapunov
+  value `B(x(t))` and its flow derivative, read from the exported
+  `metadata.certificateSeries` and drawn against the obligation threshold (e.g.
+  `\dot B \le 0`), qualitatively and with no decimals. The Verification document
+  adds a "Measured status" surface rendering the problem's `proofStatuses`:
+  per-obligation sampled outcomes (`holds`/`violated`/`not sampled`) with the
+  evaluation source, sample count, and worst sample. Both surfaces stay honest —
+  a clean sample is evidence, never a discharge, and every obligation remains
+  `external-required`.
 - Three.js scenes for configuration-space, phase-space, orbit, field, spring,
   and attractor views.
 - Renderer-hint-based camera framing and a fit-to-system reset control.
@@ -79,5 +89,11 @@ The Vite main-bundle chunk-size warning is known and non-fatal.
 
 ## Next Work
 
-1. Later, add candidate certificate values along trajectories and a proof-status
-   surface once backend metadata is exported through the manifest.
+1. Generalize the safety surfaces beyond the single `pendulum` ↔
+   `upright-pendulum-safety` pair as the backend links more systems: the region
+   overlay is currently specific to the pendulum phase lens, and the certificate
+   lanes assume a 2-D phase projection. Drive both from the linked problem's
+   declared projection/state axes instead.
+2. Once a `proofStatuses` record reports `measured-violated`, surface where on
+   the stage the violating sample sits (e.g. mark the unsafe-set entry alongside
+   the trajectory) rather than only listing it in the Verification document.

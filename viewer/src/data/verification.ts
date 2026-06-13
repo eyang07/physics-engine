@@ -107,6 +107,32 @@ export interface IrCandidate {
   obligationIds: string[];
 }
 
+/**
+ * A measured status record for one obligation evaluation surface, exported in
+ * `proofStatuses`. The backend sampled the obligation inequality somewhere (a
+ * region grid, a trajectory) and recorded whether the samples satisfied it.
+ * This is sampled evidence only: `externalStatus` stays `external-required`
+ * regardless of `status`, and the engine never claims a proof or certificate.
+ */
+export type ProofStatusKind = "measured-holds" | "measured-violated" | "external-required" | string;
+
+export interface ProofStatus {
+  id: string;
+  obligationId: string;
+  status: ProofStatusKind;
+  rigor: string;
+  externalStatus: string;
+  comparison: string;
+  rhs: number;
+  candidateId: string | null;
+  regionId: string | null;
+  evaluationKind: string;
+  sampleCount: number;
+  source: string | null;
+  worstValue: number | null;
+  note: string | null;
+}
+
 export interface IrAssumption {
   id: string;
   description: string | null;
@@ -142,6 +168,7 @@ export interface VerificationProblem {
   assumptions: IrAssumption[];
   obligations: IrObligation[];
   candidates: IrCandidate[];
+  proofStatuses: ProofStatus[];
   dynamics: IrDynamics | null;
   metadata: Record<string, unknown>;
 }
@@ -321,6 +348,31 @@ function parseCandidate(value: unknown): IrCandidate | null {
   };
 }
 
+function parseProofStatus(value: unknown): ProofStatus | null {
+  const record = asRecord(value);
+  if (!record || typeof record.id !== "string" || typeof record.obligationId !== "string") {
+    return null;
+  }
+  const evaluation = asRecord(record.evaluation) ?? {};
+  const worst = asRecord(record.worst);
+  return {
+    id: record.id,
+    obligationId: record.obligationId,
+    status: asString(record.status, "external-required"),
+    rigor: asString(record.rigor, "measured"),
+    externalStatus: asString(record.externalStatus, "external-required"),
+    comparison: asString(record.comparison),
+    rhs: asOptionalNumber(record.rhs) ?? 0,
+    candidateId: asOptionalString(record.candidateId),
+    regionId: asOptionalString(record.regionId),
+    evaluationKind: asString(evaluation.kind),
+    sampleCount: asOptionalNumber(evaluation.sampleCount) ?? 0,
+    source: asOptionalString(evaluation.source),
+    worstValue: worst ? asOptionalNumber(worst.value) : null,
+    note: asOptionalString(record.note),
+  };
+}
+
 function parseAssumption(value: unknown): IrAssumption | null {
   const record = asRecord(value);
   if (!record || typeof record.id !== "string") {
@@ -394,6 +446,7 @@ export function parseVerificationProblem(raw: unknown): VerificationProblem {
     assumptions: parseArray(record.assumptions, parseAssumption),
     obligations: parseArray(record.obligations, parseObligation),
     candidates: parseArray(record.candidates, parseCandidate),
+    proofStatuses: parseArray(record.proofStatuses, parseProofStatus),
     dynamics: parseDynamics(record.dynamics),
     metadata: asRecord(record.metadata) ?? {},
   };

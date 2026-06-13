@@ -11,6 +11,7 @@ import katex from "katex";
 import type {
   IrObligation,
   IrRegion,
+  ProofStatus,
   RegionRole,
   VerificationProblem,
 } from "./data/verification";
@@ -41,6 +42,21 @@ const RIGOR_GLOSS: Record<string, string> = {
   candidate: "candidate — not certified",
 };
 
+// Measured proof-status outcomes, surfaced honestly: a clean sample is
+// evidence, never a discharge. The obligation always still awaits external
+// proof regardless of what the samples showed.
+const PROOF_STATUS_LABEL: Record<string, string> = {
+  "measured-holds": "holds on samples",
+  "measured-violated": "violated on samples",
+  "external-required": "not sampled",
+};
+
+const PROOF_STATUS_GLOSS: Record<string, string> = {
+  "measured-holds": "sampled values satisfied the obligation — measured evidence, not a proof",
+  "measured-violated": "at least one sample violated the obligation",
+  "external-required": "no measured samples; awaiting external discharge",
+};
+
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className?: string,
@@ -64,6 +80,18 @@ function mathSpan(latex: string, displayMode = false): HTMLElement {
 
 function formatNumber(value: number): string {
   return String(value);
+}
+
+// Compact rendering for a measured sample value: a few significant figures,
+// trailing zeros trimmed, so a worst-case sample reads cleanly.
+function formatMeasured(value: number): string {
+  if (!Number.isFinite(value)) {
+    return String(value);
+  }
+  if (value === 0) {
+    return "0";
+  }
+  return Number(value.toPrecision(3)).toString();
 }
 
 function section(title: string): HTMLElement {
@@ -116,6 +144,9 @@ export class VerificationPanel {
     }
     if (problem.obligations.length > 0) {
       root.append(this.renderObligations(problem));
+    }
+    if (problem.proofStatuses.length > 0) {
+      root.append(this.renderProofStatuses(problem));
     }
     if (problem.assumptions.length > 0) {
       root.append(this.renderAssumptions(problem));
@@ -298,6 +329,73 @@ export class VerificationPanel {
       card.append(el("p", "verif-card__desc", obligation.description));
     }
     return card;
+  }
+
+  // Measured proof-status surface: where the backend sampled each obligation
+  // and whether those samples satisfied it. Honest by construction — every row
+  // reiterates that external discharge is still required, so a clean sample is
+  // never mistaken for a proof.
+  private renderProofStatuses(problem: VerificationProblem): HTMLElement {
+    const node = section("Measured status");
+    const intro = el(
+      "p",
+      "verif-meta",
+      "Sampled evidence only — a clean sample is not a proof. Every obligation still awaits external discharge.",
+    );
+    node.append(intro);
+
+    const obligationName = new Map(problem.obligations.map((obligation) => [obligation.id, obligation.name]));
+    const regionName = new Map(problem.regions.map((region) => [region.id, region.name]));
+    const list = el("div", "verif-cards");
+    problem.proofStatuses.forEach((status) => {
+      list.append(this.proofStatusCard(status, obligationName, regionName));
+    });
+    node.append(list);
+    return node;
+  }
+
+  private proofStatusCard(
+    status: ProofStatus,
+    obligationName: Map<string, string>,
+    regionName: Map<string, string>,
+  ): HTMLElement {
+    const card = el("div", "verif-card");
+    const head = el("div", "verif-card__head");
+    head.append(el("strong", "verif-card__name", obligationName.get(status.obligationId) ?? status.obligationId));
+    head.append(this.proofStatusBadge(status.status));
+    card.append(head);
+
+    const where: string[] = [];
+    if (status.regionId) {
+      where.push(`on ${regionName.get(status.regionId) ?? status.regionId}`);
+    }
+    if (status.evaluationKind) {
+      where.push(status.evaluationKind);
+    }
+    if (status.sampleCount > 0) {
+      where.push(`${status.sampleCount} samples`);
+    }
+    if (where.length > 0) {
+      card.append(el("p", "verif-card__meta", where.join(" · ")));
+    }
+
+    if (status.worstValue !== null) {
+      const worst = el("p", "verif-card__meta");
+      const sense = status.status === "measured-violated" ? "worst (violating) sample" : "worst sample";
+      worst.textContent = `${sense}: ${formatMeasured(status.worstValue)}`;
+      card.append(worst);
+    }
+
+    // The standing obligation: measured outcome never changes this.
+    card.append(el("p", "verif-card__desc", `Still ${status.externalStatus}.`));
+    return card;
+  }
+
+  private proofStatusBadge(status: string): HTMLElement {
+    const label = PROOF_STATUS_LABEL[status] ?? status;
+    const badge = el("span", `verif-status verif-status--${status.replace(/[^a-z-]/gi, "-")}`, label);
+    badge.title = PROOF_STATUS_GLOSS[status] ?? status;
+    return badge;
   }
 
   private renderAssumptions(problem: VerificationProblem): HTMLElement {
