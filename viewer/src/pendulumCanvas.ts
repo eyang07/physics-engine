@@ -175,6 +175,7 @@ function drawRegionOverlay(
     ...regions.filter((region) => !ROLE_DRAW_ORDER.includes(region.role)),
   ];
 
+  // Pass 1: translucent grid fills, layered by role.
   ordered.forEach((region) => {
     const { x, y, values } = region.grid;
     if (x.length < 2 || y.length < 2 || values.length === 0) {
@@ -195,6 +196,30 @@ function drawRegionOverlay(
         ctx.fillRect(x0, Math.min(y0, y1), Math.max(1, x1 - x0), Math.max(1, Math.abs(y0 - y1)));
       }
     }
+  });
+
+  // Pass 2: crisp level-set outlines on top of every fill, so an inner unsafe
+  // boundary stays legible where the domain wash overlaps it.
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = "round";
+  ordered.forEach((region) => {
+    if (region.boundaryPolylines.length === 0) {
+      return;
+    }
+    ctx.strokeStyle = `rgba(${ROLE_RGB[region.role] ?? ROLE_RGB.domain}, 0.9)`;
+    region.boundaryPolylines.forEach((polyline) => {
+      ctx.beginPath();
+      polyline.forEach(([px, py], index) => {
+        const sx = mapX(px);
+        const sy = mapY(py);
+        if (index === 0) {
+          ctx.moveTo(sx, sy);
+        } else {
+          ctx.lineTo(sx, sy);
+        }
+      });
+      ctx.stroke();
+    });
   });
   ctx.restore();
 }

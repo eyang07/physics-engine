@@ -76,6 +76,8 @@ export interface RegionGeometry {
   projection: string;
   plane: RegionGeometryPlane;
   grid: RegionGeometryGrid;
+  /** Backend-traced level-set outlines, each a polyline of `[x, y]` plane points. */
+  boundaryPolylines: Array<Array<[number, number]>>;
   level: number | null;
   convention: string | null;
 }
@@ -239,6 +241,23 @@ function parseRegion(value: unknown): IrRegion | null {
   };
 }
 
+function parsePolylines(value: unknown): Array<Array<[number, number]>> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((line) => {
+    if (!Array.isArray(line)) {
+      return [];
+    }
+    const points = line.flatMap((point): [number, number][] =>
+      Array.isArray(point) && typeof point[0] === "number" && typeof point[1] === "number"
+        ? [[point[0], point[1]]]
+        : [],
+    );
+    return points.length >= 2 ? [points] : [];
+  });
+}
+
 function parseRegionGeometry(value: unknown): RegionGeometry | null {
   const record = asRecord(value);
   if (!record || typeof record.regionId !== "string") {
@@ -262,6 +281,7 @@ function parseRegionGeometry(value: unknown): RegionGeometry | null {
       y: asNumberArray(grid.y),
       values,
     },
+    boundaryPolylines: parsePolylines(record.boundaryPolylines),
     level: asOptionalNumber(record.level),
     convention: asOptionalString(record.convention),
   };
