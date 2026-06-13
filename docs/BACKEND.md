@@ -169,9 +169,14 @@ ignored and should not be committed.
 
 ## Next Work
 
-1. Continue hardening backend verification foundations: richer target-specific
+1. Link a second controlled system end-to-end (region geometry, certificate
+   trajectory series, and `proofStatuses`) so the viewer's safety surfaces can
+   generalize beyond the single `upright-pendulum-safety` ↔ `pendulum` pair.
+   Promoting the backend-only controlled pendulum into the gallery is the
+   natural candidate.
+2. Continue hardening backend verification foundations: richer target-specific
    adapter checks and robustness tests before adding more case-study breadth.
-2. Extend parameter variants beyond Lorenz once the viewer has clear behavior
+3. Extend parameter variants beyond Lorenz once the viewer has clear behavior
    for backend-generated variants.
-3. Keep backend-only geodesic exploration outside the gallery until the viewer
+4. Keep backend-only geodesic exploration outside the gallery until the viewer
    can render the geometry honestly.

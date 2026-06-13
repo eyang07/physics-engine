@@ -82,8 +82,11 @@ Each stage is a deliberate artifact, not a side effect. The first three stages
 exist today for several example systems. Continuous controlled dynamics,
 certificate candidates, proof obligations, a backend-agnostic
 verification-problem IR, and a stub inspection adapter that writes problems out
-for external inspection also exist in backend form. Real external verification
-backends and actual proof discharge remain roadmap items.
+for external inspection also exist in backend form, and the first linked pair
+(`pendulum` ↔ `upright-pendulum-safety`) now surfaces its safe/unsafe geometry,
+candidate-certificate values, and a measured proof-status view in the viewer.
+Real external verification backends and actual proof discharge remain roadmap
+items.
 
 ## 5. Target Domain: Mechanics-Based CPS and Robotics
 
@@ -166,14 +169,20 @@ dynamics `dx/dt = f(t, x, u, d; θ)` with box-shaped admissible control and
 disturbance sets, closed-loop reduction, and deterministic rollouts
 (backend-only). It also implements backend-only safe/unsafe sublevel sets,
 candidate Lyapunov/barrier functions, proof obligations, measured sampled
-checks, and verification-problem IR v2 (continuous and discrete dynamics,
-control/disturbance channels, explicit assumptions, candidate certificates).
-The discrete-time analogue
+checks, and verification-problem IR v3 (continuous and discrete dynamics,
+control/disturbance channels, explicit assumptions, candidate certificates,
+plus viewer-facing exports: a manifest `system` cross-reference, measured
+`regionGeometry` grids and boundary polylines, time-aligned candidate
+certificate series, and sampled `proofStatuses`). The discrete-time analogue
 `x_{k+1} = F(k, x_k, u_k, d_k; θ)` now exists backend-only
 (`engine/dynamics/discrete.py`, spec in `docs/discrete-dynamics.md`) with
 closed-loop reduction, deterministic rollouts, and Euler discretization of
-autonomous continuous systems. It does **not** yet implement real certificate
-synthesis, proof discharge, validated numerics, or frontend safety surfaces.
+autonomous continuous systems. Frontend safety surfaces now exist for the first
+linked `pendulum` ↔ `upright-pendulum-safety` pair — a phase-plane
+safe/unsafe-set overlay, candidate-certificate diagnostic lanes, and a measured
+proof-status surface. It does **not** yet implement real certificate synthesis,
+proof discharge, or validated numerics, and the safety surfaces do not yet
+generalize beyond that single pair.
 
 A specific distinction to preserve: the existing **finite-time Lyapunov exponent**
 diagnostic (`engine/dynamics/diagnostics.py`) measures sensitive dependence /
@@ -266,18 +275,27 @@ In priority order:
    remain open.*
 3. **Verification-problem IR.** Define and serialize the IR above, even if
    the only adapter is a stub that writes the problem out for inspection.
-   *Status: v2 implemented backend-only (`engine/verification/`, spec in
+   *Status: v3 implemented (`engine/verification/`, spec in
    `docs/verification-ir.md`) with continuous and discrete dynamics,
-   control/disturbance channels, explicit assumptions, and first-class
-   candidate certificates, plus the stub inspection adapter
-   (`engine/verification/inspection_adapter.py`); visualization hooks, real
-   external backends, and proof discharge remain open.*
+   control/disturbance channels, explicit assumptions, first-class candidate
+   certificates, the stub inspection adapter
+   (`engine/verification/inspection_adapter.py`), and viewer-facing
+   visualization hooks: a manifest `system` cross-reference, measured
+   `regionGeometry` grids/boundary polylines, candidate certificate trajectory
+   series, and sampled `proofStatuses`. Real external backends and proof
+   discharge remain open.*
 4. **Backend robustness before deeper case studies.** Keep strengthening the
    IR, assumptions, safety metadata, deterministic exports, and validation so a
    future controlled case study is mostly composition rather than invention.
 5. **Frontend safety surfaces.** Safe/unsafe-set rendering, certificate-value
    display, and a proof-status panel that respects the rigor ladder (showing
    "candidate" / "measured" honestly).
+   *Status: implemented for the first linked `pendulum` ↔
+   `upright-pendulum-safety` pair — a phase-plane safe/unsafe-set overlay,
+   candidate-certificate diagnostic lanes drawn against the obligation
+   thresholds, and a measured proof-status surface, all labeled honestly by
+   rigor. Generalizing these surfaces beyond the single pair (driven by each
+   problem's declared projection/state axes) is the next step.*
 
 External verification integrations come *after* controlled dynamics and IR
 exist — not before. Building serious adapters against an unstable model would be

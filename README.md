@@ -28,17 +28,26 @@ diagnostics, controlled dynamics, safety metadata, and verification artifacts.
   - Candidate generation: quadratic Lyapunov candidates from a Hurwitz
     linearization, sublevel barrier candidates, and measured level
     suggestions — proposals only, never certification.
-  - Backend-agnostic verification-problem IR v2 encoding continuous and
+  - Backend-agnostic verification-problem IR v3 encoding continuous and
     discrete dynamics, control/disturbance channels, explicit assumptions,
-    candidate certificates, and obligations for external
-    inspection/discharge, plus a stub inspection adapter that writes canonical
-    problem JSON and a human-readable report. The engine does not certify or
-    prove safety.
+    candidate certificates, and obligations for external inspection/discharge,
+    plus a stub inspection adapter that writes canonical problem JSON and a
+    human-readable report. Viewer-facing exports add a manifest `system`
+    cross-reference, measured `regionGeometry` scalar-field grids and boundary
+    polylines for safe/unsafe/initial/domain sets, time-aligned candidate
+    certificate series along a linked trajectory, and sampled `proofStatuses`.
+    All of it is measured evidence: the engine does not certify or prove safety.
 - Viewer:
-  - Vite/TypeScript app with gallery navigation, playback controls, structure
-    panels, invariant lanes, 2D canvas lenses, and Three.js scenes.
-  - Dedicated wavefront/ray-bundle lens and fit-to-system camera reset for
-    renderer-hint-backed scenes.
+  - Two-domain Vite/TypeScript workbench — a Systems domain (catalog, stage,
+    inspector) and a Verification domain — with playback controls, structure
+    panels, invariant lanes, diagnostics, 2D canvas lenses, and Three.js scenes.
+  - A read-only verification inspector for the exported IR, with a measured
+    proof-status surface, and Systems↔Verification cross-link navigation.
+  - Safety surfaces for the linked pendulum pair: a phase-plane safe/unsafe-set
+    overlay and candidate-certificate diagnostics lanes, all honestly labeled by
+    rigor and never recomputing physics in TypeScript.
+  - A full-stage Poincaré-section lens, a wavefront/ray-bundle lens, and
+    fit-to-system camera reset for renderer-hint-backed scenes.
 
 ## Repository Layout
 
@@ -121,8 +130,11 @@ backend and viewer baseline for broad changes or release-style checks.
 
 ## Direction
 
-The near-term backend direction is to harden the verification IR, safety
-metadata, assumptions, and deterministic export contracts before adding more
-case-study breadth. The near-term frontend direction is to expose exported
-diagnostics and, later, safety/certificate metadata without recomputing physics
-in TypeScript.
+The viewer now renders exported safety/certificate metadata — region geometry,
+candidate-certificate series, and a measured proof-status surface — for the first
+linked `pendulum` ↔ `upright-pendulum-safety` pair. The near-term direction on
+both sides is to generalize those surfaces beyond that single pair: the backend
+linking a second controlled system with region geometry and certificate
+diagnostics, and the frontend driving the overlay and lanes from each problem's
+declared projection/state axes rather than the pendulum-specific assumptions.
+Real external verification backends and proof discharge remain roadmap items.
