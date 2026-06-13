@@ -49,7 +49,13 @@ natively discrete-time. Backend-only: no manifest, gallery, or viewer change.
    discrete non-increase obligations `V(F) - V <= 0` and `B(F) - B <= 0`.
    These remain external-required proof obligations; sampling them is still
    measured evidence only.
-8. **Deferred (out of v0):** exact/zero-order-hold discretization,
+8. **Controlled verification export preserves both models.** The
+   controlled-discrete verification helpers close the system under a symbolic
+   feedback law, derive obligations on that closed-loop map, and also export
+   the original controlled map as `openLoopDynamics` with its
+   control/disturbance bounds. The feedback law is metadata, not a proof
+   certificate.
+9. **Deferred (out of v0):** exact/zero-order-hold discretization,
    stochastic disturbances, discrete control synthesis, validated numerics,
    and proof discharge.
 
@@ -60,6 +66,9 @@ natively discrete-time. Backend-only: no manifest, gallery, or viewer change.
   `euler_discretization`, `DiscreteControlLaw`.
 - `engine/verification/system_codec.py` — verification-IR codecs for
   closed-loop and controlled discrete systems.
+- `engine/verification/safety_adapter.py` — closed-loop discrete and
+  controlled-discrete feedback export helpers for Lyapunov/barrier
+  obligations.
 - `engine/dynamics/safety.py` — discrete one-step differences and candidate
   proof obligations.
 - `engine/dynamics/__init__.py` — exports.
@@ -89,6 +98,10 @@ natively discrete-time. Backend-only: no manifest, gallery, or viewer change.
 7. **Discrete safety obligations (proven + measured).** The stable map
    `x_{k+1} = x_k/2` yields nonpositive one-step Lyapunov/barrier changes on
    sampled regions, while `x_{k+1} = 2 x_k` yields a counterexample.
+8. **Controlled verification export (proven on examples).** A controlled
+   discrete system with a symbolic feedback law serializes closed-loop
+   obligations, the open-loop bounded channels, and feedback-law metadata
+   deterministically.
 
 ## Verification commands
 
@@ -119,3 +132,10 @@ Updated 2026-06-13: discrete-time Lyapunov/barrier proof obligations are
 available through `LyapunovCandidate.discrete_proof_obligations` and
 `BarrierCandidate.discrete_proof_obligations`; focused tests pass with
 `pytest tests/test_safety_certificates.py tests/test_verification_ir.py tests/test_discrete_dynamics.py -q`.
+
+Updated 2026-06-13: controlled-discrete Lyapunov/barrier exports are
+available through
+`verification_problem_from_controlled_discrete_lyapunov` and
+`verification_problem_from_controlled_discrete_barrier`; focused tests pass
+with
+`pytest tests/test_verification_ir.py tests/test_inspection_adapter.py tests/test_safety_certificates.py tests/test_discrete_dynamics.py -q`.

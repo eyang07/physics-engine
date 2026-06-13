@@ -24,9 +24,11 @@ from engine.verification.ir import (
     VerificationProblem,
 )
 from engine.verification.safety_adapter import (
+    verification_problem_from_barrier,
+    verification_problem_from_controlled_discrete_barrier,
+    verification_problem_from_controlled_discrete_lyapunov,
     verification_problem_from_discrete_barrier,
     verification_problem_from_discrete_lyapunov,
-    verification_problem_from_barrier,
     verification_problem_from_lyapunov,
     verification_problem_from_obligations,
 )
@@ -63,6 +65,8 @@ __all__ = [
     "expression_spec",
     "render_inspection_markdown",
     "verification_problem_from_barrier",
+    "verification_problem_from_controlled_discrete_barrier",
+    "verification_problem_from_controlled_discrete_lyapunov",
     "verification_problem_from_discrete_barrier",
     "verification_problem_from_discrete_lyapunov",
     "verification_problem_from_lyapunov",

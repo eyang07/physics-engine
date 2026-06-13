@@ -5,7 +5,14 @@ import json
 import pytest
 import sympy as sp
 
-from engine.dynamics import DiscreteSystem, FirstOrderSystem, LyapunovCandidate, SublevelSet
+from engine.dynamics import (
+    Box,
+    ControlledDiscreteSystem,
+    DiscreteSystem,
+    FirstOrderSystem,
+    LyapunovCandidate,
+    SublevelSet,
+)
 from engine.verification import (
     ADAPTER_NAME,
     ARTIFACT_PROBLEM_JSON,
@@ -17,6 +24,7 @@ from engine.verification import (
     ObligationSpec,
     ParameterSpec,
     VariableSpec,
+    dynamics_spec_from_controlled_discrete,
     dynamics_spec_from_discrete,
     expression_spec,
     render_inspection_markdown,
@@ -102,8 +110,16 @@ def test_render_inspection_markdown_is_deterministic_and_honest() -> None:
 
 def test_render_inspection_markdown_handles_discrete_dynamics() -> None:
     x = sp.Symbol("x", real=True)
+    u = sp.Symbol("u", real=True)
     r = sp.Symbol("r", positive=True)
     system = DiscreteSystem(state=(x,), update=(r * x * (1 - x),), parameters=(r,))
+    controlled = ControlledDiscreteSystem(
+        state=(x,),
+        controls=(u,),
+        update=(r * x * (1 - x) + u,),
+        parameters=(r,),
+        control_bounds=Box(lower=(-1.0,), upper=(1.0,)),
+    )
     problem = VerificationProblem(
         id="logistic-map",
         name="logistic map",
@@ -121,12 +137,15 @@ def test_render_inspection_markdown_handles_discrete_dynamics() -> None:
             ),
         ),
         dynamics=dynamics_spec_from_discrete(system),
+        open_loop_dynamics=dynamics_spec_from_controlled_discrete(controlled),
     )
 
     text = render_inspection_markdown(problem)
 
     assert "- kind: discrete (step variable `k`)" in text
     assert "- `x_next = r*x*(1 - x)`" in text
+    assert "## Open-loop dynamics" in text
+    assert "- control `u` in [-1.0, 1.0]" in text
 
 
 def test_report_rejects_discharge_claims(tmp_path) -> None:

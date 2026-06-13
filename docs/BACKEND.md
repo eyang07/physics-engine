@@ -66,6 +66,10 @@ artifacts.
     control/disturbance channels, explicit assumptions, first-class candidate
     certificates locked to `status="candidate"`, and obligations labeled
     `rigor="external-required"`.
+  - Controlled-discrete Lyapunov/barrier verification exports that derive
+    obligations on the closed-loop map while preserving the original
+    open-loop controlled dynamics, admissible input bounds, and symbolic
+    feedback law metadata.
   - Stub inspection adapter (`engine/verification/inspection_adapter.py`) that
     consumes the IR and writes canonical problem JSON plus a human-readable
     inspection report, recording no proof results.
@@ -106,7 +110,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `270 passed`.
+Latest known result: `272 passed`.
 
 Use focused tests while iterating:
 
@@ -136,9 +140,9 @@ ignored and should not be committed.
 
 ## Next Work
 
-1. Harden backend verification foundations: explicit assumptions, IR
-   cross-reference validation, deterministic inspection artifacts, and focused
-   robustness tests before adding more case-study breadth.
+1. Harden backend verification foundations: typed verification-backend
+   diagnostics, machine-readable inspection outcomes, and focused robustness
+   tests before adding more case-study breadth.
 2. Extend parameter variants beyond Lorenz once the viewer has clear behavior
    for backend-generated variants.
 3. Keep backend-only geodesic exploration outside the gallery until the viewer

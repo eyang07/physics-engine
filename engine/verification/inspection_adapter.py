@@ -82,8 +82,12 @@ class InspectionAdapterReport:
         }
 
 
-def _dynamics_lines(dynamics: DynamicsSpec | None) -> list[str]:
-    lines = ["## Dynamics", ""]
+def _dynamics_lines(
+    dynamics: DynamicsSpec | None,
+    *,
+    title: str = "Dynamics",
+) -> list[str]:
+    lines = [f"## {title}", ""]
     if dynamics is None:
         lines.extend(["- not encoded in this problem", ""])
         return lines
@@ -206,6 +210,10 @@ def render_inspection_markdown(problem: VerificationProblem) -> str:
         lines.append("- none")
     lines.append("")
     lines.extend(_dynamics_lines(problem.dynamics))
+    if problem.open_loop_dynamics is not None:
+        lines.extend(
+            _dynamics_lines(problem.open_loop_dynamics, title="Open-loop dynamics")
+        )
     lines.extend(["## Regions", ""])
     if problem.regions:
         for region in problem.regions:

@@ -7,7 +7,8 @@ from typing import Any, Mapping, Sequence
 
 import sympy as sp
 
-from engine.dynamics.discrete import DiscreteSystem
+from engine.dynamics.controlled import ControlledFirstOrderSystem
+from engine.dynamics.discrete import ControlledDiscreteSystem, DiscreteSystem
 from engine.dynamics.first_order import FirstOrderSystem
 from engine.dynamics.safety import (
     BarrierCandidate,
@@ -28,6 +29,8 @@ from engine.verification.ir import (
 )
 from engine.verification.sympy_codec import expression_spec
 from engine.verification.system_codec import (
+    dynamics_spec_from_controlled,
+    dynamics_spec_from_controlled_discrete,
     dynamics_spec_from_discrete,
     dynamics_spec_from_system,
 )
@@ -126,18 +129,46 @@ def _parameter_assumptions(
     return tuple(assumptions)
 
 
-def _dynamics_spec(system: FirstOrderSystem | DiscreteSystem):
+ClosedSystem = FirstOrderSystem | DiscreteSystem
+OpenLoopSystem = ControlledFirstOrderSystem | ControlledDiscreteSystem
+
+
+def _dynamics_spec(system: ClosedSystem):
     if isinstance(system, DiscreteSystem):
         return dynamics_spec_from_discrete(system)
     return dynamics_spec_from_system(system)
 
 
-def _system_free_symbols(system: FirstOrderSystem | DiscreteSystem) -> set[sp.Symbol]:
+def _open_loop_dynamics_spec(system: OpenLoopSystem):
+    if isinstance(system, ControlledDiscreteSystem):
+        return dynamics_spec_from_controlled_discrete(system)
+    return dynamics_spec_from_controlled(system)
+
+
+def _system_free_symbols(system: ClosedSystem | OpenLoopSystem) -> set[sp.Symbol]:
     if isinstance(system, DiscreteSystem):
         free: set[sp.Symbol] = set()
         for expression in system.update:
             free.update(sp.sympify(expression).free_symbols)
         free.discard(system.step)
+        return free
+    if isinstance(system, ControlledDiscreteSystem):
+        free = set()
+        for expression in system.update:
+            free.update(sp.sympify(expression).free_symbols)
+        free -= set(system.state)
+        free -= set(system.controls)
+        free -= set(system.disturbances)
+        free.discard(system.step)
+        return free
+    if isinstance(system, ControlledFirstOrderSystem):
+        free = set()
+        for expression in system.rhs:
+            free.update(sp.sympify(expression).free_symbols)
+        free -= set(system.state)
+        free -= set(system.controls)
+        free -= set(system.disturbances)
+        free.discard(system.time)
         return free
 
     free = set()
@@ -147,11 +178,45 @@ def _system_free_symbols(system: FirstOrderSystem | DiscreteSystem) -> set[sp.Sy
     return free
 
 
+def _law_metadata(
+    control_law: Mapping[sp.Symbol, sp.Expr | float],
+    disturbance_law: Mapping[sp.Symbol, sp.Expr | float] | None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "control": {
+            symbol.name: expression_spec(sp.sympify(expression)).to_dict()
+            for symbol, expression in sorted(
+                control_law.items(),
+                key=lambda item: item[0].name,
+            )
+        }
+    }
+    if disturbance_law:
+        payload["disturbance"] = {
+            symbol.name: expression_spec(sp.sympify(expression)).to_dict()
+            for symbol, expression in sorted(
+                disturbance_law.items(), key=lambda item: item[0].name
+            )
+        }
+    return payload
+
+
+def _with_feedback_metadata(
+    metadata: Mapping[str, Any] | None,
+    control_law: Mapping[sp.Symbol, sp.Expr | float],
+    disturbance_law: Mapping[sp.Symbol, sp.Expr | float] | None,
+) -> dict[str, Any]:
+    payload = dict(metadata or {})
+    payload["feedbackLaw"] = _law_metadata(control_law, disturbance_law)
+    return payload
+
+
 def verification_problem_from_obligations(
     name: str,
     obligations: Sequence[ProofObligation],
     *,
-    system: FirstOrderSystem | DiscreteSystem | None = None,
+    system: ClosedSystem | None = None,
+    open_loop_system: OpenLoopSystem | None = None,
     candidate: LyapunovCandidate | BarrierCandidate | None = None,
     specification: SafetySpecification | None = None,
     substitutions: Mapping[sp.Symbol, float] | None = None,
@@ -173,6 +238,8 @@ def verification_problem_from_obligations(
         raise ValueError("specification state must match the obligation state")
     if system is not None and system.state != state:
         raise ValueError("system state must match the obligation state")
+    if open_loop_system is not None and open_loop_system.state != state:
+        raise ValueError("open-loop system state must match the obligation state")
     if candidate is not None and candidate.state != state:
         raise ValueError("candidate state must match the obligation state")
 
@@ -224,6 +291,8 @@ def verification_problem_from_obligations(
             free_symbols.update(sp.sympify(obligation.region.expression).free_symbols)
     if system is not None:
         free_symbols.update(_system_free_symbols(system))
+    if open_loop_system is not None:
+        free_symbols.update(_system_free_symbols(open_loop_system))
     if candidate is not None:
         free_symbols.update(sp.sympify(candidate.function).free_symbols)
     if specification is not None:
@@ -313,6 +382,9 @@ def verification_problem_from_obligations(
         obligations=obligation_specs,
         assumptions=assumption_specs,
         dynamics=None if system is None else _dynamics_spec(system),
+        open_loop_dynamics=(
+            None if open_loop_system is None else _open_loop_dynamics_spec(open_loop_system)
+        ),
         candidates=candidates,
         metadata=_metadata(metadata),
     )
@@ -362,6 +434,32 @@ def verification_problem_from_discrete_barrier(
     )
 
 
+def verification_problem_from_controlled_discrete_barrier(
+    name: str,
+    system: ControlledDiscreteSystem,
+    control_law: Mapping[sp.Symbol, sp.Expr | float],
+    candidate: BarrierCandidate,
+    *,
+    disturbance_law: Mapping[sp.Symbol, sp.Expr | float] | None = None,
+    specification: SafetySpecification | None = None,
+    substitutions: Mapping[sp.Symbol, float] | None = None,
+    assumptions: Sequence[AssumptionSpec] = (),
+    metadata: Mapping[str, Any] | None = None,
+) -> VerificationProblem:
+    closed = system.closed_loop(control_law, disturbance_law)
+    return verification_problem_from_obligations(
+        name,
+        candidate.discrete_proof_obligations(closed, specification),
+        system=closed,
+        open_loop_system=system,
+        candidate=candidate,
+        specification=specification,
+        substitutions=substitutions,
+        assumptions=assumptions,
+        metadata=_with_feedback_metadata(metadata, control_law, disturbance_law),
+    )
+
+
 def verification_problem_from_lyapunov(
     name: str,
     system: FirstOrderSystem,
@@ -399,4 +497,28 @@ def verification_problem_from_discrete_lyapunov(
         substitutions=substitutions,
         assumptions=assumptions,
         metadata=metadata,
+    )
+
+
+def verification_problem_from_controlled_discrete_lyapunov(
+    name: str,
+    system: ControlledDiscreteSystem,
+    control_law: Mapping[sp.Symbol, sp.Expr | float],
+    candidate: LyapunovCandidate,
+    *,
+    disturbance_law: Mapping[sp.Symbol, sp.Expr | float] | None = None,
+    substitutions: Mapping[sp.Symbol, float] | None = None,
+    assumptions: Sequence[AssumptionSpec] = (),
+    metadata: Mapping[str, Any] | None = None,
+) -> VerificationProblem:
+    closed = system.closed_loop(control_law, disturbance_law)
+    return verification_problem_from_obligations(
+        name,
+        candidate.discrete_proof_obligations(closed),
+        system=closed,
+        open_loop_system=system,
+        candidate=candidate,
+        substitutions=substitutions,
+        assumptions=assumptions,
+        metadata=_with_feedback_metadata(metadata, control_law, disturbance_law),
     )

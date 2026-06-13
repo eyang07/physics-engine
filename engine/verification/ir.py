@@ -296,6 +296,7 @@ class VerificationProblem:
     obligations: tuple[ObligationSpec, ...]
     assumptions: tuple[AssumptionSpec, ...] = ()
     dynamics: DynamicsSpec | None = None
+    open_loop_dynamics: DynamicsSpec | None = None
     candidates: tuple[CandidateSpec, ...] = ()
     metadata: Mapping[str, Any] | None = None
     schema_version: str = SCHEMA_VERSION
@@ -335,13 +336,21 @@ class VerificationProblem:
         variable_names = tuple(variable.name for variable in self.variables)
         if self.dynamics is not None and self.dynamics.state != variable_names:
             raise ValueError("dynamics state must match the problem variables in order")
+        if (
+            self.open_loop_dynamics is not None
+            and self.open_loop_dynamics.state != variable_names
+        ):
+            raise ValueError(
+                "open-loop dynamics state must match the problem variables in order"
+            )
         parameter_names = tuple(parameter.name for parameter in self.parameters)
-        input_names = (
-            tuple(input_spec.name for input_spec in self.dynamics.inputs)
-            if self.dynamics is not None
-            else ()
+        dynamics_specs = tuple(
+            spec for spec in (self.dynamics, self.open_loop_dynamics) if spec is not None
         )
-        time_names = ((self.dynamics.time_variable,) if self.dynamics is not None else ())
+        input_names = tuple(
+            input_spec.name for spec in dynamics_specs for input_spec in spec.inputs
+        )
+        time_names = tuple(spec.time_variable for spec in dynamics_specs)
         known_names = {*variable_names, *parameter_names, *input_names, *time_names}
         for assumption in self.assumptions:
             unknown_variables = set(assumption.variables) - known_names
@@ -380,6 +389,8 @@ class VerificationProblem:
         }
         if self.dynamics is not None:
             payload["dynamics"] = self.dynamics.to_dict()
+        if self.open_loop_dynamics is not None:
+            payload["openLoopDynamics"] = self.open_loop_dynamics.to_dict()
         if self.metadata is not None:
             payload["metadata"] = dict(self.metadata)
         return payload
@@ -401,6 +412,7 @@ def problem_from_parts(
     obligations: Sequence[ObligationSpec],
     assumptions: Sequence[AssumptionSpec] = (),
     dynamics: DynamicsSpec | None = None,
+    open_loop_dynamics: DynamicsSpec | None = None,
     candidates: Sequence[CandidateSpec] = (),
     metadata: Mapping[str, Any] | None = None,
 ) -> VerificationProblem:
@@ -414,6 +426,7 @@ def problem_from_parts(
         obligations=tuple(obligations),
         assumptions=tuple(assumptions),
         dynamics=dynamics,
+        open_loop_dynamics=open_loop_dynamics,
         candidates=tuple(candidates),
         metadata=metadata,
     )

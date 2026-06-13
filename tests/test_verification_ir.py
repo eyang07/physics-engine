@@ -30,6 +30,8 @@ from engine.verification import (
     dynamics_spec_from_discrete,
     expression_spec,
     verification_problem_from_barrier,
+    verification_problem_from_controlled_discrete_barrier,
+    verification_problem_from_controlled_discrete_lyapunov,
     verification_problem_from_discrete_barrier,
     verification_problem_from_discrete_lyapunov,
     verification_problem_from_lyapunov,
@@ -281,6 +283,17 @@ def test_problem_validates_dynamics_and_candidate_links() -> None:
             regions=(),
             obligations=(obligation,),
             dynamics=mismatched,
+        )
+    with pytest.raises(ValueError, match="open-loop dynamics state"):
+        VerificationProblem(
+            id="p",
+            name="p",
+            source="test",
+            variables=variables,
+            parameters=(),
+            regions=(),
+            obligations=(obligation,),
+            open_loop_dynamics=mismatched,
         )
 
     dangling = CandidateSpec(
@@ -537,3 +550,89 @@ def test_discrete_barrier_candidate_exports_verification_problem() -> None:
     (candidate_payload,) = payload["candidates"]
     assert candidate_payload["kind"] == "barrier"
     assert candidate_payload["regionId"] == "domain-unit-interval-region"
+
+
+def test_controlled_discrete_lyapunov_export_records_open_and_closed_loop() -> None:
+    x = sp.Symbol("x", real=True)
+    u = sp.Symbol("u", real=True)
+    system = ControlledDiscreteSystem(
+        state=(x,),
+        controls=(u,),
+        update=(x + u,),
+        control_bounds=Box(lower=(-1.0,), upper=(1.0,)),
+    )
+    candidate = LyapunovCandidate(
+        state=(x,),
+        function=x**2,
+        equilibrium=(0.0,),
+        name="feedback-lyapunov",
+    )
+
+    problem = verification_problem_from_controlled_discrete_lyapunov(
+        "feedback lyapunov",
+        system,
+        {u: -x / 2},
+        candidate,
+    )
+    payload = problem.to_dict()
+
+    assert payload["dynamics"]["kind"] == "discrete"
+    assert payload["dynamics"]["update"][0]["display"] == "x/2"
+    assert payload["dynamics"]["inputs"] == []
+    assert payload["openLoopDynamics"]["kind"] == "discrete"
+    assert payload["openLoopDynamics"]["update"][0]["display"] == "u + x"
+    assert payload["openLoopDynamics"]["inputs"] == [
+        {"name": "u", "latex": "u", "role": "control", "lower": -1.0, "upper": 1.0}
+    ]
+    assert payload["metadata"]["feedbackLaw"]["control"]["u"]["display"] == "-x/2"
+    assert [obligation["name"] for obligation in payload["obligations"]] == [
+        "feedback-lyapunov:equilibrium-value",
+        "feedback-lyapunov:positivity",
+        "feedback-lyapunov:decrease",
+    ]
+    assert payload["candidates"][0]["obligationIds"] == [
+        obligation["id"] for obligation in payload["obligations"]
+    ]
+
+
+def test_controlled_discrete_barrier_export_records_disturbance_law() -> None:
+    x = sp.Symbol("x", real=True)
+    u, d = sp.symbols("u d", real=True)
+    system = ControlledDiscreteSystem(
+        state=(x,),
+        controls=(u,),
+        update=(x + u + d,),
+        disturbances=(d,),
+        control_bounds=Box(lower=(-1.0,), upper=(1.0,)),
+        disturbance_bounds=Box(lower=(-0.25,), upper=(0.25,)),
+    )
+    barrier = BarrierCandidate(state=(x,), function=x**2 - 1, name="unit-interval")
+    specification = SafetySpecification(
+        state=(x,),
+        safe_set=SublevelSet(state=(x,), expression=x**2, level=1.0, name="safe"),
+    )
+
+    problem = verification_problem_from_controlled_discrete_barrier(
+        "feedback barrier",
+        system,
+        {u: -x / 2},
+        barrier,
+        disturbance_law={d: 0},
+        specification=specification,
+    )
+    payload = problem.to_dict()
+
+    assert payload["dynamics"]["update"][0]["display"] == "x/2"
+    assert payload["openLoopDynamics"]["inputs"] == [
+        {"name": "u", "latex": "u", "role": "control", "lower": -1.0, "upper": 1.0},
+        {
+            "name": "d",
+            "latex": "d",
+            "role": "disturbance",
+            "lower": -0.25,
+            "upper": 0.25,
+        },
+    ]
+    assert payload["metadata"]["feedbackLaw"]["control"]["u"]["display"] == "-x/2"
+    assert payload["metadata"]["feedbackLaw"]["disturbance"]["d"]["display"] == "0"
+    assert payload["obligations"][0]["regionId"] == "domain-unit-interval-region"

@@ -13,8 +13,11 @@ itself was lost, so no reachability, SOS, or deductive backend could actually
 verify anything. v1 added continuous dynamics, open control/disturbance
 channels, and first-class candidate-certificate records. v2 adds explicit
 assumptions, links obligations to the assumptions they require, and encodes
-discrete-time dynamics. The engine still **proposes and organizes; external
-tools dispose**: nothing in the IR stores proof results.
+discrete-time dynamics. The current v2 payload can also carry optional
+`openLoopDynamics` alongside closed-loop `dynamics` so controlled feedback
+exports preserve the admissible input channels the controller was derived
+from. The engine still **proposes and organizes; external tools dispose**:
+nothing in the IR stores proof results.
 
 ## Design decisions
 
@@ -26,9 +29,9 @@ tools dispose**: nothing in the IR stores proof results.
    records either `kind="continuous"` with `timeVariable` and one `rhs`
    expression per state derivative, or `kind="discrete"` with `stepVariable`
    and one `update` expression per next-state component. The safety adapters
-   encode the *closed-loop* continuous system, because that is what the Lie
-   derivatives were taken along; `dynamics` stays optional for
-   obligation-only problems.
+   encode the *closed-loop* system in `dynamics`, because that is what the
+   Lie derivatives or one-step differences were taken along; `dynamics` stays
+   optional for obligation-only problems.
 3. **Inputs are named, optionally interval-bounded channels.** `InputSpec`
    carries a role (`control` or `disturbance`) and optional lower/upper
    bounds. `dynamics_spec_from_controlled` and
@@ -36,28 +39,35 @@ tools dispose**: nothing in the IR stores proof results.
    systems with their admissible `Box` bounds; `dynamics_spec_from_system`
    and `dynamics_spec_from_discrete` encode closed-loop systems with no
    inputs.
-4. **Candidates are first-class and link to their obligations.**
+4. **Open-loop context is optional and non-authoritative.** Controlled
+   discrete safety exports place the closed-loop map used for obligations in
+   `dynamics`, the source controlled system in `openLoopDynamics`, and the
+   symbolic feedback law in `metadata.feedbackLaw`. External tools can then
+   inspect both the proof model and the original admissible channels without
+   treating simulation or controller construction as a proof result.
+5. **Candidates are first-class and link to their obligations.**
    `CandidateSpec` records kind (`lyapunov` or `barrier`), the certificate
    expression, the Lyapunov equilibrium, the candidate region, and the ids of
    the proof obligations that must be discharged before the candidate means
    anything. `status` is locked to `"candidate"` in `__post_init__`, the same
    construction-level honesty used for `ObligationSpec.rigor` and the stub
    adapter's report status.
-5. **Assumptions are first-class preconditions, not results.**
+6. **Assumptions are first-class preconditions, not results.**
    `AssumptionSpec` records model/domain/regularity facts in canonical
    expression-comparison form. Obligations reference required assumptions by
    id through `assumptionIds`. The safety adapter makes SymPy parameter-domain
    facts such as `k > 0` explicit for external backends instead of relying on
    implicit symbol assumptions.
-6. **Cross-references are validated at the problem level.**
+7. **Cross-references are validated at the problem level.**
    `VerificationProblem` rejects dynamics whose state does not match the
-   problem variables in order, candidate links to unknown obligation or
-   region ids, obligation links to unknown assumption ids, duplicate candidate
-   or assumption ids, assumption variables unknown to the problem, and
-   equilibria of the wrong dimension. Parameters now also collect free symbols
-   from the dynamics RHS (excluding state and time) and the candidate
+   problem variables in order, open-loop dynamics whose state does not match
+   the problem variables, candidate links to unknown obligation or region ids,
+   obligation links to unknown assumption ids, duplicate candidate or
+   assumption ids, assumption variables unknown to the problem, and equilibria
+   of the wrong dimension. Parameters now also collect free symbols from the
+   dynamics RHS/update (excluding state and time/step) and the candidate
    expression.
-7. **Deferred (out of v2):** discrete-time safety obligations, richer
+8. **Deferred (out of v2):** richer
    assumption languages beyond scalar expression comparisons, visualization
    hooks, real external backends, and any proof-result storage.
 
@@ -71,10 +81,11 @@ tools dispose**: nothing in the IR stores proof results.
   `dynamics_spec_from_controlled_discrete`.
 - `engine/verification/safety_adapter.py` — adapters now pass the system and
   candidate through; `verification_problem_from_obligations` accepts optional
-  `system` and `candidate` keywords, with discrete Lyapunov/barrier adapter
-  entry points for `DiscreteSystem` obligations.
+  `system`, `open_loop_system`, and `candidate` keywords, with discrete
+  Lyapunov/barrier adapter entry points for both `DiscreteSystem` obligations
+  and controlled-discrete feedback exports.
 - `engine/verification/inspection_adapter.py` — renders Dynamics,
-  Assumptions, and Candidate certificates report sections.
+  Open-loop dynamics, Assumptions, and Candidate certificates report sections.
 - `tests/test_verification_ir.py`, `tests/test_inspection_adapter.py`.
 
 ## Invariants / proof obligations (for this implementation)
@@ -91,10 +102,15 @@ tools dispose**: nothing in the IR stores proof results.
 4. **Discrete safety export (proven on examples).** Discrete Lyapunov and
    barrier candidate obligations serialize with `kind="discrete"` dynamics
    and linked candidate records.
-5. **Referential integrity (proven).** Mismatched dynamics state, dangling
+5. **Controlled discrete feedback export (proven on examples).** Controlled
+   discrete Lyapunov/barrier exports serialize closed-loop discrete dynamics,
+   open-loop bounded input channels, feedback-law metadata, and linked
+   candidate records.
+6. **Referential integrity (proven).** Mismatched dynamics state, dangling
    candidate-obligation ids, dangling obligation-assumption ids, unknown
-   assumption variables, and wrong-dimension equilibria raise.
-6. **Determinism (measured).** Serialization remains bit-identical across
+   assumption variables, mismatched open-loop dynamics state, and
+   wrong-dimension equilibria raise.
+7. **Determinism (measured).** Serialization remains bit-identical across
    runs; the inspection report renders the new sections deterministically.
 
 ## Verification commands
