@@ -224,6 +224,14 @@ LENSES: tuple[Lens, ...] = (
         conserved=("H",),
     ),
     Lens(
+        id="henonHeilesPoincare",
+        title="Poincaré Section",
+        kind="poincare-section",
+        description="Section crossings (x, p_x) on the surface y = 0, accreting as the orbit recurs.",
+        projections=("xPhase",),
+        conserved=("H",),
+    ),
+    Lens(
         id="variableSpeedWavefront",
         title="Wavefront",
         kind="ray-bundle",
@@ -554,7 +562,7 @@ HENON_HEILES = SystemSpec(
         "xPhase": ("x", "x_dot"),
     },
     conserved=(Conserved("H", "H", "time translation", generator=_time_translation),),
-    lenses=("henonHeilesFlow", "henonHeilesPhase", "henonHeilesPotential"),
+    lenses=("henonHeilesFlow", "henonHeilesPhase", "henonHeilesPotential", "henonHeilesPoincare"),
     data_path="/data/henon_heiles.json",
 )
 

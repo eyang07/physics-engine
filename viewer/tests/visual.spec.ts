@@ -206,6 +206,12 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-henon-heiles-potential.png`) });
 
+    await page.getByRole("button", { name: /Poincar/ }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-henon-heiles-poincare.png`) });
+
     await page.locator("#systemSelect").selectOption("variable-speed-wavefront");
     await page.waitForSelector("#scene.stage__canvas--active");
     await page.waitForTimeout(500);

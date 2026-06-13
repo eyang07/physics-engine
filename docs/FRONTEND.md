@@ -31,6 +31,10 @@ and trajectory data; it must not re-derive physics.
   decimals.
 - 2D canvas lenses for pendulum, effective-potential views, and wavefront/ray
   bundles.
+- Focused full-stage Poincaré-section lens for Hénon-Heiles, rendering the
+  exported `(x, p_x)` crossings on the `y = 0` surface; crossings accrete as
+  playback reaches each backend-located crossing time. Reads
+  `metadata.poincareSections` only — no browser-side section finding.
 - Three.js scenes for configuration-space, phase-space, orbit, field, spring,
   and attractor views.
 - Renderer-hint-based camera framing and a fit-to-system reset control.
@@ -67,10 +71,8 @@ The Vite main-bundle chunk-size warning is known and non-fatal.
 
 ## Next Work
 
-1. Promote the Poincaré section from the diagnostics panel to a focused
-   full-stage lens for Hénon-Heiles using the exported `(x, p_x)` points.
-2. Cross-link the domains: jump from a controlled system in Systems to its
+1. Cross-link the domains: jump from a controlled system in Systems to its
    verification problem, and render the IR's safe/unsafe-set geometry on a stage
    alongside the trajectory.
-3. Later, add candidate certificate values along trajectories and a proof-status
+2. Later, add candidate certificate values along trajectories and a proof-status
    surface once backend metadata is exported through the manifest.

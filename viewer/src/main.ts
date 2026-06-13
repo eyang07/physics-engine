@@ -20,6 +20,7 @@ import { drawPhaseScene, drawPotentialContourScene, drawPotentialScene } from ".
 import { StructurePanel } from "./structurePanel";
 import { DiagnosticsPanel } from "./diagnosticsPanel";
 import { drawWavefrontScene } from "./wavefrontCanvas";
+import { drawPoincareSectionScene } from "./poincareSectionCanvas";
 import { VerificationPanel } from "./verificationPanel";
 import {
   loadVerificationIndex,
@@ -41,6 +42,7 @@ type CanvasMode =
   | "beadHoopPotential"
   | "henonHeilesPhase"
   | "henonHeilesPotential"
+  | "henonHeilesPoincare"
   | "variableSpeedWavefront";
 
 const CANVAS_MODE_IDS = new Set<string>([
@@ -56,6 +58,7 @@ const CANVAS_MODE_IDS = new Set<string>([
   "beadHoopPotential",
   "henonHeilesPhase",
   "henonHeilesPotential",
+  "henonHeilesPoincare",
   "variableSpeedWavefront",
 ]);
 
@@ -479,6 +482,8 @@ function render(now: number) {
     drawPotentialScene(ctx, trajectory, selectedExample, selectedVisualization, current, canvas.clientWidth, canvas.clientHeight);
   } else if (selectedVisualization.id === "variableSpeedWavefront") {
     drawWavefrontScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
+  } else if (selectedVisualization.id === "henonHeilesPoincare") {
+    drawPoincareSectionScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else {
     threeScene.render(current.state, time, current.index);
   }
