@@ -20,6 +20,9 @@ and trajectory data; it must not re-derive physics.
   Data comes from `scripts/generate_verification_problems.py`
   (`viewer/public/data/verification/`).
 - Playback controls.
+- Parameter-family switch: for systems exporting manifest `variants` (e.g. the
+  Lorenz ρ-family), the inspector loads each backend-generated variant's data in
+  place — no browser-side regeneration.
 - Mathematical structure panels for symbolic backend exports.
 - Invariant lanes and sampled series display.
 - 2D canvas lenses for pendulum, effective-potential views, and wavefront/ray
@@ -60,15 +63,11 @@ The Vite main-bundle chunk-size warning is known and non-fatal.
 
 ## Next Work
 
-1. Add a manifest-driven diagnostics panel for exported backend diagnostics,
-   starting with Lorenz/Hénon-Heiles finite-time Lyapunov metadata and the
-   Hénon-Heiles Poincare section.
-2. Add a focused Poincare-section lens for Hénon-Heiles using exported
-   `(x, p_x)` section points.
-3. Define parameter-family UI behavior around backend-generated variants and
-   avoid arbitrary browser-side regeneration.
-4. Cross-link the domains: jump from a controlled system in Systems to its
+1. Promote the Poincaré section from the diagnostics panel to a focused
+   full-stage lens for Hénon-Heiles using the exported `(x, p_x)` points.
+2. Surface the exported invariant-residual diagnostics in the diagnostics panel.
+3. Cross-link the domains: jump from a controlled system in Systems to its
    verification problem, and render the IR's safe/unsafe-set geometry on a stage
    alongside the trajectory.
-5. Later, add candidate certificate values along trajectories and a proof-status
+4. Later, add candidate certificate values along trajectories and a proof-status
    surface once backend metadata is exported through the manifest.

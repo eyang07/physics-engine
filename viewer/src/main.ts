@@ -4,6 +4,7 @@ import { theme } from "./design/theme";
 import {
   loadManifest,
   type ManifestLens,
+  type ManifestParameterVariant,
   type SystemManifest,
 } from "./data/manifest";
 import { StaticSource } from "./data/source";
@@ -81,6 +82,8 @@ const threeCanvas = requireElement<HTMLCanvasElement>("#hamiltonianScene");
 const systemTitle = requireElement<HTMLElement>("#systemTitle");
 const systemSelect = requireElement<HTMLSelectElement>("#systemSelect");
 const visualizationModes = requireElement<HTMLElement>("#visualizationModes");
+const variantSection = requireElement<HTMLElement>("#variantSection");
+const variantModes = requireElement<HTMLElement>("#variantModes");
 const playButton = requireElement<HTMLButtonElement>("#playButton");
 const fitToSystem = requireElement<HTMLButtonElement>("#fitToSystem");
 const speedControl = requireElement<HTMLInputElement>("#speedControl");
@@ -110,8 +113,11 @@ let examples: SystemManifest[] = [];
 let lensById = new Map<string, ManifestLens>();
 let selectedExample: SystemManifest | null = null;
 let selectedVisualization: ManifestLens | null = null;
+let selectedVariant: ManifestParameterVariant | null = null;
 let trajectory: Trajectory | null = null;
 let pendulumBounds: Bounds | null = null;
+// Monotonic guard so a slow trajectory load can't overwrite a newer selection.
+let loadToken = 0;
 let verificationProblems: VerificationProblemSummary[] = [];
 let selectedProblemId: string | null = null;
 
@@ -281,10 +287,53 @@ function renderVisualizationButtons() {
   });
 }
 
-function loadTrajectory(example: SystemManifest): Promise<Trajectory> {
+// The variant whose data matches the system's default export, or the first one
+// — the family member shown when a system is first selected.
+function defaultVariant(example: SystemManifest): ManifestParameterVariant | null {
+  const variants = example.variants ?? [];
+  if (variants.length === 0) {
+    return null;
+  }
+  return variants.find((variant) => variant.dataPath === example.dataPath) ?? variants[0];
+}
+
+function renderVariantButtons() {
+  variantModes.replaceChildren();
+  const variants = selectedExample?.variants ?? [];
+  variantSection.hidden = variants.length === 0;
+  if (variants.length === 0) {
+    return;
+  }
+  variants.forEach((variant) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "mode-switch__button";
+    button.textContent = variant.label;
+    button.classList.toggle("mode-switch__button--active", variant.id === selectedVariant?.id);
+    button.addEventListener("click", () => {
+      if (variant.id === selectedVariant?.id) {
+        return;
+      }
+      selectedVariant = variant;
+      renderVariantButtons();
+      void loadAndRender();
+    });
+    variantModes.append(button);
+  });
+}
+
+function loadActiveTrajectory(): Promise<Trajectory> {
   // Behind the StaticSource seam: a future GeneratedSource (Python server)
   // implements the same interface, so parameter-driven generation can drop in
-  // here without changing the call site.
+  // here without changing the call site. A selected variant loads its own
+  // exported data file, cached separately under a per-variant id.
+  const example = selectedExample!;
+  if (selectedVariant) {
+    return trajectorySource.get({
+      id: `${example.id}:${selectedVariant.id}`,
+      dataPath: selectedVariant.dataPath,
+    });
+  }
   return trajectorySource.get(example);
 }
 
@@ -341,20 +390,38 @@ async function selectExample(exampleId: string) {
   }
   selectedExample = nextExample;
   selectedVisualization = lensFor(nextExample.lenses[0]);
+  selectedVariant = defaultVariant(nextExample);
   systemTitle.textContent = nextExample.title;
   systemSelect.value = nextExample.id;
   updateCatalogActive();
   renderVisualizationButtons();
+  renderVariantButtons();
+  await loadAndRender();
+}
+
+// Load the active system/variant trajectory and refresh every panel. Shared by
+// system selection and variant switching; the load guard drops a stale result
+// when a newer selection has already started loading.
+async function loadAndRender() {
+  if (!selectedExample) {
+    return;
+  }
+  const example = selectedExample;
+  const token = ++loadToken;
   clock.reset();
   syncPlayButton();
   structurePanel.clear();
   diagnosticsPanel.clear();
 
-  trajectory = await loadTrajectory(nextExample);
-  pendulumBounds = nextExample.id === "pendulum" ? computePendulumBounds(trajectory) : null;
+  const loaded = await loadActiveTrajectory();
+  if (token !== loadToken) {
+    return;
+  }
+  trajectory = loaded;
+  pendulumBounds = example.id === "pendulum" ? computePendulumBounds(loaded) : null;
   applyVisualization();
-  void structurePanel.show(nextExample.id, trajectory);
-  diagnosticsPanel.show(trajectory);
+  void structurePanel.show(example.id, loaded);
+  diagnosticsPanel.show(loaded);
 }
 
 function resize2dCanvas() {

@@ -178,6 +178,12 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#hamiltonianScene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-lorenz-attractor.png`) });
 
+    // The parameter-family switch loads a backend-generated variant in place.
+    await page.getByRole("button", { name: "rho = 20" }).click();
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-lorenz-rho-20.png`) });
+
     await page.locator("#systemSelect").selectOption("henon-heiles");
     await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
     await page.waitForTimeout(800);
