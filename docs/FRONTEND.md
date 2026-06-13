@@ -5,7 +5,17 @@ and trajectory data; it must not re-derive physics.
 
 ## Current Capabilities
 
-- System gallery and playback controls.
+- Persistent workbench shell: a top bar with a hard top-level domain menu
+  (**Systems** for simulation/visualization vs. **Verification** for the safety
+  and proof-obligation surfaces) plus an About dialog. The app boots straight
+  into the Systems workbench — no splash gate.
+- Systems domain laid out as a three-pane workbench: an always-visible catalog
+  rail that swaps the stage directly, the visualization stage, and an inspector.
+- Verification domain present as a stub placeholder; the read-only inspector for
+  exported verification-problem IR (model, control/disturbance channels,
+  candidate certificates, linked proof obligations, honest rigor labels) lands
+  next.
+- Playback controls.
 - Mathematical structure panels for symbolic backend exports.
 - Invariant lanes and sampled series display.
 - 2D canvas lenses for pendulum, effective-potential views, and wavefront/ray
@@ -46,12 +56,16 @@ The Vite main-bundle chunk-size warning is known and non-fatal.
 
 ## Next Work
 
-1. Add a manifest-driven diagnostics panel for exported backend diagnostics,
+1. Fill the Verification domain: a read-only inspector for the exported
+   verification-problem IR (`scripts/export_verification_problems.py` output) —
+   model, control/disturbance channels, candidate certificates, and linked proof
+   obligations, each with honest rigor labels.
+2. Add a manifest-driven diagnostics panel for exported backend diagnostics,
    starting with Lorenz/Hénon-Heiles finite-time Lyapunov metadata and the
    Hénon-Heiles Poincare section.
-2. Add a focused Poincare-section lens for Hénon-Heiles using exported
+3. Add a focused Poincare-section lens for Hénon-Heiles using exported
    `(x, p_x)` section points.
-3. Define parameter-family UI behavior around backend-generated variants and
+4. Define parameter-family UI behavior around backend-generated variants and
    avoid arbitrary browser-side regeneration.
-4. Later, add safe/unsafe-set rendering, candidate certificate values, and proof
+5. Later, add safe/unsafe-set rendering, candidate certificate values, and proof
    status surfaces once backend metadata is exported through the manifest.

@@ -8,7 +8,6 @@ import {
 } from "./data/manifest";
 import { StaticSource } from "./data/source";
 import { drawEffectivePotentialScene } from "./effectivePotentialCanvas";
-import { renderHome } from "./home";
 import { PlaybackClock, sampleTrajectory, trajectoryDuration } from "./playback";
 import {
   computePendulumBounds,
@@ -61,13 +60,14 @@ function requireElement<T extends Element>(selector: string): T {
   return element;
 }
 
-const homeView = requireElement<HTMLElement>("#homeView");
-const selectionView = requireElement<HTMLElement>("#selectionView");
-const app = requireElement<HTMLElement>("#app");
-const homeCanvas = requireElement<HTMLCanvasElement>("#homeCanvas");
-const enterSimulations = requireElement<HTMLButtonElement>("#enterSimulations");
-const backToSystems = requireElement<HTMLButtonElement>("#backToSystems");
-const systemGallery = requireElement<HTMLElement>("#systemGallery");
+const systemsDomain = requireElement<HTMLElement>("#systemsDomain");
+const verificationDomain = requireElement<HTMLElement>("#verificationDomain");
+const domainSystemsButton = requireElement<HTMLButtonElement>("#domainSystems");
+const domainVerificationButton = requireElement<HTMLButtonElement>("#domainVerification");
+const aboutButton = requireElement<HTMLButtonElement>("#aboutButton");
+const aboutDialog = requireElement<HTMLDialogElement>("#aboutDialog");
+const aboutClose = requireElement<HTMLButtonElement>("#aboutClose");
+const systemCatalog = requireElement<HTMLElement>("#systemCatalog");
 const canvas = requireElement<HTMLCanvasElement>("#scene");
 const threeCanvas = requireElement<HTMLCanvasElement>("#hamiltonianScene");
 const systemTitle = requireElement<HTMLElement>("#systemTitle");
@@ -88,11 +88,6 @@ if (!context) {
   throw new Error("Canvas 2D context is unavailable.");
 }
 const ctx: CanvasRenderingContext2D = context;
-const homeContext = homeCanvas.getContext("2d");
-if (!homeContext) {
-  throw new Error("Home canvas 2D context is unavailable.");
-}
-const homeCtx: CanvasRenderingContext2D = homeContext;
 const threeScene = new ThreeScene(threeCanvas);
 
 const trajectorySource = new StaticSource();
@@ -100,7 +95,8 @@ const structurePanel = new StructurePanel(principlesPanel, invariantsPanel, para
 const diagnosticsPanel = new DiagnosticsPanel(diagnosticsSection, diagnosticsPanel_);
 const clock = new PlaybackClock();
 
-let activeView: "home" | "selection" | "simulation" = "home";
+type Domain = "systems" | "verification";
+let activeDomain: Domain = "systems";
 let examples: SystemManifest[] = [];
 let lensById = new Map<string, ManifestLens>();
 let selectedExample: SystemManifest | null = null;
@@ -131,12 +127,20 @@ fitToSystem.addEventListener("click", () => {
   threeScene.resetCamera();
 });
 
-enterSimulations.addEventListener("click", () => {
-  showSelection();
+domainSystemsButton.addEventListener("click", () => {
+  setDomain("systems");
 });
 
-backToSystems.addEventListener("click", () => {
-  showSelection();
+domainVerificationButton.addEventListener("click", () => {
+  setDomain("verification");
+});
+
+aboutButton.addEventListener("click", () => {
+  aboutDialog.showModal();
+});
+
+aboutClose.addEventListener("click", () => {
+  aboutDialog.close();
 });
 
 systemSelect.addEventListener("change", () => {
@@ -172,22 +176,29 @@ function populateSystemSelect() {
   }
 }
 
-function renderSystemGallery() {
-  systemGallery.replaceChildren();
+function renderSystemCatalog() {
+  systemCatalog.replaceChildren();
   examples.forEach((example) => {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "system-card";
+    button.className = "catalog-item";
+    button.dataset.systemId = example.id;
+    button.classList.toggle("catalog-item--active", example.id === selectedExample?.id);
     button.innerHTML = `
-      <span class="system-card__category">${example.category}</span>
+      <span class="catalog-item__category">${example.category}</span>
       <strong>${example.title}</strong>
-      <span>${example.description}</span>
     `;
+    // The catalog rail swaps the stage directly — no separate gallery page.
     button.addEventListener("click", () => {
-      showSimulation();
       void selectExample(example.id);
     });
-    systemGallery.append(button);
+    systemCatalog.append(button);
+  });
+}
+
+function updateCatalogActive() {
+  systemCatalog.querySelectorAll<HTMLButtonElement>(".catalog-item").forEach((item) => {
+    item.classList.toggle("catalog-item--active", item.dataset.systemId === selectedExample?.id);
   });
 }
 
@@ -229,22 +240,24 @@ function setCanvasMode(mode: "2d" | "3d") {
   fitToSystem.hidden = is2d;
 }
 
-function setView(view: "home" | "selection" | "simulation") {
-  activeView = view;
-  homeView.classList.toggle("view-hidden", view !== "home");
-  selectionView.classList.toggle("view-hidden", view !== "selection");
-  app.classList.toggle("view-hidden", view !== "simulation");
+function setDomain(domain: Domain) {
+  activeDomain = domain;
+  const systemsActive = domain === "systems";
+  systemsDomain.classList.toggle("domain--active", systemsActive);
+  systemsDomain.hidden = !systemsActive;
+  verificationDomain.classList.toggle("domain--active", !systemsActive);
+  verificationDomain.hidden = systemsActive;
+  domainSystemsButton.classList.toggle("domain-switch__button--active", systemsActive);
+  domainVerificationButton.classList.toggle("domain-switch__button--active", !systemsActive);
+  // The Three.js scene only renders inside the Systems domain, and only when the
+  // active lens is a Three mode; otherwise it stays inactive to spare the GPU.
   threeScene.setActive(
-    view === "simulation" && selectedVisualization !== null && isThreeMode(selectedVisualization.id),
+    systemsActive && selectedVisualization !== null && isThreeMode(selectedVisualization.id),
   );
-}
-
-function showSelection() {
-  setView("selection");
-}
-
-function showSimulation() {
-  setView("simulation");
+  if (systemsActive) {
+    resize2dCanvas();
+    threeScene.resize();
+  }
 }
 
 function applyVisualization() {
@@ -269,6 +282,7 @@ async function selectExample(exampleId: string) {
   selectedVisualization = lensFor(nextExample.lenses[0]);
   systemTitle.textContent = nextExample.title;
   systemSelect.value = nextExample.id;
+  updateCatalogActive();
   renderVisualizationButtons();
   clock.reset();
   syncPlayButton();
@@ -300,13 +314,9 @@ window.addEventListener("resize", () => {
 });
 
 function render(now: number) {
-  if (activeView === "home") {
-    renderHome(homeCanvas, homeCtx, now);
-    requestAnimationFrame(render);
-    return;
-  }
-
-  if (activeView !== "simulation") {
+  // The stage only renders inside the Systems domain; the Verification domain is
+  // static markup, so we keep pumping the frame loop without drawing.
+  if (activeDomain !== "systems") {
     requestAnimationFrame(render);
     return;
   }
@@ -350,7 +360,7 @@ function render(now: number) {
   requestAnimationFrame(render);
 }
 
-setView("home");
+setDomain("systems");
 
 async function initialize() {
   try {
@@ -359,12 +369,13 @@ async function initialize() {
     lensById = new Map(manifest.lenses.map((lens) => [lens.id, lens]));
     selectedExample = examples[0] ?? null;
     selectedVisualization = selectedExample ? lensFor(selectedExample.lenses[0]) : null;
-    if (selectedExample) {
-      systemTitle.textContent = selectedExample.title;
-    }
     populateSystemSelect();
-    renderSystemGallery();
-    renderVisualizationButtons();
+    renderSystemCatalog();
+    // Boot straight into the workbench: render the first system's stage
+    // immediately instead of waiting behind a splash gate.
+    if (selectedExample) {
+      await selectExample(selectedExample.id);
+    }
   } catch (error) {
     console.warn("Manifest preload failed:", error);
   }

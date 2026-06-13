@@ -67,16 +67,11 @@ for (const viewport of [
   test(`renders all example systems at ${viewport.name}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto("/");
-    await page.waitForSelector("#homeView:not(.view-hidden)");
-    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-home.png`) });
-
-    await page.getByRole("button", { name: "Enter simulations" }).click();
-    await page.waitForSelector("#selectionView:not(.view-hidden)");
-    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-gallery.png`) });
-
-    await page.getByRole("button", { name: /Simple Pendulum/ }).click();
+    // Boot straight into the Systems workbench — no splash gate, no gallery page.
+    await page.waitForSelector("#systemsDomain.domain--active");
     await page.waitForSelector("#scene.stage__canvas--active");
     await page.waitForTimeout(500);
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-workbench.png`) });
 
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-pendulum.png`) });
@@ -206,17 +201,21 @@ for (const viewport of [
     await page.waitForTimeout(500);
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-variable-speed-wavefront.png`) });
+
+    // The hard top-level domain menu swaps to the Verification workbench and back.
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification.png`) });
+    await page.getByRole("button", { name: "Systems" }).click();
+    await page.waitForSelector("#systemsDomain.domain--active");
   });
 
   test(`fit-to-system reset preserves Three.js rendering at ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto("/");
-    await page.waitForSelector("#homeView:not(.view-hidden)");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.waitForSelector("#scene.stage__canvas--active");
 
-    await page.getByRole("button", { name: "Enter simulations" }).click();
-    await page.waitForSelector("#selectionView:not(.view-hidden)");
-
-    await page.getByRole("button", { name: /Simple Pendulum/ }).click();
     await page.getByRole("button", { name: "Hamiltonian Flow" }).click();
     await expectFitToSystemKeepsSceneRendered(page);
 
