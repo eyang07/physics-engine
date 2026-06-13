@@ -36,6 +36,7 @@ from engine.verification import (
     write_inspection_artifacts,
 )
 from scripts.export_verification_problems import main, upright_pendulum_problem
+from scripts.generate_verification_problems import write_verification_problems
 
 
 def _oscillator_problem() -> VerificationProblem:
@@ -309,6 +310,44 @@ def test_report_rejects_discharge_claims(tmp_path) -> None:
 def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
     problem = upright_pendulum_problem()
     assert problem.id == "upright-pendulum-safety"
+    assert problem.system == "pendulum"
+
+    payload = problem.to_dict()
+    assert payload["schemaVersion"] == "verification-problem/v3"
+    assert payload["system"] == "pendulum"
+    assert payload["metadata"]["system"] == "pendulum"
+    assert payload["metadata"]["verificationModel"] == "controlled-pendulum-closed-loop"
+    assert len(payload["regionGeometry"]) == len(payload["regions"])
+
+    geometry_by_region = {
+        geometry["regionId"]: geometry for geometry in payload["regionGeometry"]
+    }
+    assert set(geometry_by_region) == {region["id"] for region in payload["regions"]}
+    safe_geometry = geometry_by_region["safe-corridor"]
+    assert safe_geometry["role"] == "safe"
+    assert safe_geometry["projection"] == "phase"
+    assert safe_geometry["plane"] == {
+        "variables": ["theta", "omega"],
+        "stateAxes": ["theta", "theta_dot"],
+        "variableToStateAxis": {"theta": "theta", "omega": "theta_dot"},
+    }
+    assert safe_geometry["kind"] == "scalar-field-grid"
+    assert safe_geometry["rigor"] == "measured"
+    assert safe_geometry["level"] == 0.25
+    assert safe_geometry["convention"] == "expression <= level"
+    assert len(safe_geometry["grid"]["x"]) == 91
+    assert len(safe_geometry["grid"]["y"]) == 91
+    assert len(safe_geometry["grid"]["values"]) == 91
+    assert len(safe_geometry["grid"]["values"][0]) == 91
+    center_index = min(
+        range(len(safe_geometry["grid"]["x"])),
+        key=lambda index: abs(safe_geometry["grid"]["x"][index] - float(sp.pi)),
+    )
+    omega_zero_index = min(
+        range(len(safe_geometry["grid"]["y"])),
+        key=lambda index: abs(safe_geometry["grid"]["y"][index]),
+    )
+    assert safe_geometry["grid"]["values"][omega_zero_index][center_index] < 0.01
 
     main(["--output-dir", str(tmp_path)])
     captured = capsys.readouterr()
@@ -316,3 +355,26 @@ def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
     assert (tmp_path / "upright-pendulum-safety.verification-problem.json").exists()
     assert (tmp_path / "upright-pendulum-safety.inspection.md").exists()
     assert (tmp_path / "upright-pendulum-safety.inspection-outcome.json").exists()
+
+
+def test_generate_verification_problems_writes_cross_linked_index(tmp_path) -> None:
+    generated_dir = tmp_path / "generated"
+    viewer_dir = tmp_path / "viewer"
+
+    ids = write_verification_problems(
+        generated_dir=generated_dir,
+        viewer_dir=viewer_dir,
+    )
+
+    assert ids == ["upright-pendulum-safety"]
+    payload = json.loads(
+        (viewer_dir / "upright-pendulum-safety.json").read_text(encoding="utf-8")
+    )
+    index = json.loads((viewer_dir / "index.json").read_text(encoding="utf-8"))
+
+    assert payload["system"] == "pendulum"
+    assert payload["regionGeometry"]
+    assert index["problems"][0]["system"] == "pendulum"
+    assert index["problems"][0]["dataPath"] == (
+        "/data/verification/upright-pendulum-safety.json"
+    )

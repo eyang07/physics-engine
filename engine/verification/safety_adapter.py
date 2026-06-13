@@ -372,10 +372,16 @@ def verification_problem_from_obligations(
             ),
         )
 
+    metadata_payload = _metadata(metadata)
+    system_id = metadata_payload.get("system")
+    if system_id is not None and not isinstance(system_id, str):
+        raise ValueError("verification metadata system must be a string")
+
     return problem_from_parts(
         id=_slug(name),
         name=name,
         source=_SOURCE,
+        system=system_id,
         variables=variables,
         parameters=parameters,
         regions=regions,
@@ -386,7 +392,7 @@ def verification_problem_from_obligations(
             None if open_loop_system is None else _open_loop_dynamics_spec(open_loop_system)
         ),
         candidates=candidates,
-        metadata=_metadata(metadata),
+        metadata=metadata_payload,
     )
 
 

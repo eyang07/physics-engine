@@ -35,9 +35,14 @@ from engine.verification.ir import (
     ObligationSpec,
     ParameterSpec,
     RegionSpec,
+    RegionGeometrySpec,
     SCHEMA_VERSION,
     VariableSpec,
     VerificationProblem,
+)
+from engine.verification.region_geometry import (
+    scalar_field_region_geometries,
+    scalar_field_region_geometry,
 )
 from engine.verification.safety_adapter import (
     verification_problem_from_barrier,
@@ -78,6 +83,7 @@ __all__ = [
     "ObligationSpec",
     "ParameterSpec",
     "REPORT_STATUS",
+    "RegionGeometrySpec",
     "RegionSpec",
     "SCHEMA_VERSION",
     "VariableSpec",
@@ -92,6 +98,8 @@ __all__ = [
     "inspection_diagnostics",
     "obligation_classifications",
     "render_inspection_markdown",
+    "scalar_field_region_geometries",
+    "scalar_field_region_geometry",
     "verification_problem_from_barrier",
     "verification_problem_from_controlled_discrete_barrier",
     "verification_problem_from_controlled_discrete_lyapunov",

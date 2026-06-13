@@ -36,6 +36,16 @@ def test_system_lenses_are_registered() -> None:
         assert set(spec.lenses) <= registered
 
 
+def test_manifest_carries_verification_problem_links(manifest) -> None:
+    entries = {entry["id"]: entry for entry in manifest["systems"]}
+
+    assert entries["pendulum"]["verificationProblems"] == ["upright-pendulum-safety"]
+    for system_id, entry in entries.items():
+        problems = entry.get("verificationProblems", [])
+        assert len(problems) == len(set(problems)), system_id
+        assert all(isinstance(problem_id, str) and problem_id for problem_id in problems)
+
+
 def test_registered_lens_requirements_match_system_specs() -> None:
     lenses_by_id = {lens.id: lens for lens in LENSES}
 

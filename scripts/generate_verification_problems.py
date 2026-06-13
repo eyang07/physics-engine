@@ -33,7 +33,7 @@ def _problem_summary(payload: dict, data_path: str) -> dict:
     return {
         "id": payload["id"],
         "name": payload["name"],
-        "system": metadata.get("system"),
+        "system": payload.get("system") or metadata.get("system"),
         "status": metadata.get("status", "candidate"),
         "schemaVersion": payload.get("schemaVersion"),
         "dataPath": data_path,

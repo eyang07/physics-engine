@@ -61,11 +61,17 @@ artifacts.
     suggestions.
   - Proof-obligation records and deterministic sampled checks labeled
     `rigor="measured"`.
-  - Backend-agnostic verification-problem IR v2 in `engine.verification`
+  - Backend-agnostic verification-problem IR v3 in `engine.verification`
     (spec in `docs/verification-ir.md`): continuous and discrete dynamics,
     control/disturbance channels, explicit assumptions, first-class candidate
     certificates locked to `status="candidate"`, and obligations labeled
-    `rigor="external-required"`.
+    `rigor="external-required"`. Viewer-facing exports now include a
+    top-level manifest `system` cross-reference and measured `regionGeometry`
+    scalar-field grids for safe/unsafe/initial/domain regions.
+  - The first viewer-renderable verification pair is
+    `upright-pendulum-safety` linked to manifest system `pendulum`; the
+    geometry export maps IR variable `omega` to manifest state axis
+    `theta_dot` on the `phase` projection.
   - Adapter capability declarations and target-specific obligation
     classification for future verification backends; the inspection stub
     advertises no discharge capability and records required target support in
@@ -80,8 +86,8 @@ artifacts.
     typed diagnostics. It records no proof results.
 
 The backend does not synthesize, prove, or certify safety. Real external
-verification backends, proof discharge, validated numerics, manifest export of
-safety geometry, and viewer safety surfaces remain future work.
+verification backends, proof discharge, validated numerics, and viewer safety
+surfaces remain future work.
 
 ## Registered Viewer Examples
 

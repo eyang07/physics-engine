@@ -8,12 +8,14 @@ nothing here crosses the manifest/viewer boundary or claims proof discharge.
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 
 import sympy as sp
 
 from engine.dynamics import BarrierCandidate, SafetySpecification, SublevelSet
 from engine.verification import (
     VerificationProblem,
+    scalar_field_region_geometries,
     verification_problem_from_barrier,
     write_inspection_artifacts,
 )
@@ -55,13 +57,26 @@ def upright_pendulum_problem() -> VerificationProblem:
         name="energy-barrier",
     )
 
-    return verification_problem_from_barrier(
+    problem = verification_problem_from_barrier(
         "upright pendulum safety",
         closed,
         barrier,
         specification=specification,
-        metadata={"system": "controlled-pendulum"},
+        metadata={
+            "system": "pendulum",
+            "verificationModel": "controlled-pendulum-closed-loop",
+        },
     )
+    geometry = scalar_field_region_geometries(
+        problem.regions,
+        projection="phase",
+        plane_variables=("theta", "omega"),
+        variable_to_state_axis={"theta": "theta", "omega": "theta_dot"},
+        x_range=(-0.5, 4.0),
+        y_range=(-3.0, 3.0),
+        samples=(91, 91),
+    )
+    return replace(problem, region_geometry=geometry)
 
 
 def main(argv: list[str] | None = None) -> None:

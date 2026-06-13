@@ -27,6 +27,7 @@ from engine.verification import (
     ObligationSpec,
     ParameterSpec,
     SCHEMA_VERSION,
+    RegionGeometrySpec,
     RegionSpec,
     VariableSpec,
     VerificationProblem,
@@ -80,6 +81,7 @@ def test_lyapunov_candidate_exports_verification_problem() -> None:
     payload = problem.to_dict()
 
     assert payload["schemaVersion"] == SCHEMA_VERSION
+    assert payload["system"] == "damped-oscillator"
     assert payload["id"] == "damped-oscillator-lyapunov"
     assert [variable["name"] for variable in payload["variables"]] == ["x", "v"]
     assert [parameter["name"] for parameter in payload["parameters"]] == ["c", "k"]
@@ -226,7 +228,7 @@ def _minimal_problem_parts() -> tuple[tuple[VariableSpec, ...], ObligationSpec]:
     return variables, obligation
 
 
-def test_v2_spec_validation() -> None:
+def test_ir_spec_validation() -> None:
     x = sp.Symbol("x", real=True)
     expr = expression_spec(x)
 
@@ -269,6 +271,35 @@ def test_v2_spec_validation() -> None:
             expression=expr,
             comparison=">",
             role="evidence",
+        )
+    with pytest.raises(ValueError, match="rigor"):
+        RegionGeometrySpec(
+            region_id="r",
+            role="safe",
+            projection="phase",
+            plane_variables=("x", "v"),
+            state_axes=("x", "x_dot"),
+            variable_to_state_axis={"x": "x", "v": "x_dot"},
+            x_values=(0.0, 1.0),
+            y_values=(0.0, 1.0),
+            values=((0.0, 1.0), (1.0, 2.0)),
+            level=0.0,
+            convention="expression <= level",
+            rigor="external-required",
+        )
+    with pytest.raises(ValueError, match="variable-to-state-axis"):
+        RegionGeometrySpec(
+            region_id="r",
+            role="safe",
+            projection="phase",
+            plane_variables=("x", "v"),
+            state_axes=("x", "x_dot"),
+            variable_to_state_axis={"x": "x"},
+            x_values=(0.0, 1.0),
+            y_values=(0.0, 1.0),
+            values=((0.0, 1.0), (1.0, 2.0)),
+            level=0.0,
+            convention="expression <= level",
         )
 
 
@@ -459,6 +490,78 @@ def test_problem_validates_names_and_region_variables() -> None:
         obligations=(obligation,),
     )
     assert problem.regions == (valid_region,)
+
+    v = sp.Symbol("v", real=True)
+    variables_2d = (
+        VariableSpec(name="x", latex="x"),
+        VariableSpec(name="v", latex="v"),
+    )
+    obligation_2d = ObligationSpec(
+        id="claim",
+        name="claim",
+        expression=expression_spec(x),
+        comparison="<=",
+    )
+    region_2d = RegionSpec(
+        id="domain",
+        name="domain",
+        kind="sublevel",
+        role="domain",
+        variables=("x", "v"),
+        expression=expression_spec(x + v**2),
+        level=1.0,
+    )
+    valid_geometry = RegionGeometrySpec(
+        region_id="domain",
+        role="domain",
+        projection="phase",
+        plane_variables=("x", "v"),
+        state_axes=("x", "x_dot"),
+        variable_to_state_axis={"x": "x", "v": "x_dot"},
+        x_values=(0.0, 1.0),
+        y_values=(0.0, 1.0),
+        values=((0.0, 1.0), (1.0, 2.0)),
+        level=1.0,
+        convention="expression <= level",
+    )
+    with pytest.raises(ValueError, match="role"):
+        VerificationProblem(
+            id="p",
+            name="p",
+            source="test",
+            variables=variables_2d,
+            parameters=(),
+            regions=(region_2d,),
+            obligations=(obligation_2d,),
+            region_geometry=(
+                RegionGeometrySpec(
+                    region_id="domain",
+                    role="unsafe",
+                    projection="phase",
+                    plane_variables=("x", "v"),
+                    state_axes=("x", "x_dot"),
+                    variable_to_state_axis={"x": "x", "v": "x_dot"},
+                    x_values=(0.0, 1.0),
+                    y_values=(0.0, 1.0),
+                    values=((0.0, 1.0), (1.0, 2.0)),
+                    level=1.0,
+                    convention="expression <= level",
+                ),
+            ),
+        )
+    assert (
+        VerificationProblem(
+            id="p",
+            name="p",
+            source="test",
+            variables=variables_2d,
+            parameters=(),
+            regions=(region_2d,),
+            obligations=(obligation_2d,),
+            region_geometry=(valid_geometry,),
+        ).region_geometry
+        == (valid_geometry,)
+    )
 
 
 def test_obligation_classification_tracks_backend_targets() -> None:

@@ -184,6 +184,7 @@ class SystemSpec:
     effective_potentials: tuple[EffectivePotential, ...] = ()
     system_kind: str = "mechanics"
     variants: tuple[ParameterVariant, ...] = ()
+    verification_problems: tuple[str, ...] = ()
 
     def series(
         self,
@@ -458,6 +459,8 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
     }
     if spec.variants:
         entry["variants"] = [variant.to_dict() for variant in spec.variants]
+    if spec.verification_problems:
+        entry["verificationProblems"] = list(spec.verification_problems)
     return entry
 
 
@@ -498,6 +501,8 @@ def first_order_system_entry(spec: SystemSpec, system: FirstOrderSystem) -> dict
     }
     if spec.variants:
         entry["variants"] = [variant.to_dict() for variant in spec.variants]
+    if spec.verification_problems:
+        entry["verificationProblems"] = list(spec.verification_problems)
     return entry
 
 

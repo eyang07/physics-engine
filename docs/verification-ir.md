@@ -1,4 +1,4 @@
-# Verification-Problem IR — Design Spec (v2)
+# Verification-Problem IR — Design Spec (v3)
 
 Advances `docs/VISION.md` §10/§11 priority 3, building on the
 safety/certificate layer (`docs/safety-certificates.md`). Status:
@@ -11,18 +11,21 @@ tool. IR v0 carried variables, parameters, regions, and obligations, but the
 obligations arrived as pre-computed Lie-derivative expressions — the model
 itself was lost, so no reachability, SOS, or deductive backend could actually
 verify anything. v1 added continuous dynamics, open control/disturbance
-channels, and first-class candidate-certificate records. v2 adds explicit
+channels, and first-class candidate-certificate records. v2 added explicit
 assumptions, links obligations to the assumptions they require, and encodes
-discrete-time dynamics. The current v2 payload can also carry optional
+discrete-time dynamics. The v2 payload can also carry optional
 `openLoopDynamics` alongside closed-loop `dynamics` so controlled feedback
 exports preserve the admissible input channels the controller was derived
-from. The engine still **proposes and organizes; external tools dispose**:
-nothing in the IR stores proof results.
+from. v3 adds viewer-facing cross-links and sampled region geometry: a
+top-level `system` id matching a manifest system id, plus `regionGeometry`
+scalar-field grids so TypeScript can render safe/unsafe/initial/domain regions
+without evaluating symbolic inequalities. The engine still **proposes and
+organizes; external tools dispose**: nothing in the IR stores proof results.
 
 ## Design decisions
 
 1. **Schema bump, no migration.** `SCHEMA_VERSION` is now
-   `verification-problem/v2`. Artifacts are deterministic and regenerable
+   `verification-problem/v3`. Artifacts are deterministic and regenerable
    (nothing under `data/generated/` is committed), so old payloads are simply
    regenerated; the IR does not read or migrate old files.
 2. **Dynamics are the model obligations were derived along.** `DynamicsSpec`
@@ -67,16 +70,25 @@ nothing in the IR stores proof results.
    of the wrong dimension. Parameters now also collect free symbols from the
    dynamics RHS/update (excluding state and time/step) and the candidate
    expression.
-8. **Deferred (out of v2):** richer
-   assumption languages beyond scalar expression comparisons, visualization
-   hooks, real external backends, and any proof-result storage.
-9. **Adapter diagnostics are outcomes, not proofs.** Verification adapters
+8. **Viewer geometry is sampled metadata, not verification.** `regionGeometry`
+   entries carry a named manifest projection, two IR plane variables, explicit
+   IR-variable-to-manifest-state-axis mappings, the sampled scalar field of the
+   defining region expression, the original level/convention, and
+   `rigor="measured"`. For the first concrete export,
+   `upright-pendulum-safety` links to manifest system `pendulum`, maps
+   `omega -> theta_dot`, and renders the verification regions on the pendulum
+   `phase` projection. This is a render aid only; it does not prove region
+   containment or invariance.
+9. **Deferred (out of v3):** richer
+   assumption languages beyond scalar expression comparisons, boundary
+   polyline extraction, real external backends, and any proof-result storage.
+10. **Adapter diagnostics are outcomes, not proofs.** Verification adapters
    report normalized diagnostics through `VerificationDiagnostic` with
    statuses such as `not-attempted`, `externally-required`, `unsupported`,
    and `malformed`. The inspection stub writes these diagnostics to a
    machine-readable outcome artifact; it still cannot record success,
    discharge, proof, or certification.
-10. **Adapter capability checks are explicit.** `engine.verification`
+11. **Adapter capability checks are explicit.** `engine.verification`
    classifies each obligation into a target family such as
    `continuous-lyapunov`, `discrete-barrier`, or `obligation-only`.
    Adapters advertise discharge capabilities separately from inspection
@@ -90,13 +102,15 @@ nothing in the IR stores proof results.
 ## Files
 
 - `engine/verification/ir.py` — `DynamicsSpec`, `InputSpec`,
-  `AssumptionSpec`, `CandidateSpec`, extended `VerificationProblem`, schema
-  bump.
+  `AssumptionSpec`, `CandidateSpec`, `RegionGeometrySpec`, extended
+  `VerificationProblem`, schema bump.
 - `engine/verification/diagnostics.py` — typed adapter diagnostics with a
   small status/severity vocabulary for inspection and future backend
   integrations.
 - `engine/verification/capabilities.py` — adapter capability declarations and
   deterministic obligation-target classification.
+- `engine/verification/region_geometry.py` — deterministic scalar-field grid
+  sampling for region render metadata.
 - `engine/verification/system_codec.py` — `dynamics_spec_from_system`,
   `dynamics_spec_from_controlled`, `dynamics_spec_from_discrete`,
   `dynamics_spec_from_controlled_discrete`.
@@ -137,7 +151,11 @@ nothing in the IR stores proof results.
    raise.
 7. **Determinism (measured).** Serialization remains bit-identical across
    runs; the inspection report renders the new sections deterministically.
-8. **Diagnostic honesty (proven by construction).** Inspection outcomes use
+8. **Viewer-region geometry (measured).** Region geometry grids sample the
+   symbolic region expression exactly at deterministic grid points and carry
+   `rigor="measured"` plus the original level/convention. They are render
+   metadata, not certificates.
+9. **Diagnostic honesty (proven by construction).** Inspection outcomes use
    only non-success statuses (`not-attempted`, `externally-required`,
    `unsupported`, `malformed`) and every obligation receives an
    `externally-required` diagnostic until a real backend exists. Each such
@@ -154,12 +172,13 @@ pytest -q
 python -m scripts.export_verification_problems
 ```
 
-No generator or viewer commands: nothing crosses the manifest boundary.
+Run `python -m scripts.generate_manifest` and
+`python -m scripts.generate_verification_problems` when checking the viewer
+contract shape. Generated files remain ignored.
 
 ## Out of scope
 
-Everything listed under "Deferred" above, plus any change to the
-manifest/export schema and any frontend surface.
+Everything listed under "Deferred" above, plus any frontend surface.
 
 ## Verification record
 
@@ -174,3 +193,6 @@ duplicate names and region variables.
 Updated again on 2026-06-13: inspection diagnostics now distinguish
 well-formed-but-unsupported targets from malformed target shapes such as
 candidate obligations without dynamics and mixed candidate ownership.
+Updated again on 2026-06-13: IR v3 adds top-level manifest system cross-links
+and measured `regionGeometry` scalar-field grids for viewer rendering. The
+pendulum manifest entry links back to `upright-pendulum-safety`.

@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-SCHEMA_VERSION = "verification-problem/v2"
+SCHEMA_VERSION = "verification-problem/v3"
 
 _ORDER_COMPARISONS = ("<=", "<", ">=", ">")
 _ASSUMPTION_COMPARISONS = (*_ORDER_COMPARISONS, "=", "!=")
@@ -205,6 +205,82 @@ class RegionSpec:
 
 
 @dataclass(frozen=True)
+class RegionGeometrySpec:
+    """A sampled 2-D rendering aid for one symbolic region.
+
+    The scalar field is measured geometry for visualization only. It does not
+    prove containment, exclusion, or invariance.
+    """
+
+    region_id: str
+    role: str
+    projection: str
+    plane_variables: tuple[str, str]
+    state_axes: tuple[str, str]
+    variable_to_state_axis: Mapping[str, str]
+    x_values: tuple[float, ...]
+    y_values: tuple[float, ...]
+    values: tuple[tuple[float, ...], ...]
+    level: float
+    convention: str
+    kind: str = "scalar-field-grid"
+    rigor: str = "measured"
+    note: str = (
+        "Sampled scalar field of the symbolic region definition for rendering; "
+        "not a proof or certificate."
+    )
+
+    def __post_init__(self) -> None:
+        if self.kind != "scalar-field-grid":
+            raise ValueError("region geometry kind must be 'scalar-field-grid'")
+        if self.rigor != "measured":
+            raise ValueError("region geometry must keep rigor='measured'")
+        if len(self.plane_variables) != 2:
+            raise ValueError("region geometry must name exactly two plane variables")
+        if self.plane_variables[0] == self.plane_variables[1]:
+            raise ValueError("region geometry plane variables must be distinct")
+        if len(self.state_axes) != 2:
+            raise ValueError("region geometry must name exactly two state axes")
+        missing = set(self.plane_variables) - set(self.variable_to_state_axis)
+        if missing:
+            raise ValueError(
+                f"region geometry missing variable-to-state-axis mappings: {sorted(missing)}"
+            )
+        expected_axes = tuple(self.variable_to_state_axis[name] for name in self.plane_variables)
+        if expected_axes != self.state_axes:
+            raise ValueError("region geometry state axes must match the variable mapping")
+        if not self.x_values or not self.y_values:
+            raise ValueError("region geometry grid axes must be non-empty")
+        if len(self.values) != len(self.y_values):
+            raise ValueError("region geometry row count must match y_values")
+        row_widths = {len(row) for row in self.values}
+        if row_widths != {len(self.x_values)}:
+            raise ValueError("region geometry column count must match x_values")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "regionId": self.region_id,
+            "role": self.role,
+            "kind": self.kind,
+            "projection": self.projection,
+            "plane": {
+                "variables": list(self.plane_variables),
+                "stateAxes": list(self.state_axes),
+                "variableToStateAxis": dict(self.variable_to_state_axis),
+            },
+            "grid": {
+                "x": list(self.x_values),
+                "y": list(self.y_values),
+                "values": [list(row) for row in self.values],
+            },
+            "level": self.level,
+            "convention": self.convention,
+            "rigor": self.rigor,
+            "note": self.note,
+        }
+
+
+@dataclass(frozen=True)
 class AssumptionSpec:
     """A precondition an external verifier may assume while discharging claims."""
 
@@ -298,6 +374,8 @@ class VerificationProblem:
     dynamics: DynamicsSpec | None = None
     open_loop_dynamics: DynamicsSpec | None = None
     candidates: tuple[CandidateSpec, ...] = ()
+    system: str | None = None
+    region_geometry: tuple[RegionGeometrySpec, ...] = ()
     metadata: Mapping[str, Any] | None = None
     schema_version: str = SCHEMA_VERSION
 
@@ -308,6 +386,16 @@ class VerificationProblem:
             raise ValueError("verification problem must have variables")
         if not self.obligations:
             raise ValueError("verification problem must have obligations")
+        if self.system is not None and not self.system:
+            raise ValueError("verification problem system id must be non-empty")
+        if self.metadata is not None:
+            metadata_system = self.metadata.get("system")
+            if (
+                self.system is not None
+                and metadata_system is not None
+                and metadata_system != self.system
+            ):
+                raise ValueError("metadata system must match the verification system")
 
         variable_names = tuple(variable.name for variable in self.variables)
         if len(set(variable_names)) != len(variable_names):
@@ -390,6 +478,17 @@ class VerificationProblem:
                 self.variables
             ):
                 raise ValueError("candidate equilibrium must match the variable dimension")
+        region_roles = {region.id: region.role for region in self.regions}
+        for geometry in self.region_geometry:
+            if geometry.region_id not in known_regions:
+                raise ValueError(f"unknown region geometry id: {geometry.region_id}")
+            if geometry.role != region_roles[geometry.region_id]:
+                raise ValueError("region geometry role must match the referenced region")
+            unknown_variables = set(geometry.plane_variables) - known_variables
+            if unknown_variables:
+                raise ValueError(
+                    f"unknown region geometry variables: {sorted(unknown_variables)}"
+                )
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -397,12 +496,14 @@ class VerificationProblem:
             "id": self.id,
             "name": self.name,
             "source": self.source,
+            "system": self.system,
             "variables": [variable.to_dict() for variable in self.variables],
             "parameters": [parameter.to_dict() for parameter in self.parameters],
             "regions": [region.to_dict() for region in self.regions],
             "assumptions": [assumption.to_dict() for assumption in self.assumptions],
             "obligations": [obligation.to_dict() for obligation in self.obligations],
             "candidates": [candidate.to_dict() for candidate in self.candidates],
+            "regionGeometry": [geometry.to_dict() for geometry in self.region_geometry],
         }
         if self.dynamics is not None:
             payload["dynamics"] = self.dynamics.to_dict()
@@ -423,6 +524,7 @@ def problem_from_parts(
     id: str,
     name: str,
     source: str,
+    system: str | None = None,
     variables: Sequence[VariableSpec],
     parameters: Sequence[ParameterSpec],
     regions: Sequence[RegionSpec],
@@ -431,12 +533,14 @@ def problem_from_parts(
     dynamics: DynamicsSpec | None = None,
     open_loop_dynamics: DynamicsSpec | None = None,
     candidates: Sequence[CandidateSpec] = (),
+    region_geometry: Sequence[RegionGeometrySpec] = (),
     metadata: Mapping[str, Any] | None = None,
 ) -> VerificationProblem:
     return VerificationProblem(
         id=id,
         name=name,
         source=source,
+        system=system,
         variables=tuple(variables),
         parameters=tuple(parameters),
         regions=tuple(regions),
@@ -445,5 +549,6 @@ def problem_from_parts(
         dynamics=dynamics,
         open_loop_dynamics=open_loop_dynamics,
         candidates=tuple(candidates),
+        region_geometry=tuple(region_geometry),
         metadata=metadata,
     )
