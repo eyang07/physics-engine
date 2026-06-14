@@ -280,6 +280,31 @@ select {
   display: flex;
   align-items: center;
   gap: 7px;
+  width: 100%;
+  margin: 0;
+  padding: 3px 5px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.verif-violation-legend__entry:hover {
+  background: var(--surface-frost);
+}
+
+.verif-violation-legend__entry:focus-visible {
+  outline: none;
+  border-color: rgba(232, 86, 70, 0.6);
+}
+
+.verif-violation-legend__entry--focused {
+  border-color: rgba(232, 86, 70, 0.9);
+  background: rgba(232, 86, 70, 0.14);
 }
 
 .verif-violation-legend__tag {

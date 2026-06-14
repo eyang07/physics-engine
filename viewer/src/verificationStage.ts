@@ -72,16 +72,32 @@ function violationMarkers(
 // A worst-violation sample, drawn as a haloed red ring with an inner cross so it
 // reads as an annotation distinct from the region outlines, the trajectory, and
 // the moving playhead. A small index tag ties each marker to its legend entry.
+// When one marker is focused from the legend, it gains an emphasis halo and the
+// others are dimmed so the named violation stands out on the phase plane.
 function drawViolationMarkers(
   ctx: CanvasRenderingContext2D,
   markers: ViolationMarker[],
   mapX: (value: number) => number,
   mapY: (value: number) => number,
+  focusedIndex: number | null,
 ): void {
   markers.forEach((marker, index) => {
     const cx = mapX(marker.x);
     const cy = mapY(marker.y);
+    const focused = focusedIndex === index;
+    const dimmed = focusedIndex !== null && !focused;
     ctx.save();
+    ctx.globalAlpha = dimmed ? 0.35 : 1;
+    if (focused) {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = VIOLATION_RGBA;
+      ctx.shadowColor = VIOLATION_RGBA;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
     ctx.lineWidth = 4;
     ctx.strokeStyle = "rgba(12, 14, 20, 0.6)";
     ctx.beginPath();
@@ -233,6 +249,7 @@ function drawVerificationPhaseScene(
   width: number,
   height: number,
   markers: ViolationMarker[],
+  focusedIndex: number | null,
 ): void {
   drawStageBackground(ctx, width, height);
   const plot = {
@@ -286,7 +303,7 @@ function drawVerificationPhaseScene(
   ctx.fill();
   ctx.shadowBlur = 0;
 
-  drawViolationMarkers(ctx, markers, mapX, mapY);
+  drawViolationMarkers(ctx, markers, mapX, mapY, focusedIndex);
 
   ctx.fillStyle = theme.textMuted;
   ctx.font = '12px "IBM Plex Mono", monospace';
@@ -303,6 +320,7 @@ export class VerificationStage {
   private bounds: Bounds | null = null;
   private regions: RegionGeometry[] = [];
   private violations: ViolationMarker[] = [];
+  private focusedViolation: number | null = null;
   private active = false;
   private running = false;
 
@@ -367,15 +385,34 @@ export class VerificationStage {
 
   // Keep a test-visible count of drawn violation markers on the canvas so visual
   // coverage can assert the marker / no-marker paths without pixel diffing, and
-  // mirror the markers into the legend.
+  // mirror the markers into the legend. Any prior focus is dropped: the marker
+  // set has changed, so the previously named marker may no longer exist.
   private setViolations(markers: ViolationMarker[]): void {
     this.violations = markers;
     this.canvas.dataset.violationMarkers = String(markers.length);
+    this.setFocusedViolation(null);
     this.renderLegend(markers);
   }
 
+  // Focus (or clear focus on) a single drawn violation so the stage emphasizes
+  // its marker and the legend marks the matching entry. The focused index rides
+  // on the canvas dataset so visual coverage can assert focus/clear without
+  // pixel diffing, and the legend is restyled to reflect the selection.
+  private setFocusedViolation(index: number | null): void {
+    this.focusedViolation = index;
+    this.canvas.dataset.focusedViolation = index === null ? "" : String(index + 1);
+    this.legend
+      .querySelectorAll<HTMLButtonElement>(".verif-violation-legend__entry")
+      .forEach((entry, entryIndex) => {
+        const focused = entryIndex === index;
+        entry.classList.toggle("verif-violation-legend__entry--focused", focused);
+        entry.setAttribute("aria-pressed", String(focused));
+      });
+  }
+
   // The legend names each drawn violation by its obligation, keyed to the marker
-  // index. It exists only while at least one marker is on the stage.
+  // index. It exists only while at least one marker is on the stage, and each
+  // entry is a toggle that focuses its matching stage marker.
   private renderLegend(markers: ViolationMarker[]): void {
     this.legend.replaceChildren();
     if (markers.length === 0) {
@@ -387,8 +424,10 @@ export class VerificationStage {
     title.textContent = "measured violations";
     this.legend.append(title);
     markers.forEach((marker, index) => {
-      const entry = document.createElement("div");
+      const entry = document.createElement("button");
+      entry.type = "button";
       entry.className = "verif-violation-legend__entry";
+      entry.setAttribute("aria-pressed", "false");
       const tag = document.createElement("span");
       tag.className = "verif-violation-legend__tag";
       tag.textContent = String(index + 1);
@@ -396,6 +435,9 @@ export class VerificationStage {
       name.className = "verif-violation-legend__name";
       name.textContent = marker.label;
       entry.append(tag, name);
+      entry.addEventListener("click", () => {
+        this.setFocusedViolation(this.focusedViolation === index ? null : index);
+      });
       this.legend.append(entry);
     });
     this.legend.hidden = false;
@@ -494,6 +536,7 @@ export class VerificationStage {
       width,
       height,
       this.violations,
+      this.focusedViolation,
     );
     this.certificateLanes.update(sample.phase);
   }

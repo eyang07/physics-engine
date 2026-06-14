@@ -495,6 +495,77 @@ for (const viewport of [
     });
   });
 
+  test(`Verification stage focuses a violation from its legend at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Inject two mappable measured-violated samples so the legend offers more
+    // than one entry to focus between, and the dimming of the unfocused marker
+    // is meaningful.
+    const violation = (id: string, point: [number, number]) => ({
+      id,
+      obligationId: "energy-barrier-excludes-near-bottom",
+      status: "measured-violated",
+      worst: { value: 1.5, point },
+      evaluation: {
+        kind: "region-grid",
+        sampleCount: 10,
+        source: "injected",
+        variables: ["theta", "omega"],
+        stateAxes: ["theta", "omega"],
+        variableToStateAxis: { theta: "theta", omega: "omega" },
+      },
+    });
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.proofStatuses.push(
+        violation("injected-violation-a", [2.5, 0.3]),
+        violation("injected-violation-b", [-2.4, -0.4]),
+      );
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    const canvas = page.locator("#verificationCanvas");
+    const entries = page.locator(".verif-violation-legend__entry");
+    await expect(entries).toHaveCount(2);
+    // Nothing is focused until a legend entry is activated.
+    await expect(canvas).toHaveAttribute("data-focused-violation", "");
+    await expect(entries.nth(0)).toHaveAttribute("aria-pressed", "false");
+
+    // Activating an entry emphasizes only its marker: the canvas records the
+    // focused index and exactly that entry reads as pressed.
+    await entries.nth(1).click();
+    await expect(canvas).toHaveAttribute("data-focused-violation", "2");
+    await expect(entries.nth(1)).toHaveAttribute("aria-pressed", "true");
+    await expect(entries.nth(0)).toHaveAttribute("aria-pressed", "false");
+    await expect(entries.nth(1)).toHaveClass(/verif-violation-legend__entry--focused/);
+    await page.waitForTimeout(200);
+    await expectCanvasNonBlank(page, "#verificationCanvas");
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-violation-focus.png`),
+    });
+
+    // Re-activating the focused entry toggles the focus back off.
+    await entries.nth(1).click();
+    await expect(canvas).toHaveAttribute("data-focused-violation", "");
+    await expect(entries.nth(1)).toHaveAttribute("aria-pressed", "false");
+
+    // Switching problems updates the marker set, which must drop any focus so a
+    // stale index can't emphasize a marker that no longer exists.
+    await entries.nth(0).click();
+    await expect(canvas).toHaveAttribute("data-focused-violation", "1");
+    await page.locator("#verificationCatalog .catalog-item").nth(1).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+    await expect(canvas).toHaveAttribute("data-focused-violation", "");
+  });
+
   test(`Verification header echoes the selected problem counts at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

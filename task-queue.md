@@ -32,18 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-007: Focus a violation marker from its legend entry**
-   - Goal: Let clicking a violation legend entry highlight its matching stage
-     marker so a named violation can be located on the phase plane.
-   - Scope: `viewer/src/verificationStage.ts` (legend interaction + marker
-     emphasis draw), `viewer/src/styles.css` for the focused-entry chrome, and
-     visual coverage in `viewer/tests/visual.spec.ts`.
-   - Acceptance: Selecting a legend entry visibly emphasizes only its marker,
-     selection clears when the problem changes or the marker set updates, the
-     no-violation path stays interaction-free, and visual tests cover the
-     focus/clear behavior.
-
-2. **FE-008: Link header obligation count to the obligations section**
+1. **FE-008: Link header obligation count to the obligations section**
    - Goal: Let the header's obligation count scroll the problem doc to the
      obligations section so the scope summary is a way into the detail.
    - Scope: `viewer/src/verificationPanel.ts` (header count interaction +
@@ -53,6 +42,18 @@ Each task should use this structure:
      section, the region/candidate counts behave consistently or stay inert by
      design, problems without obligations expose no broken affordance, and visual
      tests cover the scroll-into-view behavior.
+
+2. **FE-009: Show the worst measured value on each violation legend entry**
+   - Goal: Carry the already-exported `worstValue` for each measured violation
+     into its legend entry so a named violation also shows how far it broke the
+     obligation inequality, not just where.
+   - Scope: `viewer/src/verificationStage.ts` (thread `worstValue` into the
+     violation marker model and render it in the legend entry), `viewer/src/styles.css`
+     for the value chrome, and visual coverage in `viewer/tests/visual.spec.ts`.
+   - Acceptance: Each legend entry displays its violation's worst measured value
+     formatted deterministically, entries with a null `worstValue` omit the value
+     without leaving broken chrome, the focus/clear interaction keeps working, and
+     visual tests assert the displayed value text.
 
 ## Backend Queue
 
