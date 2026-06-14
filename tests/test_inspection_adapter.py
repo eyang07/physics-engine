@@ -33,6 +33,7 @@ from engine.verification import (
     InspectionAdapterReport,
     InspectionArtifact,
     REPORT_STATUS,
+    SCHEMA_VERSION,
     VerificationDiagnostic,
     VerificationProblem,
     ObligationSpec,
@@ -132,7 +133,7 @@ def _valid_inspection_artifact_index() -> dict:
             {
                 "id": "example-problem",
                 "name": "example problem",
-                "schemaVersion": "verification-problem/v3",
+                "schemaVersion": SCHEMA_VERSION,
                 "artifacts": [
                     {"kind": ARTIFACT_PROBLEM_JSON, "path": "example.json"},
                     {"kind": ARTIFACT_REPORT_MARKDOWN, "path": "example.md"},
@@ -155,7 +156,7 @@ def _valid_viewer_verification_index() -> dict:
                 "name": "example problem",
                 "model": "example-model",
                 "status": "candidate",
-                "schemaVersion": "verification-problem/v3",
+                "schemaVersion": SCHEMA_VERSION,
                 "dataPath": "/data/verification/example-problem.json",
                 "counts": {"regions": 1, "obligations": 2, "candidates": 1},
             }
@@ -212,7 +213,7 @@ def _valid_viewer_verification_problem_payload() -> dict:
     return {
         "id": "example-problem",
         "name": "example problem",
-        "schemaVersion": "verification-problem/v3",
+        "schemaVersion": SCHEMA_VERSION,
         "variables": [{"name": "x"}, {"name": "v"}],
         "regions": [{"id": "domain"}],
         "regionGeometry": [{"regionId": "domain"}],
@@ -582,7 +583,7 @@ def test_export_script_writes_inspection_artifact_contract(tmp_path, capsys) -> 
     assert problem.system is None
 
     payload = problem.to_dict()
-    assert payload["schemaVersion"] == "verification-problem/v3"
+    assert payload["schemaVersion"] == SCHEMA_VERSION
     assert payload["system"] is None
     assert "system" not in payload["metadata"]
     assert payload["metadata"]["verificationModel"] == "controlled-pendulum-closed-loop"
@@ -1113,6 +1114,12 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         "/data/verification/controlled-spring-regulator-safety.json",
     ]
     assert [problem["id"] for problem in index["problems"]] == expected_ids
+    assert [problem["schemaVersion"] for problem in index["problems"]] == [
+        SCHEMA_VERSION,
+        SCHEMA_VERSION,
+    ]
+    assert payload["schemaVersion"] == SCHEMA_VERSION
+    assert spring_payload["schemaVersion"] == SCHEMA_VERSION
 
 
 def test_generate_verification_problems_default_dirs_are_ignored_paths() -> None:
@@ -1211,10 +1218,40 @@ def test_validate_viewer_verification_export_accepts_index_and_problem_payloads(
     )
 
 
+def test_validate_viewer_verification_export_rejects_wrong_index_schema_version() -> None:
+    index_payload = {
+        **_valid_viewer_verification_index(),
+        "problems": [
+            {
+                **_valid_viewer_verification_index()["problems"][0],
+                "schemaVersion": "verification-problem/v2",
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match="schemaVersion must be"):
+        validate_viewer_verification_export(
+            index_payload,
+            {
+                "/data/verification/example-problem.json": (
+                    _valid_viewer_verification_problem_payload()
+                )
+            },
+            version=INDEX_VERSION,
+        )
+
+
 @pytest.mark.parametrize(
     ("payload", "message"),
     [
         ({}, "version"),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "version": INDEX_VERSION + 1,
+            },
+            "version",
+        ),
         (
             {
                 **_valid_viewer_verification_index(),
@@ -1236,6 +1273,21 @@ def test_validate_viewer_verification_export_accepts_index_and_problem_payloads(
                 ],
             },
             "id is invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    {
+                        key: value
+                        for key, value in _valid_viewer_verification_index()[
+                            "problems"
+                        ][0].items()
+                        if key != "schemaVersion"
+                    }
+                ],
+            },
+            "schemaVersion is invalid",
         ),
         (
             {
@@ -1290,6 +1342,21 @@ def test_validate_viewer_verification_index_rejects_invalid_payloads(
 @pytest.mark.parametrize(
     ("payload", "message"),
     [
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "schemaVersion": "verification-problem/v2",
+            },
+            "schemaVersion must be",
+        ),
+        (
+            {
+                key: value
+                for key, value in _valid_viewer_verification_problem_payload().items()
+                if key != "schemaVersion"
+            },
+            "schemaVersion must be",
+        ),
         (
             {
                 **_valid_viewer_verification_problem_payload(),

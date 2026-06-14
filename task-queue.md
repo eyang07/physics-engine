@@ -57,17 +57,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-021: Add verification export schema-version guard tests**
-   - Goal: Keep viewer verification exports pinned to the intended IR and index
-     schema versions before data reaches the viewer.
-   - Scope: `engine/export/verification_contract.py`,
-     `scripts/generate_verification_problems.py`, and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: Tests reject mismatched problem `schemaVersion`, mismatched
-     index version, missing schema fields, and generator output validates with
-     the current expected versions.
-
-2. **BE-022: Add verification export unknown-extra-path guard**
+1. **BE-022: Add verification export unknown-extra-path guard**
    - Goal: Catch stale or misspelled viewer verification problem payload keys in
      generator tests before they become unreachable files.
    - Scope: `engine/export/verification_contract.py` and
@@ -75,3 +65,14 @@ Each task should use this structure:
    - Acceptance: Round-trip validation rejects problem payload maps containing
      unreferenced data paths, accepts exact referenced maps, and focused
      verification export tests pass.
+
+2. **BE-023: Add verification export index model guard tests**
+   - Goal: Keep viewer verification catalog model fields tied to problem
+     metadata rather than arbitrary generator strings.
+   - Scope: `engine/export/verification_contract.py`,
+     `scripts/generate_verification_problems.py`, and
+     `tests/test_inspection_adapter.py`.
+   - Acceptance: Round-trip validation rejects index model values that differ
+     from problem `metadata.verificationModel`, rejects missing model metadata,
+     accepts generated viewer examples, and focused verification export tests
+     pass.

@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from engine.verification import VerificationProblem
+from engine.verification import SCHEMA_VERSION, VerificationProblem
 
 
 def validate_viewer_verification_problems(
@@ -115,6 +115,11 @@ def validate_viewer_verification_export(
                 f"missing problem file {data_path}"
             )
 
+        if entry["schemaVersion"] != SCHEMA_VERSION:
+            raise ValueError(
+                f"viewer verification problem {problem_id} schemaVersion must be "
+                f"{SCHEMA_VERSION!r}"
+            )
         for key in ("id", "name", "schemaVersion"):
             if problem_payload.get(key) != entry[key]:
                 raise ValueError(
@@ -143,6 +148,12 @@ def validate_viewer_verification_problem_payload(payload: Mapping[str, Any]) -> 
     """Validate internal links in one viewer verification problem payload."""
 
     problem_id = _required_string(payload, "id", "viewer verification problem")
+    schema_version = payload.get("schemaVersion")
+    if schema_version != SCHEMA_VERSION:
+        raise ValueError(
+            f"viewer verification problem {problem_id} schemaVersion must be "
+            f"{SCHEMA_VERSION!r}"
+        )
     variable_names = _payload_named_set(payload, "variables", "name", problem_id)
     region_ids = _payload_named_set(payload, "regions", "id", problem_id)
     obligation_ids = _payload_named_set(payload, "obligations", "id", problem_id)
