@@ -86,6 +86,55 @@ def validate_viewer_verification_index(
                 )
 
 
+def validate_viewer_verification_export(
+    index_payload: Mapping[str, Any],
+    problem_payloads_by_data_path: Mapping[str, Mapping[str, Any]],
+    *,
+    version: int,
+) -> None:
+    """Validate the viewer verification index against referenced problem files."""
+
+    validate_viewer_verification_index(index_payload, version=version)
+    problems = index_payload["problems"]
+    for entry in problems:
+        problem_id = entry["id"]
+        data_path = entry["dataPath"]
+        problem_payload = problem_payloads_by_data_path.get(data_path)
+        if not isinstance(problem_payload, Mapping):
+            raise ValueError(
+                f"viewer verification index problem {problem_id} references "
+                f"missing problem file {data_path}"
+            )
+
+        for key in ("id", "name", "schemaVersion"):
+            if problem_payload.get(key) != entry[key]:
+                raise ValueError(
+                    f"viewer verification problem {problem_id} {key} does not "
+                    "match index"
+                )
+
+        expected_counts = {
+            "regions": _payload_list_count(problem_payload, "regions", problem_id),
+            "obligations": _payload_list_count(
+                problem_payload,
+                "obligations",
+                problem_id,
+            ),
+            "candidates": _payload_list_count(problem_payload, "candidates", problem_id),
+        }
+        if entry["counts"] != expected_counts:
+            raise ValueError(
+                f"viewer verification problem {problem_id} counts do not match payload"
+            )
+
+        trajectory = problem_payload.get("trajectory")
+        if not isinstance(trajectory, Mapping):
+            raise ValueError(
+                f"viewer verification problem {problem_id} trajectory is invalid"
+            )
+        validate_viewer_verification_trajectory(trajectory, problem_id=problem_id)
+
+
 def validate_viewer_verification_trajectory(
     payload: Mapping[str, Any],
     *,
@@ -159,6 +208,17 @@ def validate_viewer_verification_trajectory(
 
 def _is_number(value: Any) -> bool:
     return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def _payload_list_count(
+    payload: Mapping[str, Any],
+    key: str,
+    problem_id: str,
+) -> int:
+    values = payload.get(key)
+    if not isinstance(values, list):
+        raise ValueError(f"viewer verification problem {problem_id} {key} is invalid")
+    return len(values)
 
 
 def _validate_region_geometry(problem: VerificationProblem) -> None:

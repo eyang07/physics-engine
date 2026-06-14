@@ -58,17 +58,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-016: Add verification export round-trip contract coverage**
-   - Goal: Ensure generated viewer verification indexes and problem files stay
-     mutually consistent without committing regenerated artifacts.
-   - Scope: `engine/export/verification_contract.py`,
-     `scripts/generate_verification_problems.py`, and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: Temp-dir generation validates the index, every referenced
-     problem file, each embedded trajectory, and each index summary count against
-     the referenced problem payload; focused verification export tests pass.
-
-2. **BE-017: Validate verification export problem payload links**
+1. **BE-017: Validate verification export problem payload links**
    - Goal: Reject viewer verification problem files whose internal references
      point at missing regions, obligations, candidates, or trajectory states.
    - Scope: `engine/export/verification_contract.py`,
@@ -78,3 +68,12 @@ Each task should use this structure:
      obligation links, candidate obligation links, region-geometry region links,
      and trajectory state names not declared by the problem variables; generator
      tests cover valid and invalid payloads.
+
+2. **BE-018: Add deterministic verification export file-order checks**
+   - Goal: Keep viewer verification export ordering stable across direct writer
+     and CLI execution paths.
+   - Scope: `scripts/generate_verification_problems.py` and
+     `tests/test_inspection_adapter.py`.
+   - Acceptance: Tests assert deterministic returned ids, index order, printed
+     CLI summary order, and generated filename sets for both output directories
+     without relying on filesystem iteration order.

@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 
 from engine.export import (
-    validate_viewer_verification_index,
+    validate_viewer_verification_export,
     validate_viewer_verification_problems,
     validate_viewer_verification_trajectory,
 )
@@ -102,6 +102,8 @@ def write_verification_problems(
     viewer_dir.mkdir(parents=True, exist_ok=True)
 
     summaries: list[dict] = []
+    records: list[tuple[str, dict]] = []
+    payloads_by_data_path: dict[str, dict] = {}
     for example, problem in zip(examples, problems, strict=True):
         payload = problem.to_dict()
         payload["trajectory"] = _controlled_trajectory_payload(problem, example)
@@ -110,13 +112,21 @@ def write_verification_problems(
             problem_id=problem.id,
         )
         filename = f"{payload['id']}.json"
+        data_path = f"/data/verification/{filename}"
+        payloads_by_data_path[data_path] = payload
+        records.append((filename, payload))
+        summaries.append(_problem_summary(payload, data_path))
+
+    index_payload = {"version": INDEX_VERSION, "problems": summaries}
+    validate_viewer_verification_export(
+        index_payload,
+        payloads_by_data_path,
+        version=INDEX_VERSION,
+    )
+    for filename, payload in records:
         text = json.dumps(payload, indent=2) + "\n"
         (generated_dir / filename).write_text(text, encoding="utf-8")
         (viewer_dir / filename).write_text(text, encoding="utf-8")
-        summaries.append(_problem_summary(payload, f"/data/verification/{filename}"))
-
-    index_payload = {"version": INDEX_VERSION, "problems": summaries}
-    validate_viewer_verification_index(index_payload, version=INDEX_VERSION)
     index_text = json.dumps(index_payload, indent=2) + "\n"
     (generated_dir / "index.json").write_text(index_text, encoding="utf-8")
     (viewer_dir / "index.json").write_text(index_text, encoding="utf-8")

@@ -10,6 +10,7 @@ import sympy as sp
 
 from metadata_assertions import assert_embedded_certificate_trajectory
 from engine.export import (
+    validate_viewer_verification_export,
     validate_viewer_verification_index,
     validate_viewer_verification_trajectory,
 )
@@ -183,6 +184,30 @@ def _valid_viewer_verification_trajectory() -> dict:
                 ],
             },
         ],
+    }
+
+
+def _valid_viewer_verification_problem_payload() -> dict:
+    return {
+        "id": "example-problem",
+        "name": "example problem",
+        "schemaVersion": "verification-problem/v3",
+        "regions": [{"id": "domain"}],
+        "obligations": [{"id": "barrier-nonpositive"}, {"id": "barrier-flow"}],
+        "candidates": [{"id": "barrier"}],
+        "trajectory": _valid_viewer_verification_trajectory(),
+    }
+
+
+def _viewer_problem_payloads_by_data_path(
+    index_payload: dict,
+    directory: Path,
+) -> dict[str, dict]:
+    return {
+        entry["dataPath"]: json.loads(
+            (directory / Path(entry["dataPath"]).name).read_text(encoding="utf-8")
+        )
+        for entry in index_payload["problems"]
     }
 
 
@@ -982,6 +1007,11 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
     )
     index = json.loads((viewer_dir / "index.json").read_text(encoding="utf-8"))
     validate_viewer_verification_index(index, version=INDEX_VERSION)
+    validate_viewer_verification_export(
+        index,
+        _viewer_problem_payloads_by_data_path(index, viewer_dir),
+        version=INDEX_VERSION,
+    )
 
     assert payload["system"] is None
     assert payload["regionGeometry"]
@@ -1089,20 +1119,24 @@ def test_generate_verification_problems_cli_writes_custom_output_dirs(tmp_path) 
     assert {path.name for path in viewer_dir.iterdir()} == expected_names
 
     index = json.loads((viewer_dir / "index.json").read_text(encoding="utf-8"))
-    validate_viewer_verification_index(index, version=INDEX_VERSION)
+    viewer_payloads_by_data_path = _viewer_problem_payloads_by_data_path(
+        index,
+        viewer_dir,
+    )
+    validate_viewer_verification_export(
+        index,
+        viewer_payloads_by_data_path,
+        version=INDEX_VERSION,
+    )
     assert [entry["id"] for entry in index["problems"]] == expected_ids
 
     for entry in index["problems"]:
         filename = Path(entry["dataPath"]).name
-        viewer_payload = json.loads((viewer_dir / filename).read_text(encoding="utf-8"))
+        viewer_payload = viewer_payloads_by_data_path[entry["dataPath"]]
         generated_payload = json.loads(
             (generated_dir / filename).read_text(encoding="utf-8")
         )
         assert generated_payload == viewer_payload
-        validate_viewer_verification_trajectory(
-            viewer_payload["trajectory"],
-            problem_id=viewer_payload["id"],
-        )
 
 
 def test_validate_viewer_verification_index_accepts_export_shape() -> None:
@@ -1116,6 +1150,18 @@ def test_validate_viewer_verification_trajectory_accepts_export_shape() -> None:
     validate_viewer_verification_trajectory(
         _valid_viewer_verification_trajectory(),
         problem_id="example-problem",
+    )
+
+
+def test_validate_viewer_verification_export_accepts_index_and_problem_payloads() -> None:
+    validate_viewer_verification_export(
+        _valid_viewer_verification_index(),
+        {
+            "/data/verification/example-problem.json": (
+                _valid_viewer_verification_problem_payload()
+            )
+        },
+        version=INDEX_VERSION,
     )
 
 
@@ -1193,6 +1239,54 @@ def test_validate_viewer_verification_index_rejects_invalid_payloads(
 ) -> None:
     with pytest.raises(ValueError, match=message):
         validate_viewer_verification_index(payload, version=INDEX_VERSION)
+
+
+@pytest.mark.parametrize(
+    ("problem_payloads", "message"),
+    [
+        ({}, "references missing problem file"),
+        (
+            {
+                "/data/verification/example-problem.json": {
+                    **_valid_viewer_verification_problem_payload(),
+                    "id": "different-problem",
+                }
+            },
+            "id does not match index",
+        ),
+        (
+            {
+                "/data/verification/example-problem.json": {
+                    **_valid_viewer_verification_problem_payload(),
+                    "regions": [],
+                }
+            },
+            "counts do not match payload",
+        ),
+        (
+            {
+                "/data/verification/example-problem.json": {
+                    **_valid_viewer_verification_problem_payload(),
+                    "trajectory": {
+                        **_valid_viewer_verification_trajectory(),
+                        "states": [[0.0, 1.0]],
+                    },
+                }
+            },
+            "time and states must have matching lengths",
+        ),
+    ],
+)
+def test_validate_viewer_verification_export_rejects_mismatched_payloads(
+    problem_payloads,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        validate_viewer_verification_export(
+            _valid_viewer_verification_index(),
+            problem_payloads,
+            version=INDEX_VERSION,
+        )
 
 
 @pytest.mark.parametrize(
