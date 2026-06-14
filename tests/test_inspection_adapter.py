@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 import sympy as sp
@@ -38,15 +41,19 @@ from engine.verification import (
     write_inspection_artifacts,
 )
 from scripts.export_verification_problems import (
+    DEFAULT_OUTPUT_DIR,
     INSPECTION_ARTIFACT_INDEX_FILENAME,
     INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION,
     controlled_discrete_decay_problem,
     controlled_spring_problem,
     inspection_artifact_problems,
     main,
+    parse_args,
     upright_pendulum_problem,
 )
 from scripts.generate_verification_problems import write_verification_problems
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _oscillator_problem() -> VerificationProblem:
@@ -74,6 +81,15 @@ def _inspection_artifact_names(problem: VerificationProblem) -> tuple[str, str, 
         f"{problem.id}.inspection.md",
         f"{problem.id}.inspection-outcome.json",
     )
+
+
+def _inspection_artifact_path_lines(output_dir, problem: VerificationProblem) -> list[str]:
+    problem_name, markdown_name, outcome_name = _inspection_artifact_names(problem)
+    return [
+        f"wrote {ARTIFACT_PROBLEM_JSON}: {output_dir / problem_name}",
+        f"wrote {ARTIFACT_REPORT_MARKDOWN}: {output_dir / markdown_name}",
+        f"wrote {ARTIFACT_INSPECTION_OUTCOME_JSON}: {output_dir / outcome_name}",
+    ]
 
 
 def test_write_inspection_artifacts_round_trips_problem(tmp_path) -> None:
@@ -564,6 +580,59 @@ def test_export_script_writes_inspection_artifact_contract(tmp_path, capsys) -> 
         assert len(capability_checks) == 1
         assert capability_checks[0]["details"]["adapter"] == ADAPTER_NAME
         assert capability_checks[0]["details"]["supportsDischarge"] is False
+
+
+def test_export_script_default_output_dir_is_ignored_generated_path() -> None:
+    args = parse_args([])
+
+    assert args.output_dir == DEFAULT_OUTPUT_DIR
+    assert DEFAULT_OUTPUT_DIR.startswith("data/generated/")
+    assert "data/generated/" in (REPO_ROOT / ".gitignore").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_export_script_cli_writes_custom_output_dir(tmp_path) -> None:
+    output_dir = tmp_path / "inspection-artifacts"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "scripts.export_verification_problems",
+            "--output-dir",
+            str(output_dir),
+        ],
+        cwd=REPO_ROOT,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    exported_problems = inspection_artifact_problems()
+    expected_path_lines = [
+        line
+        for problem in exported_problems
+        for line in _inspection_artifact_path_lines(output_dir, problem)
+    ]
+    expected_path_lines.append(
+        f"wrote inspection artifact index: "
+        f"{output_dir / INSPECTION_ARTIFACT_INDEX_FILENAME}"
+    )
+    actual_path_lines = [
+        line for line in result.stdout.splitlines() if line.startswith("wrote ")
+    ]
+    assert actual_path_lines == expected_path_lines
+    assert str(DEFAULT_OUTPUT_DIR) not in result.stdout
+    assert result.stderr == ""
+
+    expected_names = {
+        name
+        for exported_problem in exported_problems
+        for name in _inspection_artifact_names(exported_problem)
+    }
+    expected_names.add(INSPECTION_ARTIFACT_INDEX_FILENAME)
+    assert {path.name for path in output_dir.iterdir()} == expected_names
 
 
 def test_controlled_discrete_fixture_writes_inspection_diagnostics(tmp_path) -> None:

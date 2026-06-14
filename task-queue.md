@@ -32,19 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-001: Finish the self-contained Verification stage**
-   - Goal: Complete the Verification-domain stage that animates the exported
-     verification trajectory with region geometry and candidate-certificate
-     lanes, independent of the Systems gallery.
-   - Scope: `viewer/index.html`, `viewer/src/main.ts`,
-     `viewer/src/verificationStage.ts`, `viewer/src/certificateLanes.ts`,
-     `viewer/src/data/verification.ts`, and related styling.
-   - Acceptance: Switching to Verification loads the selected problem's own
-     `trajectory`, overlays exported `regionGeometry`, draws certificate lanes
-     from exported series, never evaluates symbolic expressions in TypeScript,
-     and `cd viewer && npm run build` passes.
-
-2. **FE-002: Add visual coverage for the Verification stage**
+1. **FE-002: Add visual coverage for the Verification stage**
    - Goal: Cover the new Verification stage and certificate lanes in Playwright
      so layout, canvas rendering, and empty-trajectory fallback do not regress.
    - Scope: `viewer/tests` or the existing visual-test harness, plus targeted
@@ -54,7 +42,7 @@ Each task should use this structure:
      state without misleading overlays, and `cd viewer && npm run test:visual`
      passes with the dev server running.
 
-3. **FE-003: Mark measured violation samples on the Verification stage**
+2. **FE-003: Mark measured violation samples on the Verification stage**
    - Goal: When a `proofStatuses` entry reports `measured-violated` with a
      worst sampled point that maps to the active projection, show that point on
      the stage alongside the trajectory.
@@ -66,18 +54,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-010: Add inspection index CLI smoke coverage**
-   - Goal: Keep the backend inspection export CLI discoverable by checking its
-     default and custom-output behavior without writing committed generated
-     artifacts.
-   - Scope: `tests/test_inspection_adapter.py`,
-     `scripts/export_verification_problems.py`, and documentation only if CLI
-     behavior changes.
-   - Acceptance: Tests exercise the CLI entry point with a temporary output
-     directory, assert the printed artifact/index paths are deterministic, and
-     confirm no generated artifacts are expected in the repository tree.
-
-2. **BE-011: Add verification artifact index schema validation**
+1. **BE-011: Add verification artifact index schema validation**
    - Goal: Validate the inspection artifact index shape independently from the
      export script so downstream backend tools can rely on a narrow discovery
      contract.
@@ -87,3 +64,14 @@ Each task should use this structure:
    - Acceptance: A reusable validator rejects missing schema versions, duplicate
      problem ids, missing artifact paths, and unknown artifact kinds; focused
      inspection tests cover valid and invalid indexes.
+
+2. **BE-012: Add inspection artifact manifest round-trip tests**
+   - Goal: Ensure inspection artifact index entries can be used to load the
+     referenced problem, markdown, and outcome artifacts without relying on
+     filename conventions outside the index.
+   - Scope: `tests/test_inspection_adapter.py`,
+     `scripts/export_verification_problems.py`, and validation helpers if
+     introduced by BE-011.
+   - Acceptance: Tests read the index from a temporary export, load every
+     artifact path listed there, confirm each outcome references the same
+     problem id, and focused inspection tests pass.

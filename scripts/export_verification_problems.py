@@ -329,23 +329,37 @@ def write_inspection_artifact_index(
     return index_path
 
 
-def main(argv: list[str] | None = None) -> None:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--output-dir",
         default=DEFAULT_OUTPUT_DIR,
         help="directory for inspection artifacts",
     )
-    args = parser.parse_args(argv)
+    return parser.parse_args(argv)
 
-    records = []
+
+def export_inspection_artifacts(
+    output_dir: str | Path,
+) -> tuple[list[tuple[VerificationProblem, InspectionAdapterReport]], Path]:
+    """Write every inspection problem artifact and the discovery index."""
+
+    records: list[tuple[VerificationProblem, InspectionAdapterReport]] = []
     for problem in inspection_artifact_problems():
-        report = write_inspection_artifacts(problem, args.output_dir)
+        report = write_inspection_artifacts(problem, output_dir)
         records.append((problem, report))
+    index_path = write_inspection_artifact_index(records, output_dir)
+    return records, index_path
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
+
+    records, index_path = export_inspection_artifacts(args.output_dir)
+    for _problem, report in records:
         for artifact in report.artifacts:
             print(f"wrote {artifact.kind}: {artifact.path}")
         print(report.note)
-    index_path = write_inspection_artifact_index(records, args.output_dir)
     print(f"wrote inspection artifact index: {index_path}")
 
 
