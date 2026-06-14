@@ -1680,6 +1680,40 @@ def test_validate_viewer_verification_index_rejects_invalid_payloads(
             },
             "comparisonBaseline 0 rhs is invalid",
         ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "trajectory": {
+                    **_valid_viewer_verification_trajectory(),
+                    "certificateSeries": [
+                        {
+                            **_valid_viewer_verification_trajectory()[
+                                "certificateSeries"
+                            ][0],
+                            "kind": "",
+                        }
+                    ],
+                },
+            },
+            "certificateSeries 0 kind is invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "trajectory": {
+                    **_valid_viewer_verification_trajectory(),
+                    "certificateSeries": [
+                        {
+                            **_valid_viewer_verification_trajectory()[
+                                "certificateSeries"
+                            ][0],
+                            "kind": "lyapunov-value",
+                        }
+                    ],
+                },
+            },
+            "certificateSeries 0 uses unknown kind: lyapunov-value",
+        ),
     ],
 )
 def test_validate_viewer_verification_problem_payload_rejects_bad_links(

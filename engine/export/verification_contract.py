@@ -23,6 +23,11 @@ from typing import Any
 
 from engine.verification import SCHEMA_VERSION, VerificationProblem
 
+# The certificate-series semantics the viewer's certificate lanes know how to
+# render. A series is either the candidate value sampled along the trajectory or
+# its flow derivative; any other kind would have no defined lane.
+_CERTIFICATE_SERIES_KINDS = frozenset({"candidate-value", "flow-derivative"})
+
 
 def validate_viewer_verification_problems(
     problems: Sequence[VerificationProblem],
@@ -263,6 +268,17 @@ def validate_viewer_verification_problem_payload(payload: Mapping[str, Any]) -> 
             )
 
     for index, record in enumerate(trajectory["certificateSeries"]):
+        kind = record.get("kind")
+        if not isinstance(kind, str) or not kind:
+            raise ValueError(
+                f"viewer verification problem {problem_id} certificateSeries {index} "
+                "kind is invalid"
+            )
+        if kind not in _CERTIFICATE_SERIES_KINDS:
+            raise ValueError(
+                f"viewer verification problem {problem_id} certificateSeries {index} "
+                f"uses unknown kind: {kind}"
+            )
         candidate_id = record.get("candidateId")
         if candidate_id is not None and candidate_id not in candidate_ids:
             raise ValueError(

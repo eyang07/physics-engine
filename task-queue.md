@@ -59,16 +59,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-029: Add verification certificate-series kind guard**
-   - Goal: Keep viewer certificate lanes tied to known measured certificate
-     series semantics.
-   - Scope: `engine/export/verification_contract.py` and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: Problem payload validation rejects empty certificate-series
-     `kind`, rejects unknown `kind` values, accepts `candidate-value` and
-     `flow-derivative`, and focused verification export tests pass.
-
-2. **BE-030: Add verification certificate-series problem-id guard**
+1. **BE-030: Add verification certificate-series problem-id guard**
    - Goal: Ensure embedded certificate metadata cannot silently point at a
      different verification problem.
    - Scope: `engine/export/verification_contract.py` and
@@ -77,3 +68,12 @@ Each task should use this structure:
      `problemId` values that differ from the containing problem id, rejects empty
      `problemId`, accepts generated viewer examples, and focused verification
      export tests pass.
+
+2. **BE-031: Add verification certificate-series label guard**
+   - Goal: Keep each certificate-series carrying a human-readable lane label so
+     the viewer never renders an unlabeled certificate lane.
+   - Scope: `engine/export/verification_contract.py` and
+     `tests/test_inspection_adapter.py`.
+   - Acceptance: Problem payload validation rejects empty or non-string
+     certificate-series `label`, accepts the generated viewer examples, and
+     focused verification export tests pass.
