@@ -214,6 +214,7 @@ def _valid_viewer_verification_problem_payload() -> dict:
         "id": "example-problem",
         "name": "example problem",
         "schemaVersion": SCHEMA_VERSION,
+        "metadata": {"verificationModel": "example-model"},
         "variables": [{"name": "x"}, {"name": "v"}],
         "regions": [{"id": "domain"}],
         "regionGeometry": [{"regionId": "domain"}],
@@ -1254,6 +1255,45 @@ def test_validate_viewer_verification_export_rejects_unreferenced_problem_paths(
                     "id": "stale-problem",
                 },
             },
+            version=INDEX_VERSION,
+        )
+
+
+@pytest.mark.parametrize(
+    ("index_payload", "problem_payload", "message"),
+    [
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    {
+                        **_valid_viewer_verification_index()["problems"][0],
+                        "model": "different-model",
+                    }
+                ],
+            },
+            _valid_viewer_verification_problem_payload(),
+            "model does not match metadata.verificationModel",
+        ),
+        (
+            _valid_viewer_verification_index(),
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "metadata": {},
+            },
+            "metadata verificationModel is invalid",
+        ),
+    ],
+)
+def test_validate_viewer_verification_export_rejects_model_mismatches(
+    index_payload,
+    problem_payload,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        validate_viewer_verification_export(
+            index_payload,
+            {"/data/verification/example-problem.json": problem_payload},
             version=INDEX_VERSION,
         )
 

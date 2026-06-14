@@ -57,18 +57,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-023: Add verification export index model guard tests**
-   - Goal: Keep viewer verification catalog model fields tied to problem
-     metadata rather than arbitrary generator strings.
-   - Scope: `engine/export/verification_contract.py`,
-     `scripts/generate_verification_problems.py`, and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: Round-trip validation rejects index model values that differ
-     from problem `metadata.verificationModel`, rejects missing model metadata,
-     accepts generated viewer examples, and focused verification export tests
-     pass.
-
-2. **BE-024: Add verification export index status guard tests**
+1. **BE-024: Add verification export index status guard tests**
    - Goal: Keep viewer verification catalog status fields tied to problem
      metadata and candidate-only semantics.
    - Scope: `engine/export/verification_contract.py`,
@@ -77,3 +66,12 @@ Each task should use this structure:
    - Acceptance: Round-trip validation rejects status values that differ from
      `metadata.status`, rejects empty status metadata, accepts generated viewer
      examples, and focused verification export tests pass.
+
+2. **BE-025: Add verification export count type regression tests**
+   - Goal: Keep viewer verification catalog count fields strict integers that
+     exactly match problem payload list lengths.
+   - Scope: `engine/export/verification_contract.py` and
+     `tests/test_inspection_adapter.py`.
+   - Acceptance: Tests reject boolean counts, float counts, count/list mismatches
+     for each count field, accept generated viewer examples, and focused
+     verification export tests pass.

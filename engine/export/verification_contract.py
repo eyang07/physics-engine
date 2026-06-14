@@ -134,6 +134,22 @@ def validate_viewer_verification_export(
                     f"viewer verification problem {problem_id} {key} does not "
                     "match index"
                 )
+        metadata = problem_payload.get("metadata")
+        if not isinstance(metadata, Mapping):
+            raise ValueError(
+                f"viewer verification problem {problem_id} metadata is invalid"
+            )
+        model = metadata.get("verificationModel")
+        if not isinstance(model, str) or not model:
+            raise ValueError(
+                f"viewer verification problem {problem_id} metadata "
+                "verificationModel is invalid"
+            )
+        if entry["model"] != model:
+            raise ValueError(
+                f"viewer verification problem {problem_id} model does not match "
+                "metadata.verificationModel"
+            )
 
         validate_viewer_verification_problem_payload(problem_payload)
 
