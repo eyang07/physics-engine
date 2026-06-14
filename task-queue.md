@@ -56,17 +56,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-013: Validate viewer verification index shape**
-   - Goal: Add backend-side validation for `scripts.generate_verification_problems`
-     index entries so the viewer catalog can rely on stable problem summaries.
-   - Scope: `scripts/generate_verification_problems.py`,
-     `engine/export/verification_contract.py` or a nearby helper, and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: Validation rejects missing ids, duplicate ids, non-verification
-     data paths, and malformed count summaries; generator tests cover valid and
-     invalid index payloads; focused verification export tests pass.
-
-2. **BE-014: Add verification trajectory payload validation**
+1. **BE-014: Add verification trajectory payload validation**
    - Goal: Validate the embedded verification trajectory payloads written for
      the viewer so time, state names, states, series, and certificate metadata
      stay synchronized.
@@ -76,3 +66,12 @@ Each task should use this structure:
    - Acceptance: Validation rejects mismatched time/state lengths, series whose
      lengths differ from time, missing certificate series references, and empty
      state names; generator tests cover valid and invalid payloads.
+
+2. **BE-015: Add viewer verification export CLI smoke coverage**
+   - Goal: Keep `scripts.generate_verification_problems` discoverable from the
+     command line without requiring committed generated artifacts.
+   - Scope: `scripts/generate_verification_problems.py`,
+     `tests/test_inspection_adapter.py`, and docs if CLI behavior changes.
+   - Acceptance: The generator exposes configurable output directories, CLI
+     smoke tests write viewer/generator artifacts to temp directories, printed
+     summaries are deterministic, and focused verification export tests pass.

@@ -8,7 +8,8 @@ it does not consult any manifest system.
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from engine.verification import VerificationProblem
 
@@ -25,6 +26,64 @@ def validate_viewer_verification_problems(
     for problem in problems:
         _validate_region_geometry(problem)
         _validate_proof_statuses(problem)
+
+
+def validate_viewer_verification_index(
+    payload: Mapping[str, Any],
+    *,
+    version: int,
+) -> None:
+    """Validate the viewer Verification catalog index shape."""
+
+    if payload.get("version") != version:
+        raise ValueError("viewer verification index version is invalid")
+    problems = payload.get("problems")
+    if not isinstance(problems, list):
+        raise ValueError("viewer verification index problems must be a list")
+
+    seen_ids: set[str] = set()
+    for index, entry in enumerate(problems):
+        if not isinstance(entry, Mapping):
+            raise ValueError(f"viewer verification index problem {index} must be an object")
+        problem_id = entry.get("id")
+        if not isinstance(problem_id, str) or not problem_id:
+            raise ValueError(f"viewer verification index problem {index} id is invalid")
+        if problem_id in seen_ids:
+            raise ValueError(f"duplicate viewer verification problem id: {problem_id}")
+        seen_ids.add(problem_id)
+
+        for key in ("name", "model", "status", "schemaVersion"):
+            if not isinstance(entry.get(key), str) or not entry[key]:
+                raise ValueError(
+                    f"viewer verification index problem {problem_id} {key} is invalid"
+                )
+
+        data_path = entry.get("dataPath")
+        if (
+            not isinstance(data_path, str)
+            or not data_path.startswith("/data/verification/")
+            or not data_path.endswith(".json")
+        ):
+            raise ValueError(
+                f"viewer verification index problem {problem_id} dataPath is invalid"
+            )
+
+        counts = entry.get("counts")
+        if not isinstance(counts, Mapping):
+            raise ValueError(
+                f"viewer verification index problem {problem_id} counts are invalid"
+            )
+        expected_count_keys = {"regions", "obligations", "candidates"}
+        if set(counts) != expected_count_keys:
+            raise ValueError(
+                f"viewer verification index problem {problem_id} counts are malformed"
+            )
+        for key in expected_count_keys:
+            value = counts[key]
+            if not isinstance(value, int) or value < 0:
+                raise ValueError(
+                    f"viewer verification index problem {problem_id} count {key} is invalid"
+                )
 
 
 def _validate_region_geometry(problem: VerificationProblem) -> None:

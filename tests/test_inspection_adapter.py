@@ -9,6 +9,7 @@ import pytest
 import sympy as sp
 
 from metadata_assertions import assert_embedded_certificate_trajectory
+from engine.export import validate_viewer_verification_index
 from engine.dynamics import (
     Box,
     ControlledDiscreteSystem,
@@ -53,7 +54,7 @@ from scripts.export_verification_problems import (
     parse_args,
     upright_pendulum_problem,
 )
-from scripts.generate_verification_problems import write_verification_problems
+from scripts.generate_verification_problems import INDEX_VERSION, write_verification_problems
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -110,6 +111,23 @@ def _valid_inspection_artifact_index() -> dict:
                         "path": "example.outcome.json",
                     },
                 ],
+            }
+        ],
+    }
+
+
+def _valid_viewer_verification_index() -> dict:
+    return {
+        "version": INDEX_VERSION,
+        "problems": [
+            {
+                "id": "example-problem",
+                "name": "example problem",
+                "model": "example-model",
+                "status": "candidate",
+                "schemaVersion": "verification-problem/v3",
+                "dataPath": "/data/verification/example-problem.json",
+                "counts": {"regions": 1, "obligations": 2, "candidates": 1},
             }
         ],
     }
@@ -910,6 +928,7 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         )
     )
     index = json.loads((viewer_dir / "index.json").read_text(encoding="utf-8"))
+    validate_viewer_verification_index(index, version=INDEX_VERSION)
 
     assert payload["system"] is None
     assert payload["regionGeometry"]
@@ -959,3 +978,86 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         "/data/verification/upright-pendulum-safety.json",
         "/data/verification/controlled-spring-regulator-safety.json",
     ]
+
+
+def test_validate_viewer_verification_index_accepts_export_shape() -> None:
+    validate_viewer_verification_index(
+        _valid_viewer_verification_index(),
+        version=INDEX_VERSION,
+    )
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ({}, "version"),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    *_valid_viewer_verification_index()["problems"],
+                    *_valid_viewer_verification_index()["problems"],
+                ],
+            },
+            "duplicate viewer verification problem id",
+        ),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    {
+                        **_valid_viewer_verification_index()["problems"][0],
+                        "id": "",
+                    }
+                ],
+            },
+            "id is invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    {
+                        **_valid_viewer_verification_index()["problems"][0],
+                        "dataPath": "/data/example-problem.json",
+                    }
+                ],
+            },
+            "dataPath is invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    {
+                        **_valid_viewer_verification_index()["problems"][0],
+                        "counts": {"regions": 1, "obligations": 2},
+                    }
+                ],
+            },
+            "counts are malformed",
+        ),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    {
+                        **_valid_viewer_verification_index()["problems"][0],
+                        "counts": {
+                            "regions": 1,
+                            "obligations": -1,
+                            "candidates": 1,
+                        },
+                    }
+                ],
+            },
+            "count obligations is invalid",
+        ),
+    ],
+)
+def test_validate_viewer_verification_index_rejects_invalid_payloads(
+    payload,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        validate_viewer_verification_index(payload, version=INDEX_VERSION)

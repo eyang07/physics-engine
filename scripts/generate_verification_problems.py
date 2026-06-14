@@ -20,7 +20,10 @@ from pathlib import Path
 
 import numpy as np
 
-from engine.export import validate_viewer_verification_problems
+from engine.export import (
+    validate_viewer_verification_index,
+    validate_viewer_verification_problems,
+)
 from engine.verification import VerificationProblem, certificate_series_for_trajectory
 from scripts.export_verification_problems import (
     ViewerVerificationExample,
@@ -104,7 +107,9 @@ def write_verification_problems(
         (viewer_dir / filename).write_text(text, encoding="utf-8")
         summaries.append(_problem_summary(payload, f"/data/verification/{filename}"))
 
-    index_text = json.dumps({"version": INDEX_VERSION, "problems": summaries}, indent=2) + "\n"
+    index_payload = {"version": INDEX_VERSION, "problems": summaries}
+    validate_viewer_verification_index(index_payload, version=INDEX_VERSION)
+    index_text = json.dumps(index_payload, indent=2) + "\n"
     (generated_dir / "index.json").write_text(index_text, encoding="utf-8")
     (viewer_dir / "index.json").write_text(index_text, encoding="utf-8")
     return [summary["id"] for summary in summaries]
