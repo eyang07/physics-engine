@@ -54,18 +54,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-012: Add inspection artifact manifest round-trip tests**
-   - Goal: Ensure inspection artifact index entries can be used to load the
-     referenced problem, markdown, and outcome artifacts without relying on
-     filename conventions outside the index.
-   - Scope: `tests/test_inspection_adapter.py`,
-     `scripts/export_verification_problems.py`, and validation helpers if
-     introduced by BE-011.
-   - Acceptance: Tests read the index from a temporary export, load every
-     artifact path listed there, confirm each outcome references the same
-     problem id, and focused inspection tests pass.
-
-2. **BE-013: Validate viewer verification index shape**
+1. **BE-013: Validate viewer verification index shape**
    - Goal: Add backend-side validation for `scripts.generate_verification_problems`
      index entries so the viewer catalog can rely on stable problem summaries.
    - Scope: `scripts/generate_verification_problems.py`,
@@ -74,3 +63,14 @@ Each task should use this structure:
    - Acceptance: Validation rejects missing ids, duplicate ids, non-verification
      data paths, and malformed count summaries; generator tests cover valid and
      invalid index payloads; focused verification export tests pass.
+
+2. **BE-014: Add verification trajectory payload validation**
+   - Goal: Validate the embedded verification trajectory payloads written for
+     the viewer so time, state names, states, series, and certificate metadata
+     stay synchronized.
+   - Scope: `scripts/generate_verification_problems.py`,
+     `engine/export/verification_contract.py`, and
+     `tests/test_inspection_adapter.py`.
+   - Acceptance: Validation rejects mismatched time/state lengths, series whose
+     lengths differ from time, missing certificate series references, and empty
+     state names; generator tests cover valid and invalid payloads.

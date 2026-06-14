@@ -47,6 +47,7 @@ from scripts.export_verification_problems import (
     INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION,
     controlled_discrete_decay_problem,
     controlled_spring_problem,
+    export_inspection_artifacts,
     inspection_artifact_problems,
     main,
     parse_args,
@@ -659,6 +660,46 @@ def test_export_script_cli_writes_custom_output_dir(tmp_path) -> None:
     }
     expected_names.add(INSPECTION_ARTIFACT_INDEX_FILENAME)
     assert {path.name for path in output_dir.iterdir()} == expected_names
+
+
+def test_inspection_artifact_index_paths_round_trip(tmp_path) -> None:
+    _records, index_path = export_inspection_artifacts(tmp_path)
+    index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+    validate_inspection_artifact_index(
+        index_payload,
+        schema_version=INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION,
+    )
+
+    for problem_entry in index_payload["problems"]:
+        artifacts_by_kind = {
+            artifact["kind"]: Path(artifact["path"])
+            for artifact in problem_entry["artifacts"]
+        }
+        assert set(artifacts_by_kind) == {
+            ARTIFACT_PROBLEM_JSON,
+            ARTIFACT_REPORT_MARKDOWN,
+            ARTIFACT_INSPECTION_OUTCOME_JSON,
+        }
+
+        problem_payload = json.loads(
+            artifacts_by_kind[ARTIFACT_PROBLEM_JSON].read_text(encoding="utf-8")
+        )
+        markdown_text = artifacts_by_kind[ARTIFACT_REPORT_MARKDOWN].read_text(
+            encoding="utf-8"
+        )
+        outcome_payload = json.loads(
+            artifacts_by_kind[ARTIFACT_INSPECTION_OUTCOME_JSON].read_text(
+                encoding="utf-8"
+            )
+        )
+
+        assert problem_payload["id"] == problem_entry["id"]
+        assert problem_payload["name"] == problem_entry["name"]
+        assert problem_payload["schemaVersion"] == problem_entry["schemaVersion"]
+        assert f"# Verification problem: {problem_entry['name']}" in markdown_text
+        assert outcome_payload["problemId"] == problem_entry["id"]
+        assert outcome_payload["schemaVersion"] == problem_entry["schemaVersion"]
+        assert outcome_payload["artifacts"] == problem_entry["artifacts"]
 
 
 def test_validate_inspection_artifact_index_accepts_export_shape() -> None:
