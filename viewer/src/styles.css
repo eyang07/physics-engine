@@ -198,6 +198,12 @@ select {
 }
 
 .verif-stage {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(260px, 340px);
+  grid-template-areas:
+    "workspace signals"
+    "content content";
+  gap: 0;
   min-width: 0;
   height: 100%;
   overflow-y: auto;
@@ -206,7 +212,69 @@ select {
     linear-gradient(155deg, var(--ink-900) 0%, var(--ink-800) 55%, var(--ink-850) 100%);
 }
 
+.verif-stage__workspace {
+  position: relative;
+  grid-area: workspace;
+  min-height: 430px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.verif-stage__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 430px;
+}
+
+.verif-stage__controls {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: grid;
+  grid-template-columns: auto minmax(160px, 220px);
+  align-items: center;
+  gap: var(--space-3);
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost);
+  backdrop-filter: blur(20px);
+}
+
+.verif-stage__controls button {
+  min-height: 30px;
+  padding: 0 14px;
+}
+
+.verif-stage__controls label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.verif-stage__controls span {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.verif-stage__signals {
+  grid-area: signals;
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 430px;
+  padding: 22px 18px;
+  border-bottom: 1px solid var(--hairline);
+  border-left: 1px solid var(--hairline);
+  background: rgba(10, 15, 20, 0.38);
+}
+
 .verif-content {
+  grid-area: content;
   height: 100%;
 }
 
@@ -1092,6 +1160,10 @@ input[type="range"]::-moz-range-thumb {
     grid-template-rows: auto minmax(420px, 1fr) auto;
   }
 
+  #verificationDomain.domain--active {
+    grid-template-columns: 1fr;
+  }
+
   .catalog {
     height: auto;
     border-right: 0;
@@ -1111,6 +1183,30 @@ input[type="range"]::-moz-range-thumb {
   .stage__canvas {
     height: 100%;
     min-height: 420px;
+  }
+
+  .verif-stage {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "workspace"
+      "signals"
+      "content";
+  }
+
+  .verif-stage__workspace,
+  .verif-stage__canvas {
+    min-height: 360px;
+  }
+
+  .verif-stage__signals {
+    min-height: 0;
+    border-left: 0;
+  }
+
+  .verif-stage__controls {
+    left: 16px;
+    right: 16px;
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .panel {

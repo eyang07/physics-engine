@@ -35,9 +35,6 @@
           <div class="panel__header">
             <p class="eyebrow">Selected System</p>
             <h1 id="systemTitle">Simple Pendulum</h1>
-            <button id="verificationLink" class="panel-link" type="button" hidden>
-              View safety verification →
-            </button>
           </div>
           <label class="select-field">
             <span>system</span>
@@ -46,12 +43,6 @@
           <div>
             <p class="control-label">visualization</p>
             <div id="visualizationModes" class="mode-switch" aria-label="Visualization mode"></div>
-          </div>
-          <div id="safetyToggleSection" class="panel-toggle" hidden>
-            <label class="toggle-field">
-              <input id="safetyRegionsToggle" type="checkbox" />
-              <span>Show safety regions</span>
-            </label>
           </div>
           <div id="variantSection" class="panel-variants" hidden>
             <p class="control-label">parameter family</p>
@@ -95,6 +86,20 @@
           <div id="verificationCatalog" class="system-catalog"></div>
         </aside>
         <section class="verif-stage" aria-label="Verification problem">
+          <div class="verif-stage__workspace">
+            <canvas id="verificationCanvas" class="verif-stage__canvas"></canvas>
+            <div class="verif-stage__controls">
+              <button id="verificationPlayButton" type="button">Pause</button>
+              <label>
+                <span>speed</span>
+                <input id="verificationSpeedControl" type="range" min="0.2" max="3" step="0.1" value="1" />
+              </label>
+            </div>
+          </div>
+          <aside class="verif-stage__signals" aria-label="Candidate certificate signals">
+            <p class="control-label">certificate lanes</p>
+            <div id="verificationCertificateLanes" class="diagnostics"></div>
+          </aside>
           <div id="verificationContent" class="verif-content"></div>
         </section>
       </section>

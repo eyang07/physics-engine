@@ -15,11 +15,27 @@
  * missing optional section degrades to empty instead of throwing.
  */
 
+import { parseCertificateSeriesList, type CertificateSeries } from "./trajectory";
+
 export interface IrExpression {
   /** Human-readable rendering, e.g. `omega**2/2 + ...`. */
   display: string;
   /** LaTeX rendering for KaTeX; falls back to `display` when absent. */
   latex: string;
+}
+
+/**
+ * The self-contained trajectory the Verification world animates: the controlled
+ * system the obligations are derived for, integrated by the engine, with
+ * candidate-certificate series evaluated along it. Exported in the problem JSON
+ * under `trajectory` (its own state, independent of any gallery system).
+ */
+export interface VerificationTrajectory {
+  time: number[];
+  stateNames: string[];
+  states: number[][];
+  series: Record<string, number[]>;
+  certificateSeries: CertificateSeries[];
 }
 
 export interface IrVariable {
@@ -170,13 +186,15 @@ export interface VerificationProblem {
   candidates: IrCandidate[];
   proofStatuses: ProofStatus[];
   dynamics: IrDynamics | null;
+  trajectory: VerificationTrajectory | null;
   metadata: Record<string, unknown>;
 }
 
 export interface VerificationProblemSummary {
   id: string;
   name: string;
-  system: string | null;
+  /** The self-contained model the problem describes (no gallery cross-link). */
+  model: string | null;
   status: string;
   schemaVersion: string | null;
   dataPath: string;
@@ -398,6 +416,30 @@ function parseInput(value: unknown): IrInput | null {
   };
 }
 
+function parseVerificationTrajectory(value: unknown): VerificationTrajectory | null {
+  const record = asRecord(value);
+  if (!record) {
+    return null;
+  }
+  const time = asNumberArray(record.time);
+  const states = Array.isArray(record.states) ? record.states.map(asNumberArray) : [];
+  if (time.length === 0 || states.length === 0) {
+    return null;
+  }
+  const seriesRecord = asRecord(record.series) ?? {};
+  const series: Record<string, number[]> = {};
+  for (const [key, raw] of Object.entries(seriesRecord)) {
+    series[key] = asNumberArray(raw);
+  }
+  return {
+    time,
+    stateNames: asStringArray(record.stateNames),
+    states,
+    series,
+    certificateSeries: parseCertificateSeriesList(record.certificateSeries),
+  };
+}
+
 function parseDynamics(value: unknown): IrDynamics | null {
   const record = asRecord(value);
   if (!record) {
@@ -448,6 +490,7 @@ export function parseVerificationProblem(raw: unknown): VerificationProblem {
     candidates: parseArray(record.candidates, parseCandidate),
     proofStatuses: parseArray(record.proofStatuses, parseProofStatus),
     dynamics: parseDynamics(record.dynamics),
+    trajectory: parseVerificationTrajectory(record.trajectory),
     metadata: asRecord(record.metadata) ?? {},
   };
 }
@@ -461,7 +504,7 @@ function parseSummary(value: unknown): VerificationProblemSummary | null {
   return {
     id: record.id,
     name: asString(record.name, record.id),
-    system: asOptionalString(record.system),
+    model: asOptionalString(record.model),
     status: asString(record.status, "candidate"),
     schemaVersion: asOptionalString(record.schemaVersion),
     dataPath: record.dataPath,

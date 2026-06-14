@@ -266,7 +266,11 @@ export function invariantResiduals(trajectory: Trajectory): InvariantResidual[] 
 
 /** Read the candidate-certificate series Python attached to the trajectory. */
 export function certificateSeries(trajectory: Trajectory): CertificateSeries[] {
-  const raw = trajectory.metadata?.certificateSeries;
+  return parseCertificateSeriesList(trajectory.metadata?.certificateSeries);
+}
+
+/** Parse a raw `certificateSeries` array (shared by trajectory + verification data). */
+export function parseCertificateSeriesList(raw: unknown): CertificateSeries[] {
   if (!Array.isArray(raw)) {
     return [];
   }

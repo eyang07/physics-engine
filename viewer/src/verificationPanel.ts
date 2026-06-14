@@ -111,9 +111,6 @@ function comparisonLatex(comparison: string): string {
 }
 
 export class VerificationPanel {
-  /** Set by the host to navigate back to a problem's linked Systems example. */
-  onOpenSystem: ((systemId: string) => void) | null = null;
-
   constructor(private readonly container: HTMLElement) {}
 
   clear(): void {
@@ -175,14 +172,6 @@ export class VerificationPanel {
         ? problem.metadata.note
         : "Verification-problem IR only: every obligation awaits external sound discharge. This is candidate metadata, not certification.";
     header.append(el("p", "verif-note", note));
-
-    // Jump back to the Systems example this problem is derived along, when linked.
-    if (problem.system) {
-      const link = el("button", "panel-link", `Open system: ${problem.system} →`);
-      link.type = "button";
-      link.addEventListener("click", () => this.onOpenSystem?.(problem.system!));
-      header.append(link);
-    }
     return header;
   }
 

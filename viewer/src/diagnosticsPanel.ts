@@ -20,11 +20,9 @@ import katex from "katex";
 import { theme } from "./design/theme";
 import { magma } from "./design/colormaps";
 import {
-  certificateSeries,
   invariantResiduals,
   lyapunovDiagnostic,
   poincareSections,
-  type CertificateSeries,
   type InvariantResidual,
   type PoincareSection,
   type Trajectory,
@@ -52,24 +50,6 @@ type SectionPlot = {
   ctx: CanvasRenderingContext2D;
   points: { x: number; y: number; normTime: number }[];
   bounds: { minX: number; maxX: number; minY: number; maxY: number };
-};
-
-type CertificateLane = {
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
-  // The candidate series v(t) and the obligation threshold it is read against.
-  values: number[];
-  baseline: number;
-  amplitude: number;
-};
-
-const COMPARISON_LATEX: Record<string, string> = {
-  "<=": "\\le",
-  "<": "<",
-  ">=": "\\ge",
-  ">": ">",
-  "==": "=",
-  "=": "=",
 };
 
 function renderLatex(element: HTMLElement, latex: string): void {
@@ -143,7 +123,6 @@ export class DiagnosticsPanel {
   private lyapunovLane: LyapunovLane | null = null;
   private sectionPlots: SectionPlot[] = [];
   private residualLanes: ResidualLane[] = [];
-  private certificateLanes: CertificateLane[] = [];
 
   constructor(
     private readonly section: HTMLElement,
@@ -155,7 +134,6 @@ export class DiagnosticsPanel {
     this.lyapunovLane = null;
     this.sectionPlots = [];
     this.residualLanes = [];
-    this.certificateLanes = [];
     this.section.hidden = true;
   }
 
@@ -163,13 +141,11 @@ export class DiagnosticsPanel {
     this.clear();
     this.renderLyapunov(data);
     this.renderResiduals(data);
-    this.renderCertificates(data);
     this.renderSections(data);
     this.section.hidden =
       this.lyapunovLane === null &&
       this.sectionPlots.length === 0 &&
-      this.residualLanes.length === 0 &&
-      this.certificateLanes.length === 0;
+      this.residualLanes.length === 0;
   }
 
   update(phase: number): void {
@@ -177,7 +153,6 @@ export class DiagnosticsPanel {
       drawLyapunovLane(this.lyapunovLane, phase);
     }
     this.residualLanes.forEach((lane) => drawResidualLane(lane, phase));
-    this.certificateLanes.forEach((lane) => drawCertificateLane(lane, phase));
     this.sectionPlots.forEach((plot) => drawSectionPlot(plot, phase));
   }
 
@@ -222,54 +197,6 @@ export class DiagnosticsPanel {
     const laneCtx = lane.getContext("2d");
     if (laneCtx) {
       this.residualLanes.push({ canvas: lane, ctx: laneCtx, residual: drift, amplitude });
-    }
-  }
-
-  // Candidate-certificate values sampled along the trajectory: the barrier (or
-  // Lyapunov) value B(x(t)) and its flow derivative, each drawn against the
-  // obligation threshold. This is measured signal only — the pass/fail verdict
-  // lives in the Verification domain's proof-status surface, never here.
-  private renderCertificates(data: Trajectory): void {
-    certificateSeries(data).forEach((record) => this.buildCertificateRow(record, data));
-  }
-
-  private buildCertificateRow(record: CertificateSeries, data: Trajectory): void {
-    const series = data.series?.[record.series];
-    if (!series || series.length === 0) {
-      return;
-    }
-    const baseline = record.comparisonBaselines[0]?.rhs ?? 0;
-    let amplitude = 0;
-    for (const value of series) {
-      amplitude = Math.max(amplitude, Math.abs(value - baseline));
-    }
-
-    const row = document.createElement("div");
-    row.className = "diagnostic";
-
-    const head = document.createElement("div");
-    head.className = "diagnostic__head";
-    const symbol = document.createElement("span");
-    symbol.className = "diagnostic__symbol";
-    renderLatex(symbol, certificateSymbolLatex(record));
-    const caption = document.createElement("span");
-    caption.className = "diagnostic__caption";
-    const captionLatex = certificateCaptionLatex(record);
-    if (captionLatex) {
-      renderLatex(caption, captionLatex);
-    } else {
-      caption.textContent = record.kind === "flow-derivative" ? "flow derivative" : "candidate value";
-    }
-    head.append(symbol, caption);
-
-    const lane = document.createElement("canvas");
-    lane.className = "diagnostic__residual diagnostic__certificate";
-    row.append(head, lane);
-    this.content.append(row);
-
-    const laneCtx = lane.getContext("2d");
-    if (laneCtx) {
-      this.certificateLanes.push({ canvas: lane, ctx: laneCtx, values: series, baseline, amplitude });
     }
   }
 
@@ -381,33 +308,6 @@ function lyapunovCaption(kind?: string, method?: string): string {
   const words = (kind ?? "").split("-").filter(Boolean);
   const phrase = words.length > 0 ? words.join(" ") : "lyapunov";
   return method?.includes("variational") ? `${phrase} · variational` : phrase;
-}
-
-// The certificate's base symbol: a Lyapunov candidate reads as V, a barrier
-// (the default) as B. Derived from the exported candidate id — the panel only
-// labels the exported series, it does not classify the certificate.
-function certificateBaseSymbol(record: CertificateSeries): string {
-  return (record.candidateId ?? "").toLowerCase().includes("lyapunov") ? "V" : "B";
-}
-
-function certificateSymbolLatex(record: CertificateSeries): string {
-  const base = certificateBaseSymbol(record);
-  return record.kind === "flow-derivative" ? `\\dot{${base}}` : base;
-}
-
-// Show the obligation threshold as `symbol <comparison> rhs` when the series is
-// read against a single comparison (e.g. the non-increase obligation
-// `\dot B \le 0`). Region-conditional value obligations impose more than one
-// comparison, so there the threshold is ambiguous and we fall back to a word
-// caption.
-function certificateCaptionLatex(record: CertificateSeries): string | null {
-  const comparisons = new Set(record.comparisonBaselines.map((baseline) => baseline.comparison));
-  if (comparisons.size !== 1) {
-    return null;
-  }
-  const baseline = record.comparisonBaselines[0];
-  const comparison = COMPARISON_LATEX[baseline.comparison] ?? baseline.comparison;
-  return `${certificateSymbolLatex(record)} ${comparison} ${constantLatex(baseline.rhs)}`;
 }
 
 function axisLatex(axis: string): string {
@@ -568,74 +468,6 @@ function drawResidualLane(lane: ResidualLane, phase: number): void {
   ctx.shadowBlur = 8;
   ctx.beginPath();
   ctx.arc(clamp(phase, 0, 1) * width, yOf(residual[playIndex]), 3.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-}
-
-// A candidate certificate v(t) drawn against its obligation threshold. The
-// dashed baseline is the threshold; the curve is the measured value along the
-// run, auto-scaled to its own excursion so its sign and shape relative to the
-// threshold read clearly. No decimal is shown — the magnitude is qualitative,
-// and whether the obligation actually holds is the proof-status surface's job.
-function drawCertificateLane(lane: CertificateLane, phase: number): void {
-  const { canvas, ctx, values, baseline, amplitude } = lane;
-  const { width, height } = prepareCanvas(canvas, ctx);
-
-  const count = values.length;
-  if (count === 0) {
-    return;
-  }
-  const pad = 5;
-  const amp = amplitude > 0 ? amplitude : 1;
-  const mid = height / 2;
-  const yOf = (value: number) =>
-    clamp(mid - ((value - baseline) / amp) * (height / 2 - pad), pad, height - pad);
-  const xOf = (index: number) => (count <= 1 ? 0 : (index / (count - 1)) * width);
-  const step = Math.max(1, Math.floor(count / 320));
-
-  // Obligation threshold baseline, faint and dashed, no label.
-  ctx.save();
-  ctx.setLineDash([3, 4]);
-  ctx.strokeStyle = theme.hairlineStrong;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, mid);
-  ctx.lineTo(width, mid);
-  ctx.stroke();
-  ctx.restore();
-
-  // Warm fill between the curve and the threshold: the area is the qualitative
-  // margin of the certificate, never a printed number.
-  ctx.beginPath();
-  ctx.moveTo(0, mid);
-  for (let index = 0; index < count; index += step) {
-    ctx.lineTo(xOf(index), yOf(values[index]));
-  }
-  ctx.lineTo(xOf(count - 1), mid);
-  ctx.closePath();
-  ctx.fillStyle = magma.css(0.72, 0.14);
-  ctx.fill();
-
-  ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  for (let index = 0; index < count; index += step) {
-    const x = xOf(index);
-    const y = yOf(values[index]);
-    if (index === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-  }
-  ctx.stroke();
-
-  const playIndex = clamp(Math.round(phase * (count - 1)), 0, count - 1);
-  ctx.fillStyle = theme.accentStrong;
-  ctx.shadowColor = theme.accent;
-  ctx.shadowBlur = 8;
-  ctx.beginPath();
-  ctx.arc(clamp(phase, 0, 1) * width, yOf(values[playIndex]), 3.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.shadowBlur = 0;
 }
