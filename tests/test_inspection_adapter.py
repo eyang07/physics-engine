@@ -1817,6 +1817,30 @@ def test_validate_viewer_verification_export_rejects_mismatched_payloads(
             },
             "references missing series 'missing_series'",
         ),
+        (
+            {
+                **_valid_viewer_verification_trajectory(),
+                "time": [0.0, float("nan")],
+            },
+            "time values must be numeric",
+        ),
+        (
+            {
+                **_valid_viewer_verification_trajectory(),
+                "states": [[0.0, 1.0], [0.1, float("inf")]],
+            },
+            "state row 1 values must be numeric",
+        ),
+        (
+            {
+                **_valid_viewer_verification_trajectory(),
+                "series": {
+                    "certificate_barrier_value": [0.5, float("-inf")],
+                    "certificate_barrier_flow_derivative": [-0.1, -0.2],
+                },
+            },
+            "series 'certificate_barrier_value' values must be numeric",
+        ),
     ],
 )
 def test_validate_viewer_verification_trajectory_rejects_invalid_payloads(

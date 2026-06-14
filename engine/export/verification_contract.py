@@ -18,6 +18,7 @@ The checks are export-contract guards, not mathematical proof checks:
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+import math
 from typing import Any
 
 from engine.verification import SCHEMA_VERSION, VerificationProblem
@@ -361,7 +362,11 @@ def validate_viewer_verification_trajectory(
 
 
 def _is_number(value: Any) -> bool:
-    return isinstance(value, int | float) and not isinstance(value, bool)
+    return (
+        isinstance(value, int | float)
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+    )
 
 
 def _payload_list_count(
