@@ -77,22 +77,10 @@ for (const viewport of [
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-pendulum.png`) });
 
     // The pendulum exports an invariant-residual diagnostic (energy drift), so
-    // the diagnostics panel shows a conservation-drift lane on boot.
+    // the diagnostics panel shows a conservation-drift lane on boot. Candidate
+    // certificates and the safety-region overlay now live in the Verification
+    // workbench (covered separately), not the Systems diagnostics panel.
     await expect(page.locator("#diagnostics .diagnostic__residual").first()).toBeVisible();
-
-    // It also links a barrier candidate, so the diagnostics panel shows the
-    // candidate value and flow-derivative certificate lanes sampled along the run.
-    await expect(page.locator("#diagnostics .diagnostic__certificate")).toHaveCount(2);
-
-    // The pendulum links to a verification problem: the cross-link button is
-    // present and the safety-region overlay toggle rides on its phase lens.
-    await expect(page.locator("#verificationLink")).toBeVisible();
-    await expect(page.locator("#safetyToggleSection")).toBeVisible();
-    await page.locator("#safetyRegionsToggle").check();
-    await page.waitForTimeout(400);
-    await expectCanvasNonBlank(page, "#scene");
-    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-pendulum-safety-regions.png`) });
-    await page.locator("#safetyRegionsToggle").uncheck();
 
     await page.getByRole("button", { name: "Hamiltonian Flow" }).click();
     await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
@@ -261,14 +249,17 @@ for (const viewport of [
     }
   });
 
-  test(`cross-links Systems and Verification at ${viewport.name}`, async ({ page }) => {
+  test(`navigates between Systems and Verification workbenches at ${viewport.name}`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.waitForSelector("#scene.stage__canvas--active");
 
-    // Systems -> Verification: the pendulum's link opens its safety problem.
-    await page.locator("#verificationLink").click();
+    // The top-level workbench switch opens the Verification domain and loads the
+    // default problem read-only.
+    await page.getByRole("button", { name: "Verification" }).click();
     await page.waitForSelector("#verificationDomain.domain--active");
     await page.waitForSelector("#verificationContent .verif-doc");
     await expect(
@@ -280,9 +271,64 @@ for (const viewport of [
     await expect(page.getByRole("heading", { name: /measured status/i })).toBeVisible();
     await expect(page.locator(".verif-status").first()).toBeVisible();
 
-    // Verification -> Systems: the "Open system" link returns to the pendulum.
-    await page.getByRole("button", { name: /open system/i }).click();
+    // Switching back returns to the Systems workbench on the default pendulum.
+    await page.getByRole("button", { name: "Systems" }).click();
     await page.waitForSelector("#systemsDomain.domain--active");
     await expect(page.locator("#systemTitle")).toHaveText("Simple Pendulum");
+  });
+
+  test(`Verification stage renders trajectory and certificate lanes at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+
+    // Enter the Verification workbench and let its stage animation spin up.
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    // The catalog lists every exported problem; the first is active by default.
+    const catalogItems = page.locator("#verificationCatalog .catalog-item");
+    await expect(catalogItems).toHaveCount(2);
+    await expect(page.locator("#verificationCatalog .catalog-item--active")).toHaveCount(1);
+
+    // The default problem animates its controlled trajectory on the exported
+    // region geometry: the stage canvas must actually paint, not stay blank.
+    await page.waitForTimeout(600);
+    await expectCanvasNonBlank(page, "#verificationCanvas");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-stage.png`) });
+
+    // Each linked candidate certificate gets a tracking lane that renders the
+    // sampled series against its obligation threshold.
+    const certificateLanes = page.locator("#verificationCertificateLanes .diagnostic__certificate");
+    await expect(certificateLanes.first()).toBeVisible();
+    expect(await certificateLanes.count()).toBeGreaterThan(0);
+    await expectCanvasNonBlank(page, "#verificationCertificateLanes .diagnostic__certificate >> nth=0");
+
+    // Switching problems swaps the stage in place and keeps it rendering.
+    await catalogItems.nth(1).click();
+    await expect(
+      page.getByRole("heading", { name: /controlled spring regulator safety/i }),
+    ).toBeVisible();
+    await page.waitForTimeout(600);
+    await expectCanvasNonBlank(page, "#verificationCanvas");
+
+    // Unavailable problem data must degrade honestly: the panel shows a regen
+    // message and the stage clears its certificate lanes instead of leaving a
+    // stale, misleading overlay painted under the error.
+    await page.route("**/data/verification/upright-pendulum-safety.json", (route) =>
+      route.abort(),
+    );
+    await catalogItems.nth(0).click();
+    await expect(page.locator("#verificationContent .verif-empty")).toBeVisible();
+    await expect(page.locator("#verificationContent .verif-empty__copy")).toContainText(
+      /could not load/i,
+    );
+    await expect(certificateLanes).toHaveCount(0);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-unavailable.png`),
+    });
   });
 }

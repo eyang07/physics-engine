@@ -32,17 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-002: Add visual coverage for the Verification stage**
-   - Goal: Cover the new Verification stage and certificate lanes in Playwright
-     so layout, canvas rendering, and empty-trajectory fallback do not regress.
-   - Scope: `viewer/tests` or the existing visual-test harness, plus targeted
-     viewer fixtures/helpers if needed.
-   - Acceptance: Visual tests exercise the default verification problem, verify
-     the stage canvas is nonblank, cover a no-trajectory or unavailable-data
-     state without misleading overlays, and `cd viewer && npm run test:visual`
-     passes with the dev server running.
-
-2. **FE-003: Mark measured violation samples on the Verification stage**
+1. **FE-003: Mark measured violation samples on the Verification stage**
    - Goal: When a `proofStatuses` entry reports `measured-violated` with a
      worst sampled point that maps to the active projection, show that point on
      the stage alongside the trajectory.
@@ -51,6 +41,18 @@ Each task should use this structure:
    - Acceptance: Violations are visually distinguished from safe/unsafe region
      boundaries, absent or unmappable samples do not render misleading markers,
      and visual tests cover at least the no-marker and marker paths.
+
+2. **FE-004: Surface verification problem selection in the catalog**
+   - Goal: Make the Verification catalog show which problem is active and how
+     many obligations/candidates each carries so the read-only workbench is
+     navigable without opening every problem.
+   - Scope: `viewer/src/main.ts` (catalog rendering), `viewer/index.html`/styles
+     for the catalog item layout, and visual coverage in
+     `viewer/tests/visual.spec.ts`.
+   - Acceptance: Each catalog item shows its obligation/candidate counts from the
+     index summary, the active item is visually marked and stays in sync when the
+     selection changes, and visual tests assert the active-item marker and the
+     count badges for at least two problems.
 
 ## Backend Queue
 
