@@ -32,17 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-003: Mark measured violation samples on the Verification stage**
-   - Goal: When a `proofStatuses` entry reports `measured-violated` with a
-     worst sampled point that maps to the active projection, show that point on
-     the stage alongside the trajectory.
-   - Scope: `viewer/src/data/verification.ts`, `viewer/src/verificationStage.ts`,
-     safety-region rendering helpers, and focused visual coverage.
-   - Acceptance: Violations are visually distinguished from safe/unsafe region
-     boundaries, absent or unmappable samples do not render misleading markers,
-     and visual tests cover at least the no-marker and marker paths.
-
-2. **FE-004: Surface verification problem selection in the catalog**
+1. **FE-004: Surface verification problem selection in the catalog**
    - Goal: Make the Verification catalog show which problem is active and how
      many obligations/candidates each carries so the read-only workbench is
      navigable without opening every problem.
@@ -54,24 +44,37 @@ Each task should use this structure:
      selection changes, and visual tests assert the active-item marker and the
      count badges for at least two problems.
 
+2. **FE-005: Label and legend the Verification stage violation markers**
+   - Goal: Give the measured-violation markers a stage legend and an on-hover or
+     adjacent caption naming the obligation each violated point belongs to, so a
+     red marker is self-explanatory rather than an unlabeled glyph.
+   - Scope: `viewer/src/verificationStage.ts` (marker draw + legend),
+     `viewer/src/styles.css` for any legend chrome, and visual coverage in
+     `viewer/tests/visual.spec.ts`.
+   - Acceptance: A legend entry appears only when at least one violation marker is
+     drawn, each marker is associated with its obligation name without overlapping
+     the trajectory readout, and visual tests cover both the no-violation (no
+     legend) and violation (legend present) paths.
+
 ## Backend Queue
 
-1. **BE-014: Add verification trajectory payload validation**
-   - Goal: Validate the embedded verification trajectory payloads written for
-     the viewer so time, state names, states, series, and certificate metadata
-     stay synchronized.
-   - Scope: `scripts/generate_verification_problems.py`,
-     `engine/export/verification_contract.py`, and
+1. **BE-016: Add verification export round-trip contract coverage**
+   - Goal: Ensure generated viewer verification indexes and problem files stay
+     mutually consistent without committing regenerated artifacts.
+   - Scope: `engine/export/verification_contract.py`,
+     `scripts/generate_verification_problems.py`, and
      `tests/test_inspection_adapter.py`.
-   - Acceptance: Validation rejects mismatched time/state lengths, series whose
-     lengths differ from time, missing certificate series references, and empty
-     state names; generator tests cover valid and invalid payloads.
+   - Acceptance: Temp-dir generation validates the index, every referenced
+     problem file, each embedded trajectory, and each index summary count against
+     the referenced problem payload; focused verification export tests pass.
 
-2. **BE-015: Add viewer verification export CLI smoke coverage**
-   - Goal: Keep `scripts.generate_verification_problems` discoverable from the
-     command line without requiring committed generated artifacts.
-   - Scope: `scripts/generate_verification_problems.py`,
-     `tests/test_inspection_adapter.py`, and docs if CLI behavior changes.
-   - Acceptance: The generator exposes configurable output directories, CLI
-     smoke tests write viewer/generator artifacts to temp directories, printed
-     summaries are deterministic, and focused verification export tests pass.
+2. **BE-017: Validate verification export problem payload links**
+   - Goal: Reject viewer verification problem files whose internal references
+     point at missing regions, obligations, candidates, or trajectory states.
+   - Scope: `engine/export/verification_contract.py`,
+     `scripts/generate_verification_problems.py`, and
+     `tests/test_inspection_adapter.py`.
+   - Acceptance: Problem payload validation catches missing proof-status
+     obligation links, candidate obligation links, region-geometry region links,
+     and trajectory state names not declared by the problem variables; generator
+     tests cover valid and invalid payloads.
