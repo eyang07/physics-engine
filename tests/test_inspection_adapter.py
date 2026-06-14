@@ -185,6 +185,7 @@ def _valid_viewer_verification_trajectory() -> dict:
                         "obligationId": "barrier-nonpositive",
                         "comparison": "<=",
                         "rhs": 0.0,
+                        "regionId": "domain",
                     }
                 ],
             },
@@ -1348,6 +1349,99 @@ def test_validate_viewer_verification_index_rejects_invalid_payloads(
                 },
             },
             "trajectory uses unknown state names",
+        ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "trajectory": {
+                    **_valid_viewer_verification_trajectory(),
+                    "certificateSeries": [
+                        {
+                            **_valid_viewer_verification_trajectory()[
+                                "certificateSeries"
+                            ][0],
+                            "comparisonBaselines": [
+                                {
+                                    "obligationId": "missing-obligation",
+                                    "comparison": "<=",
+                                    "rhs": 0.0,
+                                }
+                            ],
+                        }
+                    ],
+                },
+            },
+            "comparisonBaseline 0 references unknown obligation",
+        ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "trajectory": {
+                    **_valid_viewer_verification_trajectory(),
+                    "certificateSeries": [
+                        {
+                            **_valid_viewer_verification_trajectory()[
+                                "certificateSeries"
+                            ][0],
+                            "comparisonBaselines": [
+                                {
+                                    "obligationId": "barrier-nonpositive",
+                                    "comparison": "<=",
+                                    "rhs": 0.0,
+                                    "regionId": "missing-region",
+                                }
+                            ],
+                        }
+                    ],
+                },
+            },
+            "comparisonBaseline 0 references unknown region",
+        ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "trajectory": {
+                    **_valid_viewer_verification_trajectory(),
+                    "certificateSeries": [
+                        {
+                            **_valid_viewer_verification_trajectory()[
+                                "certificateSeries"
+                            ][0],
+                            "comparisonBaselines": [
+                                {
+                                    "obligationId": "barrier-nonpositive",
+                                    "comparison": "",
+                                    "rhs": 0.0,
+                                }
+                            ],
+                        }
+                    ],
+                },
+            },
+            "comparisonBaseline 0 comparison is invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "trajectory": {
+                    **_valid_viewer_verification_trajectory(),
+                    "certificateSeries": [
+                        {
+                            **_valid_viewer_verification_trajectory()[
+                                "certificateSeries"
+                            ][0],
+                            "comparisonBaselines": [
+                                {
+                                    "obligationId": "barrier-nonpositive",
+                                    "comparison": "<=",
+                                    "rhs": "0.0",
+                                }
+                            ],
+                        }
+                    ],
+                },
+            },
+            "comparisonBaseline 0 rhs is invalid",
         ),
     ],
 )

@@ -57,16 +57,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-019: Validate verification certificate baseline links**
-   - Goal: Reject viewer verification certificate metadata whose comparison
-     baselines refer to missing obligations or regions.
-   - Scope: `engine/export/verification_contract.py` and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: Problem payload validation catches missing baseline obligation
-     links, missing baseline region links, malformed baseline comparison records,
-     and focused verification export tests pass.
-
-2. **BE-020: Document viewer verification export contract checks**
+1. **BE-020: Document viewer verification export contract checks**
    - Goal: Make the backend-owned viewer verification export validations
      discoverable for future generator changes.
    - Scope: `docs/verification-ir.md`, `docs/BACKEND.md`, and
@@ -74,3 +65,13 @@ Each task should use this structure:
    - Acceptance: Docs name the index, problem-payload, trajectory, and
      round-trip validation layers; they state that these are contract checks and
      not proof or certification; focused verification export tests pass.
+
+2. **BE-021: Add verification export schema-version guard tests**
+   - Goal: Keep viewer verification exports pinned to the intended IR and index
+     schema versions before data reaches the viewer.
+   - Scope: `engine/export/verification_contract.py`,
+     `scripts/generate_verification_problems.py`, and
+     `tests/test_inspection_adapter.py`.
+   - Acceptance: Tests reject mismatched problem `schemaVersion`, mismatched
+     index version, missing schema fields, and generator output validates with
+     the current expected versions.

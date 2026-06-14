@@ -221,6 +221,13 @@ def validate_viewer_verification_problem_payload(payload: Mapping[str, Any]) -> 
                 f"viewer verification problem {problem_id} certificateSeries {index} "
                 f"uses unknown obligations: {sorted(unknown_obligations)}"
             )
+        _validate_certificate_comparison_baselines(
+            record,
+            problem_id=problem_id,
+            series_index=index,
+            obligation_ids=obligation_ids,
+            region_ids=region_ids,
+        )
 
 
 def validate_viewer_verification_trajectory(
@@ -376,6 +383,56 @@ def _optional_string_list(
             f"viewer verification problem {problem_id} {context} {key} is invalid"
         )
     return values
+
+
+def _validate_certificate_comparison_baselines(
+    record: Mapping[str, Any],
+    *,
+    problem_id: str,
+    series_index: int,
+    obligation_ids: set[str],
+    region_ids: set[str],
+) -> None:
+    baselines = record.get("comparisonBaselines")
+    if not isinstance(baselines, list):
+        raise ValueError(
+            f"viewer verification problem {problem_id} certificateSeries "
+            f"{series_index} comparisonBaselines is invalid"
+        )
+    for baseline_index, baseline in enumerate(baselines):
+        if not isinstance(baseline, Mapping):
+            raise ValueError(
+                f"viewer verification problem {problem_id} certificateSeries "
+                f"{series_index} comparisonBaseline {baseline_index} must be an object"
+            )
+        obligation_id = baseline.get("obligationId")
+        if not isinstance(obligation_id, str) or obligation_id not in obligation_ids:
+            raise ValueError(
+                f"viewer verification problem {problem_id} certificateSeries "
+                f"{series_index} comparisonBaseline {baseline_index} references "
+                f"unknown obligation: {obligation_id}"
+            )
+        comparison = baseline.get("comparison")
+        if not isinstance(comparison, str) or not comparison:
+            raise ValueError(
+                f"viewer verification problem {problem_id} certificateSeries "
+                f"{series_index} comparisonBaseline {baseline_index} comparison "
+                "is invalid"
+            )
+        rhs = baseline.get("rhs")
+        if not _is_number(rhs):
+            raise ValueError(
+                f"viewer verification problem {problem_id} certificateSeries "
+                f"{series_index} comparisonBaseline {baseline_index} rhs is invalid"
+            )
+        region_id = baseline.get("regionId")
+        if region_id is not None:
+            if not isinstance(region_id, str) or region_id not in region_ids:
+                raise ValueError(
+                    f"viewer verification problem {problem_id} certificateSeries "
+                    f"{series_index} comparisonBaseline {baseline_index} references "
+                    f"unknown region: {region_id}"
+                )
 
 
 def _validate_region_geometry(problem: VerificationProblem) -> None:
