@@ -32,19 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-004: Surface verification problem selection in the catalog**
-   - Goal: Make the Verification catalog show which problem is active and how
-     many obligations/candidates each carries so the read-only workbench is
-     navigable without opening every problem.
-   - Scope: `viewer/src/main.ts` (catalog rendering), `viewer/index.html`/styles
-     for the catalog item layout, and visual coverage in
-     `viewer/tests/visual.spec.ts`.
-   - Acceptance: Each catalog item shows its obligation/candidate counts from the
-     index summary, the active item is visually marked and stays in sync when the
-     selection changes, and visual tests assert the active-item marker and the
-     count badges for at least two problems.
-
-2. **FE-005: Label and legend the Verification stage violation markers**
+1. **FE-005: Label and legend the Verification stage violation markers**
    - Goal: Give the measured-violation markers a stage legend and an on-hover or
      adjacent caption naming the obligation each violated point belongs to, so a
      red marker is self-explanatory rather than an unlabeled glyph.
@@ -55,6 +43,17 @@ Each task should use this structure:
      drawn, each marker is associated with its obligation name without overlapping
      the trajectory readout, and visual tests cover both the no-violation (no
      legend) and violation (legend present) paths.
+
+2. **FE-006: Show selected verification counts in the stage header**
+   - Goal: Echo the active problem's obligation/candidate/region counts in the
+     Verification stage so the focused problem's scope is visible without
+     scanning back to the catalog.
+   - Scope: `viewer/src/verificationPanel.ts` or the stage header in
+     `viewer/index.html`/`viewer/src/main.ts`, `viewer/src/styles.css`, and
+     visual coverage in `viewer/tests/visual.spec.ts`.
+   - Acceptance: The header reflects the selected problem's counts, updates when
+     the selection changes, stays consistent with the catalog badges, and visual
+     tests assert the header counts for at least two problems.
 
 ## Backend Queue
 
