@@ -1275,6 +1275,29 @@ def test_validate_viewer_verification_export_rejects_unreferenced_problem_paths(
         )
 
 
+def test_validate_viewer_verification_export_rejects_data_path_basename_mismatch() -> None:
+    index_payload = {
+        **_valid_viewer_verification_index(),
+        "problems": [
+            {
+                **_valid_viewer_verification_index()["problems"][0],
+                "dataPath": "/data/verification/wrong-file.json",
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match="dataPath basename must match problem id"):
+        validate_viewer_verification_export(
+            index_payload,
+            {
+                "/data/verification/wrong-file.json": (
+                    _valid_viewer_verification_problem_payload()
+                )
+            },
+            version=INDEX_VERSION,
+        )
+
+
 @pytest.mark.parametrize(
     ("index_payload", "problem_payload", "message"),
     [

@@ -116,6 +116,11 @@ def validate_viewer_verification_export(
     for entry in problems:
         problem_id = entry["id"]
         data_path = entry["dataPath"]
+        if data_path.rsplit("/", maxsplit=1)[-1] != f"{problem_id}.json":
+            raise ValueError(
+                f"viewer verification problem {problem_id} dataPath basename "
+                "must match problem id"
+            )
         problem_payload = problem_payloads_by_data_path.get(data_path)
         if not isinstance(problem_payload, Mapping):
             raise ValueError(
