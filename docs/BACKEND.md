@@ -142,7 +142,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `300 passed`.
+Latest known result: `306 passed`.
 
 Use focused tests while iterating:
 

@@ -37,6 +37,7 @@ from engine.verification import (
     expression_spec,
     inspection_diagnostics,
     render_inspection_markdown,
+    validate_inspection_artifact_index,
     verification_problem_from_lyapunov,
     write_inspection_artifacts,
 )
@@ -90,6 +91,27 @@ def _inspection_artifact_path_lines(output_dir, problem: VerificationProblem) ->
         f"wrote {ARTIFACT_REPORT_MARKDOWN}: {output_dir / markdown_name}",
         f"wrote {ARTIFACT_INSPECTION_OUTCOME_JSON}: {output_dir / outcome_name}",
     ]
+
+
+def _valid_inspection_artifact_index() -> dict:
+    return {
+        "schemaVersion": INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION,
+        "problems": [
+            {
+                "id": "example-problem",
+                "name": "example problem",
+                "schemaVersion": "verification-problem/v3",
+                "artifacts": [
+                    {"kind": ARTIFACT_PROBLEM_JSON, "path": "example.json"},
+                    {"kind": ARTIFACT_REPORT_MARKDOWN, "path": "example.md"},
+                    {
+                        "kind": ARTIFACT_INSPECTION_OUTCOME_JSON,
+                        "path": "example.outcome.json",
+                    },
+                ],
+            }
+        ],
+    }
 
 
 def test_write_inspection_artifacts_round_trips_problem(tmp_path) -> None:
@@ -504,6 +526,10 @@ def test_export_script_writes_inspection_artifact_contract(tmp_path, capsys) -> 
     index_path = tmp_path / INSPECTION_ARTIFACT_INDEX_FILENAME
     assert f"wrote inspection artifact index: {index_path}" in captured.out
     index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+    validate_inspection_artifact_index(
+        index_payload,
+        schema_version=INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION,
+    )
     assert index_payload["schemaVersion"] == INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION
     assert [entry["id"] for entry in index_payload["problems"]] == [
         exported_problem.id for exported_problem in exported_problems
@@ -633,6 +659,93 @@ def test_export_script_cli_writes_custom_output_dir(tmp_path) -> None:
     }
     expected_names.add(INSPECTION_ARTIFACT_INDEX_FILENAME)
     assert {path.name for path in output_dir.iterdir()} == expected_names
+
+
+def test_validate_inspection_artifact_index_accepts_export_shape() -> None:
+    payload = _valid_inspection_artifact_index()
+
+    validate_inspection_artifact_index(
+        payload,
+        schema_version=INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION,
+    )
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ({}, "schemaVersion"),
+        (
+            {
+                **_valid_inspection_artifact_index(),
+                "schemaVersion": "wrong",
+            },
+            "schemaVersion",
+        ),
+        (
+            {
+                **_valid_inspection_artifact_index(),
+                "problems": [
+                    *_valid_inspection_artifact_index()["problems"],
+                    *_valid_inspection_artifact_index()["problems"],
+                ],
+            },
+            "duplicate inspection artifact problem id",
+        ),
+        (
+            {
+                **_valid_inspection_artifact_index(),
+                "problems": [
+                    {
+                        **_valid_inspection_artifact_index()["problems"][0],
+                        "artifacts": [
+                            {
+                                **_valid_inspection_artifact_index()["problems"][0][
+                                    "artifacts"
+                                ][0],
+                                "path": "",
+                            },
+                            *_valid_inspection_artifact_index()["problems"][0][
+                                "artifacts"
+                            ][1:],
+                        ],
+                    }
+                ],
+            },
+            "path missing",
+        ),
+        (
+            {
+                **_valid_inspection_artifact_index(),
+                "problems": [
+                    {
+                        **_valid_inspection_artifact_index()["problems"][0],
+                        "artifacts": [
+                            {
+                                **_valid_inspection_artifact_index()["problems"][0][
+                                    "artifacts"
+                                ][0],
+                                "kind": "proof-result",
+                            },
+                            *_valid_inspection_artifact_index()["problems"][0][
+                                "artifacts"
+                            ][1:],
+                        ],
+                    }
+                ],
+            },
+            "unknown inspection artifact kind",
+        ),
+    ],
+)
+def test_validate_inspection_artifact_index_rejects_invalid_payloads(
+    payload,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        validate_inspection_artifact_index(
+            payload,
+            schema_version=INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION,
+        )
 
 
 def test_controlled_discrete_fixture_writes_inspection_diagnostics(tmp_path) -> None:

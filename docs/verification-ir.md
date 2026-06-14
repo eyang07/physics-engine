@@ -157,7 +157,8 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
   Open-loop dynamics, Assumptions, and Candidate certificates report sections;
   writes canonical problem JSON, human inspection markdown, and
   machine-readable inspection outcome JSON. The backend export script writes a
-  deterministic inspection artifact index alongside those files.
+  deterministic inspection artifact index alongside those files, with a reusable
+  validator for downstream discovery tools.
 - `tests/test_verification_ir.py`, `tests/test_inspection_adapter.py`.
 
 ## Invariants / proof obligations (for this implementation)

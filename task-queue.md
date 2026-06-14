@@ -54,18 +54,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-011: Add verification artifact index schema validation**
-   - Goal: Validate the inspection artifact index shape independently from the
-     export script so downstream backend tools can rely on a narrow discovery
-     contract.
-   - Scope: `engine/verification/` or `engine/export/` validation helpers,
-     `tests/test_inspection_adapter.py`, and docs if validation behavior is
-     documented.
-   - Acceptance: A reusable validator rejects missing schema versions, duplicate
-     problem ids, missing artifact paths, and unknown artifact kinds; focused
-     inspection tests cover valid and invalid indexes.
-
-2. **BE-012: Add inspection artifact manifest round-trip tests**
+1. **BE-012: Add inspection artifact manifest round-trip tests**
    - Goal: Ensure inspection artifact index entries can be used to load the
      referenced problem, markdown, and outcome artifacts without relying on
      filename conventions outside the index.
@@ -75,3 +64,13 @@ Each task should use this structure:
    - Acceptance: Tests read the index from a temporary export, load every
      artifact path listed there, confirm each outcome references the same
      problem id, and focused inspection tests pass.
+
+2. **BE-013: Validate viewer verification index shape**
+   - Goal: Add backend-side validation for `scripts.generate_verification_problems`
+     index entries so the viewer catalog can rely on stable problem summaries.
+   - Scope: `scripts/generate_verification_problems.py`,
+     `engine/export/verification_contract.py` or a nearby helper, and
+     `tests/test_inspection_adapter.py`.
+   - Acceptance: Validation rejects missing ids, duplicate ids, non-verification
+     data paths, and malformed count summaries; generator tests cover valid and
+     invalid index payloads; focused verification export tests pass.

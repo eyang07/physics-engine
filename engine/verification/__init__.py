@@ -20,9 +20,11 @@ from engine.verification.inspection_adapter import (
     ARTIFACT_REPORT_MARKDOWN,
     InspectionAdapterReport,
     InspectionArtifact,
+    INSPECTION_ARTIFACT_KINDS,
     REPORT_STATUS,
     inspection_diagnostics,
     render_inspection_markdown,
+    validate_inspection_artifact_index,
     write_inspection_artifacts,
 )
 from engine.verification.diagnostics import (
@@ -95,6 +97,7 @@ __all__ = [
     "InputSpec",
     "InspectionAdapterReport",
     "InspectionArtifact",
+    "INSPECTION_ARTIFACT_KINDS",
     "MALFORMED_OBLIGATION_TARGETS",
     "OBLIGATION_SHAPE_FEATURES",
     "OBLIGATION_TARGETS",
@@ -133,5 +136,6 @@ __all__ = [
     "verification_problem_from_discrete_lyapunov",
     "verification_problem_from_lyapunov",
     "verification_problem_from_obligations",
+    "validate_inspection_artifact_index",
     "write_inspection_artifacts",
 ]

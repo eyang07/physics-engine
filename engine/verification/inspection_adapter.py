@@ -9,6 +9,7 @@ records, or claims proof discharge; every obligation it touches remains
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,11 @@ ADAPTER_CAPABILITIES = AdapterCapabilities(adapter=ADAPTER_NAME)
 ARTIFACT_PROBLEM_JSON = "verification-problem-json"
 ARTIFACT_REPORT_MARKDOWN = "inspection-report-markdown"
 ARTIFACT_INSPECTION_OUTCOME_JSON = "inspection-outcome-json"
+INSPECTION_ARTIFACT_KINDS = (
+    ARTIFACT_PROBLEM_JSON,
+    ARTIFACT_REPORT_MARKDOWN,
+    ARTIFACT_INSPECTION_OUTCOME_JSON,
+)
 
 _NOTE = (
     "Inspection artifacts only: no obligation has been attempted or "
@@ -60,15 +66,73 @@ class InspectionArtifact:
     path: Path
 
     def __post_init__(self) -> None:
-        if self.kind not in (
-            ARTIFACT_PROBLEM_JSON,
-            ARTIFACT_REPORT_MARKDOWN,
-            ARTIFACT_INSPECTION_OUTCOME_JSON,
-        ):
+        if self.kind not in INSPECTION_ARTIFACT_KINDS:
             raise ValueError(f"unknown inspection artifact kind: {self.kind!r}")
 
     def to_dict(self) -> dict[str, str]:
         return {"kind": self.kind, "path": str(self.path)}
+
+
+def validate_inspection_artifact_index(
+    payload: Mapping[str, Any],
+    *,
+    schema_version: str,
+) -> None:
+    """Validate the narrow discovery index for inspection artifacts."""
+
+    if payload.get("schemaVersion") != schema_version:
+        raise ValueError("inspection artifact index schemaVersion is invalid")
+    problems = payload.get("problems")
+    if not isinstance(problems, list):
+        raise ValueError("inspection artifact index problems must be a list")
+
+    seen_problem_ids: set[str] = set()
+    for problem_index, problem in enumerate(problems):
+        if not isinstance(problem, Mapping):
+            raise ValueError(f"inspection artifact problem {problem_index} must be an object")
+        problem_id = problem.get("id")
+        if not isinstance(problem_id, str) or not problem_id:
+            raise ValueError(f"inspection artifact problem {problem_index} id is invalid")
+        if problem_id in seen_problem_ids:
+            raise ValueError(f"duplicate inspection artifact problem id: {problem_id}")
+        seen_problem_ids.add(problem_id)
+        if not isinstance(problem.get("name"), str) or not problem["name"]:
+            raise ValueError(f"inspection artifact problem {problem_id} name is invalid")
+        if not isinstance(problem.get("schemaVersion"), str) or not problem["schemaVersion"]:
+            raise ValueError(
+                f"inspection artifact problem {problem_id} schemaVersion is invalid"
+            )
+
+        artifacts = problem.get("artifacts")
+        if not isinstance(artifacts, list):
+            raise ValueError(
+                f"inspection artifact problem {problem_id} artifacts must be a list"
+            )
+        seen_kinds: set[str] = set()
+        for artifact_index, artifact in enumerate(artifacts):
+            if not isinstance(artifact, Mapping):
+                raise ValueError(
+                    f"inspection artifact {problem_id}[{artifact_index}] must be an object"
+                )
+            kind = artifact.get("kind")
+            if kind not in INSPECTION_ARTIFACT_KINDS:
+                raise ValueError(f"unknown inspection artifact kind: {kind!r}")
+            if kind in seen_kinds:
+                raise ValueError(
+                    f"duplicate inspection artifact kind for {problem_id}: {kind}"
+                )
+            seen_kinds.add(kind)
+            path = artifact.get("path")
+            if not isinstance(path, str) or not path:
+                raise ValueError(
+                    f"inspection artifact path missing for {problem_id}: {kind}"
+                )
+        missing_kinds = set(INSPECTION_ARTIFACT_KINDS) - seen_kinds
+        if missing_kinds:
+            raise ValueError(
+                f"inspection artifact problem {problem_id} missing artifact kinds: "
+                f"{sorted(missing_kinds)}"
+            )
 
 
 @dataclass(frozen=True)
