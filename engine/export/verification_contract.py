@@ -302,6 +302,10 @@ def validate_viewer_verification_trajectory(
         raise ValueError(f"{problem_id} trajectory time must be a non-empty list")
     if any(not _is_number(value) for value in time):
         raise ValueError(f"{problem_id} trajectory time values must be numeric")
+    if any(current <= previous for previous, current in zip(time, time[1:])):
+        raise ValueError(
+            f"{problem_id} trajectory time values must be strictly increasing"
+        )
 
     state_names = payload.get("stateNames")
     if (

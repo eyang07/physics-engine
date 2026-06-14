@@ -54,6 +54,8 @@ Each task should use this structure:
      design, problems without obligations expose no broken affordance, and visual
      tests cover the scroll-into-view behavior.
 
+## Backend Queue
+
 1. **BE-029: Add verification certificate-series kind guard**
    - Goal: Keep viewer certificate lanes tied to known measured certificate
      series semantics.

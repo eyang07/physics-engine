@@ -1827,6 +1827,20 @@ def test_validate_viewer_verification_export_rejects_mismatched_payloads(
         (
             {
                 **_valid_viewer_verification_trajectory(),
+                "time": [0.1, 0.0],
+            },
+            "time values must be strictly increasing",
+        ),
+        (
+            {
+                **_valid_viewer_verification_trajectory(),
+                "time": [0.0, 0.0],
+            },
+            "time values must be strictly increasing",
+        ),
+        (
+            {
+                **_valid_viewer_verification_trajectory(),
                 "states": [[0.0, 1.0], [0.1, float("inf")]],
             },
             "state row 1 values must be numeric",
