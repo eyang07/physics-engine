@@ -32,11 +32,12 @@ diagnostics, controlled dynamics, safety metadata, and verification artifacts.
     discrete dynamics, control/disturbance channels, explicit assumptions,
     candidate certificates, and obligations for external inspection/discharge,
     plus a stub inspection adapter that writes canonical problem JSON and a
-    human-readable report. Viewer-facing exports add a manifest `system`
-    cross-reference, measured `regionGeometry` scalar-field grids and boundary
-    polylines for safe/unsafe/initial/domain sets, time-aligned candidate
-    certificate series along a linked trajectory, and sampled `proofStatuses`.
-    All of it is measured evidence: the engine does not certify or prove safety.
+    human-readable report. Viewer-facing verification exports are
+    self-contained: each problem carries measured `regionGeometry` scalar-field
+    grids and boundary polylines for safe/unsafe/initial/domain sets, a
+    controlled trajectory, time-aligned candidate-certificate series, and
+    sampled `proofStatuses`. All of it is measured evidence: the engine does
+    not certify or prove safety.
 - Viewer:
   - Two-domain Vite/TypeScript workbench — a Systems domain (catalog, stage,
     inspector) and a Verification domain — with playback controls, structure
@@ -79,9 +80,9 @@ Registered viewer examples:
 - Hénon-Heiles system
 - Variable-speed wavefront propagation
 
-Backend-only examples and helpers include the controlled pendulum, metric
-geometry reference constructors, safety/certificate candidate checks, and
-verification-problem IR export.
+Backend-only examples and helpers include controlled pendulum and controlled
+spring verification cases, metric geometry reference constructors,
+safety/certificate candidate checks, and verification-problem IR export.
 
 ## Development
 
@@ -130,11 +131,10 @@ backend and viewer baseline for broad changes or release-style checks.
 
 ## Direction
 
-The viewer now renders exported safety/certificate metadata — region geometry,
-candidate-certificate series, and a measured proof-status surface — for the first
-linked `pendulum` ↔ `upright-pendulum-safety` pair. The near-term direction on
-both sides is to generalize those surfaces beyond that single pair: the backend
-linking a second controlled system with region geometry and certificate
-diagnostics, and the frontend driving the overlay and lanes from each problem's
-declared projection/state axes rather than the pendulum-specific assumptions.
-Real external verification backends and proof discharge remain roadmap items.
+The verification export path now includes two self-contained controlled safety
+case studies — the upright pendulum and a regulated spring-mass system — each
+with region geometry, candidate-certificate series, controlled trajectory data,
+and measured proof-status samples. The near-term direction is to keep hardening
+the verification foundations and to have the frontend drive overlays and lanes
+from each problem's declared projection/state axes. Real external verification
+backends and proof discharge remain roadmap items.

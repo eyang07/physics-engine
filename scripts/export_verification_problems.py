@@ -8,7 +8,8 @@ nothing here crosses the manifest/viewer boundary or claims proof discharge.
 from __future__ import annotations
 
 import argparse
-from dataclasses import replace
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, replace
 
 import numpy as np
 import sympy as sp
@@ -23,6 +24,7 @@ from engine.verification import (
     write_inspection_artifacts,
 )
 from systems.controlled_pendulum import build_system
+from systems.controlled_spring import build_system as build_spring_system
 
 DEFAULT_OUTPUT_DIR = "data/generated/verification"
 
@@ -30,6 +32,16 @@ DEFAULT_OUTPUT_DIR = "data/generated/verification"
 # (theta, omega) state, mapped to itself, with no dependency on any gallery
 # manifest system.
 _PHASE_AXES = {"theta": "theta", "omega": "omega"}
+_SPRING_PHASE_AXES = {"x": "x", "v": "v"}
+
+
+@dataclass(frozen=True)
+class ViewerVerificationExample:
+    """A self-contained verification problem plus the trajectory it animates."""
+
+    problem_factory: Callable[[], VerificationProblem]
+    trajectory_factory: Callable[[], tuple[np.ndarray, np.ndarray]]
+    variable_to_state_axis: Mapping[str, str]
 
 
 def upright_pendulum_closed_loop():
@@ -121,6 +133,111 @@ def upright_pendulum_trajectory(
     return time, states
 
 
+def spring_mass_closed_loop():
+    """The controlled spring-mass regulator closed-loop system and its state."""
+
+    spring = build_spring_system(
+        mass=sp.Integer(1),
+        stiffness=sp.Integer(1),
+        damping=sp.Rational(2, 5),
+    )
+    x, v = spring.state
+    (u,) = spring.controls
+    closed = spring.closed_loop({u: -x - sp.Rational(13, 5) * v})
+    return closed, x, v
+
+
+def controlled_spring_problem() -> VerificationProblem:
+    """Controlled spring-mass regulator with a quadratic barrier candidate."""
+
+    closed, x, v = spring_mass_closed_loop()
+
+    regulated_energy = x**2 + x * v + v**2
+    specification = SafetySpecification(
+        state=(x, v),
+        safe_set=SublevelSet(
+            state=(x, v),
+            expression=regulated_energy,
+            level=1.0,
+            name="regulated-energy",
+        ),
+        unsafe_sets=(
+            SublevelSet(
+                state=(x, v),
+                expression=-regulated_energy,
+                level=-1.5,
+                name="outside-energy-envelope",
+            ),
+        ),
+        initial_set=SublevelSet(
+            state=(x, v),
+            expression=regulated_energy,
+            level=0.16,
+            name="start-ellipse",
+        ),
+    )
+    barrier = BarrierCandidate(
+        state=(x, v),
+        function=regulated_energy - 1,
+        name="regulated-energy-barrier",
+    )
+
+    problem = verification_problem_from_barrier(
+        "controlled spring regulator safety",
+        closed,
+        barrier,
+        specification=specification,
+        metadata={"verificationModel": "controlled-spring-regulator"},
+    )
+    geometry = scalar_field_region_geometries(
+        problem.regions,
+        projection="phase",
+        plane_variables=("x", "v"),
+        variable_to_state_axis=_SPRING_PHASE_AXES,
+        x_range=(-1.8, 1.8),
+        y_range=(-1.8, 1.8),
+        samples=(81, 81),
+    )
+    problem = replace(problem, region_geometry=geometry)
+    return replace(problem, proof_statuses=sampled_region_proof_statuses(problem))
+
+
+def controlled_spring_trajectory(
+    *,
+    x0: float = 0.35,
+    v0: float = -0.1,
+    t_span: tuple[float, float] = (0.0, 8.0),
+    dt: float = 0.01,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Integrate the regulated spring-mass closed loop inside the initial set."""
+
+    closed, _, _ = spring_mass_closed_loop()
+    time, states = integrate_fixed_step(
+        closed.numerical_rhs(),
+        initial_state=[float(x0), float(v0)],
+        t_span=t_span,
+        dt=dt,
+    )
+    return time, states
+
+
+def viewer_verification_examples() -> tuple[ViewerVerificationExample, ...]:
+    """Every self-contained verification problem exported to the viewer."""
+
+    return (
+        ViewerVerificationExample(
+            problem_factory=upright_pendulum_problem,
+            trajectory_factory=upright_pendulum_trajectory,
+            variable_to_state_axis=_PHASE_AXES,
+        ),
+        ViewerVerificationExample(
+            problem_factory=controlled_spring_problem,
+            trajectory_factory=controlled_spring_trajectory,
+            variable_to_state_axis=_SPRING_PHASE_AXES,
+        ),
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -130,10 +247,11 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
-    report = write_inspection_artifacts(upright_pendulum_problem(), args.output_dir)
-    for artifact in report.artifacts:
-        print(f"wrote {artifact.kind}: {artifact.path}")
-    print(report.note)
+    for example in viewer_verification_examples():
+        report = write_inspection_artifacts(example.problem_factory(), args.output_dir)
+        for artifact in report.artifacts:
+            print(f"wrote {artifact.kind}: {artifact.path}")
+        print(report.note)
 
 
 if __name__ == "__main__":

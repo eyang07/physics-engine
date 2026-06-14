@@ -23,17 +23,13 @@ import numpy as np
 from engine.export import validate_viewer_verification_problems
 from engine.verification import VerificationProblem, certificate_series_for_trajectory
 from scripts.export_verification_problems import (
-    upright_pendulum_problem,
-    upright_pendulum_trajectory,
+    ViewerVerificationExample,
+    viewer_verification_examples,
 )
 
 DEFAULT_GENERATED_DIR = Path("data/generated/verification")
 DEFAULT_VIEWER_DIR = Path("viewer/public/data/verification")
 INDEX_VERSION = 1
-
-# The state-axis mapping for the self-contained pendulum phase plane.
-_PHASE_AXES = {"theta": "theta", "omega": "omega"}
-
 
 def _problem_summary(payload: dict, data_path: str) -> dict:
     """A thin catalog entry the viewer lists; the detail lives in the IR file."""
@@ -54,22 +50,25 @@ def _problem_summary(payload: dict, data_path: str) -> dict:
     }
 
 
-def _controlled_trajectory_payload(problem: VerificationProblem) -> dict:
-    """The controlled-pendulum path plus its candidate-certificate series.
+def _controlled_trajectory_payload(
+    problem: VerificationProblem,
+    example: ViewerVerificationExample,
+) -> dict:
+    """The controlled path plus its candidate-certificate series.
 
     The viewer animates this self-contained trajectory in the Verification world;
     the certificate series are evaluated along the very system the obligations are
     derived for, so the path and the barrier describe one system.
     """
 
-    time, states = upright_pendulum_trajectory()
+    time, states = example.trajectory_factory()
     state_names = [variable.name for variable in problem.variables]
     diagnostics = certificate_series_for_trajectory(
         problem,
         time=time,
         states=states,
         state_names=state_names,
-        variable_to_state_axis=_PHASE_AXES,
+        variable_to_state_axis=example.variable_to_state_axis,
     )
     return {
         "time": [float(value) for value in time],
@@ -87,15 +86,18 @@ def write_verification_problems(
 ) -> list[str]:
     """Serialize every viewer verification problem and its index. Returns ids."""
 
-    problems: list[VerificationProblem] = [upright_pendulum_problem()]
+    examples = viewer_verification_examples()
+    problems: list[VerificationProblem] = [
+        example.problem_factory() for example in examples
+    ]
     validate_viewer_verification_problems(problems)
     generated_dir.mkdir(parents=True, exist_ok=True)
     viewer_dir.mkdir(parents=True, exist_ok=True)
 
     summaries: list[dict] = []
-    for problem in problems:
+    for example, problem in zip(examples, problems, strict=True):
         payload = problem.to_dict()
-        payload["trajectory"] = _controlled_trajectory_payload(problem)
+        payload["trajectory"] = _controlled_trajectory_payload(problem, example)
         filename = f"{payload['id']}.json"
         text = json.dumps(payload, indent=2) + "\n"
         (generated_dir / filename).write_text(text, encoding="utf-8")

@@ -65,21 +65,20 @@ artifacts.
     (spec in `docs/verification-ir.md`): continuous and discrete dynamics,
     control/disturbance channels, explicit assumptions, first-class candidate
     certificates locked to `status="candidate"`, and obligations labeled
-    `rigor="external-required"`. Viewer-facing exports now include a
-    top-level manifest `system` cross-reference and measured `regionGeometry`
-    scalar-field grids plus boundary polylines for safe/unsafe/initial/domain
-    regions.
-  - The first viewer-renderable verification pair is
-    `upright-pendulum-safety` linked to manifest system `pendulum`; the
-    geometry export maps IR variable `omega` to manifest state axis
-    `theta_dot` on the `phase` projection.
-  - Viewer verification generation validates manifest/problem cross-links and
+    `rigor="external-required"`. Viewer-facing verification exports are
+    self-contained and include measured `regionGeometry` scalar-field grids plus
+    boundary polylines for safe/unsafe/initial/domain regions.
+  - Viewer-renderable verification examples now include
+    `upright-pendulum-safety` and `controlled-spring-regulator-safety`, each
+    with its own controlled trajectory, region geometry, candidate-certificate
+    series, and sampled `proofStatuses`.
+  - Viewer verification generation validates each problem's internal
     region-geometry projection/state-axis mappings before writing JSON.
   - Measured certificate diagnostics for the viewer
-    (`engine/verification/measured.py`), all `rigor="measured"`: the linked
-    pendulum trajectory exports time-aligned candidate value (`B(x(t))`) and
+    (`engine/verification/measured.py`), all `rigor="measured"`: each exported
+    controlled trajectory carries time-aligned candidate value (`B(x(t))`) and
     flow-derivative (`dB/dt` from the verification dynamics) `series`, joined
-    back to the problem through trajectory `metadata.certificateSeries`
+    back to the problem through `certificateSeries`
     (`problemId`, `candidateId`, `obligationIds`, comparison baselines). The
     verification problem exports sampled region-grid `proofStatuses`, one per
     obligation surface, each with a machine-readable status
@@ -120,8 +119,8 @@ surfaces remain future work.
 - Hénon-Heiles system
 - Variable-speed wavefront propagation
 
-Backend-only examples include controlled pendulum safety/certificate candidates
-and metric-geometry reference systems.
+Backend-only examples include controlled pendulum and controlled spring
+safety/certificate candidates and metric-geometry reference systems.
 
 ## Scope
 
@@ -139,7 +138,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `290 passed`.
+Latest known result: `289 passed`.
 
 Use focused tests while iterating:
 
@@ -169,14 +168,9 @@ ignored and should not be committed.
 
 ## Next Work
 
-1. Link a second controlled system end-to-end (region geometry, certificate
-   trajectory series, and `proofStatuses`) so the viewer's safety surfaces can
-   generalize beyond the single `upright-pendulum-safety` ↔ `pendulum` pair.
-   Promoting the backend-only controlled pendulum into the gallery is the
-   natural candidate.
-2. Continue hardening backend verification foundations: richer target-specific
+1. Continue hardening backend verification foundations: richer target-specific
    adapter checks and robustness tests before adding more case-study breadth.
-3. Extend parameter variants beyond Lorenz once the viewer has clear behavior
+2. Extend parameter variants beyond Lorenz once the viewer has clear behavior
    for backend-generated variants.
-4. Keep backend-only geodesic exploration outside the gallery until the viewer
+3. Keep backend-only geodesic exploration outside the gallery until the viewer
    can render the geometry honestly.

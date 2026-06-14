@@ -35,7 +35,11 @@ from engine.verification import (
     verification_problem_from_lyapunov,
     write_inspection_artifacts,
 )
-from scripts.export_verification_problems import main, upright_pendulum_problem
+from scripts.export_verification_problems import (
+    controlled_spring_problem,
+    main,
+    upright_pendulum_problem,
+)
 from scripts.generate_verification_problems import write_verification_problems
 
 
@@ -389,6 +393,60 @@ def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
     assert (tmp_path / "upright-pendulum-safety.verification-problem.json").exists()
     assert (tmp_path / "upright-pendulum-safety.inspection.md").exists()
     assert (tmp_path / "upright-pendulum-safety.inspection-outcome.json").exists()
+    assert (
+        tmp_path / "controlled-spring-regulator-safety.verification-problem.json"
+    ).exists()
+    assert (tmp_path / "controlled-spring-regulator-safety.inspection.md").exists()
+    assert (
+        tmp_path / "controlled-spring-regulator-safety.inspection-outcome.json"
+    ).exists()
+
+
+def test_controlled_spring_problem_exports_viewer_contract() -> None:
+    problem = controlled_spring_problem()
+    assert problem.id == "controlled-spring-regulator-safety"
+    assert problem.system is None
+
+    payload = problem.to_dict()
+    assert payload["metadata"]["verificationModel"] == "controlled-spring-regulator"
+    assert len(payload["regionGeometry"]) == len(payload["regions"])
+    assert len(payload["proofStatuses"]) == len(payload["obligations"])
+
+    geometry_by_region = {
+        geometry["regionId"]: geometry for geometry in payload["regionGeometry"]
+    }
+    assert set(geometry_by_region) == {region["id"] for region in payload["regions"]}
+    safe_geometry = geometry_by_region["safe-regulated-energy"]
+    assert safe_geometry["projection"] == "phase"
+    assert safe_geometry["plane"] == {
+        "variables": ["x", "v"],
+        "stateAxes": ["x", "v"],
+        "variableToStateAxis": {"x": "x", "v": "v"},
+    }
+    assert len(safe_geometry["grid"]["x"]) == 81
+    assert len(safe_geometry["grid"]["y"]) == 81
+    assert safe_geometry["boundaryPolylines"]
+
+    statuses_by_obligation = {
+        status["obligationId"]: status for status in payload["proofStatuses"]
+    }
+    assert set(statuses_by_obligation) == {
+        "regulated-energy-barrier-non-increase",
+        "regulated-energy-barrier-initial-containment",
+        "regulated-energy-barrier-excludes-outside-energy-envelope",
+    }
+    assert {
+        status["status"] for status in statuses_by_obligation.values()
+    } == {"measured-holds"}
+    non_increase_status = statuses_by_obligation[
+        "regulated-energy-barrier-non-increase"
+    ]
+    assert non_increase_status["candidateId"] == "regulated-energy-barrier"
+    assert non_increase_status["regionId"] == "domain-regulated-energy-barrier-region"
+    assert non_increase_status["evaluation"]["variableToStateAxis"] == {
+        "x": "x",
+        "v": "v",
+    }
 
 
 def test_generate_verification_problems_writes_self_contained_index(tmp_path) -> None:
@@ -400,9 +458,17 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         viewer_dir=viewer_dir,
     )
 
-    assert ids == ["upright-pendulum-safety"]
+    assert ids == [
+        "upright-pendulum-safety",
+        "controlled-spring-regulator-safety",
+    ]
     payload = json.loads(
         (viewer_dir / "upright-pendulum-safety.json").read_text(encoding="utf-8")
+    )
+    spring_payload = json.loads(
+        (viewer_dir / "controlled-spring-regulator-safety.json").read_text(
+            encoding="utf-8"
+        )
     )
     index = json.loads((viewer_dir / "index.json").read_text(encoding="utf-8"))
 
@@ -433,7 +499,22 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
     assert abs(trajectory["states"][0][0] - float(sp.pi)) < 0.3
     assert abs(trajectory["states"][-1][0] - float(sp.pi)) < 0.05
 
-    assert index["problems"][0]["model"] == "controlled-pendulum-closed-loop"
-    assert index["problems"][0]["dataPath"] == (
-        "/data/verification/upright-pendulum-safety.json"
-    )
+    spring_trajectory = spring_payload["trajectory"]
+    assert spring_trajectory["stateNames"] == ["x", "v"]
+    assert len(spring_trajectory["time"]) == len(spring_trajectory["states"]) > 0
+    assert set(spring_trajectory["series"]) == {
+        "certificate_regulated_energy_barrier_value",
+        "certificate_regulated_energy_barrier_flow_derivative",
+    }
+    assert spring_trajectory["states"][0] == [0.35, -0.1]
+    assert abs(spring_trajectory["states"][-1][0]) < 0.01
+    assert abs(spring_trajectory["states"][-1][1]) < 0.01
+
+    assert [problem["model"] for problem in index["problems"]] == [
+        "controlled-pendulum-closed-loop",
+        "controlled-spring-regulator",
+    ]
+    assert [problem["dataPath"] for problem in index["problems"]] == [
+        "/data/verification/upright-pendulum-safety.json",
+        "/data/verification/controlled-spring-regulator-safety.json",
+    ]
