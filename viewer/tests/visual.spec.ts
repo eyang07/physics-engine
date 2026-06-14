@@ -331,4 +331,75 @@ for (const viewport of [
       path: testInfo.outputPath(`${viewport.name}-verification-unavailable.png`),
     });
   });
+
+  test(`Verification stage marks measured violations at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+
+    // No-marker path: the default problem's samples all hold, so the stage draws
+    // zero violation markers.
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationContent .verif-doc");
+    await expect(page.locator("#verificationCanvas")).toHaveAttribute(
+      "data-violation-markers",
+      "0",
+    );
+
+    // Marker path: inject two measured-violated samples into the pendulum problem
+    // — one whose worst point projects onto the stage's (theta, omega) axes, and
+    // one sampled on an unrelated projection. Only the mappable one is drawn; the
+    // unmappable sample must not produce a misleading marker.
+    const mappableViolation = {
+      id: "injected-violation-mappable",
+      obligationId: "energy-barrier-excludes-near-bottom",
+      status: "measured-violated",
+      worst: { value: 1.5, point: [2.5, 0.3] },
+      evaluation: {
+        kind: "region-grid",
+        sampleCount: 10,
+        source: "injected",
+        variables: ["theta", "omega"],
+        stateAxes: ["theta", "omega"],
+        variableToStateAxis: { theta: "theta", omega: "omega" },
+      },
+    };
+    const unmappableViolation = {
+      id: "injected-violation-unmappable",
+      obligationId: "energy-barrier-excludes-near-bottom",
+      status: "measured-violated",
+      worst: { value: 2.0, point: [1.0, 1.0] },
+      evaluation: {
+        kind: "region-grid",
+        sampleCount: 10,
+        source: "injected",
+        variables: ["phi", "psi"],
+        stateAxes: ["phi", "psi"],
+        variableToStateAxis: { phi: "phi", psi: "psi" },
+      },
+    };
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.proofStatuses.push(mappableViolation, unmappableViolation);
+      await route.fulfill({ response, json });
+    });
+
+    // Reload from scratch so the workbench re-fetches the (now injected) payload
+    // and re-selects the default problem.
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+    await expect(page.locator("#verificationCanvas")).toHaveAttribute(
+      "data-violation-markers",
+      "1",
+    );
+    await page.waitForTimeout(400);
+    await expectCanvasNonBlank(page, "#verificationCanvas");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-violation.png`) });
+  });
 }

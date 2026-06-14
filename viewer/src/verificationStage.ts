@@ -11,7 +11,7 @@ import { drawStageBackground } from "./pendulumCanvas";
 import { PlaybackClock, sampleTrajectory, trajectoryDuration } from "./playback";
 import { CertificateLanes } from "./certificateLanes";
 import { theme } from "./design/theme";
-import type { RegionGeometry, VerificationProblem } from "./data/verification";
+import type { ProofStatus, RegionGeometry, VerificationProblem } from "./data/verification";
 import type { Trajectory } from "./data/trajectory";
 import { clamp } from "./util";
 
@@ -21,6 +21,78 @@ type Bounds = {
   minY: number;
   maxY: number;
 };
+
+type ViolationMarker = { x: number; y: number };
+
+// A measured violation sample only belongs on the stage if its worst sampled
+// point projects onto the two axes this stage actually plots (state[0] vs
+// state[1]). Samples taken on a different projection, or with no exported point,
+// are dropped rather than drawn somewhere misleading.
+function violationMarkers(statuses: ProofStatus[], axisX: string, axisY: string): ViolationMarker[] {
+  if (!axisX || !axisY) {
+    return [];
+  }
+  const markers: ViolationMarker[] = [];
+  for (const status of statuses) {
+    if (status.status !== "measured-violated") {
+      continue;
+    }
+    const point = status.worstPoint;
+    const projection = status.projection;
+    if (!point || !projection) {
+      continue;
+    }
+    const byStateAxis = new Map<string, number>();
+    projection.variables.forEach((variable, index) => {
+      const axis = projection.variableToStateAxis[variable] ?? variable;
+      const value = point[index];
+      if (typeof value === "number" && Number.isFinite(value)) {
+        byStateAxis.set(axis, value);
+      }
+    });
+    const x = byStateAxis.get(axisX);
+    const y = byStateAxis.get(axisY);
+    if (x === undefined || y === undefined) {
+      continue;
+    }
+    markers.push({ x, y });
+  }
+  return markers;
+}
+
+// A worst-violation sample, drawn as a haloed red ring with an inner cross so it
+// reads as an annotation distinct from the region outlines, the trajectory, and
+// the moving playhead.
+function drawViolationMarkers(
+  ctx: CanvasRenderingContext2D,
+  markers: ViolationMarker[],
+  mapX: (value: number) => number,
+  mapY: (value: number) => number,
+): void {
+  markers.forEach((marker) => {
+    const cx = mapX(marker.x);
+    const cy = mapY(marker.y);
+    ctx.save();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(12, 14, 20, 0.6)";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(232, 86, 70, 0.95)";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+    ctx.stroke();
+    const r = 4;
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy - r);
+    ctx.lineTo(cx + r, cy + r);
+    ctx.moveTo(cx - r, cy + r);
+    ctx.lineTo(cx + r, cy - r);
+    ctx.stroke();
+    ctx.restore();
+  });
+}
 
 const ROLE_RGB: Record<string, string> = {
   domain: "138, 148, 166",
@@ -148,6 +220,7 @@ function drawVerificationPhaseScene(
   phase: number,
   width: number,
   height: number,
+  markers: ViolationMarker[],
 ): void {
   drawStageBackground(ctx, width, height);
   const plot = {
@@ -201,6 +274,8 @@ function drawVerificationPhaseScene(
   ctx.fill();
   ctx.shadowBlur = 0;
 
+  drawViolationMarkers(ctx, markers, mapX, mapY);
+
   ctx.fillStyle = theme.textMuted;
   ctx.font = '12px "IBM Plex Mono", monospace';
   ctx.fillText(trajectory.state_names[0] ?? "x", plot.right - 18, plot.bottom + 24);
@@ -214,6 +289,7 @@ export class VerificationStage {
   private trajectory: Trajectory | null = null;
   private bounds: Bounds | null = null;
   private regions: RegionGeometry[] = [];
+  private violations: ViolationMarker[] = [];
   private active = false;
   private running = false;
 
@@ -241,6 +317,7 @@ export class VerificationStage {
       this.trajectory = null;
       this.bounds = null;
       this.regions = [];
+      this.setViolations([]);
       this.syncPlayButton();
       return;
     }
@@ -253,9 +330,19 @@ export class VerificationStage {
     };
     this.regions = problem.regionGeometry;
     this.bounds = boundsFromRegions(problem.regionGeometry) ?? boundsFromTrajectory(this.trajectory);
+    this.setViolations(
+      violationMarkers(problem.proofStatuses, vt.stateNames[0] ?? "", vt.stateNames[1] ?? ""),
+    );
     this.certificateLanes.show(vt.series, vt.certificateSeries);
     this.syncPlayButton();
     this.resize();
+  }
+
+  // Keep a test-visible count of drawn violation markers on the canvas so visual
+  // coverage can assert the marker / no-marker paths without pixel diffing.
+  private setViolations(markers: ViolationMarker[]): void {
+    this.violations = markers;
+    this.canvas.dataset.violationMarkers = String(markers.length);
   }
 
   clear(): void {
@@ -265,6 +352,7 @@ export class VerificationStage {
     this.trajectory = null;
     this.bounds = null;
     this.regions = [];
+    this.setViolations([]);
     this.syncPlayButton();
     this.resize();
   }
@@ -349,6 +437,7 @@ export class VerificationStage {
       sample.phase,
       width,
       height,
+      this.violations,
     );
     this.certificateLanes.update(sample.phase);
   }

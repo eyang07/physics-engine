@@ -132,6 +132,18 @@ export interface IrCandidate {
  */
 export type ProofStatusKind = "measured-holds" | "measured-violated" | "external-required" | string;
 
+/**
+ * How a sampled proof-status point projects onto trajectory state axes. The
+ * worst point is reported in `variables` order; `variableToStateAxis` says which
+ * trajectory state axis each plane variable corresponds to, so the viewer can
+ * place the sample on the stage without re-deriving the projection.
+ */
+export interface ProofStatusProjection {
+  variables: string[];
+  stateAxes: string[];
+  variableToStateAxis: Record<string, string>;
+}
+
 export interface ProofStatus {
   id: string;
   obligationId: string;
@@ -146,6 +158,10 @@ export interface ProofStatus {
   sampleCount: number;
   source: string | null;
   worstValue: number | null;
+  /** The worst sampled point, in `projection.variables` order; null if absent. */
+  worstPoint: number[] | null;
+  /** The sampled point's projection onto state axes; null when not exported. */
+  projection: ProofStatusProjection | null;
   note: string | null;
 }
 
@@ -373,6 +389,8 @@ function parseProofStatus(value: unknown): ProofStatus | null {
   }
   const evaluation = asRecord(record.evaluation) ?? {};
   const worst = asRecord(record.worst);
+  const worstPoint = worst ? asNumberArray(worst.point) : [];
+  const projectionVariables = asStringArray(evaluation.variables);
   return {
     id: record.id,
     obligationId: record.obligationId,
@@ -387,6 +405,15 @@ function parseProofStatus(value: unknown): ProofStatus | null {
     sampleCount: asOptionalNumber(evaluation.sampleCount) ?? 0,
     source: asOptionalString(evaluation.source),
     worstValue: worst ? asOptionalNumber(worst.value) : null,
+    worstPoint: worstPoint.length > 0 ? worstPoint : null,
+    projection:
+      projectionVariables.length > 0
+        ? {
+            variables: projectionVariables,
+            stateAxes: asStringArray(evaluation.stateAxes),
+            variableToStateAxis: asStringRecord(evaluation.variableToStateAxis),
+          }
+        : null,
     note: asOptionalString(record.note),
   };
 }
