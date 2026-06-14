@@ -21,8 +21,8 @@ and trajectory data; it must not re-derive physics.
   (`viewer/public/data/verification/`).
 - Playback controls.
 - Parameter-family switch: for systems exporting manifest `variants` (e.g. the
-  Lorenz ρ-family), the inspector loads each backend-generated variant's data in
-  place — no browser-side regeneration.
+  Lorenz rho family and ideal-spring stiffness family), the inspector loads each
+  backend-generated variant's data in place — no browser-side regeneration.
 - Mathematical structure panels for symbolic backend exports.
 - Invariant lanes and sampled series display.
 - Diagnostics panel for exported phase-space structure: the finite-time Lyapunov

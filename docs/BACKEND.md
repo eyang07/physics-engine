@@ -139,7 +139,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `290 passed`.
+Latest known result: `291 passed`.
 
 Use focused tests while iterating:
 
@@ -171,7 +171,7 @@ ignored and should not be committed.
 
 1. Continue hardening backend verification foundations: richer target-specific
    adapter checks and robustness tests before adding more case-study breadth.
-2. Extend parameter variants beyond Lorenz once the viewer has clear behavior
-   for backend-generated variants.
+2. Add controlled-discrete inspection/export fixtures so discrete target
+   diagnostics stay covered outside unit-only IR tests.
 3. Keep backend-only geodesic exploration outside the gallery until the viewer
    can render the geometry honestly.

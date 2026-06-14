@@ -327,8 +327,9 @@ charged particle in a magnetic field, uniform gravity, ideal spring, Kepler
 problem, bead on a rotating hoop, Lorenz attractor, Hénon–Heiles, and a
 variable-speed wavefront. These exercise symbolic mechanics, conserved
 quantities, Poincaré sections, finite-time Lyapunov *exponents*, invariant
-residuals, a first parameter-sweep manifest slice (Lorenz ρ-family), ray-bundle /
-cotangent-Hamiltonian export with travel-time, caustic-proximity, and
+residuals, parameter-sweep manifest slices (Lorenz rho and ideal-spring
+stiffness families), ray-bundle / cotangent-Hamiltonian export with
+travel-time, caustic-proximity, and
 wavefront-envelope diagnostics, reusable parameterized media models, and a
 backend-only metric-geometry helper (2-sphere, equatorial Schwarzschild). They
 remain valuable as the structural and diagnostic backbone.

@@ -1,10 +1,14 @@
 import numpy as np
 import sympy as sp
 
-from scripts.generate_ideal_spring import generate_ideal_spring_trajectory
+from engine.export.manifest import system_entry
+from scripts.example_specs import IDEAL_SPRING, KEPLER
+from scripts.generate_ideal_spring import (
+    generate_ideal_spring_trajectory,
+    write_ideal_spring_variant_trajectories,
+)
 from scripts.generate_kepler_problem import generate_kepler_trajectory
 from scripts.generate_uniform_gravity import generate_uniform_gravity_trajectory
-from scripts.example_specs import KEPLER
 from systems.ideal_spring import build_system as ideal_spring
 from systems.kepler_problem import build_system as kepler_problem
 from systems.uniform_gravity import build_system as uniform_gravity
@@ -52,6 +56,40 @@ def test_ideal_spring_generated_motion_conserves_energy():
     energy = 0.5 * x_dot**2 + 0.5 * x**2
 
     assert np.max(np.abs(energy - energy[0])) < 1e-8
+
+
+def test_ideal_spring_manifest_and_variant_generation(tmp_path):
+    entry = system_entry(IDEAL_SPRING)
+    assert [variant["id"] for variant in entry["variants"]] == ["k-0-5", "k-1", "k-2"]
+    assert entry["variants"][1]["dataPath"] == "/data/ideal_spring.json"
+
+    output_dir = tmp_path / "data"
+    viewer_output_dir = tmp_path / "viewer-data"
+    trajectories = write_ideal_spring_variant_trajectories(
+        output_dir,
+        viewer_output_dir=viewer_output_dir,
+    )
+    written_variants = [
+        variant
+        for variant in IDEAL_SPRING.variants
+        if variant.data_path != IDEAL_SPRING.data_path
+    ]
+
+    assert len(trajectories) == len(written_variants)
+    for variant, trajectory in zip(written_variants, trajectories, strict=True):
+        filename = variant.data_path.removeprefix("/data/")
+        assert (output_dir / filename).exists()
+        assert (viewer_output_dir / filename).exists()
+        assert trajectory.metadata["mass"] == variant.parameters["m"]
+        assert trajectory.metadata["spring_constant"] == variant.parameters["k"]
+        assert trajectory.state_names == ("x", "x_dot")
+        assert trajectory.series is not None
+        x, x_dot = trajectory.states.T
+        energy = (
+            0.5 * variant.parameters["m"] * x_dot**2
+            + 0.5 * variant.parameters["k"] * x**2
+        )
+        assert np.max(np.abs(energy - energy[0])) < 1e-8
 
 
 def test_kepler_equations():

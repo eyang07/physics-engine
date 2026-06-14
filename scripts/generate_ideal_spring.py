@@ -70,9 +70,48 @@ def write_ideal_spring_trajectory(
     output: Path,
     *,
     viewer_output: Path | None = None,
+    mass: float = 1.0,
+    spring_constant: float = 1.0,
+    initial_state: Sequence[float] = (1.0, 0.0),
 ) -> Trajectory:
-    trajectory = generate_ideal_spring_trajectory()
+    trajectory = generate_ideal_spring_trajectory(
+        mass=mass,
+        spring_constant=spring_constant,
+        initial_state=initial_state,
+    )
     return write_trajectory_outputs(trajectory, output, viewer_output)
+
+
+def _variant_filename(data_path: str) -> str:
+    prefix = "/data/"
+    if not data_path.startswith(prefix):
+        raise ValueError(f"Ideal spring variant path must start with {prefix!r}: {data_path!r}")
+    return data_path.removeprefix(prefix)
+
+
+def write_ideal_spring_variant_trajectories(
+    output_dir: Path,
+    *,
+    viewer_output_dir: Path | None = None,
+) -> list[Trajectory]:
+    trajectories = []
+    for variant in IDEAL_SPRING.variants:
+        if variant.data_path == IDEAL_SPRING.data_path:
+            continue
+
+        parameters = variant.parameters
+        filename = _variant_filename(variant.data_path)
+        viewer_output = None if viewer_output_dir is None else viewer_output_dir / filename
+        trajectories.append(
+            write_ideal_spring_trajectory(
+                output_dir / filename,
+                viewer_output=viewer_output,
+                mass=parameters["m"],
+                spring_constant=parameters["k"],
+                initial_state=(parameters["x0"], parameters["x_dot0"]),
+            )
+        )
+    return trajectories
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

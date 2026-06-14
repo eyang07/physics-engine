@@ -33,7 +33,8 @@ Implemented diagnostics include:
 - Finite-time Lyapunov exponent estimates for Lorenz and Hénon-Heiles.
 - Poincare sections for Hénon-Heiles.
 - Invariant-residual tracking for conserved quantities.
-- Parameter variants, currently used by the Lorenz rho family.
+- Parameter variants, currently used by the Lorenz rho family and ideal-spring
+  stiffness family.
 - Ray diagnostics: travel time, caustic proximity, and wavefront envelopes.
 
 ## Current Examples
@@ -51,7 +52,7 @@ Implemented diagnostics include:
 
 - Add basin sampling or bifurcation-style diagnostics when a concrete example
   needs them.
-- Extend parameter-family exports beyond Lorenz once frontend variant behavior
-  is settled.
+- Factor shared parameter-family generation helpers if more systems add
+  variants.
 - Keep advanced geometry backend-only until the viewer can represent it
   honestly.

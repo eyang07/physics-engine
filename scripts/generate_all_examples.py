@@ -7,7 +7,10 @@ from scripts.example_specs import LENSES, SPECS
 from scripts.generate_bead_on_hoop import write_bead_on_hoop_trajectory
 from scripts.generate_charged_particle import write_charged_particle_trajectory
 from scripts.generate_henon_heiles import write_henon_heiles_trajectory
-from scripts.generate_ideal_spring import write_ideal_spring_trajectory
+from scripts.generate_ideal_spring import (
+    write_ideal_spring_trajectory,
+    write_ideal_spring_variant_trajectories,
+)
 from scripts.generate_kepler_problem import write_kepler_trajectory
 from scripts.generate_lorenz_attractor import write_lorenz_trajectory, write_lorenz_variant_trajectories
 from scripts.generate_pendulum import write_pendulum_trajectory
@@ -36,6 +39,10 @@ def main() -> None:
     write_ideal_spring_trajectory(
         Path("data/generated/ideal_spring.json"),
         viewer_output=Path("viewer/public/data/ideal_spring.json"),
+    )
+    write_ideal_spring_variant_trajectories(
+        Path("data/generated"),
+        viewer_output_dir=Path("viewer/public/data"),
     )
     write_kepler_trajectory(
         Path("data/generated/kepler_problem.json"),

@@ -73,7 +73,7 @@ Registered viewer examples:
 - Geodesic on a sphere
 - Charged particle in a uniform magnetic field
 - Uniform gravitational field
-- Ideal spring
+- Ideal spring, including precomputed stiffness variants
 - Kepler problem
 - Bead on a rotating hoop
 - Lorenz attractor, including precomputed rho variants

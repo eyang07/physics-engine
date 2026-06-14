@@ -390,6 +390,41 @@ IDEAL_SPRING = SystemSpec(
     conserved=(Conserved("H", "H", "time translation", generator=_time_translation),),
     lenses=("idealSpring", "idealSpringPhase", "idealSpringPotential"),
     data_path="/data/ideal_spring.json",
+    variants=(
+        ParameterVariant(
+            id="k-0-5",
+            label="k = 0.5",
+            parameters={
+                "m": 1.0,
+                "k": 0.5,
+                "x0": 1.0,
+                "x_dot0": 0.0,
+            },
+            data_path="/data/ideal_spring_k_0_5.json",
+        ),
+        ParameterVariant(
+            id="k-1",
+            label="k = 1",
+            parameters={
+                "m": 1.0,
+                "k": 1.0,
+                "x0": 1.0,
+                "x_dot0": 0.0,
+            },
+            data_path="/data/ideal_spring.json",
+        ),
+        ParameterVariant(
+            id="k-2",
+            label="k = 2",
+            parameters={
+                "m": 1.0,
+                "k": 2.0,
+                "x0": 1.0,
+                "x_dot0": 0.0,
+            },
+            data_path="/data/ideal_spring_k_2.json",
+        ),
+    ),
 )
 
 
