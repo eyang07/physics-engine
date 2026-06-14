@@ -1241,6 +1241,23 @@ def test_validate_viewer_verification_export_rejects_wrong_index_schema_version(
         )
 
 
+def test_validate_viewer_verification_export_rejects_unreferenced_problem_paths() -> None:
+    with pytest.raises(ValueError, match="unreferenced problem files"):
+        validate_viewer_verification_export(
+            _valid_viewer_verification_index(),
+            {
+                "/data/verification/example-problem.json": (
+                    _valid_viewer_verification_problem_payload()
+                ),
+                "/data/verification/stale-problem.json": {
+                    **_valid_viewer_verification_problem_payload(),
+                    "id": "stale-problem",
+                },
+            },
+            version=INDEX_VERSION,
+        )
+
+
 @pytest.mark.parametrize(
     ("payload", "message"),
     [

@@ -105,6 +105,14 @@ def validate_viewer_verification_export(
 
     validate_viewer_verification_index(index_payload, version=version)
     problems = index_payload["problems"]
+    referenced_data_paths = {entry["dataPath"] for entry in problems}
+    extra_data_paths = set(problem_payloads_by_data_path) - referenced_data_paths
+    if extra_data_paths:
+        raise ValueError(
+            "viewer verification export includes unreferenced problem files: "
+            f"{sorted(extra_data_paths)}"
+        )
+
     for entry in problems:
         problem_id = entry["id"]
         data_path = entry["dataPath"]
