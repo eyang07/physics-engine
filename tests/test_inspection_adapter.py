@@ -1219,6 +1219,22 @@ def test_validate_viewer_verification_export_accepts_index_and_problem_payloads(
     )
 
 
+def test_validate_viewer_verification_export_accepts_explicit_metadata_status() -> None:
+    validate_viewer_verification_export(
+        _valid_viewer_verification_index(),
+        {
+            "/data/verification/example-problem.json": {
+                **_valid_viewer_verification_problem_payload(),
+                "metadata": {
+                    **_valid_viewer_verification_problem_payload()["metadata"],
+                    "status": "candidate",
+                },
+            }
+        },
+        version=INDEX_VERSION,
+    )
+
+
 def test_validate_viewer_verification_export_rejects_wrong_index_schema_version() -> None:
     index_payload = {
         **_valid_viewer_verification_index(),
@@ -1286,6 +1302,48 @@ def test_validate_viewer_verification_export_rejects_unreferenced_problem_paths(
     ],
 )
 def test_validate_viewer_verification_export_rejects_model_mismatches(
+    index_payload,
+    problem_payload,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        validate_viewer_verification_export(
+            index_payload,
+            {"/data/verification/example-problem.json": problem_payload},
+            version=INDEX_VERSION,
+        )
+
+
+@pytest.mark.parametrize(
+    ("index_payload", "problem_payload", "message"),
+    [
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    {
+                        **_valid_viewer_verification_index()["problems"][0],
+                        "status": "stale",
+                    }
+                ],
+            },
+            _valid_viewer_verification_problem_payload(),
+            "status does not match metadata.status",
+        ),
+        (
+            _valid_viewer_verification_index(),
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "metadata": {
+                    **_valid_viewer_verification_problem_payload()["metadata"],
+                    "status": "",
+                },
+            },
+            "metadata status is invalid",
+        ),
+    ],
+)
+def test_validate_viewer_verification_export_rejects_status_mismatches(
     index_payload,
     problem_payload,
     message: str,

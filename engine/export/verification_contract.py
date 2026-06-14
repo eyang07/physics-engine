@@ -150,6 +150,16 @@ def validate_viewer_verification_export(
                 f"viewer verification problem {problem_id} model does not match "
                 "metadata.verificationModel"
             )
+        status = metadata.get("status", "candidate")
+        if not isinstance(status, str) or not status:
+            raise ValueError(
+                f"viewer verification problem {problem_id} metadata status is invalid"
+            )
+        if entry["status"] != status:
+            raise ValueError(
+                f"viewer verification problem {problem_id} status does not match "
+                "metadata.status"
+            )
 
         validate_viewer_verification_problem_payload(problem_payload)
 
