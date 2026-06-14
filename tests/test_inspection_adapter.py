@@ -39,6 +39,7 @@ from engine.verification import (
 from scripts.export_verification_problems import (
     controlled_discrete_decay_problem,
     controlled_spring_problem,
+    inspection_artifact_problems,
     main,
     upright_pendulum_problem,
 )
@@ -61,6 +62,14 @@ def _oscillator_problem() -> VerificationProblem:
         candidate,
         substitutions={k: 4.0},
         metadata={"system": "damped-oscillator"},
+    )
+
+
+def _inspection_artifact_names(problem: VerificationProblem) -> tuple[str, str, str]:
+    return (
+        f"{problem.id}.verification-problem.json",
+        f"{problem.id}.inspection.md",
+        f"{problem.id}.inspection-outcome.json",
     )
 
 
@@ -386,7 +395,7 @@ def test_report_rejects_discharge_claims(tmp_path) -> None:
         )
 
 
-def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
+def test_export_script_writes_inspection_artifact_contract(tmp_path, capsys) -> None:
     problem = upright_pendulum_problem()
     assert problem.id == "upright-pendulum-safety"
     # Self-contained: the verification world names no gallery system.
@@ -464,26 +473,71 @@ def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
 
     main(["--output-dir", str(tmp_path)])
     captured = capsys.readouterr()
-    assert "wrote" in captured.out
-    assert (tmp_path / "upright-pendulum-safety.verification-problem.json").exists()
-    assert (tmp_path / "upright-pendulum-safety.inspection.md").exists()
-    assert (tmp_path / "upright-pendulum-safety.inspection-outcome.json").exists()
-    assert (
-        tmp_path / "controlled-spring-regulator-safety.verification-problem.json"
-    ).exists()
-    assert (tmp_path / "controlled-spring-regulator-safety.inspection.md").exists()
-    assert (
-        tmp_path / "controlled-spring-regulator-safety.inspection-outcome.json"
-    ).exists()
-    assert (
-        tmp_path / "controlled-discrete-decay-lyapunov.verification-problem.json"
-    ).exists()
-    assert (
-        tmp_path / "controlled-discrete-decay-lyapunov.inspection.md"
-    ).exists()
-    assert (
-        tmp_path / "controlled-discrete-decay-lyapunov.inspection-outcome.json"
-    ).exists()
+    exported_problems = inspection_artifact_problems()
+    expected_names = {
+        name
+        for exported_problem in exported_problems
+        for name in _inspection_artifact_names(exported_problem)
+    }
+    assert {path.name for path in tmp_path.iterdir()} == expected_names
+
+    for exported_problem in exported_problems:
+        problem_name, markdown_name, outcome_name = _inspection_artifact_names(
+            exported_problem
+        )
+        problem_path = tmp_path / problem_name
+        markdown_path = tmp_path / markdown_name
+        outcome_path = tmp_path / outcome_name
+
+        assert f"wrote {ARTIFACT_PROBLEM_JSON}: {problem_path}" in captured.out
+        assert f"wrote {ARTIFACT_REPORT_MARKDOWN}: {markdown_path}" in captured.out
+        assert (
+            f"wrote {ARTIFACT_INSPECTION_OUTCOME_JSON}: {outcome_path}"
+            in captured.out
+        )
+
+        assert json.loads(problem_path.read_text(encoding="utf-8")) == (
+            exported_problem.to_dict()
+        )
+        assert markdown_path.read_text(encoding="utf-8") == (
+            render_inspection_markdown(exported_problem)
+        )
+
+        outcome = json.loads(outcome_path.read_text(encoding="utf-8"))
+        expected_obligation_ids = [
+            obligation.id for obligation in exported_problem.obligations
+        ]
+        assert outcome["adapter"] == ADAPTER_NAME
+        assert outcome["problemId"] == exported_problem.id
+        assert outcome["schemaVersion"] == exported_problem.schema_version
+        assert outcome["status"] == REPORT_STATUS
+        assert outcome["obligationIds"] == expected_obligation_ids
+        assert outcome["artifacts"] == [
+            {"kind": ARTIFACT_PROBLEM_JSON, "path": str(problem_path)},
+            {"kind": ARTIFACT_REPORT_MARKDOWN, "path": str(markdown_path)},
+            {"kind": ARTIFACT_INSPECTION_OUTCOME_JSON, "path": str(outcome_path)},
+        ]
+        assert {
+            diagnostic["status"] for diagnostic in outcome["diagnostics"]
+        } == {"not-attempted", "unsupported", "externally-required"}
+        assert [
+            diagnostic["obligationId"]
+            for diagnostic in outcome["diagnostics"]
+            if diagnostic["code"] == "inspection.target_unsupported"
+        ] == expected_obligation_ids
+        assert [
+            diagnostic["obligationId"]
+            for diagnostic in outcome["diagnostics"]
+            if diagnostic["status"] == "externally-required"
+        ] == expected_obligation_ids
+        capability_checks = [
+            diagnostic
+            for diagnostic in outcome["diagnostics"]
+            if diagnostic["code"] == "inspection.capability_check"
+        ]
+        assert len(capability_checks) == 1
+        assert capability_checks[0]["details"]["adapter"] == ADAPTER_NAME
+        assert capability_checks[0]["details"]["supportsDischarge"] is False
 
 
 def test_controlled_discrete_fixture_writes_inspection_diagnostics(tmp_path) -> None:
