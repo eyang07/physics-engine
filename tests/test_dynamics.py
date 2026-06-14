@@ -5,6 +5,11 @@ import math
 import numpy as np
 import sympy as sp
 
+from metadata_assertions import (
+    assert_lyapunov_diagnostic_references_series,
+    assert_metadata_keys,
+    assert_renderer_hint_keys,
+)
 from engine.numerics import integrate_adaptive
 from scripts.example_specs import LORENZ
 from scripts.generate_lorenz_attractor import generate_lorenz_trajectory, write_lorenz_variant_trajectories
@@ -80,19 +85,31 @@ def test_lorenz_export_metadata_and_series() -> None:
     assert len(trajectory.series["lyapunov_local_growth"]) == len(trajectory.time)
     assert trajectory.series["ftle"][0] == 0.0
     assert trajectory.series["ftle"][-1] > 0.0
-    assert trajectory.metadata["kind"] == "first-order-flow"
-    assert "invariantResiduals" not in trajectory.metadata
-    assert trajectory.metadata["divergence"] == -(10.0 + 1.0 + 8.0 / 3.0)
-    assert set(trajectory.metadata["bounds"]) == {"x", "y", "z"}
-    assert len(trajectory.metadata["fixedPoints"]) == 3
-    lyapunov = trajectory.metadata["diagnostics"]["lyapunov"]
-    assert lyapunov["kind"] == "finite-time-largest"
-    assert lyapunov["method"] == "sampled-variational-jacobian"
+    metadata = assert_metadata_keys(
+        trajectory,
+        {
+            "system",
+            "kind",
+            "parameters",
+            "bounds",
+            "divergence",
+            "fixedPoints",
+            "diagnostics",
+            "rendererHints",
+        },
+    )
+    assert metadata["kind"] == "first-order-flow"
+    assert metadata["divergence"] == -(10.0 + 1.0 + 8.0 / 3.0)
+    assert set(metadata["bounds"]) == {"x", "y", "z"}
+    assert len(metadata["fixedPoints"]) == 3
+    lyapunov = assert_lyapunov_diagnostic_references_series(trajectory)
     assert lyapunov["series"] == "ftle"
     assert lyapunov["localGrowthSeries"] == "lyapunov_local_growth"
-    assert lyapunov["sampleCount"] == len(trajectory.time)
     assert lyapunov["finalEstimate"] == trajectory.series["ftle"][-1]
-    hints = trajectory.metadata["rendererHints"]
+    hints = assert_renderer_hint_keys(
+        metadata,
+        {"bounds", "camera", "transform", "referenceGeometry"},
+    )
     assert hints["transform"]["scale"] > 0
     assert hints["referenceGeometry"][0]["kind"] == "guideRings"
     assert hints["referenceGeometry"][1]["kind"] == "fixedPointMarkers"
@@ -126,40 +143,38 @@ def test_lorenz_variant_generation_matches_manifest(tmp_path) -> None:
         filename = variant.data_path.removeprefix("/data/")
         assert (output_dir / filename).exists()
         assert (viewer_output_dir / filename).exists()
-        assert set(trajectory.metadata) == {
-            "system",
-            "kind",
-            "parameters",
-            "bounds",
-            "divergence",
-            "fixedPoints",
-            "diagnostics",
-            "rendererHints",
-        }
-        assert trajectory.metadata["system"] == "lorenz_attractor"
-        assert trajectory.metadata["kind"] == "first-order-flow"
-        assert trajectory.metadata["parameters"] == {
+        metadata = assert_metadata_keys(
+            trajectory,
+            {
+                "system",
+                "kind",
+                "parameters",
+                "bounds",
+                "divergence",
+                "fixedPoints",
+                "diagnostics",
+                "rendererHints",
+            },
+        )
+        assert metadata["system"] == "lorenz_attractor"
+        assert metadata["kind"] == "first-order-flow"
+        assert metadata["parameters"] == {
             "sigma": variant.parameters["sigma"],
             "rho": variant.parameters["rho"],
             "beta": variant.parameters["beta"],
         }
-        assert trajectory.metadata["divergence"] == -(
+        assert metadata["divergence"] == -(
             variant.parameters["sigma"] + 1.0 + variant.parameters["beta"]
         )
-        assert set(trajectory.metadata["bounds"]) == {"x", "y", "z"}
-        assert len(trajectory.metadata["fixedPoints"]) == 3
-        lyapunov = trajectory.metadata["diagnostics"]["lyapunov"]
-        assert lyapunov["kind"] == "finite-time-largest"
-        assert lyapunov["method"] == "sampled-variational-jacobian"
+        assert set(metadata["bounds"]) == {"x", "y", "z"}
+        assert len(metadata["fixedPoints"]) == 3
+        lyapunov = assert_lyapunov_diagnostic_references_series(trajectory)
         assert lyapunov["series"] == "ftle"
         assert lyapunov["localGrowthSeries"] == "lyapunov_local_growth"
-        assert lyapunov["sampleCount"] == len(trajectory.time)
-        assert set(trajectory.metadata["rendererHints"]) == {
-            "bounds",
-            "camera",
-            "transform",
-            "referenceGeometry",
-        }
+        assert_renderer_hint_keys(
+            metadata,
+            {"bounds", "camera", "transform", "referenceGeometry"},
+        )
         assert trajectory.states.shape[1] == 3
         assert trajectory.series is not None
         assert len(trajectory.series["ftle"]) == len(trajectory.time)

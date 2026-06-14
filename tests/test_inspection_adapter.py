@@ -5,6 +5,7 @@ import json
 import pytest
 import sympy as sp
 
+from metadata_assertions import assert_embedded_certificate_trajectory
 from engine.dynamics import (
     Box,
     ControlledDiscreteSystem,
@@ -699,28 +700,30 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
     # The embedded controlled trajectory the Verification world animates, with
     # candidate-certificate series along the same system the obligations describe.
     trajectory = payload["trajectory"]
-    assert trajectory["stateNames"] == ["theta", "omega"]
-    assert len(trajectory["time"]) == len(trajectory["states"]) > 0
-    assert set(trajectory["series"]) == {
-        "certificate_energy_barrier_value",
-        "certificate_energy_barrier_flow_derivative",
-    }
-    assert {record["kind"] for record in trajectory["certificateSeries"]} == {
-        "candidate-value",
-        "flow-derivative",
-    }
+    assert_embedded_certificate_trajectory(
+        trajectory,
+        state_names=("theta", "omega"),
+        series_names={
+            "certificate_energy_barrier_value",
+            "certificate_energy_barrier_flow_derivative",
+        },
+        certificate_kinds={"candidate-value", "flow-derivative"},
+    )
     # Starts near upright (theta = pi) inside the initial set and the controller
     # holds it there, so the path never approaches the unsafe bottom.
     assert abs(trajectory["states"][0][0] - float(sp.pi)) < 0.3
     assert abs(trajectory["states"][-1][0] - float(sp.pi)) < 0.05
 
     spring_trajectory = spring_payload["trajectory"]
-    assert spring_trajectory["stateNames"] == ["x", "v"]
-    assert len(spring_trajectory["time"]) == len(spring_trajectory["states"]) > 0
-    assert set(spring_trajectory["series"]) == {
-        "certificate_regulated_energy_barrier_value",
-        "certificate_regulated_energy_barrier_flow_derivative",
-    }
+    assert_embedded_certificate_trajectory(
+        spring_trajectory,
+        state_names=("x", "v"),
+        series_names={
+            "certificate_regulated_energy_barrier_value",
+            "certificate_regulated_energy_barrier_flow_derivative",
+        },
+        certificate_kinds={"candidate-value", "flow-derivative"},
+    )
     assert spring_trajectory["states"][0] == [0.35, -0.1]
     assert abs(spring_trajectory["states"][-1][0]) < 0.01
     assert abs(spring_trajectory["states"][-1][1]) < 0.01

@@ -3,6 +3,12 @@ from __future__ import annotations
 import numpy as np
 import sympy as sp
 
+from metadata_assertions import (
+    assert_invariant_residual_names,
+    assert_lyapunov_diagnostic_references_series,
+    assert_metadata_keys,
+    assert_renderer_hint_keys,
+)
 from scripts.generate_henon_heiles import generate_henon_heiles_trajectory
 from systems.henon_heiles import build_system
 
@@ -33,14 +39,28 @@ def test_henon_heiles_generated_energy_and_potential_surface() -> None:
     assert trajectory.series is not None
     energy = np.asarray(trajectory.series["H"], dtype=float)
     assert np.max(np.abs(energy - energy[0])) < 1e-8
-    assert [record["name"] for record in trajectory.metadata["invariantResiduals"]] == ["H"]
+    metadata = assert_metadata_keys(
+        trajectory,
+        {
+            "invariantResiduals",
+            "system",
+            "mass",
+            "stiffness",
+            "coupling",
+            "potentialSurface",
+            "poincareSections",
+            "diagnostics",
+            "rendererHints",
+        },
+    )
+    assert_invariant_residual_names(metadata, ["H"])
 
-    surface = trajectory.metadata["potentialSurface"]
+    surface = metadata["potentialSurface"]
     assert len(surface["xValues"]) == 120
     assert len(surface["yValues"]) == 120
     assert np.asarray(surface["values"], dtype=float).shape == (120, 120)
     assert abs(surface["energy"] - float(energy.mean())) < 1e-12
-    section = trajectory.metadata["poincareSections"][0]
+    section = metadata["poincareSections"][0]
     assert section["name"] == "y_zero_upward"
     assert section["coordinate"] == "y"
     assert section["value"] == 0.0
@@ -53,7 +73,10 @@ def test_henon_heiles_generated_energy_and_potential_surface() -> None:
     assert first_point["coordinates"]["y_dot"] > 0.0
     assert abs(first_point["series"]["H"] - float(energy[0])) < 1e-8
     assert first_point["extra"]["p_x"] == first_point["coordinates"]["x_dot"]
-    hints = trajectory.metadata["rendererHints"]
+    hints = assert_renderer_hint_keys(
+        metadata,
+        {"bounds", "camera", "flow", "referenceGeometry"},
+    )
     assert hints["referenceGeometry"][0]["kind"] == "potentialSurface"
     assert hints["flow"]["kind"] == "potentialGradient"
     assert set(hints["bounds"]) == {"x", "y", "z"}
@@ -64,24 +87,9 @@ def test_henon_heiles_generated_lyapunov_diagnostic() -> None:
     repeat = generate_henon_heiles_trajectory(t_span=(0.0, 12.0), dt=0.01)
 
     assert trajectory.series is not None
-    lyapunov = trajectory.metadata["diagnostics"]["lyapunov"]
-    assert set(lyapunov) == {
-        "kind",
-        "method",
-        "series",
-        "localGrowthSeries",
-        "initialTangent",
-        "finalTangent",
-        "finalEstimate",
-        "sampleCount",
-        "timeWindow",
-    }
-    assert lyapunov["kind"] == "finite-time-largest"
-    assert lyapunov["method"] == "sampled-variational-jacobian"
+    lyapunov = assert_lyapunov_diagnostic_references_series(trajectory)
     assert lyapunov["series"] == "ftle"
     assert lyapunov["localGrowthSeries"] == "lyapunov_local_growth"
-    assert lyapunov["sampleCount"] == len(trajectory.time)
-    assert lyapunov["timeWindow"] == [float(trajectory.time[0]), float(trajectory.time[-1])]
 
     ftle = np.asarray(trajectory.series["ftle"], dtype=float)
     local_growth = np.asarray(trajectory.series["lyapunov_local_growth"], dtype=float)

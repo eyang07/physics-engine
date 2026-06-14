@@ -66,18 +66,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-009: Add generated trajectory metadata contract helpers**
-   - Goal: Centralize reusable assertions for generated trajectory metadata so
-     backend tests can distinguish manifest fields, renderer hints, diagnostics,
-     and certificate/safety metadata without ad hoc checks.
-   - Scope: `tests/` helper modules, trajectory generator regression tests, and
-     documentation only if the exported trajectory contract changes.
-   - Acceptance: Shared helpers validate trajectory metadata key sets and nested
-     diagnostic references for representative Lagrangian and first-order
-     systems; existing Lorenz, ideal-spring, Hénon-Heiles, and verification
-     trajectory tests use the helpers; and focused generator tests pass.
-
-2. **BE-010: Add inspection index CLI smoke coverage**
+1. **BE-010: Add inspection index CLI smoke coverage**
    - Goal: Keep the backend inspection export CLI discoverable by checking its
      default and custom-output behavior without writing committed generated
      artifacts.
@@ -87,3 +76,14 @@ Each task should use this structure:
    - Acceptance: Tests exercise the CLI entry point with a temporary output
      directory, assert the printed artifact/index paths are deterministic, and
      confirm no generated artifacts are expected in the repository tree.
+
+2. **BE-011: Add verification artifact index schema validation**
+   - Goal: Validate the inspection artifact index shape independently from the
+     export script so downstream backend tools can rely on a narrow discovery
+     contract.
+   - Scope: `engine/verification/` or `engine/export/` validation helpers,
+     `tests/test_inspection_adapter.py`, and docs if validation behavior is
+     documented.
+   - Acceptance: A reusable validator rejects missing schema versions, duplicate
+     problem ids, missing artifact paths, and unknown artifact kinds; focused
+     inspection tests cover valid and invalid indexes.
