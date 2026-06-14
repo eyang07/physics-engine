@@ -13,7 +13,7 @@ import { CertificateLanes } from "./certificateLanes";
 import { theme } from "./design/theme";
 import type { ProofStatus, RegionGeometry, VerificationProblem } from "./data/verification";
 import type { Trajectory } from "./data/trajectory";
-import { clamp } from "./util";
+import { clamp, formatMeasured } from "./util";
 
 type Bounds = {
   minX: number;
@@ -22,15 +22,16 @@ type Bounds = {
   maxY: number;
 };
 
-type ViolationMarker = { x: number; y: number; label: string };
+type ViolationMarker = { x: number; y: number; label: string; worstValue: number | null };
 
 const VIOLATION_RGBA = "rgba(232, 86, 70, 0.95)";
 
 // A measured violation sample only belongs on the stage if its worst sampled
 // point projects onto the two axes this stage actually plots (state[0] vs
 // state[1]). Samples taken on a different projection, or with no exported point,
-// are dropped rather than drawn somewhere misleading. The obligation name rides
-// along so each marker can be named in the legend.
+// are dropped rather than drawn somewhere misleading. The obligation name and
+// worst measured value ride along so each marker can be named and quantified in
+// the legend.
 function violationMarkers(
   statuses: ProofStatus[],
   axisX: string,
@@ -64,7 +65,7 @@ function violationMarkers(
       continue;
     }
     const label = obligationName.get(status.obligationId) ?? status.obligationId;
-    markers.push({ x, y, label });
+    markers.push({ x, y, label, worstValue: status.worstValue });
   }
   return markers;
 }
@@ -435,6 +436,15 @@ export class VerificationStage {
       name.className = "verif-violation-legend__name";
       name.textContent = marker.label;
       entry.append(tag, name);
+      // Show how far the sample broke the obligation, when the backend exported
+      // a worst value. A missing value simply omits the chip — no broken chrome.
+      if (marker.worstValue !== null) {
+        const value = document.createElement("span");
+        value.className = "verif-violation-legend__value";
+        value.textContent = formatMeasured(marker.worstValue);
+        value.title = "worst measured value";
+        entry.append(value);
+      }
       entry.addEventListener("click", () => {
         this.setFocusedViolation(this.focusedViolation === index ? null : index);
       });

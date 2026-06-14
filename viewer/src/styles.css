@@ -322,10 +322,20 @@ select {
 }
 
 .verif-violation-legend__name {
+  flex: 1;
   color: var(--text-primary);
   font-size: var(--text-xs);
   line-height: 1.2;
   word-break: break-word;
+}
+
+.verif-violation-legend__value {
+  flex: none;
+  color: rgba(232, 86, 70, 0.95);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .verif-stage__controls {

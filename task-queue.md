@@ -32,19 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-009: Show the worst measured value on each violation legend entry**
-   - Goal: Carry the already-exported `worstValue` for each measured violation
-     into its legend entry so a named violation also shows how far it broke the
-     obligation inequality, not just where.
-   - Scope: `viewer/src/verificationStage.ts` (thread `worstValue` into the
-     violation marker model and render it in the legend entry), `viewer/src/styles.css`
-     for the value chrome, and visual coverage in `viewer/tests/visual.spec.ts`.
-   - Acceptance: Each legend entry displays its violation's worst measured value
-     formatted deterministically, entries with a null `worstValue` omit the value
-     without leaving broken chrome, the focus/clear interaction keeps working, and
-     visual tests assert the displayed value text.
-
-2. **FE-010: Jump from a candidate's obligation link to its obligation card**
+1. **FE-010: Jump from a candidate's obligation link to its obligation card**
    - Goal: Let the obligation ids listed on a candidate-certificate card scroll
      the doc to the matching obligation card so the candidate→obligation link is
      navigable, reusing the section-anchor pattern from FE-008.
@@ -56,6 +44,18 @@ Each task should use this structure:
      obligation card into view and briefly emphasizes it, links whose obligation
      id is missing from the obligations list stay inert, and visual tests cover
      the navigate/emphasis behavior.
+
+2. **FE-011: Jump from a measured-status card to its obligation card**
+   - Goal: Let each measured-status card link to the obligation it sampled so the
+     measured evidence is navigable back to the obligation it bears on, reusing
+     the obligation-card ids introduced in FE-010.
+   - Scope: `viewer/src/verificationPanel.ts` (make the measured-status card's
+     obligation name scroll/emphasize the matching obligation card),
+     `viewer/src/styles.css`, and visual coverage in `viewer/tests/visual.spec.ts`.
+   - Acceptance: Activating a measured-status card's obligation link brings the
+     matching obligation card into view and emphasizes it, status rows whose
+     obligation id has no obligation card stay inert, and visual tests cover the
+     navigate behavior.
 
 ## Backend Queue
 

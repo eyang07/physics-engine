@@ -566,6 +566,66 @@ for (const viewport of [
     await expect(canvas).toHaveAttribute("data-focused-violation", "");
   });
 
+  test(`Verification stage shows worst measured values in the legend at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Inject two mappable measured-violated samples: one carrying a worst value,
+    // one whose worst point exists but with no exported value. Both map onto the
+    // stage's (theta, omega) axes so both draw markers and legend entries.
+    const evaluation = {
+      kind: "region-grid",
+      sampleCount: 10,
+      source: "injected",
+      variables: ["theta", "omega"],
+      stateAxes: ["theta", "omega"],
+      variableToStateAxis: { theta: "theta", omega: "omega" },
+    };
+    const withValue = {
+      id: "injected-violation-valued",
+      obligationId: "energy-barrier-excludes-near-bottom",
+      status: "measured-violated",
+      worst: { value: 1.5, point: [2.5, 0.3] },
+      evaluation,
+    };
+    const withoutValue = {
+      id: "injected-violation-unvalued",
+      obligationId: "energy-barrier-excludes-near-bottom",
+      status: "measured-violated",
+      worst: { point: [-2.4, -0.4] },
+      evaluation,
+    };
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.proofStatuses.push(withValue, withoutValue);
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    const entries = page.locator(".verif-violation-legend__entry");
+    await expect(entries).toHaveCount(2);
+
+    // The valued violation shows its worst value, formatted deterministically.
+    await expect(entries.nth(0).locator(".verif-violation-legend__value")).toHaveText("1.5");
+    // The value-less violation omits the chip rather than rendering broken chrome.
+    await expect(entries.nth(1).locator(".verif-violation-legend__value")).toHaveCount(0);
+
+    // The focus interaction still works alongside the value chip.
+    const canvas = page.locator("#verificationCanvas");
+    await entries.nth(0).click();
+    await expect(canvas).toHaveAttribute("data-focused-violation", "1");
+    await page.waitForTimeout(150);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-violation-value.png`),
+    });
+  });
+
   test(`Verification header obligation count scrolls to the obligations section at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

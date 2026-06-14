@@ -15,6 +15,7 @@ import type {
   RegionRole,
   VerificationProblem,
 } from "./data/verification";
+import { formatMeasured } from "./util";
 
 // The count-bearing sections a header chip can scroll to. A null entry means
 // that section was not rendered for this problem, so its count stays inert.
@@ -88,18 +89,6 @@ function mathSpan(latex: string, displayMode = false): HTMLElement {
 
 function formatNumber(value: number): string {
   return String(value);
-}
-
-// Compact rendering for a measured sample value: a few significant figures,
-// trailing zeros trimmed, so a worst-case sample reads cleanly.
-function formatMeasured(value: number): string {
-  if (!Number.isFinite(value)) {
-    return String(value);
-  }
-  if (value === 0) {
-    return "0";
-  }
-  return Number(value.toPrecision(3)).toString();
 }
 
 function section(title: string, id?: string): HTMLElement {
