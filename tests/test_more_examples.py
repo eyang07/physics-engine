@@ -80,8 +80,23 @@ def test_ideal_spring_manifest_and_variant_generation(tmp_path):
         filename = variant.data_path.removeprefix("/data/")
         assert (output_dir / filename).exists()
         assert (viewer_output_dir / filename).exists()
+        assert set(trajectory.metadata) == {
+            "invariantResiduals",
+            "system",
+            "mass",
+            "spring_constant",
+            "potentialPlots",
+        }
+        assert trajectory.metadata["system"] == "ideal_spring"
         assert trajectory.metadata["mass"] == variant.parameters["m"]
         assert trajectory.metadata["spring_constant"] == variant.parameters["k"]
+        potential_plot = trajectory.metadata["potentialPlots"][0]
+        assert potential_plot["name"] == "spring_potential"
+        assert potential_plot["coordinate"] == "x"
+        assert potential_plot["coordinateLatex"] == "x"
+        assert potential_plot["potentialLatex"] == "V"
+        assert len(potential_plot["coordinateValues"]) == 260
+        assert len(potential_plot["potentialValues"]) == 260
         assert trajectory.state_names == ("x", "x_dot")
         assert trajectory.series is not None
         x, x_dot = trajectory.states.T

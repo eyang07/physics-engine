@@ -7,16 +7,46 @@ editing a system can't silently desync the viewer.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
-from engine.export import validate_viewer_verification_problems
-from engine.export.manifest import build_manifest, system_entry
+from engine.export import Trajectory, validate_viewer_verification_problems
+from engine.export.manifest import SystemSpec, build_manifest, system_entry
 from engine.dynamics import CotangentHamiltonianSystem
 from engine.mechanics.lagrangian import LagrangianSystem
-from scripts.example_specs import LENSES, SPECS
+from scripts.example_specs import IDEAL_SPRING, LENSES, LORENZ, SPECS
 from scripts.export_verification_problems import upright_pendulum_problem
+from scripts.generate_ideal_spring import write_ideal_spring_variant_trajectories
+from scripts.generate_lorenz_attractor import write_lorenz_variant_trajectories
+
+
+def _write_ideal_spring_variants(
+    output_dir: Path,
+    viewer_output_dir: Path,
+) -> list[Trajectory]:
+    return write_ideal_spring_variant_trajectories(
+        output_dir,
+        viewer_output_dir=viewer_output_dir,
+    )
+
+
+def _write_lorenz_variants(
+    output_dir: Path,
+    viewer_output_dir: Path,
+) -> list[Trajectory]:
+    return write_lorenz_variant_trajectories(
+        output_dir,
+        viewer_output_dir=viewer_output_dir,
+    )
+
+
+VARIANT_TRAJECTORY_WRITERS: dict[str, Callable[[Path, Path], list[Trajectory]]] = {
+    IDEAL_SPRING.id: _write_ideal_spring_variants,
+    LORENZ.id: _write_lorenz_variants,
+}
 
 
 @pytest.fixture(scope="module")
@@ -156,6 +186,123 @@ def test_parameter_variants_are_well_formed(spec) -> None:
         for name, value in rendered["parameters"].items():
             parameter = parameter_by_name[name]
             assert parameter.minimum <= value <= parameter.maximum
+
+
+def test_variant_specs_have_one_default_variant_and_python_writer() -> None:
+    variant_specs = [spec for spec in SPECS if spec.variants]
+
+    assert set(VARIANT_TRAJECTORY_WRITERS) == {spec.id for spec in variant_specs}
+    for spec in variant_specs:
+        default_variants = [
+            variant for variant in spec.variants if variant.data_path == spec.data_path
+        ]
+        assert len(default_variants) == 1, spec.id
+        assert default_variants[0].parameters == {
+            parameter.name: parameter.default for parameter in spec.parameters
+        }
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [spec for spec in SPECS if spec.variants],
+    ids=[spec.id for spec in SPECS if spec.variants],
+)
+def test_variant_python_writers_generate_non_default_manifest_paths(
+    spec: SystemSpec,
+    tmp_path: Path,
+) -> None:
+    writer = VARIANT_TRAJECTORY_WRITERS[spec.id]
+    output_dir = tmp_path / "data"
+    viewer_output_dir = tmp_path / "viewer-data"
+
+    trajectories = writer(output_dir, viewer_output_dir)
+
+    written_variants = [
+        variant for variant in spec.variants if variant.data_path != spec.data_path
+    ]
+    expected_filenames = [
+        variant.data_path.removeprefix("/data/") for variant in written_variants
+    ]
+    assert len(trajectories) == len(written_variants)
+    assert sorted(path.relative_to(output_dir).as_posix() for path in output_dir.rglob("*.json")) == (
+        sorted(expected_filenames)
+    )
+    assert sorted(
+        path.relative_to(viewer_output_dir).as_posix()
+        for path in viewer_output_dir.rglob("*.json")
+    ) == sorted(expected_filenames)
+
+    for variant, trajectory in zip(written_variants, trajectories, strict=True):
+        filename = variant.data_path.removeprefix("/data/")
+        assert trajectory.metadata is not None
+        assert (output_dir / filename).exists()
+        assert (viewer_output_dir / filename).exists()
+
+
+def test_known_parameter_variant_manifest_metadata_is_stable() -> None:
+    entries = {entry["id"]: entry for entry in build_manifest(SPECS, LENSES)["systems"]}
+
+    assert entries[IDEAL_SPRING.id]["variants"] == [
+        {
+            "id": "k-0-5",
+            "label": "k = 0.5",
+            "parameters": {"m": 1.0, "k": 0.5, "x0": 1.0, "x_dot0": 0.0},
+            "dataPath": "/data/ideal_spring_k_0_5.json",
+        },
+        {
+            "id": "k-1",
+            "label": "k = 1",
+            "parameters": {"m": 1.0, "k": 1.0, "x0": 1.0, "x_dot0": 0.0},
+            "dataPath": "/data/ideal_spring.json",
+        },
+        {
+            "id": "k-2",
+            "label": "k = 2",
+            "parameters": {"m": 1.0, "k": 2.0, "x0": 1.0, "x_dot0": 0.0},
+            "dataPath": "/data/ideal_spring_k_2.json",
+        },
+    ]
+    assert entries[LORENZ.id]["variants"] == [
+        {
+            "id": "rho-20",
+            "label": "rho = 20",
+            "parameters": {
+                "sigma": 10.0,
+                "rho": 20.0,
+                "beta": 8.0 / 3.0,
+                "x0": 0.0,
+                "y0": 1.0,
+                "z0": 1.05,
+            },
+            "dataPath": "/data/lorenz_attractor_rho_20.json",
+        },
+        {
+            "id": "rho-28",
+            "label": "rho = 28",
+            "parameters": {
+                "sigma": 10.0,
+                "rho": 28.0,
+                "beta": 8.0 / 3.0,
+                "x0": 0.0,
+                "y0": 1.0,
+                "z0": 1.05,
+            },
+            "dataPath": "/data/lorenz_attractor.json",
+        },
+        {
+            "id": "rho-35",
+            "label": "rho = 35",
+            "parameters": {
+                "sigma": 10.0,
+                "rho": 35.0,
+                "beta": 8.0 / 3.0,
+                "x0": 0.0,
+                "y0": 1.0,
+                "z0": 1.05,
+            },
+            "dataPath": "/data/lorenz_attractor_rho_35.json",
+        },
+    ]
 
 
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])

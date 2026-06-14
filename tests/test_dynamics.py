@@ -126,10 +126,39 @@ def test_lorenz_variant_generation_matches_manifest(tmp_path) -> None:
         filename = variant.data_path.removeprefix("/data/")
         assert (output_dir / filename).exists()
         assert (viewer_output_dir / filename).exists()
+        assert set(trajectory.metadata) == {
+            "system",
+            "kind",
+            "parameters",
+            "bounds",
+            "divergence",
+            "fixedPoints",
+            "diagnostics",
+            "rendererHints",
+        }
+        assert trajectory.metadata["system"] == "lorenz_attractor"
+        assert trajectory.metadata["kind"] == "first-order-flow"
         assert trajectory.metadata["parameters"] == {
             "sigma": variant.parameters["sigma"],
             "rho": variant.parameters["rho"],
             "beta": variant.parameters["beta"],
+        }
+        assert trajectory.metadata["divergence"] == -(
+            variant.parameters["sigma"] + 1.0 + variant.parameters["beta"]
+        )
+        assert set(trajectory.metadata["bounds"]) == {"x", "y", "z"}
+        assert len(trajectory.metadata["fixedPoints"]) == 3
+        lyapunov = trajectory.metadata["diagnostics"]["lyapunov"]
+        assert lyapunov["kind"] == "finite-time-largest"
+        assert lyapunov["method"] == "sampled-variational-jacobian"
+        assert lyapunov["series"] == "ftle"
+        assert lyapunov["localGrowthSeries"] == "lyapunov_local_growth"
+        assert lyapunov["sampleCount"] == len(trajectory.time)
+        assert set(trajectory.metadata["rendererHints"]) == {
+            "bounds",
+            "camera",
+            "transform",
+            "referenceGeometry",
         }
         assert trajectory.states.shape[1] == 3
         assert trajectory.series is not None
