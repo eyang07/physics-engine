@@ -16,13 +16,11 @@ assumptions, links obligations to the assumptions they require, and encodes
 discrete-time dynamics. The v2 payload can also carry optional
 `openLoopDynamics` alongside closed-loop `dynamics` so controlled feedback
 exports preserve the admissible input channels the controller was derived
-from. v3 adds viewer-facing cross-links and sampled region geometry: a
-top-level `system` id matching a manifest system id, plus `regionGeometry`
-scalar-field grids and boundary polylines so TypeScript can render
-safe/unsafe/initial/domain regions without evaluating symbolic inequalities.
-The current v3 export also adds measured candidate diagnostics for the concrete
-pendulum pair: trajectory JSON carries time-aligned candidate value and
-flow-derivative series, and the verification problem carries sampled
+from. v3 adds self-contained viewer-facing verification payloads:
+`regionGeometry` scalar-field grids and boundary polylines so TypeScript can
+render safe/unsafe/initial/domain regions without evaluating symbolic
+inequalities, plus controlled trajectories with time-aligned candidate value
+and flow-derivative series. Verification problems also carry sampled
 `proofStatuses` for obligation-region grids. The engine still **proposes and
 organizes; external tools dispose**: nothing in the IR stores proof results.
 
@@ -74,26 +72,22 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    of the wrong dimension. Parameters now also collect free symbols from the
    dynamics RHS/update (excluding state and time/step) and the candidate
    expression.
-   Viewer export additionally validates that each problem's top-level `system`
-   id exists in the manifest, that the manifest links back to the problem id,
-   and that every `regionGeometry` projection/state-axis mapping matches the
-   linked manifest system.
+   Viewer export additionally validates that every `regionGeometry`
+   projection/state-axis mapping is internally consistent with the problem's
+   variables and declared state-axis mapping.
 8. **Viewer geometry is sampled metadata, not verification.** `regionGeometry`
-   entries carry a named manifest projection, two IR plane variables, explicit
-   IR-variable-to-manifest-state-axis mappings, the sampled scalar field of the
-   defining region expression, sampled boundary polylines from that grid, the
-   original level/convention, and `rigor="measured"`. For the first concrete export,
-   `upright-pendulum-safety` links to manifest system `pendulum`, maps
-   `omega -> theta_dot`, and renders the verification regions on the pendulum
-   `phase` projection. This is a render aid only; it does not prove region
-   containment or invariance.
+   entries carry a named projection, two IR plane variables, explicit
+   IR-variable-to-state-axis mappings, the sampled scalar field of the defining
+   region expression, sampled boundary polylines from that grid, the original
+   level/convention, and `rigor="measured"`. This is a render aid only; it does
+   not prove region containment or invariance.
 9. **Measured certificate diagnostics are separate from obligations.**
-   The linked pendulum trajectory exports additional scalar `series` entries
-   for `certificate_energy_barrier_value` (`B(x(t))`) and
-   `certificate_energy_barrier_flow_derivative` (`dB/dt` evaluated from the
-   verification dynamics at the trajectory samples). The join table lives in
-   trajectory `metadata.certificateSeries`, with `problemId`, `candidateId`,
-   `obligationIds`, comparison baselines, and `rigor="measured"`.
+   Each self-contained verification trajectory exports additional scalar
+   `series` entries for candidate value (`B(x(t))` or `V(x(t))`) and flow
+   derivative (`dB/dt` / `dV/dt` evaluated from the verification dynamics at
+   trajectory samples). The join table lives in the trajectory
+   `certificateSeries`, with `problemId`, `candidateId`, `obligationIds`,
+   comparison baselines, and `rigor="measured"`.
    Verification-problem JSON exports `proofStatuses` records, one per sampled
    obligation surface in the current concrete slice. Each record links
    `obligationId`, `candidateId`, `regionId`, the sampled evaluation source
@@ -112,13 +106,16 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    discharge, proof, or certification.
 12. **Adapter capability checks are explicit.** `engine.verification`
    classifies each obligation into a target family such as
-   `continuous-lyapunov`, `discrete-barrier`, or `obligation-only`.
-   Adapters advertise discharge capabilities separately from inspection
-   support, and diagnostics include both the target classification and whether
-   the adapter supports that target. The inspection stub advertises no
-   discharge capabilities. Ambiguous or incomplete target shapes, currently
-   mixed-candidate ownership and candidate obligations without encoded
-   dynamics, are classified as malformed adapter targets rather than as
+   `continuous-lyapunov`, `discrete-barrier`, or `obligation-only`, and records
+   structural shape features such as region scoping, excluded points,
+   assumptions, strict comparisons, and nonzero right-hand sides. Adapters
+   advertise discharge capabilities separately from inspection support,
+   including supported target families, dynamics kinds, candidate kinds, and
+   obligation shape features. Diagnostics include the target classification and
+   a `capabilityAssessment` explaining unsupported facets. The inspection stub
+   advertises no discharge capabilities. Ambiguous or incomplete target shapes,
+   currently mixed-candidate ownership and candidate obligations without
+   encoded dynamics, are classified as malformed adapter targets rather than as
    unsupported proof attempts.
 13. **Target-specific prechecks are structural only.** The SOS-polynomial
    requirement checker verifies that certificate targets have polynomial
@@ -185,9 +182,9 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    assumption variables, mismatched open-loop dynamics state, and
    wrong-dimension equilibria raise. Duplicate variables/parameters,
    parameter names shadowing state variables, and unknown region variables also
-   raise. Viewer verification export also rejects missing manifest systems,
-   missing manifest back-links, unknown geometry projections, and geometry
-   state axes that do not match the manifest projection.
+   raise. Viewer verification export also rejects region geometry or
+   proof-status records whose variables and state-axis mappings do not match the
+   problem.
 7. **Determinism (measured).** Serialization remains bit-identical across
    runs; the inspection report renders the new sections deterministically.
 8. **Viewer-region geometry (measured).** Region geometry grids sample the
@@ -195,19 +192,20 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    `rigor="measured"` plus the original level/convention. They are render
    metadata, not certificates. Boundary polylines are extracted from those
    measured grids and carry the same rigor.
-9. **Measured certificate diagnostics (measured).** The pendulum trajectory
-   exports candidate value and flow-derivative series aligned to its time grid,
-   with `metadata.certificateSeries` linking each series back to the
-   verification problem, candidate, obligations, and comparison baselines.
-   The upright-pendulum verification problem exports sampled region-grid
+9. **Measured certificate diagnostics (measured).** Self-contained
+   verification trajectories export candidate value and flow-derivative series
+   aligned to their time grids, with `certificateSeries` linking each series
+   back to the verification problem, candidate, obligations, and comparison
+   baselines. Viewer verification problems export sampled region-grid
    `proofStatuses` for each obligation, all with `rigor="measured"` and
    `externalStatus="external-required"`.
 10. **Diagnostic honesty (proven by construction).** Inspection outcomes use
    only non-success statuses (`not-attempted`, `externally-required`,
    `unsupported`, `malformed`) and every obligation receives an
    `externally-required` diagnostic until a real backend exists. Each such
-   diagnostic carries its obligation target and required discharge capability.
-   The inspection stub also emits target-level `unsupported` diagnostics for
+   diagnostic carries its obligation target, required discharge capability,
+   structural shape features, and a facet-level capability assessment. The
+   inspection stub also emits target-level `unsupported` diagnostics for
    well-formed obligations it cannot discharge and `malformed` diagnostics for
    ambiguous or incomplete target shapes.
 11. **SOS-polynomial requirements (proven on examples).** A polynomial damped
@@ -246,21 +244,23 @@ duplicate names and region variables.
 Updated again on 2026-06-13: inspection diagnostics now distinguish
 well-formed-but-unsupported targets from malformed target shapes such as
 candidate obligations without dynamics and mixed candidate ownership.
-Updated again on 2026-06-13: IR v3 adds top-level manifest system cross-links
-and measured `regionGeometry` scalar-field grids for viewer rendering. The
-pendulum manifest entry links back to `upright-pendulum-safety`.
+Updated again on 2026-06-13: IR v3 adds measured `regionGeometry` scalar-field
+grids for viewer rendering.
 Updated again on 2026-06-13: `regionGeometry` now includes sampled boundary
 polylines extracted from the scalar grids for direct viewer contour rendering.
-Updated again on 2026-06-13: viewer verification generation validates manifest
-cross-links and region-geometry projection/state-axis mappings before writing
-JSON.
+Updated again on 2026-06-13: viewer verification generation validates
+region-geometry projection/state-axis mappings before writing JSON.
 Updated again on 2026-06-13: added an SOS-polynomial structural requirement
 checker for future certificate adapters. It emits only unsupported/malformed
 diagnostics and does not attempt proof discharge.
 Updated again on 2026-06-13: the SOS-polynomial checker now validates preserved
 open-loop controlled dynamics and treats declared control/disturbance inputs as
 known symbols.
-Updated again on 2026-06-13: added measured candidate trajectory series for
-the linked pendulum run and measured region-grid `proofStatuses` for the
-upright-pendulum safety obligations. These records remain sampled evidence and
-do not change obligation rigor from `external-required`.
+Updated again on 2026-06-13: added measured candidate trajectory series and
+measured region-grid `proofStatuses` for viewer verification exports. These
+records remain sampled evidence and do not change obligation rigor from
+`external-required`.
+Updated 2026-06-14: adapter capability diagnostics now include structural
+obligation shape features and facet-level support checks for target family,
+dynamics kind, candidate kind, and obligation shape. The inspection stub still
+records no proof discharge.

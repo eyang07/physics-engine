@@ -18,6 +18,7 @@ from engine.verification import (
     ARTIFACT_INSPECTION_OUTCOME_JSON,
     ARTIFACT_PROBLEM_JSON,
     ARTIFACT_REPORT_MARKDOWN,
+    AdapterCapabilities,
     CandidateSpec,
     InspectionAdapterReport,
     InspectionArtifact,
@@ -94,6 +95,15 @@ def test_write_inspection_artifacts_round_trips_problem(tmp_path) -> None:
         "adapter": ADAPTER_NAME,
         "supportsDischarge": False,
         "supportedTargets": [],
+        "supportedDynamicsKinds": ["continuous", "discrete"],
+        "supportedCandidateKinds": ["lyapunov", "barrier"],
+        "supportedObligationShapes": [
+            "region-scoped",
+            "excluded-points",
+            "assumptions",
+            "strict-comparison",
+            "nonzero-rhs",
+        ],
         "classifiedTargets": ["continuous-lyapunov"],
     }
     assert {
@@ -116,7 +126,9 @@ def test_write_inspection_artifacts_round_trips_problem(tmp_path) -> None:
         assert diagnostic["details"]["classification"]["requiredCapability"] == (
             "discharge:continuous-lyapunov"
         )
+        assert "shapeFeatures" in diagnostic["details"]["classification"]
         assert diagnostic["details"]["adapterSupportsTarget"] is False
+        assert diagnostic["details"]["capabilityAssessment"]["supported"] is False
 
     encoded = json.dumps(report.to_dict())
     assert "external" in encoded
@@ -225,6 +237,15 @@ def test_inspection_diagnostics_mark_missing_dynamics_unsupported() -> None:
         "adapter": ADAPTER_NAME,
         "supportsDischarge": False,
         "supportedTargets": [],
+        "supportedDynamicsKinds": ["continuous", "discrete"],
+        "supportedCandidateKinds": ["lyapunov", "barrier"],
+        "supportedObligationShapes": [
+            "region-scoped",
+            "excluded-points",
+            "assumptions",
+            "strict-comparison",
+            "nonzero-rhs",
+        ],
         "classifiedTargets": ["obligation-only"],
     }
     assert diagnostics[2].code == "inspection.dynamics_missing"
@@ -234,6 +255,59 @@ def test_inspection_diagnostics_mark_missing_dynamics_unsupported() -> None:
     assert diagnostics[3].details["classification"]["target"] == "obligation-only"
     assert diagnostics[4].details is not None
     assert diagnostics[4].details["classification"]["target"] == "obligation-only"
+
+
+def test_inspection_diagnostics_report_future_adapter_capability_facets() -> None:
+    problem = _oscillator_problem()
+    limited = AdapterCapabilities(
+        adapter="limited-certificate-adapter",
+        supported_targets=("continuous-lyapunov",),
+        supports_discharge=True,
+        supported_dynamics_kinds=("discrete",),
+        supported_candidate_kinds=("barrier",),
+        supported_obligation_shapes=("region-scoped", "assumptions"),
+    )
+
+    diagnostics = inspection_diagnostics(problem, capabilities=limited)
+
+    assert [
+        diagnostic.code
+        for diagnostic in diagnostics
+        if diagnostic.code == "inspection.target_unsupported"
+    ] == []
+    assert [
+        diagnostic.obligation_id
+        for diagnostic in diagnostics
+        if diagnostic.code == "inspection.dynamics_kind_unsupported"
+    ] == [obligation.id for obligation in problem.obligations]
+    assert [
+        diagnostic.obligation_id
+        for diagnostic in diagnostics
+        if diagnostic.code == "inspection.candidate_kind_unsupported"
+    ] == [obligation.id for obligation in problem.obligations]
+
+    shape_diagnostics = [
+        diagnostic
+        for diagnostic in diagnostics
+        if diagnostic.code == "inspection.obligation_shape_unsupported"
+    ]
+    assert [diagnostic.obligation_id for diagnostic in shape_diagnostics] == [
+        "lyapunov-candidate-positivity"
+    ]
+    shape_details = shape_diagnostics[0].details
+    assert shape_details is not None
+    assert shape_details["classification"]["shapeFeatures"] == [
+        "region-scoped",
+        "excluded-points",
+        "assumptions",
+        "strict-comparison",
+    ]
+    assert shape_details["capabilityAssessment"]["unsupportedShapeFeatures"] == [
+        "excluded-points",
+        "strict-comparison",
+    ]
+    assert shape_details["capabilityAssessment"]["dynamicsKindSupported"] is False
+    assert shape_details["capabilityAssessment"]["candidateKindSupported"] is False
 
 
 def test_inspection_diagnostics_mark_malformed_targets() -> None:

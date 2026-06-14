@@ -42,6 +42,9 @@ _NOTE = (
 _DIAGNOSTIC_PROOF_NOT_ATTEMPTED = "inspection.proof_not_attempted"
 _DIAGNOSTIC_CAPABILITY_CHECK = "inspection.capability_check"
 _DIAGNOSTIC_DYNAMICS_MISSING = "inspection.dynamics_missing"
+_DIAGNOSTIC_DYNAMICS_KIND_UNSUPPORTED = "inspection.dynamics_kind_unsupported"
+_DIAGNOSTIC_CANDIDATE_KIND_UNSUPPORTED = "inspection.candidate_kind_unsupported"
+_DIAGNOSTIC_OBLIGATION_SHAPE_UNSUPPORTED = "inspection.obligation_shape_unsupported"
 _DIAGNOSTIC_TARGET_UNSUPPORTED = "inspection.target_unsupported"
 _DIAGNOSTIC_TARGET_MALFORMED = "inspection.target_malformed"
 _DIAGNOSTIC_EXTERNAL_DISCHARGE_REQUIRED = (
@@ -116,6 +119,8 @@ class InspectionAdapterReport:
 
 def inspection_diagnostics(
     problem: VerificationProblem,
+    *,
+    capabilities: AdapterCapabilities = ADAPTER_CAPABILITIES,
 ) -> tuple[VerificationDiagnostic, ...]:
     """Return deterministic diagnostics for the inspection-only adapter."""
 
@@ -130,7 +135,7 @@ def inspection_diagnostics(
                 "backend was invoked."
             ),
             location="problem",
-            details={"adapter": ADAPTER_NAME},
+            details={"adapter": capabilities.adapter},
         ),
         VerificationDiagnostic(
             code=_DIAGNOSTIC_CAPABILITY_CHECK,
@@ -142,7 +147,7 @@ def inspection_diagnostics(
             ),
             location="adapter",
             details={
-                **ADAPTER_CAPABILITIES.to_dict(),
+                **capabilities.to_dict(),
                 "classifiedTargets": sorted(
                     {
                         classification.target
@@ -167,9 +172,12 @@ def inspection_diagnostics(
         )
     for obligation in problem.obligations:
         classification = classifications[obligation.id]
+        assessment = capabilities.assess(classification)
         classification_details = {
             "classification": classification.to_dict(),
-            "adapterSupportsTarget": ADAPTER_CAPABILITIES.supports(classification),
+            "capabilityAssessment": assessment.to_dict(),
+            "adapterSupportsTarget": assessment.target_supported,
+            "adapterSupportsObligation": assessment.supported,
         }
         if classification.malformed_reason is not None:
             diagnostics.append(
@@ -183,21 +191,66 @@ def inspection_diagnostics(
                     details=classification_details,
                 )
             )
-        elif not ADAPTER_CAPABILITIES.supports(classification):
-            diagnostics.append(
-                VerificationDiagnostic(
-                    code=_DIAGNOSTIC_TARGET_UNSUPPORTED,
-                    severity="warning",
-                    status="unsupported",
-                    message=(
-                        "The inspection adapter cannot discharge this "
-                        "obligation target."
-                    ),
-                    location=f"obligations.{obligation.id}",
-                    obligation_id=obligation.id,
-                    details=classification_details,
+        else:
+            if not assessment.target_supported:
+                diagnostics.append(
+                    VerificationDiagnostic(
+                        code=_DIAGNOSTIC_TARGET_UNSUPPORTED,
+                        severity="warning",
+                        status="unsupported",
+                        message=(
+                            "The inspection adapter cannot discharge this "
+                            "obligation target."
+                        ),
+                        location=f"obligations.{obligation.id}",
+                        obligation_id=obligation.id,
+                        details=classification_details,
+                    )
                 )
-            )
+            if capabilities.supports_discharge and not assessment.dynamics_kind_supported:
+                diagnostics.append(
+                    VerificationDiagnostic(
+                        code=_DIAGNOSTIC_DYNAMICS_KIND_UNSUPPORTED,
+                        severity="warning",
+                        status="unsupported",
+                        message=(
+                            "The adapter does not support this obligation's "
+                            "dynamics kind."
+                        ),
+                        location=f"obligations.{obligation.id}",
+                        obligation_id=obligation.id,
+                        details=classification_details,
+                    )
+                )
+            if capabilities.supports_discharge and not assessment.candidate_kind_supported:
+                diagnostics.append(
+                    VerificationDiagnostic(
+                        code=_DIAGNOSTIC_CANDIDATE_KIND_UNSUPPORTED,
+                        severity="warning",
+                        status="unsupported",
+                        message=(
+                            "The adapter does not support this candidate kind."
+                        ),
+                        location=f"obligations.{obligation.id}",
+                        obligation_id=obligation.id,
+                        details=classification_details,
+                    )
+                )
+            if capabilities.supports_discharge and assessment.unsupported_shape_features:
+                diagnostics.append(
+                    VerificationDiagnostic(
+                        code=_DIAGNOSTIC_OBLIGATION_SHAPE_UNSUPPORTED,
+                        severity="warning",
+                        status="unsupported",
+                        message=(
+                            "The adapter does not support this obligation's "
+                            "structural shape."
+                        ),
+                        location=f"obligations.{obligation.id}",
+                        obligation_id=obligation.id,
+                        details=classification_details,
+                    )
+                )
         diagnostics.append(
             VerificationDiagnostic(
                 code=_DIAGNOSTIC_EXTERNAL_DISCHARGE_REQUIRED,

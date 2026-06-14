@@ -87,9 +87,10 @@ artifacts.
     evidence only and keep `externalStatus="external-required"` distinct from
     the sampled status — never a proof or certificate.
   - Adapter capability declarations and target-specific obligation
-    classification for future verification backends; the inspection stub
-    advertises no discharge capability and records required target support in
-    diagnostics.
+    classification for future verification backends, including machine-readable
+    support checks for target family, dynamics kind, candidate kind, and
+    obligation shape features. The inspection stub advertises no discharge
+    capability and records required external support in diagnostics.
   - SOS-polynomial structural requirement diagnostics for future certificate
     adapters. These check polynomial compatibility only; they do not attempt or
     record proof discharge.
@@ -138,7 +139,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `289 passed`.
+Latest known result: `290 passed`.
 
 Use focused tests while iterating:
 

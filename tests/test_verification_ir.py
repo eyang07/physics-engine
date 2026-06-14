@@ -678,6 +678,7 @@ def test_obligation_classification_tracks_backend_targets() -> None:
     }
     assert classification.target == "discrete-lyapunov"
     assert classification.required_capability == "discharge:discrete-lyapunov"
+    assert classification.shape_features == ()
 
     variables, obligation = _minimal_problem_parts()
     generic = VerificationProblem(
@@ -755,6 +756,28 @@ def test_obligation_classification_tracks_backend_targets() -> None:
     )
     assert capability.supports(obligation_classifications(continuous)[0])
     assert not capability.supports(generic_classification)
+    unsupported_shape_capability = AdapterCapabilities(
+        adapter="shape-limited-adapter",
+        supported_targets=("continuous-lyapunov",),
+        supports_discharge=True,
+        supported_obligation_shapes=("region-scoped", "assumptions"),
+    )
+    (positivity_classification,) = {
+        classification
+        for classification in obligation_classifications(continuous)
+        if classification.obligation_id.endswith("positivity")
+    }
+    assert positivity_classification.shape_features == (
+        "excluded-points",
+        "assumptions",
+        "strict-comparison",
+    )
+    assessment = unsupported_shape_capability.assess(positivity_classification)
+    assert not assessment.supported
+    assert assessment.unsupported_shape_features == (
+        "excluded-points",
+        "strict-comparison",
+    )
     assert "continuous-lyapunov" in OBLIGATION_TARGETS
 
     with pytest.raises(ValueError, match="non-discharging"):
@@ -767,6 +790,16 @@ def test_obligation_classification_tracks_backend_targets() -> None:
             adapter="bad",
             supported_targets=("mixed-candidate",),
             supports_discharge=True,
+        )
+    with pytest.raises(ValueError, match="candidate kinds"):
+        AdapterCapabilities(
+            adapter="bad",
+            supported_candidate_kinds=("unknown",),
+        )
+    with pytest.raises(ValueError, match="obligation shapes"):
+        AdapterCapabilities(
+            adapter="bad",
+            supported_obligation_shapes=("unknown",),
         )
     assert set(MALFORMED_OBLIGATION_TARGETS) <= set(OBLIGATION_TARGETS)
 
