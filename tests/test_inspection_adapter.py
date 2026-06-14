@@ -12,6 +12,7 @@ from metadata_assertions import assert_embedded_certificate_trajectory
 from engine.export import (
     validate_viewer_verification_export,
     validate_viewer_verification_index,
+    validate_viewer_verification_problem_payload,
     validate_viewer_verification_trajectory,
 )
 from engine.dynamics import (
@@ -192,9 +193,30 @@ def _valid_viewer_verification_problem_payload() -> dict:
         "id": "example-problem",
         "name": "example problem",
         "schemaVersion": "verification-problem/v3",
+        "variables": [{"name": "x"}, {"name": "v"}],
         "regions": [{"id": "domain"}],
-        "obligations": [{"id": "barrier-nonpositive"}, {"id": "barrier-flow"}],
-        "candidates": [{"id": "barrier"}],
+        "regionGeometry": [{"regionId": "domain"}],
+        "obligations": [
+            {"id": "barrier-nonpositive", "regionId": "domain"},
+            {"id": "barrier-nonincreasing", "regionId": "domain"},
+        ],
+        "candidates": [
+            {
+                "id": "barrier",
+                "obligationIds": [
+                    "barrier-nonpositive",
+                    "barrier-nonincreasing",
+                ],
+            }
+        ],
+        "proofStatuses": [
+            {
+                "id": "barrier-nonpositive-region-grid",
+                "obligationId": "barrier-nonpositive",
+                "candidateId": "barrier",
+                "regionId": "domain",
+            }
+        ],
         "trajectory": _valid_viewer_verification_trajectory(),
     }
 
@@ -1153,6 +1175,12 @@ def test_validate_viewer_verification_trajectory_accepts_export_shape() -> None:
     )
 
 
+def test_validate_viewer_verification_problem_payload_accepts_export_shape() -> None:
+    validate_viewer_verification_problem_payload(
+        _valid_viewer_verification_problem_payload()
+    )
+
+
 def test_validate_viewer_verification_export_accepts_index_and_problem_payloads() -> None:
     validate_viewer_verification_export(
         _valid_viewer_verification_index(),
@@ -1242,6 +1270,79 @@ def test_validate_viewer_verification_index_rejects_invalid_payloads(
 
 
 @pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "proofStatuses": [
+                    {
+                        **_valid_viewer_verification_problem_payload()[
+                            "proofStatuses"
+                        ][0],
+                        "obligationId": "missing-obligation",
+                    }
+                ],
+            },
+            "proof status barrier-nonpositive-region-grid references unknown obligation",
+        ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "candidates": [
+                    {
+                        **_valid_viewer_verification_problem_payload()["candidates"][
+                            0
+                        ],
+                        "obligationIds": ["missing-obligation"],
+                    }
+                ],
+            },
+            "candidate barrier uses unknown obligations",
+        ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "proofStatuses": [
+                    {
+                        **_valid_viewer_verification_problem_payload()[
+                            "proofStatuses"
+                        ][0],
+                        "candidateId": "missing-candidate",
+                    }
+                ],
+            },
+            "proof status barrier-nonpositive-region-grid references unknown candidate",
+        ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "regionGeometry": [{"regionId": "missing-region"}],
+            },
+            "regionGeometry references unknown region",
+        ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "trajectory": {
+                    **_valid_viewer_verification_trajectory(),
+                    "stateNames": ["x", "missing_state"],
+                    "states": [[0.0, 1.0], [0.1, 0.9]],
+                },
+            },
+            "trajectory uses unknown state names",
+        ),
+    ],
+)
+def test_validate_viewer_verification_problem_payload_rejects_bad_links(
+    payload,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        validate_viewer_verification_problem_payload(payload)
+
+
+@pytest.mark.parametrize(
     ("problem_payloads", "message"),
     [
         ({}, "references missing problem file"),
@@ -1258,7 +1359,11 @@ def test_validate_viewer_verification_index_rejects_invalid_payloads(
             {
                 "/data/verification/example-problem.json": {
                     **_valid_viewer_verification_problem_payload(),
-                    "regions": [],
+                    "regions": [{"id": "domain"}, {"id": "extra-domain"}],
+                    "regionGeometry": [
+                        {"regionId": "domain"},
+                        {"regionId": "extra-domain"},
+                    ],
                 }
             },
             "counts do not match payload",

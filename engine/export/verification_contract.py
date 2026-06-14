@@ -113,6 +113,8 @@ def validate_viewer_verification_export(
                     "match index"
                 )
 
+        validate_viewer_verification_problem_payload(problem_payload)
+
         expected_counts = {
             "regions": _payload_list_count(problem_payload, "regions", problem_id),
             "obligations": _payload_list_count(
@@ -127,12 +129,98 @@ def validate_viewer_verification_export(
                 f"viewer verification problem {problem_id} counts do not match payload"
             )
 
-        trajectory = problem_payload.get("trajectory")
-        if not isinstance(trajectory, Mapping):
+
+def validate_viewer_verification_problem_payload(payload: Mapping[str, Any]) -> None:
+    """Validate internal links in one viewer verification problem payload."""
+
+    problem_id = _required_string(payload, "id", "viewer verification problem")
+    variable_names = _payload_named_set(payload, "variables", "name", problem_id)
+    region_ids = _payload_named_set(payload, "regions", "id", problem_id)
+    obligation_ids = _payload_named_set(payload, "obligations", "id", problem_id)
+    candidate_ids = _payload_named_set(payload, "candidates", "id", problem_id)
+
+    trajectory = payload.get("trajectory")
+    if not isinstance(trajectory, Mapping):
+        raise ValueError(
+            f"viewer verification problem {problem_id} trajectory is invalid"
+        )
+    validate_viewer_verification_trajectory(trajectory, problem_id=problem_id)
+    trajectory_state_names = trajectory["stateNames"]
+    unknown_trajectory_states = set(trajectory_state_names) - variable_names
+    if unknown_trajectory_states:
+        raise ValueError(
+            f"viewer verification problem {problem_id} trajectory uses unknown "
+            f"state names: {sorted(unknown_trajectory_states)}"
+        )
+
+    for candidate in _payload_mapping_list(payload, "candidates", problem_id):
+        candidate_id = candidate["id"]
+        candidate_obligations = _optional_string_list(
+            candidate,
+            "obligationIds",
+            problem_id,
+            f"candidate {candidate_id}",
+        )
+        unknown_obligations = set(candidate_obligations) - obligation_ids
+        if unknown_obligations:
             raise ValueError(
-                f"viewer verification problem {problem_id} trajectory is invalid"
+                f"viewer verification problem {problem_id} candidate {candidate_id} "
+                f"uses unknown obligations: {sorted(unknown_obligations)}"
             )
-        validate_viewer_verification_trajectory(trajectory, problem_id=problem_id)
+
+    for geometry in _payload_mapping_list(payload, "regionGeometry", problem_id):
+        region_id = geometry.get("regionId")
+        if not isinstance(region_id, str) or not region_id:
+            raise ValueError(
+                f"viewer verification problem {problem_id} regionGeometry regionId "
+                "is invalid"
+            )
+        if region_id not in region_ids:
+            raise ValueError(
+                f"viewer verification problem {problem_id} regionGeometry references "
+                f"unknown region: {region_id}"
+            )
+
+    for status in _payload_mapping_list(payload, "proofStatuses", problem_id):
+        status_id = _required_string(status, "id", f"proof status in {problem_id}")
+        obligation_id = status.get("obligationId")
+        if not isinstance(obligation_id, str) or obligation_id not in obligation_ids:
+            raise ValueError(
+                f"viewer verification problem {problem_id} proof status {status_id} "
+                f"references unknown obligation: {obligation_id}"
+            )
+        candidate_id = status.get("candidateId")
+        if candidate_id is not None and candidate_id not in candidate_ids:
+            raise ValueError(
+                f"viewer verification problem {problem_id} proof status {status_id} "
+                f"references unknown candidate: {candidate_id}"
+            )
+        region_id = status.get("regionId")
+        if region_id is not None and region_id not in region_ids:
+            raise ValueError(
+                f"viewer verification problem {problem_id} proof status {status_id} "
+                f"references unknown region: {region_id}"
+            )
+
+    for index, record in enumerate(trajectory["certificateSeries"]):
+        candidate_id = record.get("candidateId")
+        if candidate_id is not None and candidate_id not in candidate_ids:
+            raise ValueError(
+                f"viewer verification problem {problem_id} certificateSeries {index} "
+                f"references unknown candidate: {candidate_id}"
+            )
+        certificate_obligations = _optional_string_list(
+            record,
+            "obligationIds",
+            problem_id,
+            f"certificateSeries {index}",
+        )
+        unknown_obligations = set(certificate_obligations) - obligation_ids
+        if unknown_obligations:
+            raise ValueError(
+                f"viewer verification problem {problem_id} certificateSeries {index} "
+                f"uses unknown obligations: {sorted(unknown_obligations)}"
+            )
 
 
 def validate_viewer_verification_trajectory(
@@ -219,6 +307,75 @@ def _payload_list_count(
     if not isinstance(values, list):
         raise ValueError(f"viewer verification problem {problem_id} {key} is invalid")
     return len(values)
+
+
+def _payload_mapping_list(
+    payload: Mapping[str, Any],
+    key: str,
+    problem_id: str,
+) -> list[Mapping[str, Any]]:
+    values = payload.get(key)
+    if not isinstance(values, list):
+        raise ValueError(f"viewer verification problem {problem_id} {key} is invalid")
+    for index, value in enumerate(values):
+        if not isinstance(value, Mapping):
+            raise ValueError(
+                f"viewer verification problem {problem_id} {key} {index} "
+                "must be an object"
+            )
+    return values
+
+
+def _payload_named_set(
+    payload: Mapping[str, Any],
+    key: str,
+    name_key: str,
+    problem_id: str,
+) -> set[str]:
+    seen: set[str] = set()
+    for index, value in enumerate(_payload_mapping_list(payload, key, problem_id)):
+        name = value.get(name_key)
+        if not isinstance(name, str) or not name:
+            raise ValueError(
+                f"viewer verification problem {problem_id} {key} {index} "
+                f"{name_key} is invalid"
+            )
+        if name in seen:
+            raise ValueError(
+                f"viewer verification problem {problem_id} {key} duplicate "
+                f"{name_key}: {name}"
+            )
+        seen.add(name)
+    return seen
+
+
+def _required_string(
+    payload: Mapping[str, Any],
+    key: str,
+    context: str,
+) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{context} {key} is invalid")
+    return value
+
+
+def _optional_string_list(
+    payload: Mapping[str, Any],
+    key: str,
+    problem_id: str,
+    context: str,
+) -> list[str]:
+    values = payload.get(key)
+    if values is None:
+        return []
+    if not isinstance(values, list) or any(
+        not isinstance(value, str) or not value for value in values
+    ):
+        raise ValueError(
+            f"viewer verification problem {problem_id} {context} {key} is invalid"
+        )
+    return values
 
 
 def _validate_region_geometry(problem: VerificationProblem) -> None:

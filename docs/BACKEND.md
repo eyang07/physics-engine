@@ -74,7 +74,8 @@ artifacts.
     series, and sampled `proofStatuses`.
   - Viewer verification generation validates each problem's internal
     region-geometry projection/state-axis mappings, embedded trajectory payload,
-    and index-to-problem-file summary counts before writing JSON.
+    internal problem-payload links, and index-to-problem-file summary counts
+    before writing JSON.
   - Measured certificate diagnostics for the viewer
     (`engine/verification/measured.py`), all `rigor="measured"`: each exported
     controlled trajectory carries time-aligned candidate value (`B(x(t))`) and
@@ -143,7 +144,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `328 passed`.
+Latest known result: `334 passed`.
 
 Use focused tests while iterating:
 

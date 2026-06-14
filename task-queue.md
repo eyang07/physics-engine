@@ -57,18 +57,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-017: Validate verification export problem payload links**
-   - Goal: Reject viewer verification problem files whose internal references
-     point at missing regions, obligations, candidates, or trajectory states.
-   - Scope: `engine/export/verification_contract.py`,
-     `scripts/generate_verification_problems.py`, and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: Problem payload validation catches missing proof-status
-     obligation links, candidate obligation links, region-geometry region links,
-     and trajectory state names not declared by the problem variables; generator
-     tests cover valid and invalid payloads.
-
-2. **BE-018: Add deterministic verification export file-order checks**
+1. **BE-018: Add deterministic verification export file-order checks**
    - Goal: Keep viewer verification export ordering stable across direct writer
      and CLI execution paths.
    - Scope: `scripts/generate_verification_problems.py` and
@@ -76,3 +65,12 @@ Each task should use this structure:
    - Acceptance: Tests assert deterministic returned ids, index order, printed
      CLI summary order, and generated filename sets for both output directories
      without relying on filesystem iteration order.
+
+2. **BE-019: Validate verification certificate baseline links**
+   - Goal: Reject viewer verification certificate metadata whose comparison
+     baselines refer to missing obligations or regions.
+   - Scope: `engine/export/verification_contract.py` and
+     `tests/test_inspection_adapter.py`.
+   - Acceptance: Problem payload validation catches missing baseline obligation
+     links, missing baseline region links, malformed baseline comparison records,
+     and focused verification export tests pass.
