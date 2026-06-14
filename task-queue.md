@@ -66,19 +66,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-004: Add controlled-discrete inspection fixtures**
-   - Goal: Add a deterministic backend fixture that exports controlled-discrete
-     Lyapunov or barrier obligations through the inspection-artifact path so
-     discrete target diagnostics stay covered outside unit-only IR tests.
-   - Scope: `scripts/export_verification_problems.py` or a focused backend
-     fixture helper, `engine/verification/`, and inspection/export tests.
-   - Acceptance: The fixture preserves open-loop controlled-discrete dynamics,
-     symbolic feedback metadata, and candidate obligation links; inspection
-     diagnostics classify the obligations as discrete certificate targets
-     without recording proof discharge; focused verification/inspection tests
-     pass.
-
-2. **BE-005: Factor shared parameter-variant generation helpers**
+1. **BE-005: Factor shared parameter-variant generation helpers**
    - Goal: Reduce duplication between Lorenz and ideal-spring variant writers
      before adding more backend-generated parameter families.
    - Scope: `scripts/generation.py`, affected per-system generators, and focused
@@ -86,3 +74,14 @@ Each task should use this structure:
    - Acceptance: Existing Lorenz and ideal-spring variant outputs and manifest
      metadata remain unchanged, variant file-path validation stays explicit, and
      focused generator tests pass.
+
+2. **BE-006: Add inspection artifact contract tests**
+   - Goal: Assert the exact file set and outcome payload shape for every problem
+     exported by `scripts.export_verification_problems` so new inspection
+     fixtures cannot silently drift.
+   - Scope: `tests/test_inspection_adapter.py`,
+     `scripts/export_verification_problems.py`, and documentation if the
+     artifact contract changes.
+   - Acceptance: Tests cover every problem returned by
+     `inspection_artifact_problems`, verify JSON/Markdown/outcome artifact names
+     and outcome diagnostics, and focused inspection tests pass.

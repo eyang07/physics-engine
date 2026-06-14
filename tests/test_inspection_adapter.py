@@ -37,6 +37,7 @@ from engine.verification import (
     write_inspection_artifacts,
 )
 from scripts.export_verification_problems import (
+    controlled_discrete_decay_problem,
     controlled_spring_problem,
     main,
     upright_pendulum_problem,
@@ -474,6 +475,67 @@ def test_export_script_writes_pendulum_artifacts(tmp_path, capsys) -> None:
     assert (
         tmp_path / "controlled-spring-regulator-safety.inspection-outcome.json"
     ).exists()
+    assert (
+        tmp_path / "controlled-discrete-decay-lyapunov.verification-problem.json"
+    ).exists()
+    assert (
+        tmp_path / "controlled-discrete-decay-lyapunov.inspection.md"
+    ).exists()
+    assert (
+        tmp_path / "controlled-discrete-decay-lyapunov.inspection-outcome.json"
+    ).exists()
+
+
+def test_controlled_discrete_fixture_writes_inspection_diagnostics(tmp_path) -> None:
+    problem = controlled_discrete_decay_problem()
+    assert problem.id == "controlled-discrete-decay-lyapunov"
+    assert problem.dynamics is not None
+    assert problem.dynamics.kind == "discrete"
+    assert problem.open_loop_dynamics is not None
+    assert problem.open_loop_dynamics.kind == "discrete"
+
+    payload = problem.to_dict()
+    assert payload["dynamics"]["update"][0]["display"] == "x/2"
+    assert payload["openLoopDynamics"]["update"][0]["display"] == "u + x"
+    assert payload["openLoopDynamics"]["inputs"] == [
+        {"name": "u", "latex": "u", "role": "control", "lower": -1.0, "upper": 1.0}
+    ]
+    assert payload["metadata"]["verificationModel"] == "controlled-discrete-decay"
+    assert payload["metadata"]["feedbackLaw"]["control"]["u"]["display"] == "-x/2"
+    assert payload["candidates"][0]["obligationIds"] == [
+        obligation["id"] for obligation in payload["obligations"]
+    ]
+
+    report = write_inspection_artifacts(problem, tmp_path)
+    outcome_path = next(
+        artifact.path
+        for artifact in report.artifacts
+        if artifact.kind == ARTIFACT_INSPECTION_OUTCOME_JSON
+    )
+    outcome = json.loads(outcome_path.read_text(encoding="utf-8"))
+    assert outcome["status"] == REPORT_STATUS
+    assert {diagnostic["status"] for diagnostic in outcome["diagnostics"]} == {
+        "not-attempted",
+        "unsupported",
+        "externally-required",
+    }
+    unsupported = [
+        diagnostic
+        for diagnostic in outcome["diagnostics"]
+        if diagnostic["code"] == "inspection.target_unsupported"
+    ]
+    assert [diagnostic["obligationId"] for diagnostic in unsupported] == [
+        obligation.id for obligation in problem.obligations
+    ]
+    for diagnostic in unsupported:
+        classification = diagnostic["details"]["classification"]
+        assessment = diagnostic["details"]["capabilityAssessment"]
+        assert classification["target"] == "discrete-lyapunov"
+        assert classification["dynamicsKind"] == "discrete"
+        assert classification["candidateKind"] == "lyapunov"
+        assert assessment["supportsDischarge"] is False
+        assert assessment["supported"] is False
+        assert "discharged" not in json.dumps(diagnostic).lower()
 
 
 def test_controlled_spring_problem_exports_viewer_contract() -> None:

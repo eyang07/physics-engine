@@ -1,8 +1,8 @@
 """Export verification-problem inspection artifacts (backend-only).
 
-Builds the controlled-pendulum barrier verification problem and runs the
-stub inspection adapter on it. The artifacts are for external inspection;
-nothing here crosses the manifest/viewer boundary or claims proof discharge.
+Builds representative verification problems and runs the stub inspection
+adapter on them. The artifacts are for external inspection; nothing here crosses
+the manifest/viewer boundary or claims proof discharge.
 """
 
 from __future__ import annotations
@@ -14,13 +14,21 @@ from dataclasses import dataclass, replace
 import numpy as np
 import sympy as sp
 
-from engine.dynamics import BarrierCandidate, SafetySpecification, SublevelSet
+from engine.dynamics import (
+    BarrierCandidate,
+    Box,
+    ControlledDiscreteSystem,
+    LyapunovCandidate,
+    SafetySpecification,
+    SublevelSet,
+)
 from engine.numerics import integrate_fixed_step
 from engine.verification import (
     VerificationProblem,
     scalar_field_region_geometries,
     sampled_region_proof_statuses,
     verification_problem_from_barrier,
+    verification_problem_from_controlled_discrete_lyapunov,
     write_inspection_artifacts,
 )
 from systems.controlled_pendulum import build_system
@@ -238,6 +246,49 @@ def viewer_verification_examples() -> tuple[ViewerVerificationExample, ...]:
     )
 
 
+def controlled_discrete_decay_problem() -> VerificationProblem:
+    """Controlled discrete regulator fixture for inspection artifacts.
+
+    This backend-only problem keeps controlled-discrete export coverage out of
+    unit-only IR tests: the inspection artifact path sees the closed-loop map,
+    preserved open-loop input channel, symbolic feedback law, and candidate
+    obligation links.
+    """
+
+    x = sp.Symbol("x", real=True)
+    u = sp.Symbol("u", real=True)
+    controlled = ControlledDiscreteSystem(
+        state=(x,),
+        controls=(u,),
+        update=(x + u,),
+        control_bounds=Box(lower=(-1.0,), upper=(1.0,)),
+    )
+    candidate = LyapunovCandidate(
+        state=(x,),
+        function=x**2,
+        equilibrium=(0.0,),
+        domain=SublevelSet(state=(x,), expression=x**2, level=1.0, name="unit-domain"),
+        name="discrete-decay-lyapunov",
+    )
+    return verification_problem_from_controlled_discrete_lyapunov(
+        "controlled discrete decay lyapunov",
+        controlled,
+        {u: -x / 2},
+        candidate,
+        metadata={"verificationModel": "controlled-discrete-decay"},
+    )
+
+
+def inspection_artifact_problems() -> tuple[VerificationProblem, ...]:
+    """Backend-only problems written by the inspection artifact script."""
+
+    return (
+        upright_pendulum_problem(),
+        controlled_spring_problem(),
+        controlled_discrete_decay_problem(),
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -247,8 +298,8 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
-    for example in viewer_verification_examples():
-        report = write_inspection_artifacts(example.problem_factory(), args.output_dir)
+    for problem in inspection_artifact_problems():
+        report = write_inspection_artifacts(problem, args.output_dir)
         for artifact in report.artifacts:
             print(f"wrote {artifact.kind}: {artifact.path}")
         print(report.note)

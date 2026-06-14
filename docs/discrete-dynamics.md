@@ -139,3 +139,8 @@ available through
 `verification_problem_from_controlled_discrete_barrier`; focused tests pass
 with
 `pytest tests/test_verification_ir.py tests/test_inspection_adapter.py tests/test_safety_certificates.py tests/test_discrete_dynamics.py -q`.
+
+Updated 2026-06-14: `scripts.export_verification_problems` writes a
+controlled-discrete Lyapunov inspection fixture that preserves open-loop
+controlled dynamics and symbolic feedback metadata while still recording no
+proof discharge.

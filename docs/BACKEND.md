@@ -97,7 +97,9 @@ artifacts.
   - Controlled-discrete Lyapunov/barrier verification exports that derive
     obligations on the closed-loop map while preserving the original
     open-loop controlled dynamics, admissible input bounds, and symbolic
-    feedback law metadata.
+    feedback law metadata. The backend inspection artifact script includes a
+    controlled-discrete Lyapunov fixture so this path is covered outside
+    unit-only IR tests.
   - Stub inspection adapter (`engine/verification/inspection_adapter.py`) that
     consumes the IR and writes canonical problem JSON, a human-readable
     inspection report, and a machine-readable inspection outcome JSON with
@@ -139,7 +141,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `291 passed`.
+Latest known result: `292 passed`.
 
 Use focused tests while iterating:
 
@@ -171,7 +173,7 @@ ignored and should not be committed.
 
 1. Continue hardening backend verification foundations: richer target-specific
    adapter checks and robustness tests before adding more case-study breadth.
-2. Add controlled-discrete inspection/export fixtures so discrete target
-   diagnostics stay covered outside unit-only IR tests.
+2. Factor shared parameter-variant generation helpers if more systems add
+   backend-generated parameter families.
 3. Keep backend-only geodesic exploration outside the gallery until the viewer
    can render the geometry honestly.
