@@ -494,4 +494,54 @@ for (const viewport of [
       path: testInfo.outputPath(`${viewport.name}-verification-violation-legend.png`),
     });
   });
+
+  test(`Verification header echoes the selected problem counts at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    const header = page.locator(".verif-header");
+    await expect(header.locator('.verif-count[data-count="regions"]')).toHaveText(/\d+ regions/);
+    await expect(header.locator('.verif-count[data-count="obligations"]')).toHaveText(
+      /\d+ obligations/,
+    );
+    await expect(header.locator('.verif-count[data-count="candidates"]')).toHaveText(
+      /\d+ candidates/,
+    );
+
+    // The header counts must agree with the active catalog item's badges.
+    const headerObligations = await header
+      .locator('.verif-count[data-count="obligations"]')
+      .textContent();
+    const catalogObligations = await page
+      .locator(
+        '#verificationCatalog .catalog-item--active .catalog-item__count[data-count="obligations"]',
+      )
+      .textContent();
+    expect(headerObligations).toBe(catalogObligations);
+
+    // Selecting another problem re-renders the header with that problem's counts.
+    await page.locator("#verificationCatalog .catalog-item").nth(1).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+    await expect(header.locator('.verif-count[data-count="obligations"]')).toHaveText(
+      /\d+ obligations/,
+    );
+    const headerObligations2 = await header
+      .locator('.verif-count[data-count="obligations"]')
+      .textContent();
+    const catalogObligations2 = await page
+      .locator(
+        '#verificationCatalog .catalog-item--active .catalog-item__count[data-count="obligations"]',
+      )
+      .textContent();
+    expect(headerObligations2).toBe(catalogObligations2);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-header-counts.png`),
+    });
+  });
 }

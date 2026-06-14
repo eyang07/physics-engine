@@ -158,6 +158,16 @@ export class VerificationPanel {
     header.append(el("p", "eyebrow", "Verification problem"));
     header.append(el("h1", "verif-header__title", problem.name));
 
+    // Echo the selected problem's scope so its size is visible at the stage
+    // without scanning back to the catalog; counts mirror the catalog badges.
+    const counts = el("div", "verif-counts");
+    counts.append(
+      this.countChip("regions", problem.regions.length),
+      this.countChip("obligations", problem.obligations.length),
+      this.countChip("candidates", problem.candidates.length),
+    );
+    header.append(counts);
+
     const chips = el("div", "verif-chips");
     chips.append(this.chip("id", problem.id));
     if (problem.source) {
@@ -179,6 +189,12 @@ export class VerificationPanel {
     const chip = el("span", "verif-chip");
     chip.append(el("span", "verif-chip__label", label));
     chip.append(el("span", "verif-chip__value", value));
+    return chip;
+  }
+
+  private countChip(label: string, value: number): HTMLElement {
+    const chip = el("span", "verif-count", `${value} ${label}`);
+    chip.dataset.count = label;
     return chip;
   }
 

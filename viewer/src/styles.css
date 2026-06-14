@@ -401,6 +401,22 @@ select {
   gap: var(--space-2);
 }
 
+.verif-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.verif-count {
+  padding: 2px 10px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .verif-chip {
   display: inline-flex;
   align-items: baseline;
