@@ -1444,6 +1444,38 @@ def test_validate_viewer_verification_export_rejects_status_mismatches(
             },
             "count obligations is invalid",
         ),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    {
+                        **_valid_viewer_verification_index()["problems"][0],
+                        "counts": {
+                            "regions": True,
+                            "obligations": 2,
+                            "candidates": 1,
+                        },
+                    }
+                ],
+            },
+            "count regions is invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    {
+                        **_valid_viewer_verification_index()["problems"][0],
+                        "counts": {
+                            "regions": 1,
+                            "obligations": 2.0,
+                            "candidates": 1,
+                        },
+                    }
+                ],
+            },
+            "count obligations is invalid",
+        ),
     ],
 )
 def test_validate_viewer_verification_index_rejects_invalid_payloads(
@@ -1656,6 +1688,32 @@ def test_validate_viewer_verification_problem_payload_rejects_bad_links(
                     "regionGeometry": [
                         {"regionId": "domain"},
                         {"regionId": "extra-domain"},
+                    ],
+                }
+            },
+            "counts do not match payload",
+        ),
+        (
+            {
+                "/data/verification/example-problem.json": {
+                    **_valid_viewer_verification_problem_payload(),
+                    "obligations": [
+                        *_valid_viewer_verification_problem_payload()[
+                            "obligations"
+                        ],
+                        {"id": "extra-obligation", "regionId": "domain"},
+                    ],
+                }
+            },
+            "counts do not match payload",
+        ),
+        (
+            {
+                "/data/verification/example-problem.json": {
+                    **_valid_viewer_verification_problem_payload(),
+                    "candidates": [
+                        *_valid_viewer_verification_problem_payload()["candidates"],
+                        {"id": "extra-candidate", "obligationIds": []},
                     ],
                 }
             },

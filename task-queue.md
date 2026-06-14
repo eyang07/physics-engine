@@ -57,16 +57,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-025: Add verification export count type regression tests**
-   - Goal: Keep viewer verification catalog count fields strict integers that
-     exactly match problem payload list lengths.
-   - Scope: `engine/export/verification_contract.py` and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: Tests reject boolean counts, float counts, count/list mismatches
-     for each count field, accept generated viewer examples, and focused
-     verification export tests pass.
-
-2. **BE-026: Add verification export data-path basename guard**
+1. **BE-026: Add verification export data-path basename guard**
    - Goal: Keep viewer verification catalog data paths tied to their problem ids
      so files remain predictable and discoverable.
    - Scope: `engine/export/verification_contract.py` and
@@ -74,3 +65,12 @@ Each task should use this structure:
    - Acceptance: Round-trip validation rejects data paths whose basename does
      not equal `<problem-id>.json`, accepts generated viewer examples, and
      focused verification export tests pass.
+
+2. **BE-027: Add verification trajectory finite-number guards**
+   - Goal: Prevent non-finite trajectory samples from reaching viewer lanes and
+     stage rendering.
+   - Scope: `engine/export/verification_contract.py` and
+     `tests/test_inspection_adapter.py`.
+   - Acceptance: Trajectory validation rejects `NaN`, positive infinity, and
+     negative infinity in time, states, and series values; generated viewer
+     examples still validate; focused verification export tests pass.

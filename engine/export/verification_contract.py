@@ -89,7 +89,7 @@ def validate_viewer_verification_index(
             )
         for key in expected_count_keys:
             value = counts[key]
-            if not isinstance(value, int) or value < 0:
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
                 raise ValueError(
                     f"viewer verification index problem {problem_id} count {key} is invalid"
                 )
