@@ -32,18 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-006: Show selected verification counts in the stage header**
-   - Goal: Echo the active problem's obligation/candidate/region counts in the
-     Verification stage so the focused problem's scope is visible without
-     scanning back to the catalog.
-   - Scope: `viewer/src/verificationPanel.ts` or the stage header in
-     `viewer/index.html`/`viewer/src/main.ts`, `viewer/src/styles.css`, and
-     visual coverage in `viewer/tests/visual.spec.ts`.
-   - Acceptance: The header reflects the selected problem's counts, updates when
-     the selection changes, stays consistent with the catalog badges, and visual
-     tests assert the header counts for at least two problems.
-
-2. **FE-007: Focus a violation marker from its legend entry**
+1. **FE-007: Focus a violation marker from its legend entry**
    - Goal: Let clicking a violation legend entry highlight its matching stage
      marker so a named violation can be located on the phase plane.
    - Scope: `viewer/src/verificationStage.ts` (legend interaction + marker
@@ -54,7 +43,16 @@ Each task should use this structure:
      no-violation path stays interaction-free, and visual tests cover the
      focus/clear behavior.
 
-## Backend Queue
+2. **FE-008: Link header obligation count to the obligations section**
+   - Goal: Let the header's obligation count scroll the problem doc to the
+     obligations section so the scope summary is a way into the detail.
+   - Scope: `viewer/src/verificationPanel.ts` (header count interaction +
+     obligations section anchor), `viewer/src/styles.css`, and visual coverage
+     in `viewer/tests/visual.spec.ts`.
+   - Acceptance: Activating the obligation count moves the doc to the obligations
+     section, the region/candidate counts behave consistently or stay inert by
+     design, problems without obligations expose no broken affordance, and visual
+     tests cover the scroll-into-view behavior.
 
 1. **BE-029: Add verification certificate-series kind guard**
    - Goal: Keep viewer certificate lanes tied to known measured certificate
