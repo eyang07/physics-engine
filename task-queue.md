@@ -57,16 +57,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-018: Add deterministic verification export file-order checks**
-   - Goal: Keep viewer verification export ordering stable across direct writer
-     and CLI execution paths.
-   - Scope: `scripts/generate_verification_problems.py` and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: Tests assert deterministic returned ids, index order, printed
-     CLI summary order, and generated filename sets for both output directories
-     without relying on filesystem iteration order.
-
-2. **BE-019: Validate verification certificate baseline links**
+1. **BE-019: Validate verification certificate baseline links**
    - Goal: Reject viewer verification certificate metadata whose comparison
      baselines refer to missing obligations or regions.
    - Scope: `engine/export/verification_contract.py` and
@@ -74,3 +65,12 @@ Each task should use this structure:
    - Acceptance: Problem payload validation catches missing baseline obligation
      links, missing baseline region links, malformed baseline comparison records,
      and focused verification export tests pass.
+
+2. **BE-020: Document viewer verification export contract checks**
+   - Goal: Make the backend-owned viewer verification export validations
+     discoverable for future generator changes.
+   - Scope: `docs/verification-ir.md`, `docs/BACKEND.md`, and
+     `engine/export/verification_contract.py` docstrings if needed.
+   - Acceptance: Docs name the index, problem-payload, trajectory, and
+     round-trip validation layers; they state that these are contract checks and
+     not proof or certification; focused verification export tests pass.

@@ -70,6 +70,25 @@ from scripts.generate_verification_problems import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
+def _viewer_verification_expected_ids() -> list[str]:
+    return [
+        "upright-pendulum-safety",
+        "controlled-spring-regulator-safety",
+    ]
+
+
+def _viewer_verification_expected_filenames() -> set[str]:
+    filenames = {
+        f"{problem_id}.json" for problem_id in _viewer_verification_expected_ids()
+    }
+    filenames.add("index.json")
+    return filenames
+
+
+def _directory_filenames(directory: Path) -> set[str]:
+    return {path.name for path in directory.iterdir()}
+
+
 def _oscillator_problem() -> VerificationProblem:
     x, v = sp.symbols("x v", real=True)
     k, c = sp.symbols("k c", positive=True)
@@ -1015,10 +1034,11 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         viewer_dir=viewer_dir,
     )
 
-    assert ids == [
-        "upright-pendulum-safety",
-        "controlled-spring-regulator-safety",
-    ]
+    expected_ids = _viewer_verification_expected_ids()
+    expected_filenames = _viewer_verification_expected_filenames()
+    assert ids == expected_ids
+    assert _directory_filenames(generated_dir) == expected_filenames
+    assert _directory_filenames(viewer_dir) == expected_filenames
     payload = json.loads(
         (viewer_dir / "upright-pendulum-safety.json").read_text(encoding="utf-8")
     )
@@ -1091,6 +1111,7 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         "/data/verification/upright-pendulum-safety.json",
         "/data/verification/controlled-spring-regulator-safety.json",
     ]
+    assert [problem["id"] for problem in index["problems"]] == expected_ids
 
 
 def test_generate_verification_problems_default_dirs_are_ignored_paths() -> None:
@@ -1124,10 +1145,7 @@ def test_generate_verification_problems_cli_writes_custom_output_dirs(tmp_path) 
         capture_output=True,
     )
 
-    expected_ids = [
-        "upright-pendulum-safety",
-        "controlled-spring-regulator-safety",
-    ]
+    expected_ids = _viewer_verification_expected_ids()
     assert result.stdout.splitlines() == [
         f"wrote 2 verification problem(s): {', '.join(expected_ids)}",
         f"generated dir: {generated_dir}",
@@ -1135,10 +1153,9 @@ def test_generate_verification_problems_cli_writes_custom_output_dirs(tmp_path) 
     ]
     assert result.stderr == ""
 
-    expected_names = {f"{problem_id}.json" for problem_id in expected_ids}
-    expected_names.add("index.json")
-    assert {path.name for path in generated_dir.iterdir()} == expected_names
-    assert {path.name for path in viewer_dir.iterdir()} == expected_names
+    expected_names = _viewer_verification_expected_filenames()
+    assert _directory_filenames(generated_dir) == expected_names
+    assert _directory_filenames(viewer_dir) == expected_names
 
     index = json.loads((viewer_dir / "index.json").read_text(encoding="utf-8"))
     viewer_payloads_by_data_path = _viewer_problem_payloads_by_data_path(
