@@ -32,19 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-005: Label and legend the Verification stage violation markers**
-   - Goal: Give the measured-violation markers a stage legend and an on-hover or
-     adjacent caption naming the obligation each violated point belongs to, so a
-     red marker is self-explanatory rather than an unlabeled glyph.
-   - Scope: `viewer/src/verificationStage.ts` (marker draw + legend),
-     `viewer/src/styles.css` for any legend chrome, and visual coverage in
-     `viewer/tests/visual.spec.ts`.
-   - Acceptance: A legend entry appears only when at least one violation marker is
-     drawn, each marker is associated with its obligation name without overlapping
-     the trajectory readout, and visual tests cover both the no-violation (no
-     legend) and violation (legend present) paths.
-
-2. **FE-006: Show selected verification counts in the stage header**
+1. **FE-006: Show selected verification counts in the stage header**
    - Goal: Echo the active problem's obligation/candidate/region counts in the
      Verification stage so the focused problem's scope is visible without
      scanning back to the catalog.
@@ -55,18 +43,20 @@ Each task should use this structure:
      the selection changes, stays consistent with the catalog badges, and visual
      tests assert the header counts for at least two problems.
 
+2. **FE-007: Focus a violation marker from its legend entry**
+   - Goal: Let clicking a violation legend entry highlight its matching stage
+     marker so a named violation can be located on the phase plane.
+   - Scope: `viewer/src/verificationStage.ts` (legend interaction + marker
+     emphasis draw), `viewer/src/styles.css` for the focused-entry chrome, and
+     visual coverage in `viewer/tests/visual.spec.ts`.
+   - Acceptance: Selecting a legend entry visibly emphasizes only its marker,
+     selection clears when the problem changes or the marker set updates, the
+     no-violation path stays interaction-free, and visual tests cover the
+     focus/clear behavior.
+
 ## Backend Queue
 
-1. **BE-028: Add verification trajectory monotonic-time guard**
-   - Goal: Prevent unsorted or duplicate trajectory time grids from reaching
-     viewer animation code.
-   - Scope: `engine/export/verification_contract.py` and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: Trajectory validation rejects decreasing time samples and
-     duplicate adjacent time samples, accepts generated viewer examples, and
-     focused verification export tests pass.
-
-2. **BE-029: Add verification certificate-series kind guard**
+1. **BE-029: Add verification certificate-series kind guard**
    - Goal: Keep viewer certificate lanes tied to known measured certificate
      series semantics.
    - Scope: `engine/export/verification_contract.py` and
@@ -74,3 +64,13 @@ Each task should use this structure:
    - Acceptance: Problem payload validation rejects empty certificate-series
      `kind`, rejects unknown `kind` values, accepts `candidate-value` and
      `flow-derivative`, and focused verification export tests pass.
+
+2. **BE-030: Add verification certificate-series problem-id guard**
+   - Goal: Ensure embedded certificate metadata cannot silently point at a
+     different verification problem.
+   - Scope: `engine/export/verification_contract.py` and
+     `tests/test_inspection_adapter.py`.
+   - Acceptance: Problem payload validation rejects certificate-series
+     `problemId` values that differ from the containing problem id, rejects empty
+     `problemId`, accepts generated viewer examples, and focused verification
+     export tests pass.
