@@ -161,6 +161,25 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
   validator for downstream discovery tools.
 - `tests/test_verification_ir.py`, `tests/test_inspection_adapter.py`.
 
+## Viewer export contract checks
+
+Viewer-facing verification data is guarded by backend-owned contract checks in
+`engine/export/verification_contract.py` before JSON is written. These checks
+make the TypeScript renderer's inputs coherent; they are not proof,
+certification, validated numerics, or obligation discharge.
+
+- **Index validation** checks the catalog version, problem entries, data paths,
+  and summary count shape.
+- **Trajectory validation** checks time/state alignment, state names, per-series
+  time alignment, and `certificateSeries` references into the exported numeric
+  `series`.
+- **Problem-payload validation** checks internal links among declared variables,
+  regions, region geometry, obligations, candidates, `proofStatuses`,
+  trajectory state names, and certificate comparison baselines.
+- **Round-trip export validation** checks the index against the referenced
+  problem payloads: ids, names, schema versions, summary counts, and embedded
+  trajectories must agree.
+
 ## Invariants / proof obligations (for this implementation)
 
 1. **Model fidelity (proven on examples).** The encoded RHS/update

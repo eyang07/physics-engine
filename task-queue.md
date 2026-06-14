@@ -57,16 +57,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-020: Document viewer verification export contract checks**
-   - Goal: Make the backend-owned viewer verification export validations
-     discoverable for future generator changes.
-   - Scope: `docs/verification-ir.md`, `docs/BACKEND.md`, and
-     `engine/export/verification_contract.py` docstrings if needed.
-   - Acceptance: Docs name the index, problem-payload, trajectory, and
-     round-trip validation layers; they state that these are contract checks and
-     not proof or certification; focused verification export tests pass.
-
-2. **BE-021: Add verification export schema-version guard tests**
+1. **BE-021: Add verification export schema-version guard tests**
    - Goal: Keep viewer verification exports pinned to the intended IR and index
      schema versions before data reaches the viewer.
    - Scope: `engine/export/verification_contract.py`,
@@ -75,3 +66,12 @@ Each task should use this structure:
    - Acceptance: Tests reject mismatched problem `schemaVersion`, mismatched
      index version, missing schema fields, and generator output validates with
      the current expected versions.
+
+2. **BE-022: Add verification export unknown-extra-path guard**
+   - Goal: Catch stale or misspelled viewer verification problem payload keys in
+     generator tests before they become unreachable files.
+   - Scope: `engine/export/verification_contract.py` and
+     `tests/test_inspection_adapter.py`.
+   - Acceptance: Round-trip validation rejects problem payload maps containing
+     unreferenced data paths, accepts exact referenced maps, and focused
+     verification export tests pass.

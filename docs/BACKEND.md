@@ -75,7 +75,9 @@ artifacts.
   - Viewer verification generation validates each problem's internal
     region-geometry projection/state-axis mappings, embedded trajectory payload,
     internal problem-payload links, certificate comparison baselines, and
-    index-to-problem-file summary counts before writing JSON.
+    index-to-problem-file summary counts before writing JSON. These are
+    export-contract checks only: they keep renderer data coherent but do not
+    prove, certify, or discharge any obligation.
   - Measured certificate diagnostics for the viewer
     (`engine/verification/measured.py`), all `rigor="measured"`: each exported
     controlled trajectory carries time-aligned candidate value (`B(x(t))`) and

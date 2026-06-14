@@ -4,6 +4,15 @@ The verification world is independent of the Systems manifest: a problem carries
 its own variables, region geometry, and proof statuses on its own phase plane.
 This module checks those internal cross-links before the viewer data is written;
 it does not consult any manifest system.
+
+The checks are export-contract guards, not mathematical proof checks:
+
+- index validation checks the catalog shape and per-problem summaries.
+- trajectory validation checks time/state/series alignment and certificate
+  series references.
+- problem-payload validation checks internal links among variables, regions,
+  obligations, candidates, proof statuses, and certificate baselines.
+- export validation checks that the index and referenced problem files agree.
 """
 
 from __future__ import annotations
