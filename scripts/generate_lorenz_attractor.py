@@ -9,9 +9,13 @@ import sympy as sp
 
 from engine.dynamics import finite_time_lyapunov
 from engine.export import Trajectory
+from engine.export.manifest import ParameterVariant
 from engine.numerics import integrate_adaptive
 from scripts.example_specs import LORENZ
-from scripts.generation import write_trajectory_outputs
+from scripts.generation import (
+    write_parameter_variant_trajectories,
+    write_trajectory_outputs,
+)
 from systems.lorenz_attractor import build_system
 
 
@@ -165,11 +169,24 @@ def write_lorenz_trajectory(
     return write_trajectory_outputs(trajectory, output, viewer_output)
 
 
-def _variant_filename(data_path: str) -> str:
-    prefix = "/data/"
-    if not data_path.startswith(prefix):
-        raise ValueError(f"Lorenz variant path must start with {prefix!r}: {data_path!r}")
-    return data_path.removeprefix(prefix)
+def _write_lorenz_variant(
+    variant: ParameterVariant,
+    output: Path,
+    viewer_output: Path | None,
+) -> Trajectory:
+    parameters = variant.parameters
+    return write_lorenz_trajectory(
+        output,
+        viewer_output=viewer_output,
+        sigma=parameters["sigma"],
+        rho=parameters["rho"],
+        beta=parameters["beta"],
+        initial_state=(
+            parameters["x0"],
+            parameters["y0"],
+            parameters["z0"],
+        ),
+    )
 
 
 def write_lorenz_variant_trajectories(
@@ -177,29 +194,13 @@ def write_lorenz_variant_trajectories(
     *,
     viewer_output_dir: Path | None = None,
 ) -> list[Trajectory]:
-    trajectories = []
-    for variant in LORENZ.variants:
-        if variant.data_path == LORENZ.data_path:
-            continue
-
-        parameters = variant.parameters
-        filename = _variant_filename(variant.data_path)
-        viewer_output = None if viewer_output_dir is None else viewer_output_dir / filename
-        trajectories.append(
-            write_lorenz_trajectory(
-                output_dir / filename,
-                viewer_output=viewer_output,
-                sigma=parameters["sigma"],
-                rho=parameters["rho"],
-                beta=parameters["beta"],
-                initial_state=(
-                    parameters["x0"],
-                    parameters["y0"],
-                    parameters["z0"],
-                ),
-            )
-        )
-    return trajectories
+    return write_parameter_variant_trajectories(
+        LORENZ,
+        output_dir,
+        write_variant=_write_lorenz_variant,
+        viewer_output_dir=viewer_output_dir,
+        system_name="Lorenz",
+    )
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

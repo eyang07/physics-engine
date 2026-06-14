@@ -52,7 +52,7 @@ Implemented diagnostics include:
 
 - Add basin sampling or bifurcation-style diagnostics when a concrete example
   needs them.
-- Factor shared parameter-family generation helpers if more systems add
-  variants.
+- Add more parameter-family examples only when they clarify a visible
+  dynamical behavior.
 - Keep advanced geometry backend-only until the viewer can represent it
   honestly.

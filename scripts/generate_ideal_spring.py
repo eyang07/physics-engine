@@ -7,10 +7,12 @@ from typing import Sequence
 import numpy as np
 
 from engine.export import Trajectory
+from engine.export.manifest import ParameterVariant
 from scripts.example_specs import IDEAL_SPRING
 from scripts.generation import (
     generate_lagrangian_trajectory,
     potential_plot_metadata,
+    write_parameter_variant_trajectories,
     write_trajectory_outputs,
 )
 from systems.ideal_spring import build_system
@@ -82,11 +84,19 @@ def write_ideal_spring_trajectory(
     return write_trajectory_outputs(trajectory, output, viewer_output)
 
 
-def _variant_filename(data_path: str) -> str:
-    prefix = "/data/"
-    if not data_path.startswith(prefix):
-        raise ValueError(f"Ideal spring variant path must start with {prefix!r}: {data_path!r}")
-    return data_path.removeprefix(prefix)
+def _write_ideal_spring_variant(
+    variant: ParameterVariant,
+    output: Path,
+    viewer_output: Path | None,
+) -> Trajectory:
+    parameters = variant.parameters
+    return write_ideal_spring_trajectory(
+        output,
+        viewer_output=viewer_output,
+        mass=parameters["m"],
+        spring_constant=parameters["k"],
+        initial_state=(parameters["x0"], parameters["x_dot0"]),
+    )
 
 
 def write_ideal_spring_variant_trajectories(
@@ -94,24 +104,13 @@ def write_ideal_spring_variant_trajectories(
     *,
     viewer_output_dir: Path | None = None,
 ) -> list[Trajectory]:
-    trajectories = []
-    for variant in IDEAL_SPRING.variants:
-        if variant.data_path == IDEAL_SPRING.data_path:
-            continue
-
-        parameters = variant.parameters
-        filename = _variant_filename(variant.data_path)
-        viewer_output = None if viewer_output_dir is None else viewer_output_dir / filename
-        trajectories.append(
-            write_ideal_spring_trajectory(
-                output_dir / filename,
-                viewer_output=viewer_output,
-                mass=parameters["m"],
-                spring_constant=parameters["k"],
-                initial_state=(parameters["x0"], parameters["x_dot0"]),
-            )
-        )
-    return trajectories
+    return write_parameter_variant_trajectories(
+        IDEAL_SPRING,
+        output_dir,
+        write_variant=_write_ideal_spring_variant,
+        viewer_output_dir=viewer_output_dir,
+        system_name="Ideal spring",
+    )
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
