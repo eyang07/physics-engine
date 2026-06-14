@@ -16,6 +16,14 @@ import type {
   VerificationProblem,
 } from "./data/verification";
 
+// The count-bearing sections a header chip can scroll to. A null entry means
+// that section was not rendered for this problem, so its count stays inert.
+type CountSections = {
+  regions: HTMLElement | null;
+  candidates: HTMLElement | null;
+  obligations: HTMLElement | null;
+};
+
 const COMPARISON_LATEX: Record<string, string> = {
   "<=": "\\le",
   ">=": "\\ge",
@@ -94,8 +102,11 @@ function formatMeasured(value: number): string {
   return Number(value.toPrecision(3)).toString();
 }
 
-function section(title: string): HTMLElement {
+function section(title: string, id?: string): HTMLElement {
   const node = el("section", "verif-section");
+  if (id) {
+    node.id = id;
+  }
   node.append(el("h2", "verif-section__title", title));
   return node;
 }
@@ -129,18 +140,26 @@ export class VerificationPanel {
     this.container.replaceChildren();
     const root = el("article", "verif-doc");
 
-    root.append(this.renderHeader(problem));
+    // Build the count-bearing sections first so the header counts can link to
+    // the ones that actually render; an absent section keeps its count inert.
+    const sections: CountSections = {
+      regions: problem.regions.length > 0 ? this.renderRegions(problem.regions) : null,
+      candidates: problem.candidates.length > 0 ? this.renderCandidates(problem) : null,
+      obligations: problem.obligations.length > 0 ? this.renderObligations(problem) : null,
+    };
+
+    root.append(this.renderHeader(problem, sections));
     if (problem.dynamics) {
       root.append(this.renderDynamics(problem));
     }
-    if (problem.regions.length > 0) {
-      root.append(this.renderRegions(problem.regions));
+    if (sections.regions) {
+      root.append(sections.regions);
     }
-    if (problem.candidates.length > 0) {
-      root.append(this.renderCandidates(problem));
+    if (sections.candidates) {
+      root.append(sections.candidates);
     }
-    if (problem.obligations.length > 0) {
-      root.append(this.renderObligations(problem));
+    if (sections.obligations) {
+      root.append(sections.obligations);
     }
     if (problem.proofStatuses.length > 0) {
       root.append(this.renderProofStatuses(problem));
@@ -153,7 +172,7 @@ export class VerificationPanel {
     this.container.scrollTop = 0;
   }
 
-  private renderHeader(problem: VerificationProblem): HTMLElement {
+  private renderHeader(problem: VerificationProblem, sections: CountSections): HTMLElement {
     const header = el("header", "verif-header");
     header.append(el("p", "eyebrow", "Verification problem"));
     header.append(el("h1", "verif-header__title", problem.name));
@@ -162,9 +181,9 @@ export class VerificationPanel {
     // without scanning back to the catalog; counts mirror the catalog badges.
     const counts = el("div", "verif-counts");
     counts.append(
-      this.countChip("regions", problem.regions.length),
-      this.countChip("obligations", problem.obligations.length),
-      this.countChip("candidates", problem.candidates.length),
+      this.countChip("regions", problem.regions.length, sections.regions),
+      this.countChip("obligations", problem.obligations.length, sections.obligations),
+      this.countChip("candidates", problem.candidates.length, sections.candidates),
     );
     header.append(counts);
 
@@ -192,8 +211,22 @@ export class VerificationPanel {
     return chip;
   }
 
-  private countChip(label: string, value: number): HTMLElement {
-    const chip = el("span", "verif-count", `${value} ${label}`);
+  // A scope count. When its section was rendered, the chip becomes a button that
+  // scrolls the doc to that section so the scope summary is a way into the
+  // detail; when the section is absent (zero count) it stays an inert label so
+  // there is no affordance leading nowhere.
+  private countChip(label: string, value: number, target: HTMLElement | null): HTMLElement {
+    const text = `${value} ${label}`;
+    if (target && value > 0) {
+      const link = el("button", "verif-count verif-count--link", text);
+      link.type = "button";
+      link.dataset.count = label;
+      link.addEventListener("click", () => {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      return link;
+    }
+    const chip = el("span", "verif-count", text);
     chip.dataset.count = label;
     return chip;
   }
@@ -232,7 +265,7 @@ export class VerificationPanel {
   }
 
   private renderRegions(regions: IrRegion[]): HTMLElement {
-    const node = section("Regions");
+    const node = section("Regions", "verifRegions");
     const list = el("div", "verif-cards");
     regions.forEach((region) => {
       const card = el("div", "verif-card");
@@ -263,7 +296,7 @@ export class VerificationPanel {
   }
 
   private renderCandidates(problem: VerificationProblem): HTMLElement {
-    const node = section("Candidate certificates");
+    const node = section("Candidate certificates", "verifCandidates");
     const list = el("div", "verif-cards");
     problem.candidates.forEach((candidate) => {
       const card = el("div", "verif-card");
@@ -292,7 +325,7 @@ export class VerificationPanel {
   }
 
   private renderObligations(problem: VerificationProblem): HTMLElement {
-    const node = section("Proof obligations");
+    const node = section("Proof obligations", "verifObligations");
     const regionName = new Map(problem.regions.map((region) => [region.id, region.name]));
     const list = el("div", "verif-cards");
     problem.obligations.forEach((obligation) => {

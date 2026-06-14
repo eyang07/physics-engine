@@ -442,6 +442,24 @@ select {
   white-space: nowrap;
 }
 
+.verif-count--link {
+  margin: 0;
+  font-family: inherit;
+  background: none;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.verif-count--link:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.verif-count--link:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .verif-chip {
   display: inline-flex;
   align-items: baseline;

@@ -566,6 +566,60 @@ for (const viewport of [
     await expect(canvas).toHaveAttribute("data-focused-violation", "");
   });
 
+  test(`Verification header obligation count scrolls to the obligations section at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    // The obligations section sits far below the header, so it starts out of
+    // view at the top of the doc.
+    const obligations = page.locator("#verifObligations");
+    await expect(obligations).not.toBeInViewport();
+
+    // The obligation count is an interactive control that moves the doc to that
+    // section.
+    const count = page.locator('.verif-header .verif-count[data-count="obligations"]');
+    await expect(count).toHaveText(/\d+ obligations/);
+    await count.click();
+    await expect(obligations).toBeInViewport();
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-obligations-scroll.png`),
+    });
+  });
+
+  test(`Verification obligation count stays inert without obligations at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // A problem with no obligations renders no obligations section, so the count
+    // must stay a plain label rather than a link pointing nowhere.
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.obligations = [];
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    await expect(page.locator("#verifObligations")).toHaveCount(0);
+    const count = page.locator('.verif-header .verif-count[data-count="obligations"]');
+    await expect(count).toHaveText("0 obligations");
+    // The chip is an inert <span>, not the interactive <button> form.
+    await expect(page.locator('.verif-header button.verif-count[data-count="obligations"]')).toHaveCount(
+      0,
+    );
+  });
+
   test(`Verification header echoes the selected problem counts at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

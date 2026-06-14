@@ -32,18 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-008: Link header obligation count to the obligations section**
-   - Goal: Let the header's obligation count scroll the problem doc to the
-     obligations section so the scope summary is a way into the detail.
-   - Scope: `viewer/src/verificationPanel.ts` (header count interaction +
-     obligations section anchor), `viewer/src/styles.css`, and visual coverage
-     in `viewer/tests/visual.spec.ts`.
-   - Acceptance: Activating the obligation count moves the doc to the obligations
-     section, the region/candidate counts behave consistently or stay inert by
-     design, problems without obligations expose no broken affordance, and visual
-     tests cover the scroll-into-view behavior.
-
-2. **FE-009: Show the worst measured value on each violation legend entry**
+1. **FE-009: Show the worst measured value on each violation legend entry**
    - Goal: Carry the already-exported `worstValue` for each measured violation
      into its legend entry so a named violation also shows how far it broke the
      obligation inequality, not just where.
@@ -54,6 +43,19 @@ Each task should use this structure:
      formatted deterministically, entries with a null `worstValue` omit the value
      without leaving broken chrome, the focus/clear interaction keeps working, and
      visual tests assert the displayed value text.
+
+2. **FE-010: Jump from a candidate's obligation link to its obligation card**
+   - Goal: Let the obligation ids listed on a candidate-certificate card scroll
+     the doc to the matching obligation card so the candidate→obligation link is
+     navigable, reusing the section-anchor pattern from FE-008.
+   - Scope: `viewer/src/verificationPanel.ts` (give each obligation card a stable
+     id, make candidate obligation links scroll/emphasize the target),
+     `viewer/src/styles.css` for the target emphasis, and visual coverage in
+     `viewer/tests/visual.spec.ts`.
+   - Acceptance: Activating a candidate's obligation link brings the matching
+     obligation card into view and briefly emphasizes it, links whose obligation
+     id is missing from the obligations list stay inert, and visual tests cover
+     the navigate/emphasis behavior.
 
 ## Backend Queue
 
