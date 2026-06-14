@@ -402,4 +402,39 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#verificationCanvas");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-violation.png`) });
   });
+
+  test(`Verification catalog shows counts and active selection at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    const items = page.locator("#verificationCatalog .catalog-item");
+    await expect(items).toHaveCount(2);
+
+    // Every item carries its obligation/candidate counts from the index summary.
+    for (let index = 0; index < 2; index += 1) {
+      await expect(
+        items.nth(index).locator('.catalog-item__count[data-count="obligations"]'),
+      ).toHaveText(/\d+ obligations/);
+      await expect(
+        items.nth(index).locator('.catalog-item__count[data-count="candidates"]'),
+      ).toHaveText(/\d+ candidates/);
+    }
+
+    // The first problem is active by default; selecting another moves the marker
+    // and clears it from the previous item.
+    await expect(items.nth(0)).toHaveClass(/catalog-item--active/);
+    await expect(items.nth(1)).not.toHaveClass(/catalog-item--active/);
+
+    await items.nth(1).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+    await expect(items.nth(1)).toHaveClass(/catalog-item--active/);
+    await expect(items.nth(0)).not.toHaveClass(/catalog-item--active/);
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-catalog.png`) });
+  });
 }

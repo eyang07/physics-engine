@@ -241,16 +241,37 @@ function renderVerificationCatalog() {
     button.className = "catalog-item";
     button.dataset.problemId = problem.id;
     button.classList.toggle("catalog-item--active", problem.id === selectedProblemId);
-    const subtitle = problem.model ?? problem.status;
-    button.innerHTML = `
-      <span class="catalog-item__category">${subtitle}</span>
-      <strong>${problem.name}</strong>
-    `;
+
+    const category = document.createElement("span");
+    category.className = "catalog-item__category";
+    category.textContent = problem.model ?? problem.status;
+
+    const title = document.createElement("strong");
+    title.textContent = problem.name;
+
+    // Obligation/candidate counts from the index summary let the workbench be
+    // scanned without opening each problem.
+    const counts = document.createElement("span");
+    counts.className = "catalog-item__counts";
+    counts.append(
+      countBadge("obligations", problem.counts.obligations),
+      countBadge("candidates", problem.counts.candidates),
+    );
+
+    button.append(category, title, counts);
     button.addEventListener("click", () => {
       void selectVerificationProblem(problem.id);
     });
     verificationCatalog.append(button);
   });
+}
+
+function countBadge(label: string, value: number): HTMLSpanElement {
+  const badge = document.createElement("span");
+  badge.className = "catalog-item__count";
+  badge.dataset.count = label;
+  badge.textContent = `${value} ${label}`;
+  return badge;
 }
 
 function updateVerificationCatalogActive() {
