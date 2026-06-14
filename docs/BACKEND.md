@@ -103,7 +103,8 @@ artifacts.
   - Stub inspection adapter (`engine/verification/inspection_adapter.py`) that
     consumes the IR and writes canonical problem JSON, a human-readable
     inspection report, and a machine-readable inspection outcome JSON with
-    typed diagnostics. It records no proof results.
+    typed diagnostics. The export script also writes a deterministic inspection
+    artifact index for backend-only discovery. It records no proof results.
 
 The backend does not synthesize, prove, or certify safety. Real external
 verification backends, proof discharge, validated numerics, and viewer safety
@@ -160,7 +161,8 @@ python -m scripts.generate_all_examples
 ```
 
 Export verification-problem inspection artifacts (backend-only, ignored under
-`data/generated/`):
+`data/generated/`). This writes per-problem JSON/Markdown/outcome artifacts and
+`inspection-artifacts.index.json`:
 
 ```sh
 python -m scripts.export_verification_problems

@@ -37,6 +37,8 @@ from engine.verification import (
     write_inspection_artifacts,
 )
 from scripts.export_verification_problems import (
+    INSPECTION_ARTIFACT_INDEX_FILENAME,
+    INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION,
     controlled_discrete_decay_problem,
     controlled_spring_problem,
     inspection_artifact_problems,
@@ -479,9 +481,22 @@ def test_export_script_writes_inspection_artifact_contract(tmp_path, capsys) -> 
         for exported_problem in exported_problems
         for name in _inspection_artifact_names(exported_problem)
     }
+    expected_names.add(INSPECTION_ARTIFACT_INDEX_FILENAME)
     assert {path.name for path in tmp_path.iterdir()} == expected_names
 
-    for exported_problem in exported_problems:
+    index_path = tmp_path / INSPECTION_ARTIFACT_INDEX_FILENAME
+    assert f"wrote inspection artifact index: {index_path}" in captured.out
+    index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+    assert index_payload["schemaVersion"] == INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION
+    assert [entry["id"] for entry in index_payload["problems"]] == [
+        exported_problem.id for exported_problem in exported_problems
+    ]
+
+    for exported_problem, index_entry in zip(
+        exported_problems,
+        index_payload["problems"],
+        strict=True,
+    ):
         problem_name, markdown_name, outcome_name = _inspection_artifact_names(
             exported_problem
         )
@@ -495,6 +510,16 @@ def test_export_script_writes_inspection_artifact_contract(tmp_path, capsys) -> 
             f"wrote {ARTIFACT_INSPECTION_OUTCOME_JSON}: {outcome_path}"
             in captured.out
         )
+        assert index_entry == {
+            "id": exported_problem.id,
+            "name": exported_problem.name,
+            "schemaVersion": exported_problem.schema_version,
+            "artifacts": [
+                {"kind": ARTIFACT_PROBLEM_JSON, "path": str(problem_path)},
+                {"kind": ARTIFACT_REPORT_MARKDOWN, "path": str(markdown_path)},
+                {"kind": ARTIFACT_INSPECTION_OUTCOME_JSON, "path": str(outcome_path)},
+            ],
+        }
 
         assert json.loads(problem_path.read_text(encoding="utf-8")) == (
             exported_problem.to_dict()

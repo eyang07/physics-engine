@@ -66,19 +66,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-008: Add verification inspection artifact index**
-   - Goal: Write a deterministic backend-only index for inspection artifacts so
-     tools can discover exported verification problems without globbing
-     filenames.
-   - Scope: `scripts/export_verification_problems.py`,
-     `tests/test_inspection_adapter.py`, and documentation if the artifact
-     contract changes.
-   - Acceptance: The export script writes an index listing every
-     `inspection_artifact_problems` id, name, schema version, and artifact path;
-     tests verify the index stays in sync with the problem registry; and focused
-     inspection tests pass.
-
-2. **BE-009: Add generated trajectory metadata contract helpers**
+1. **BE-009: Add generated trajectory metadata contract helpers**
    - Goal: Centralize reusable assertions for generated trajectory metadata so
      backend tests can distinguish manifest fields, renderer hints, diagnostics,
      and certificate/safety metadata without ad hoc checks.
@@ -88,3 +76,14 @@ Each task should use this structure:
      diagnostic references for representative Lagrangian and first-order
      systems; existing Lorenz, ideal-spring, Hénon-Heiles, and verification
      trajectory tests use the helpers; and focused generator tests pass.
+
+2. **BE-010: Add inspection index CLI smoke coverage**
+   - Goal: Keep the backend inspection export CLI discoverable by checking its
+     default and custom-output behavior without writing committed generated
+     artifacts.
+   - Scope: `tests/test_inspection_adapter.py`,
+     `scripts/export_verification_problems.py`, and documentation only if CLI
+     behavior changes.
+   - Acceptance: Tests exercise the CLI entry point with a temporary output
+     directory, assert the printed artifact/index paths are deterministic, and
+     confirm no generated artifacts are expected in the repository tree.

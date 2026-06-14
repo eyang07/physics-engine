@@ -8,8 +8,10 @@ the manifest/viewer boundary or claims proof discharge.
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable, Mapping
+import json
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from pathlib import Path
 
 import numpy as np
 import sympy as sp
@@ -24,6 +26,7 @@ from engine.dynamics import (
 )
 from engine.numerics import integrate_fixed_step
 from engine.verification import (
+    InspectionAdapterReport,
     VerificationProblem,
     scalar_field_region_geometries,
     sampled_region_proof_statuses,
@@ -35,6 +38,8 @@ from systems.controlled_pendulum import build_system
 from systems.controlled_spring import build_system as build_spring_system
 
 DEFAULT_OUTPUT_DIR = "data/generated/verification"
+INSPECTION_ARTIFACT_INDEX_FILENAME = "inspection-artifacts.index.json"
+INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION = "verification-inspection-artifacts/v1"
 
 # The verification world is self-contained: its phase plane is the problem's own
 # (theta, omega) state, mapped to itself, with no dependency on any gallery
@@ -289,6 +294,41 @@ def inspection_artifact_problems() -> tuple[VerificationProblem, ...]:
     )
 
 
+def inspection_artifact_index(
+    records: Sequence[tuple[VerificationProblem, InspectionAdapterReport]],
+) -> dict[str, object]:
+    """Return a deterministic discovery index for inspection artifacts."""
+
+    return {
+        "schemaVersion": INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION,
+        "problems": [
+            {
+                "id": problem.id,
+                "name": problem.name,
+                "schemaVersion": problem.schema_version,
+                "artifacts": [artifact.to_dict() for artifact in report.artifacts],
+            }
+            for problem, report in records
+        ],
+    }
+
+
+def write_inspection_artifact_index(
+    records: Sequence[tuple[VerificationProblem, InspectionAdapterReport]],
+    directory: str | Path,
+) -> Path:
+    """Write the backend-only discovery index for inspection artifacts."""
+
+    output_dir = Path(directory)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    index_path = output_dir / INSPECTION_ARTIFACT_INDEX_FILENAME
+    index_path.write_text(
+        json.dumps(inspection_artifact_index(records), indent=2),
+        encoding="utf-8",
+    )
+    return index_path
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -298,11 +338,15 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
+    records = []
     for problem in inspection_artifact_problems():
         report = write_inspection_artifacts(problem, args.output_dir)
+        records.append((problem, report))
         for artifact in report.artifacts:
             print(f"wrote {artifact.kind}: {artifact.path}")
         print(report.note)
+    index_path = write_inspection_artifact_index(records, args.output_dir)
+    print(f"wrote inspection artifact index: {index_path}")
 
 
 if __name__ == "__main__":
