@@ -15,6 +15,7 @@ from engine.export.trajectory import Trajectory
 from engine.export.verification_contract import (
     validate_viewer_verification_index,
     validate_viewer_verification_problems,
+    validate_viewer_verification_trajectory,
 )
 
 __all__ = [
@@ -29,5 +30,6 @@ __all__ = [
     "system_entry",
     "validate_viewer_verification_index",
     "validate_viewer_verification_problems",
+    "validate_viewer_verification_trajectory",
     "write_manifest",
 ]

@@ -9,7 +9,10 @@ import pytest
 import sympy as sp
 
 from metadata_assertions import assert_embedded_certificate_trajectory
-from engine.export import validate_viewer_verification_index
+from engine.export import (
+    validate_viewer_verification_index,
+    validate_viewer_verification_trajectory,
+)
 from engine.dynamics import (
     Box,
     ControlledDiscreteSystem,
@@ -54,7 +57,13 @@ from scripts.export_verification_problems import (
     parse_args,
     upright_pendulum_problem,
 )
-from scripts.generate_verification_problems import INDEX_VERSION, write_verification_problems
+from scripts.generate_verification_problems import (
+    DEFAULT_GENERATED_DIR as VIEWER_VERIFICATION_GENERATED_DIR,
+    DEFAULT_VIEWER_DIR as VIEWER_VERIFICATION_VIEWER_DIR,
+    INDEX_VERSION,
+    parse_args as parse_generate_verification_args,
+    write_verification_problems,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -129,6 +138,50 @@ def _valid_viewer_verification_index() -> dict:
                 "dataPath": "/data/verification/example-problem.json",
                 "counts": {"regions": 1, "obligations": 2, "candidates": 1},
             }
+        ],
+    }
+
+
+def _valid_viewer_verification_trajectory() -> dict:
+    return {
+        "time": [0.0, 0.1],
+        "stateNames": ["x", "v"],
+        "states": [[0.0, 1.0], [0.1, 0.9]],
+        "series": {
+            "certificate_barrier_value": [0.5, 0.45],
+            "certificate_barrier_flow_derivative": [-0.1, -0.2],
+        },
+        "certificateSeries": [
+            {
+                "problemId": "example-problem",
+                "candidateId": "barrier",
+                "kind": "candidate-value",
+                "label": "B(x(t))",
+                "series": "certificate_barrier_value",
+                "obligationIds": ["barrier-nonpositive"],
+                "comparisonBaselines": [
+                    {
+                        "obligationId": "barrier-nonpositive",
+                        "comparison": "<=",
+                        "rhs": 0.0,
+                    }
+                ],
+            },
+            {
+                "problemId": "example-problem",
+                "candidateId": "barrier",
+                "kind": "flow-derivative",
+                "label": "dB/dt",
+                "series": "certificate_barrier_flow_derivative",
+                "obligationIds": ["barrier-nonincreasing"],
+                "comparisonBaselines": [
+                    {
+                        "obligationId": "barrier-nonincreasing",
+                        "comparison": "<=",
+                        "rhs": 0.0,
+                    }
+                ],
+            },
         ],
     }
 
@@ -942,6 +995,10 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
     # The embedded controlled trajectory the Verification world animates, with
     # candidate-certificate series along the same system the obligations describe.
     trajectory = payload["trajectory"]
+    validate_viewer_verification_trajectory(
+        trajectory,
+        problem_id=payload["id"],
+    )
     assert_embedded_certificate_trajectory(
         trajectory,
         state_names=("theta", "omega"),
@@ -966,6 +1023,10 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         },
         certificate_kinds={"candidate-value", "flow-derivative"},
     )
+    validate_viewer_verification_trajectory(
+        spring_trajectory,
+        problem_id=spring_payload["id"],
+    )
     assert spring_trajectory["states"][0] == [0.35, -0.1]
     assert abs(spring_trajectory["states"][-1][0]) < 0.01
     assert abs(spring_trajectory["states"][-1][1]) < 0.01
@@ -980,10 +1041,81 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
     ]
 
 
+def test_generate_verification_problems_default_dirs_are_ignored_paths() -> None:
+    args = parse_generate_verification_args([])
+
+    assert args.generated_dir == VIEWER_VERIFICATION_GENERATED_DIR
+    assert args.viewer_dir == VIEWER_VERIFICATION_VIEWER_DIR
+
+    gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+    assert "data/generated/" in gitignore
+    assert "viewer/public/data/verification/" in gitignore
+
+
+def test_generate_verification_problems_cli_writes_custom_output_dirs(tmp_path) -> None:
+    generated_dir = tmp_path / "generated-verification"
+    viewer_dir = tmp_path / "viewer-verification"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "scripts.generate_verification_problems",
+            "--generated-dir",
+            str(generated_dir),
+            "--viewer-dir",
+            str(viewer_dir),
+        ],
+        cwd=REPO_ROOT,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    expected_ids = [
+        "upright-pendulum-safety",
+        "controlled-spring-regulator-safety",
+    ]
+    assert result.stdout.splitlines() == [
+        f"wrote 2 verification problem(s): {', '.join(expected_ids)}",
+        f"generated dir: {generated_dir}",
+        f"viewer dir: {viewer_dir}",
+    ]
+    assert result.stderr == ""
+
+    expected_names = {f"{problem_id}.json" for problem_id in expected_ids}
+    expected_names.add("index.json")
+    assert {path.name for path in generated_dir.iterdir()} == expected_names
+    assert {path.name for path in viewer_dir.iterdir()} == expected_names
+
+    index = json.loads((viewer_dir / "index.json").read_text(encoding="utf-8"))
+    validate_viewer_verification_index(index, version=INDEX_VERSION)
+    assert [entry["id"] for entry in index["problems"]] == expected_ids
+
+    for entry in index["problems"]:
+        filename = Path(entry["dataPath"]).name
+        viewer_payload = json.loads((viewer_dir / filename).read_text(encoding="utf-8"))
+        generated_payload = json.loads(
+            (generated_dir / filename).read_text(encoding="utf-8")
+        )
+        assert generated_payload == viewer_payload
+        validate_viewer_verification_trajectory(
+            viewer_payload["trajectory"],
+            problem_id=viewer_payload["id"],
+        )
+
+
 def test_validate_viewer_verification_index_accepts_export_shape() -> None:
     validate_viewer_verification_index(
         _valid_viewer_verification_index(),
         version=INDEX_VERSION,
+    )
+
+
+def test_validate_viewer_verification_trajectory_accepts_export_shape() -> None:
+    validate_viewer_verification_trajectory(
+        _valid_viewer_verification_trajectory(),
+        problem_id="example-problem",
     )
 
 
@@ -1061,3 +1193,65 @@ def test_validate_viewer_verification_index_rejects_invalid_payloads(
 ) -> None:
     with pytest.raises(ValueError, match=message):
         validate_viewer_verification_index(payload, version=INDEX_VERSION)
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ({}, "time"),
+        (
+            {
+                **_valid_viewer_verification_trajectory(),
+                "states": [[0.0, 1.0]],
+            },
+            "time and states must have matching lengths",
+        ),
+        (
+            {
+                **_valid_viewer_verification_trajectory(),
+                "stateNames": ["x", ""],
+            },
+            "stateNames are invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_trajectory(),
+                "states": [[0.0, 1.0], [0.1]],
+            },
+            "state row 1 must match stateNames",
+        ),
+        (
+            {
+                **_valid_viewer_verification_trajectory(),
+                "series": {
+                    "certificate_barrier_value": [0.5],
+                    "certificate_barrier_flow_derivative": [-0.1, -0.2],
+                },
+            },
+            "series 'certificate_barrier_value' must match time length",
+        ),
+        (
+            {
+                **_valid_viewer_verification_trajectory(),
+                "certificateSeries": [
+                    {
+                        **_valid_viewer_verification_trajectory()[
+                            "certificateSeries"
+                        ][0],
+                        "series": "missing_series",
+                    }
+                ],
+            },
+            "references missing series 'missing_series'",
+        ),
+    ],
+)
+def test_validate_viewer_verification_trajectory_rejects_invalid_payloads(
+    payload,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        validate_viewer_verification_trajectory(
+            payload,
+            problem_id="example-problem",
+        )

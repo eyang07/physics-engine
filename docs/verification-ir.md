@@ -227,7 +227,9 @@ python -m scripts.export_verification_problems
 
 Run `python -m scripts.generate_manifest` and
 `python -m scripts.generate_verification_problems` when checking the viewer
-contract shape. Generated files remain ignored.
+contract shape. Use `--generated-dir` and `--viewer-dir` to redirect
+verification artifacts into temporary directories for smoke checks. Generated
+files remain ignored.
 
 ## Out of scope
 

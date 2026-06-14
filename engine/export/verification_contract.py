@@ -86,6 +86,81 @@ def validate_viewer_verification_index(
                 )
 
 
+def validate_viewer_verification_trajectory(
+    payload: Mapping[str, Any],
+    *,
+    problem_id: str = "verification problem",
+) -> None:
+    """Validate the embedded viewer trajectory and certificate-series links."""
+
+    time = payload.get("time")
+    if not isinstance(time, list) or not time:
+        raise ValueError(f"{problem_id} trajectory time must be a non-empty list")
+    if any(not _is_number(value) for value in time):
+        raise ValueError(f"{problem_id} trajectory time values must be numeric")
+
+    state_names = payload.get("stateNames")
+    if (
+        not isinstance(state_names, list)
+        or not state_names
+        or any(not isinstance(name, str) or not name for name in state_names)
+    ):
+        raise ValueError(f"{problem_id} trajectory stateNames are invalid")
+
+    states = payload.get("states")
+    if not isinstance(states, list) or len(states) != len(time):
+        raise ValueError(
+            f"{problem_id} trajectory time and states must have matching lengths"
+        )
+    for index, row in enumerate(states):
+        if not isinstance(row, list) or len(row) != len(state_names):
+            raise ValueError(
+                f"{problem_id} trajectory state row {index} must match stateNames"
+            )
+        if any(not _is_number(value) for value in row):
+            raise ValueError(
+                f"{problem_id} trajectory state row {index} values must be numeric"
+            )
+
+    series = payload.get("series")
+    if not isinstance(series, Mapping):
+        raise ValueError(f"{problem_id} trajectory series must be an object")
+    for series_name, values in series.items():
+        if not isinstance(series_name, str) or not series_name:
+            raise ValueError(f"{problem_id} trajectory series names are invalid")
+        if not isinstance(values, list) or len(values) != len(time):
+            raise ValueError(
+                f"{problem_id} trajectory series {series_name!r} must match time length"
+            )
+        if any(not _is_number(value) for value in values):
+            raise ValueError(
+                f"{problem_id} trajectory series {series_name!r} values must be numeric"
+            )
+
+    certificate_series = payload.get("certificateSeries")
+    if not isinstance(certificate_series, list):
+        raise ValueError(f"{problem_id} trajectory certificateSeries must be a list")
+    for index, record in enumerate(certificate_series):
+        if not isinstance(record, Mapping):
+            raise ValueError(
+                f"{problem_id} trajectory certificateSeries {index} must be an object"
+            )
+        series_name = record.get("series")
+        if not isinstance(series_name, str) or not series_name:
+            raise ValueError(
+                f"{problem_id} trajectory certificateSeries {index} series is invalid"
+            )
+        if series_name not in series:
+            raise ValueError(
+                f"{problem_id} trajectory certificateSeries {index} references "
+                f"missing series {series_name!r}"
+            )
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
 def _validate_region_geometry(problem: VerificationProblem) -> None:
     problem_variable_names = {variable.name for variable in problem.variables}
     region_ids = {region.id for region in problem.regions}

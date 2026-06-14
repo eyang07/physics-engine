@@ -15,7 +15,9 @@ any physics.
 
 from __future__ import annotations
 
+import argparse
 import json
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -23,6 +25,7 @@ import numpy as np
 from engine.export import (
     validate_viewer_verification_index,
     validate_viewer_verification_problems,
+    validate_viewer_verification_trajectory,
 )
 from engine.verification import VerificationProblem, certificate_series_for_trajectory
 from scripts.export_verification_problems import (
@@ -33,6 +36,7 @@ from scripts.export_verification_problems import (
 DEFAULT_GENERATED_DIR = Path("data/generated/verification")
 DEFAULT_VIEWER_DIR = Path("viewer/public/data/verification")
 INDEX_VERSION = 1
+
 
 def _problem_summary(payload: dict, data_path: str) -> dict:
     """A thin catalog entry the viewer lists; the detail lives in the IR file."""
@@ -101,6 +105,10 @@ def write_verification_problems(
     for example, problem in zip(examples, problems, strict=True):
         payload = problem.to_dict()
         payload["trajectory"] = _controlled_trajectory_payload(problem, example)
+        validate_viewer_verification_trajectory(
+            payload["trajectory"],
+            problem_id=problem.id,
+        )
         filename = f"{payload['id']}.json"
         text = json.dumps(payload, indent=2) + "\n"
         (generated_dir / filename).write_text(text, encoding="utf-8")
@@ -115,9 +123,33 @@ def write_verification_problems(
     return [summary["id"] for summary in summaries]
 
 
-def main() -> None:
-    ids = write_verification_problems()
-    print(f"Wrote {len(ids)} verification problem(s) and index.json: {', '.join(ids)}")
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--generated-dir",
+        type=Path,
+        default=DEFAULT_GENERATED_DIR,
+        help="directory for ignored backend-generated verification files",
+    )
+    parser.add_argument(
+        "--viewer-dir",
+        type=Path,
+        default=DEFAULT_VIEWER_DIR,
+        help="directory for ignored viewer verification files",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    args = parse_args(argv)
+
+    ids = write_verification_problems(
+        generated_dir=args.generated_dir,
+        viewer_dir=args.viewer_dir,
+    )
+    print(f"wrote {len(ids)} verification problem(s): {', '.join(ids)}")
+    print(f"generated dir: {args.generated_dir}")
+    print(f"viewer dir: {args.viewer_dir}")
 
 
 if __name__ == "__main__":
