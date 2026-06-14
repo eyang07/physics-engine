@@ -437,4 +437,61 @@ for (const viewport of [
     await expect(items.nth(0)).not.toHaveClass(/catalog-item--active/);
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-catalog.png`) });
   });
+
+  test(`Verification stage legends measured violations at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+
+    // No-violation path: the default problem holds on every sample, so the stage
+    // draws no markers and shows no legend.
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationContent .verif-doc");
+    await expect(page.locator(".verif-violation-legend")).toBeHidden();
+
+    // Violation path: inject a mappable measured-violated sample referencing a
+    // real obligation. The legend appears and names that obligation against its
+    // numbered marker tag.
+    const violation = {
+      id: "injected-violation-legend",
+      obligationId: "energy-barrier-excludes-near-bottom",
+      status: "measured-violated",
+      worst: { value: 1.5, point: [2.5, 0.3] },
+      evaluation: {
+        kind: "region-grid",
+        sampleCount: 10,
+        source: "injected",
+        variables: ["theta", "omega"],
+        stateAxes: ["theta", "omega"],
+        variableToStateAxis: { theta: "theta", omega: "omega" },
+      },
+    };
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.proofStatuses.push(violation);
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    const legend = page.locator(".verif-violation-legend");
+    await expect(legend).toBeVisible();
+    await expect(legend.locator(".verif-violation-legend__entry")).toHaveCount(1);
+    // The name (colon-delimited) rather than the obligation id (hyphenated)
+    // confirms the legend resolves the obligation, not just echoes the link.
+    await expect(legend.locator(".verif-violation-legend__name")).toHaveText(
+      "energy-barrier:excludes:near-bottom",
+    );
+    await expect(legend.locator(".verif-violation-legend__tag")).toHaveText("1");
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-violation-legend.png`),
+    });
+  });
 }

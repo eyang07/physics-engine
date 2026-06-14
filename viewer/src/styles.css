@@ -247,6 +247,62 @@ select {
   min-height: 430px;
 }
 
+.verif-violation-legend {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: grid;
+  gap: 5px;
+  max-width: 220px;
+  padding: 9px 11px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost-strong);
+  backdrop-filter: blur(20px);
+  pointer-events: none;
+}
+
+.verif-violation-legend[hidden] {
+  display: none;
+}
+
+.verif-violation-legend__title {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.verif-violation-legend__entry {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.verif-violation-legend__tag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: rgba(232, 86, 70, 0.95);
+  color: #fff;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+}
+
+.verif-violation-legend__name {
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  word-break: break-word;
+}
+
 .verif-stage__controls {
   position: absolute;
   right: 18px;

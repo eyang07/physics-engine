@@ -22,13 +22,21 @@ type Bounds = {
   maxY: number;
 };
 
-type ViolationMarker = { x: number; y: number };
+type ViolationMarker = { x: number; y: number; label: string };
+
+const VIOLATION_RGBA = "rgba(232, 86, 70, 0.95)";
 
 // A measured violation sample only belongs on the stage if its worst sampled
 // point projects onto the two axes this stage actually plots (state[0] vs
 // state[1]). Samples taken on a different projection, or with no exported point,
-// are dropped rather than drawn somewhere misleading.
-function violationMarkers(statuses: ProofStatus[], axisX: string, axisY: string): ViolationMarker[] {
+// are dropped rather than drawn somewhere misleading. The obligation name rides
+// along so each marker can be named in the legend.
+function violationMarkers(
+  statuses: ProofStatus[],
+  axisX: string,
+  axisY: string,
+  obligationName: Map<string, string>,
+): ViolationMarker[] {
   if (!axisX || !axisY) {
     return [];
   }
@@ -55,21 +63,22 @@ function violationMarkers(statuses: ProofStatus[], axisX: string, axisY: string)
     if (x === undefined || y === undefined) {
       continue;
     }
-    markers.push({ x, y });
+    const label = obligationName.get(status.obligationId) ?? status.obligationId;
+    markers.push({ x, y, label });
   }
   return markers;
 }
 
 // A worst-violation sample, drawn as a haloed red ring with an inner cross so it
 // reads as an annotation distinct from the region outlines, the trajectory, and
-// the moving playhead.
+// the moving playhead. A small index tag ties each marker to its legend entry.
 function drawViolationMarkers(
   ctx: CanvasRenderingContext2D,
   markers: ViolationMarker[],
   mapX: (value: number) => number,
   mapY: (value: number) => number,
 ): void {
-  markers.forEach((marker) => {
+  markers.forEach((marker, index) => {
     const cx = mapX(marker.x);
     const cy = mapY(marker.y);
     ctx.save();
@@ -79,7 +88,7 @@ function drawViolationMarkers(
     ctx.arc(cx, cy, 7, 0, Math.PI * 2);
     ctx.stroke();
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "rgba(232, 86, 70, 0.95)";
+    ctx.strokeStyle = VIOLATION_RGBA;
     ctx.beginPath();
     ctx.arc(cx, cy, 7, 0, Math.PI * 2);
     ctx.stroke();
@@ -90,6 +99,9 @@ function drawViolationMarkers(
     ctx.moveTo(cx - r, cy + r);
     ctx.lineTo(cx + r, cy - r);
     ctx.stroke();
+    ctx.fillStyle = VIOLATION_RGBA;
+    ctx.font = 'bold 11px "IBM Plex Mono", monospace';
+    ctx.fillText(String(index + 1), cx + 9, cy - 8);
     ctx.restore();
   });
 }
@@ -286,6 +298,7 @@ export class VerificationStage {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly clock = new PlaybackClock();
   private readonly certificateLanes: CertificateLanes;
+  private readonly legend: HTMLElement;
   private trajectory: Trajectory | null = null;
   private bounds: Bounds | null = null;
   private regions: RegionGeometry[] = [];
@@ -305,6 +318,12 @@ export class VerificationStage {
     }
     this.ctx = context;
     this.certificateLanes = new CertificateLanes(certificateContainer);
+    // The violation legend overlays the stage workspace (the canvas's parent),
+    // hidden until a measured violation is actually drawn.
+    this.legend = document.createElement("div");
+    this.legend.className = "verif-violation-legend";
+    this.legend.hidden = true;
+    canvas.parentElement?.append(this.legend);
     this.playButton.addEventListener("click", () => this.togglePlay());
   }
 
@@ -330,8 +349,16 @@ export class VerificationStage {
     };
     this.regions = problem.regionGeometry;
     this.bounds = boundsFromRegions(problem.regionGeometry) ?? boundsFromTrajectory(this.trajectory);
+    const obligationName = new Map(
+      problem.obligations.map((obligation) => [obligation.id, obligation.name]),
+    );
     this.setViolations(
-      violationMarkers(problem.proofStatuses, vt.stateNames[0] ?? "", vt.stateNames[1] ?? ""),
+      violationMarkers(
+        problem.proofStatuses,
+        vt.stateNames[0] ?? "",
+        vt.stateNames[1] ?? "",
+        obligationName,
+      ),
     );
     this.certificateLanes.show(vt.series, vt.certificateSeries);
     this.syncPlayButton();
@@ -339,10 +366,39 @@ export class VerificationStage {
   }
 
   // Keep a test-visible count of drawn violation markers on the canvas so visual
-  // coverage can assert the marker / no-marker paths without pixel diffing.
+  // coverage can assert the marker / no-marker paths without pixel diffing, and
+  // mirror the markers into the legend.
   private setViolations(markers: ViolationMarker[]): void {
     this.violations = markers;
     this.canvas.dataset.violationMarkers = String(markers.length);
+    this.renderLegend(markers);
+  }
+
+  // The legend names each drawn violation by its obligation, keyed to the marker
+  // index. It exists only while at least one marker is on the stage.
+  private renderLegend(markers: ViolationMarker[]): void {
+    this.legend.replaceChildren();
+    if (markers.length === 0) {
+      this.legend.hidden = true;
+      return;
+    }
+    const title = document.createElement("p");
+    title.className = "verif-violation-legend__title";
+    title.textContent = "measured violations";
+    this.legend.append(title);
+    markers.forEach((marker, index) => {
+      const entry = document.createElement("div");
+      entry.className = "verif-violation-legend__entry";
+      const tag = document.createElement("span");
+      tag.className = "verif-violation-legend__tag";
+      tag.textContent = String(index + 1);
+      const name = document.createElement("span");
+      name.className = "verif-violation-legend__name";
+      name.textContent = marker.label;
+      entry.append(tag, name);
+      this.legend.append(entry);
+    });
+    this.legend.hidden = false;
   }
 
   clear(): void {
