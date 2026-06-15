@@ -10,6 +10,7 @@ import numpy as np
 import sympy as sp
 
 from engine.verification.ir import (
+    AssumptionSpec,
     CandidateSpec,
     ExpressionSpec,
     ObligationSpec,
@@ -134,12 +135,25 @@ def certificate_series_for_trajectory(
     return CertificateTrajectoryDiagnostics(series=series, metadata=tuple(metadata))
 
 
-def sampled_region_proof_statuses(problem: VerificationProblem) -> tuple[ProofStatusSpec, ...]:
-    """Sample obligation inequalities on exported region-geometry grids."""
+def sampled_region_proof_statuses(
+    problem: VerificationProblem,
+    *,
+    restrict_to_assumption_regions: bool = False,
+) -> tuple[ProofStatusSpec, ...]:
+    """Sample obligation inequalities on exported region-geometry grids.
+
+    When ``restrict_to_assumption_regions`` is set, each obligation is sampled
+    only where its stated domain assumptions hold (those expressible in the
+    plane variables), so a claim that is asserted only under an assumption is
+    measured only there rather than over the whole region. This keeps the
+    verdict honest for obligations like the drone's forward-invariance claim,
+    which holds inside the speed bound but not over all velocities.
+    """
 
     variables = tuple(variable.name for variable in problem.variables)
     regions_by_id = {region.id: region for region in problem.regions}
     geometry_by_region = {geometry.region_id: geometry for geometry in problem.region_geometry}
+    assumptions_by_id = {assumption.id: assumption for assumption in problem.assumptions}
     candidate_by_obligation = _candidate_by_obligation(problem)
     statuses: list[ProofStatusSpec] = []
     expressions = _problem_expressions(problem)
@@ -152,10 +166,21 @@ def sampled_region_proof_statuses(problem: VerificationProblem) -> tuple[ProofSt
         geometry = geometry_by_region.get(obligation.region_id)
         if geometry is None:
             continue
+        inside_values = np.asarray(geometry.values, dtype=float) <= float(region.level)
+        applied_assumptions: tuple[str, ...] = ()
+        if restrict_to_assumption_regions:
+            assumption_mask, applied_assumptions = _assumption_region_mask(
+                geometry,
+                obligation,
+                assumptions_by_id=assumptions_by_id,
+                variables=variables,
+                symbols=symbols,
+            )
+            inside_values = inside_values & assumption_mask
         points = _region_geometry_points(
             geometry,
             variables=variables,
-            inside_values=np.asarray(geometry.values, dtype=float) <= float(region.level),
+            inside_values=inside_values,
         )
         if points.shape[0] == 0:
             statuses.append(
@@ -175,10 +200,7 @@ def sampled_region_proof_statuses(problem: VerificationProblem) -> tuple[ProofSt
                     state_axes=tuple(geometry.variable_to_state_axis[name] for name in variables),
                     variable_to_state_axis=dict(geometry.variable_to_state_axis),
                     source=f"regionGeometry:{geometry.region_id}",
-                    note=(
-                        "No grid samples fell inside the obligation region; the obligation "
-                        "still requires external discharge."
-                    ),
+                    note=_no_samples_note(applied_assumptions),
                 )
             )
             continue
@@ -205,10 +227,87 @@ def sampled_region_proof_statuses(problem: VerificationProblem) -> tuple[ProofSt
                 worst_value=float(values[worst_index]),
                 worst_point=tuple(float(value) for value in points[worst_index]),
                 worst_margin=worst_margin,
-                note=_MEASURED_NOTE,
+                note=_restricted_note(applied_assumptions),
             )
         )
     return tuple(statuses)
+
+
+def _assumption_region_mask(
+    geometry: RegionGeometrySpec,
+    obligation: ObligationSpec,
+    *,
+    assumptions_by_id: Mapping[str, AssumptionSpec],
+    variables: tuple[str, ...],
+    symbols: tuple[sp.Symbol, ...],
+) -> tuple[np.ndarray, tuple[str, ...]]:
+    """Boolean grid mask for the obligation's plane-expressible assumptions.
+
+    Returns the mask aligned to ``geometry.values`` plus the ids of the
+    assumptions actually applied. Order-comparison assumptions whose free
+    symbols are all plane variables carve a sampling sub-region; assumptions
+    referencing parameters or other variables are left for external discharge.
+    """
+
+    x_grid, y_grid = np.meshgrid(
+        np.asarray(geometry.x_values, dtype=float),
+        np.asarray(geometry.y_values, dtype=float),
+        indexing="xy",
+    )
+    plane_coordinates = {
+        geometry.plane_variables[0]: x_grid.ravel(),
+        geometry.plane_variables[1]: y_grid.ravel(),
+    }
+    flat_points = np.column_stack([plane_coordinates[name] for name in variables])
+    mask = np.ones(x_grid.shape, dtype=bool)
+    applied: list[str] = []
+    plane_variable_set = set(geometry.plane_variables)
+    for assumption_id in obligation.assumption_ids:
+        assumption = assumptions_by_id.get(assumption_id)
+        if assumption is None or assumption.comparison not in ("<=", "<", ">=", ">"):
+            continue
+        expression = _expression(assumption.expression)
+        if not {symbol.name for symbol in expression.free_symbols} <= plane_variable_set:
+            continue
+        values = _evaluate_expression(expression, symbols, flat_points).reshape(x_grid.shape)
+        mask &= _comparison_mask(values, assumption.comparison, float(assumption.rhs))
+        applied.append(assumption_id)
+    return mask, tuple(applied)
+
+
+def _comparison_mask(values: np.ndarray, comparison: str, rhs: float) -> np.ndarray:
+    if comparison == "<=":
+        return values <= rhs
+    if comparison == "<":
+        return values < rhs
+    if comparison == ">=":
+        return values >= rhs
+    if comparison == ">":
+        return values > rhs
+    raise ValueError("comparison must be one of <=, <, >=, >")
+
+
+def _restricted_note(applied_assumptions: tuple[str, ...]) -> str:
+    if not applied_assumptions:
+        return _MEASURED_NOTE
+    return (
+        f"{_MEASURED_NOTE} Sampled only where the stated assumption region holds "
+        f"({', '.join(applied_assumptions)})."
+    )
+
+
+def _no_samples_note(applied_assumptions: tuple[str, ...]) -> str:
+    base = (
+        "No grid samples fell inside the obligation region; the obligation "
+        "still requires external discharge."
+    )
+    if not applied_assumptions:
+        return base
+    return (
+        "No grid samples fell inside the obligation region under the stated "
+        f"assumption region ({', '.join(applied_assumptions)}); the obligation "
+        "still requires external discharge."
+    )
 
 
 def _certificate_series_record(

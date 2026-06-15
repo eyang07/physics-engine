@@ -428,7 +428,16 @@ def drone_geofence_problem(params: DroneParams = DroneParams()) -> VerificationP
         y_range=(-0.35, 0.35),
         samples=(81, 81),
     )
-    return replace(problem, region_geometry=geometry)
+    problem = replace(problem, region_geometry=geometry)
+    # The forward-invariance claim is asserted only under the stated speed bound,
+    # so sample its grid honestly within that assumption region rather than over
+    # all velocities (where one guard-band step can overshoot the wall).
+    return replace(
+        problem,
+        proof_statuses=sampled_region_proof_statuses(
+            problem, restrict_to_assumption_regions=True
+        ),
+    )
 
 
 def drone_geofence_trajectory(

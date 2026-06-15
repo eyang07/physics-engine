@@ -61,31 +61,23 @@ geofence safe/inner regions, `(q1, v1)` geometry, the box-barrier candidate, the
 honest forward-invariance + initial-containment obligations (the box barrier's
 non-increase condition is false, so it is not used), and a discrete
 candidate-value certificate series (`measured.py` now supports discrete dynamics).
-It has **no measured `proofStatuses` yet** — that is the remaining gap for full
-viewer parity, handled next.
 
 BE-036 is done: region-grid `proofStatuses` now carry a numeric signed worst
 `margin` to the obligation boundary (nonnegative when the sampled check holds,
 negative when violated), the IR round-trips it, and the export contract validates
 the optional `worst` record (value/point/time/margin), rejecting malformed shapes.
-The drone still needs its measured `proofStatuses` populated (next), which will
-attach these margins.
 
-1. **BE-042: Drone measured proof statuses (+ P2 / admissibility obligations)**
-   - Goal: Give the drone problem its measured `proofStatuses` so the viewer shows
-     the verdict ledger (BE-041 left them empty). Sample the forward-invariance
-     and initial-containment obligations on the `(q1, v1)` grid honestly — the
-     forward-invariance claim holds only under `speedBound`, so sample within that
-     restricted region (or report the margin honestly) rather than over all
-     velocities. Optionally add the P2 one-step velocity invariance and controller
-     admissibility obligations (spec K 1, 3), and attach the BE-036 margins.
-   - Scope: `engine/verification/measured.py` (sampling that respects assumption
-     regions), `scripts/export_verification_problems.py`, and `tests/`.
-   - Acceptance: the drone exports measured `proofStatuses` (rigor `measured`,
-     never proved) with margins; the viewer ledger renders; the export contract
-     validates; focused tests pass.
+BE-042 is done: the drone now exports measured `proofStatuses` for both
+obligations. `sampled_region_proof_statuses` gained an opt-in
+`restrict_to_assumption_regions` flag that samples each obligation only where its
+plane-expressible domain assumptions hold; the drone uses it so forward-invariance
+is measured inside `speedBound` (where one guard-band step holds the geofence,
+margin >= 0) instead of over all velocities (where it overshoots). Both statuses
+carry BE-036 margins at rigor `measured`; pendulum/spring sampling is unchanged.
+The optional P2 / admissibility obligations were left out (not needed for the
+ledger) and remain available for BE-043 if the package wants them.
 
-2. **BE-043: Assemble and export the flagship drone verification package**
+1. **BE-043: Assemble and export the flagship drone verification package**
    - Goal: Route the drone end-to-end into one BE-039 verification package —
      manifest, dynamics, assumptions (spec G: `speedBound`, `velBound`, `dtSmall`,
      `driftBound`), safe set, candidate, obligations, measured traces/diagnostics,
@@ -98,7 +90,7 @@ attach these margins.
      claims proof/certification; generated data stays uncommitted; focused tests
      pass.
 
-3. **BE-044: Backend adapter stubs in the verification package**
+2. **BE-044: Backend adapter stubs in the verification package**
    - Goal: Include optional adapter-stub descriptors in the package describing how
      external backend *categories* (reachability, SOS/certificate synthesis,
      deductive prover) would consume each obligation — descriptors of target and

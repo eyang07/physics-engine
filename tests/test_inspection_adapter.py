@@ -1102,6 +1102,31 @@ def test_drone_geofence_problem_exports_viewer_contract() -> None:
     assert forward["assumptionIds"] == ["speed-within-half-guard-reach"]
     assert obligations["geofence-barrier-initial-containment"]["assumptionIds"] == []
 
+    # Measured verdict ledger: one region-grid status per obligation, rigor
+    # 'measured' (never proved), each carrying a signed worst margin.
+    statuses_by_obligation = {
+        status["obligationId"]: status for status in payload["proofStatuses"]
+    }
+    assert set(statuses_by_obligation) == set(obligations)
+    for status in statuses_by_obligation.values():
+        assert status["rigor"] == "measured"
+        assert status["externalStatus"] == "external-required"
+        assert status["evaluation"]["kind"] == "region-grid"
+        assert status["evaluation"]["sampleCount"] > 0
+        assert isinstance(status["worst"]["margin"], float)
+
+    # The forward-invariance claim is sampled only inside the speed bound, where
+    # one guard-band step holds the drone in the geofence (margin >= 0); the
+    # status note records that restriction.
+    forward_status = statuses_by_obligation["geofence-barrier-forward-invariance"]
+    assert forward_status["status"] == "measured-holds"
+    assert forward_status["worst"]["margin"] >= 0.0
+    assert "speed-within-half-guard-reach" in forward_status["note"]
+    # Initial containment has no assumptions, so its note is the plain measured one.
+    initial_status = statuses_by_obligation["geofence-barrier-initial-containment"]
+    assert initial_status["status"] == "measured-holds"
+    assert "stated assumption region" not in initial_status["note"]
+
     # The viewer contract accepts the Max/Piecewise-backed problem.
     validate_viewer_verification_problems([problem])
 
