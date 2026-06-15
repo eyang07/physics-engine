@@ -23,16 +23,14 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
-import numpy as np
-
 from engine.export import (
     validate_viewer_verification_export,
     validate_viewer_verification_problems,
     validate_viewer_verification_trajectory,
 )
-from engine.verification import VerificationProblem, certificate_series_for_trajectory
+from engine.verification import VerificationProblem
 from scripts.export_verification_problems import (
-    ViewerVerificationExample,
+    controlled_trajectory_payload,
     viewer_verification_examples,
 )
 
@@ -61,35 +59,6 @@ def _problem_summary(payload: dict, data_path: str, ir_path: str) -> dict:
     }
 
 
-def _controlled_trajectory_payload(
-    problem: VerificationProblem,
-    example: ViewerVerificationExample,
-) -> dict:
-    """The controlled path plus its candidate-certificate series.
-
-    The viewer animates this self-contained trajectory in the Verification world;
-    the certificate series are evaluated along the very system the obligations are
-    derived for, so the path and the barrier describe one system.
-    """
-
-    time, states = example.trajectory_factory()
-    state_names = [variable.name for variable in problem.variables]
-    diagnostics = certificate_series_for_trajectory(
-        problem,
-        time=time,
-        states=states,
-        state_names=state_names,
-        variable_to_state_axis=example.variable_to_state_axis,
-    )
-    return {
-        "time": [float(value) for value in time],
-        "stateNames": state_names,
-        "states": np.asarray(states, dtype=float).tolist(),
-        "series": {name: list(values) for name, values in diagnostics.series.items()},
-        "certificateSeries": list(diagnostics.metadata),
-    }
-
-
 def write_verification_problems(
     *,
     generated_dir: Path = DEFAULT_GENERATED_DIR,
@@ -115,7 +84,7 @@ def write_verification_problems(
         ir_payload = problem.to_dict()
         payload = {
             **ir_payload,
-            "trajectory": _controlled_trajectory_payload(problem, example),
+            "trajectory": controlled_trajectory_payload(problem, example),
         }
         validate_viewer_verification_trajectory(
             payload["trajectory"],

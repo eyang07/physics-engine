@@ -24,10 +24,12 @@ from engine.dynamics import (
     SafetySpecification,
     SublevelSet,
 )
+from engine.export import PackageManifest, write_package
 from engine.numerics import integrate_fixed_step
 from engine.verification import (
     InspectionAdapterReport,
     VerificationProblem,
+    certificate_series_for_trajectory,
     scalar_field_region_geometries,
     sampled_region_proof_statuses,
     verification_problem_from_barrier,
@@ -249,6 +251,59 @@ def viewer_verification_examples() -> tuple[ViewerVerificationExample, ...]:
             variable_to_state_axis=_SPRING_PHASE_AXES,
         ),
     )
+
+
+def controlled_trajectory_payload(
+    problem: VerificationProblem,
+    example: ViewerVerificationExample,
+) -> dict:
+    """The controlled path plus its candidate-certificate series.
+
+    The viewer animates this self-contained trajectory in the Verification world;
+    the certificate series are evaluated along the very system the obligations are
+    derived for, so the path and the barrier describe one system.
+    """
+
+    time, states = example.trajectory_factory()
+    state_names = [variable.name for variable in problem.variables]
+    diagnostics = certificate_series_for_trajectory(
+        problem,
+        time=time,
+        states=states,
+        state_names=state_names,
+        variable_to_state_axis=example.variable_to_state_axis,
+    )
+    return {
+        "time": [float(value) for value in time],
+        "stateNames": state_names,
+        "states": np.asarray(states, dtype=float).tolist(),
+        "series": {name: list(values) for name, values in diagnostics.series.items()},
+        "certificateSeries": list(diagnostics.metadata),
+    }
+
+
+def verification_package_inputs() -> tuple[tuple[VerificationProblem, dict], ...]:
+    """Each viewer example as a (problem, trajectory payload) package input."""
+
+    inputs: list[tuple[VerificationProblem, dict]] = []
+    for example in viewer_verification_examples():
+        problem = example.problem_factory()
+        inputs.append((problem, controlled_trajectory_payload(problem, example)))
+    return tuple(inputs)
+
+
+def write_verification_packages(directory: str | Path) -> list[PackageManifest]:
+    """Write one self-contained verification package per viewer example.
+
+    Each package lands under ``directory/<problem_id>/``. Output is deterministic
+    and regenerable; keep it uncommitted like the other generated data.
+    """
+
+    output_dir = Path(directory)
+    manifests: list[PackageManifest] = []
+    for problem, trajectory in verification_package_inputs():
+        manifests.append(write_package(problem, trajectory, output_dir / problem.id))
+    return manifests
 
 
 def controlled_discrete_decay_problem() -> VerificationProblem:
