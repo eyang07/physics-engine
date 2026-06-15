@@ -32,20 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-015: Tie measured evidence to the obligation it bears on**
-   - Goal: Let selecting an obligation (from its card or the obligation ledger)
-     highlight the certificate lane(s) and comparison baseline that bear on it —
-     via `certificateSeries[].obligationIds` and `comparisonBaselines` — so a user
-     sees which measured signal supports which obligation (VISION §6 legibility).
-   - Scope: `viewer/src/certificateLanes.ts` and `viewer/src/verificationPanel.ts`
-     (obligation selection → lane/baseline emphasis), `viewer/src/styles.css`, and
-     visual coverage in `viewer/tests/visual.spec.ts`.
-   - Acceptance: Selecting an obligation emphasizes only the lanes/baselines that
-     reference it, selection clears when the problem changes, obligations with no
-     referencing lane stay interaction-free, and visual tests cover the
-     emphasis/clear behavior. Frontend-only — uses already-exported links.
-
-2. **FE-016: Download the selected verification problem as a backend-agnostic
+1. **FE-016: Download the selected verification problem as a backend-agnostic
    artifact**
    - Goal: Realize the Definition of Success "export a backend-agnostic
      verification problem that an external tool can attempt to discharge" by
@@ -58,6 +45,22 @@ Each task should use this structure:
      viewer-shaped payload) for the active problem, is absent/inert when no IR
      artifact is published, and visual tests cover the affordance. **Depends on
      BE-032** publishing the IR artifact and a path to it in the viewer export.
+
+2. **FE-017: Reverse-link a certificate lane to the obligations it bears on**
+   - Goal: Complete the bidirectional evidence↔obligation mapping started in
+     FE-015 — selecting a certificate lane emphasizes the obligation rows/cards it
+     references (via the lane's `data-obligations`), so a measured signal leads
+     back to the obligations it supports (VISION §6 legibility).
+   - Scope: `viewer/src/certificateLanes.ts` (lane selection → callback with the
+     lane's obligation ids), `viewer/src/verificationStage.ts` and
+     `viewer/src/main.ts` (forward the selection to the panel),
+     `viewer/src/verificationPanel.ts` (emphasize the matching obligation
+     rows/cards), `viewer/src/styles.css`, and visual coverage in
+     `viewer/tests/visual.spec.ts`.
+   - Acceptance: Selecting a lane emphasizes only the obligations it references,
+     selection clears when the problem changes, lanes with no obligation stay
+     interaction-free, and visual tests cover the emphasis/clear behavior.
+     Frontend-only — uses already-exported links.
 
 ## Backend Queue
 

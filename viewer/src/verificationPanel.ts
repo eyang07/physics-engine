@@ -157,6 +157,12 @@ export class VerificationPanel {
   private readonly obligationCards = new Map<string, HTMLElement>();
   private readonly assumptionCards = new Map<string, HTMLElement>();
 
+  // The obligation whose measured evidence (certificate lanes) is currently
+  // emphasized, and a hook the host wires to the certificate lanes. Selection is
+  // per-problem and resets on every render.
+  private selectedEvidenceObligation: string | null = null;
+  onEvidenceSelect: (obligationId: string | null) => void = () => {};
+
   constructor(private readonly container: HTMLElement) {}
 
   clear(): void {
@@ -176,6 +182,7 @@ export class VerificationPanel {
   render(problem: VerificationProblem): void {
     this.obligationCards.clear();
     this.assumptionCards.clear();
+    this.selectedEvidenceObligation = null;
     this.container.replaceChildren();
     const root = el("article", "verif-doc");
 
@@ -459,9 +466,15 @@ export class VerificationPanel {
     const node = section("Proof obligations", "verifObligations");
     const regionName = new Map(problem.regions.map((region) => [region.id, region.name]));
     const assumptionIds = new Set(problem.assumptions.map((assumption) => assumption.id));
+    // Obligations a certificate lane bears on: only these expose the evidence
+    // affordance, so an obligation with no referencing lane stays inert.
+    const laneObligationIds = new Set<string>();
+    for (const series of problem.trajectory?.certificateSeries ?? []) {
+      series.obligationIds.forEach((id) => laneObligationIds.add(id));
+    }
     const list = el("div", "verif-cards");
     problem.obligations.forEach((obligation) => {
-      list.append(this.obligationCard(obligation, regionName, assumptionIds));
+      list.append(this.obligationCard(obligation, regionName, assumptionIds, laneObligationIds));
     });
     node.append(list);
     return node;
@@ -521,6 +534,7 @@ export class VerificationPanel {
     obligation: IrObligation,
     regionName: Map<string, string>,
     assumptionIds: Set<string>,
+    laneObligationIds: Set<string>,
   ): HTMLElement {
     const card = el("div", "verif-card");
     card.id = obligationCardId(obligation.id);
@@ -563,7 +577,35 @@ export class VerificationPanel {
     if (obligation.description) {
       card.append(el("p", "verif-card__desc", obligation.description));
     }
+
+    // Only obligations a certificate lane bears on can highlight their measured
+    // evidence; the rest expose no affordance.
+    if (laneObligationIds.has(obligation.id)) {
+      const toggle = el("button", "verif-evidence-toggle", "highlight measured evidence");
+      toggle.type = "button";
+      toggle.dataset.obligation = obligation.id;
+      toggle.setAttribute("aria-pressed", "false");
+      toggle.addEventListener("click", () => this.toggleEvidence(obligation.id));
+      card.append(toggle);
+    }
     return card;
+  }
+
+  // Toggle which obligation's measured evidence is emphasized in the certificate
+  // lanes, syncing the pressed state of every evidence toggle and notifying the
+  // host. Re-selecting the active obligation clears the emphasis.
+  private toggleEvidence(obligationId: string): void {
+    this.selectedEvidenceObligation =
+      this.selectedEvidenceObligation === obligationId ? null : obligationId;
+    this.container
+      .querySelectorAll<HTMLButtonElement>(".verif-evidence-toggle")
+      .forEach((toggle) => {
+        toggle.setAttribute(
+          "aria-pressed",
+          String(toggle.dataset.obligation === this.selectedEvidenceObligation),
+        );
+      });
+    this.onEvidenceSelect(this.selectedEvidenceObligation);
   }
 
   // Measured proof-status surface: where the backend sampled each obligation

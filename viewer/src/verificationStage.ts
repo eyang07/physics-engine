@@ -453,6 +453,11 @@ export class VerificationStage {
     this.legend.hidden = false;
   }
 
+  /** Emphasize the certificate lanes bearing on an obligation (null clears). */
+  emphasizeCertificates(obligationId: string | null): void {
+    this.certificateLanes.setEmphasis(obligationId);
+  }
+
   clear(): void {
     this.certificateLanes.clear();
     this.clock.reset();

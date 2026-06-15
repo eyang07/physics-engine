@@ -15,6 +15,8 @@ import type { CertificateSeries } from "./data/trajectory";
 import { clamp } from "./util";
 
 type Lane = {
+  row: HTMLElement;
+  obligationIds: string[];
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   values: number[];
@@ -111,6 +113,21 @@ export class CertificateLanes {
     this.lanes.forEach((lane) => drawLane(lane, phase));
   }
 
+  // Emphasize the lanes that bear on a selected obligation and dim the rest; a
+  // null selection clears all emphasis. Lets the obligation surfaces show which
+  // measured signal supports which obligation.
+  setEmphasis(obligationId: string | null): void {
+    this.lanes.forEach((lane) => {
+      lane.row.classList.remove("diagnostic--emphasized", "diagnostic--dimmed");
+      if (obligationId === null) {
+        return;
+      }
+      lane.row.classList.add(
+        lane.obligationIds.includes(obligationId) ? "diagnostic--emphasized" : "diagnostic--dimmed",
+      );
+    });
+  }
+
   private buildRow(record: CertificateSeries, series: Record<string, number[]>): void {
     const values = series[record.series];
     if (!values || values.length === 0) {
@@ -124,6 +141,7 @@ export class CertificateLanes {
 
     const row = document.createElement("div");
     row.className = "diagnostic";
+    row.dataset.obligations = record.obligationIds.join(" ");
 
     const head = document.createElement("div");
     head.className = "diagnostic__head";
@@ -147,7 +165,15 @@ export class CertificateLanes {
 
     const laneCtx = lane.getContext("2d");
     if (laneCtx) {
-      this.lanes.push({ canvas: lane, ctx: laneCtx, values, baseline, amplitude });
+      this.lanes.push({
+        row,
+        obligationIds: record.obligationIds,
+        canvas: lane,
+        ctx: laneCtx,
+        values,
+        baseline,
+        amplitude,
+      });
     }
   }
 }

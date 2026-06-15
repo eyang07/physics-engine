@@ -521,6 +521,46 @@ select {
   color: var(--text-muted);
 }
 
+.verif-evidence-toggle {
+  justify-self: start;
+  margin: 0;
+  padding: 3px 10px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.verif-evidence-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.verif-evidence-toggle:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.verif-evidence-toggle[aria-pressed="true"] {
+  color: var(--ink-900);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.diagnostic--emphasized {
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: rgba(240, 180, 106, 0.08);
+}
+
+.diagnostic--dimmed {
+  opacity: 0.4;
+}
+
 .verif-ladder {
   list-style: none;
   margin: 0;

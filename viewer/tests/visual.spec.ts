@@ -931,6 +931,96 @@ for (const viewport of [
     });
   });
 
+  test(`Verification obligation evidence emphasizes its certificate lanes at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    // No lane emphasis until an obligation's evidence is selected.
+    await expect(page.locator("#verificationCertificateLanes .diagnostic--emphasized")).toHaveCount(
+      0,
+    );
+
+    // The non-increase obligation bears on exactly the flow-derivative lane;
+    // selecting its evidence emphasizes only that lane and dims the rest.
+    const toggle = page.locator(
+      '#verif-obligation-energy-barrier-non-increase .verif-evidence-toggle',
+    );
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const emphasized = page.locator("#verificationCertificateLanes .diagnostic--emphasized");
+    await expect(emphasized).toHaveCount(1);
+    await expect(emphasized).toHaveAttribute("data-obligations", /energy-barrier-non-increase/);
+    await expect(
+      page.locator("#verificationCertificateLanes .diagnostic--dimmed"),
+    ).toHaveCount(1);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-evidence-emphasis.png`),
+    });
+
+    // Re-selecting clears the emphasis.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator("#verificationCertificateLanes .diagnostic--emphasized")).toHaveCount(
+      0,
+    );
+    await expect(page.locator("#verificationCertificateLanes .diagnostic--dimmed")).toHaveCount(0);
+  });
+
+  test(`Verification evidence selection clears when the problem changes at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    await page
+      .locator("#verif-obligation-energy-barrier-non-increase .verif-evidence-toggle")
+      .click();
+    await expect(page.locator("#verificationCertificateLanes .diagnostic--emphasized")).toHaveCount(
+      1,
+    );
+
+    // Switching problems rebuilds the lanes, dropping any prior emphasis.
+    await page.locator("#verificationCatalog .catalog-item").nth(1).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+    await expect(page.locator("#verificationCertificateLanes .diagnostic--emphasized")).toHaveCount(
+      0,
+    );
+  });
+
+  test(`Verification obligation without a certificate lane has no evidence affordance at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Inject an obligation that no certificate series references; it must expose
+    // no evidence toggle while the lane-backed obligations still do.
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.obligations.push({ id: "extra-untested" });
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    await expect(
+      page.locator("#verif-obligation-extra-untested .verif-evidence-toggle"),
+    ).toHaveCount(0);
+    // The three lane-backed obligations still expose the affordance.
+    await expect(page.locator("#verifObligations .verif-evidence-toggle")).toHaveCount(3);
+  });
+
   test(`Verification header echoes the selected problem counts at ${viewport.name}`, async ({
     page,
   }, testInfo) => {
