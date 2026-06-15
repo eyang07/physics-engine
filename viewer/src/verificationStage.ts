@@ -458,6 +458,12 @@ export class VerificationStage {
     this.certificateLanes.setEmphasis(obligationId);
   }
 
+  /** Notify when a certificate lane is selected, with the obligations it bears
+   * on (null clears), so the host can emphasize them. */
+  setOnCertificateSelect(handler: (obligationIds: string[] | null) => void): void {
+    this.certificateLanes.onSelect = handler;
+  }
+
   clear(): void {
     this.certificateLanes.clear();
     this.clock.reset();

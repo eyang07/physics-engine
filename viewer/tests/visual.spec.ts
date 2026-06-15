@@ -1079,6 +1079,93 @@ for (const viewport of [
     await expect(page.locator(".verif-download-ir")).toHaveCount(0);
   });
 
+  test(`Verification certificate lane emphasizes the obligations it bears on at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    // No obligation is referenced until a lane is selected.
+    await expect(page.locator("#verificationContent .verif-card--referenced")).toHaveCount(0);
+
+    // The flow-derivative lane bears on the non-increase obligation; selecting it
+    // emphasizes exactly that obligation card and ledger row.
+    const lane = page.locator(
+      '#verificationCertificateLanes [data-obligations~="energy-barrier-non-increase"]',
+    );
+    await lane.click();
+    await expect(lane).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.locator("#verif-obligation-energy-barrier-non-increase"),
+    ).toHaveClass(/verif-card--referenced/);
+    await expect(page.locator("#verificationContent .verif-card--referenced")).toHaveCount(1);
+    await expect(
+      page.locator("#verifLedger .verif-ledger__row--referenced"),
+    ).toHaveCount(1);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-lane-to-obligation.png`),
+    });
+
+    // Re-selecting the lane clears the emphasis.
+    await lane.click();
+    await expect(lane).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator("#verificationContent .verif-card--referenced")).toHaveCount(0);
+  });
+
+  test(`Verification lane selection clears when the problem changes at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    await page
+      .locator('#verificationCertificateLanes [data-obligations~="energy-barrier-non-increase"]')
+      .click();
+    await expect(page.locator("#verificationContent .verif-card--referenced")).toHaveCount(1);
+
+    await page.locator("#verificationCatalog .catalog-item").nth(1).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+    await expect(page.locator("#verificationContent .verif-card--referenced")).toHaveCount(0);
+  });
+
+  test(`Verification certificate lane with no obligation stays inert at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Inject a certificate series that references no obligation; its lane must
+    // not be selectable while the obligation-backed lanes still are.
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      const first = json.trajectory.certificateSeries[0];
+      json.trajectory.certificateSeries.push({
+        ...first,
+        obligationIds: [],
+        comparisonBaselines: [],
+        label: "unlinked series",
+      });
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    await expect(page.locator("#verificationCertificateLanes .diagnostic")).toHaveCount(3);
+    // Only the two obligation-backed lanes are selectable.
+    await expect(
+      page.locator("#verificationCertificateLanes .diagnostic--selectable"),
+    ).toHaveCount(2);
+  });
+
   test(`Verification header echoes the selected problem counts at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

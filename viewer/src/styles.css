@@ -583,6 +583,35 @@ select {
   opacity: 0.4;
 }
 
+.diagnostic--selectable {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.diagnostic--selectable:hover {
+  box-shadow: inset 0 0 0 1px var(--hairline-strong);
+}
+
+.diagnostic--selectable:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.diagnostic--selected {
+  box-shadow: inset 2px 0 0 0 var(--accent);
+  background: rgba(240, 180, 106, 0.08);
+}
+
+.verif-card--referenced {
+  border-color: var(--accent);
+  background: rgba(240, 180, 106, 0.08);
+}
+
+.verif-ledger__row--referenced {
+  border-radius: var(--radius-sm);
+  box-shadow: inset 2px 0 0 0 var(--accent);
+}
+
 .verif-ladder {
   list-style: none;
   margin: 0;

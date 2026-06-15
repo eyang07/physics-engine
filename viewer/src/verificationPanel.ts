@@ -371,6 +371,7 @@ export class VerificationPanel {
     const list = el("ul", "verif-ledger");
     problem.obligations.forEach((obligation) => {
       const row = el("li", "verif-ledger__row");
+      row.dataset.obligation = obligation.id;
       const name = el("button", "verif-ledger__name", obligation.name);
       name.type = "button";
       name.addEventListener("click", () => this.jumpToObligation(obligation.id));
@@ -521,6 +522,25 @@ export class VerificationPanel {
 
   private jumpToObligation(obligationId: string): void {
     this.emphasizeCard(this.obligationCards.get(obligationId));
+  }
+
+  // Emphasize the obligations a selected certificate lane bears on (null clears),
+  // completing the evidence -> obligation direction. Marks both the obligation
+  // cards and their ledger rows.
+  emphasizeObligations(obligationIds: string[] | null): void {
+    const targeted = obligationIds === null ? null : new Set(obligationIds);
+    this.obligationCards.forEach((card, id) => {
+      card.classList.toggle("verif-card--referenced", targeted !== null && targeted.has(id));
+    });
+    this.container
+      .querySelectorAll<HTMLElement>(".verif-ledger__row")
+      .forEach((row) => {
+        const id = row.dataset.obligation;
+        row.classList.toggle(
+          "verif-ledger__row--referenced",
+          targeted !== null && id !== undefined && targeted.has(id),
+        );
+      });
   }
 
   private jumpToAssumption(assumptionId: string): void {

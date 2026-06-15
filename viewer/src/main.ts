@@ -123,6 +123,11 @@ const verificationStage = new VerificationStage(
 // lanes that bear on it (both live in the Verification domain).
 verificationPanel.onEvidenceSelect = (obligationId) =>
   verificationStage.emphasizeCertificates(obligationId);
+// The reverse direction: selecting a certificate lane emphasizes the obligations
+// it bears on in the document.
+verificationStage.setOnCertificateSelect((obligationIds) =>
+  verificationPanel.emphasizeObligations(obligationIds),
+);
 const clock = new PlaybackClock();
 
 type Domain = "systems" | "verification";

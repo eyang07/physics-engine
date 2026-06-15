@@ -92,6 +92,11 @@ function prepareCanvas(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D)
 
 export class CertificateLanes {
   private lanes: Lane[] = [];
+  private selectedRow: HTMLElement | null = null;
+
+  // Notified when a lane is selected (with the obligations it bears on) or
+  // cleared (null), so the host can emphasize the matching obligations.
+  onSelect: (obligationIds: string[] | null) => void = () => {};
 
   constructor(private readonly container: HTMLElement) {}
 
@@ -102,6 +107,7 @@ export class CertificateLanes {
   clear(): void {
     this.container.replaceChildren();
     this.lanes = [];
+    this.selectedRow = null;
   }
 
   show(series: Record<string, number[]>, records: CertificateSeries[]): void {
@@ -111,6 +117,25 @@ export class CertificateLanes {
 
   update(phase: number): void {
     this.lanes.forEach((lane) => drawLane(lane, phase));
+  }
+
+  // Select a lane (by its row) to reveal the obligations it bears on, or clear
+  // the selection. Re-selecting the active lane clears it.
+  private toggleSelect(row: HTMLElement, obligationIds: string[]): void {
+    const clearing = this.selectedRow === row;
+    if (this.selectedRow) {
+      this.selectedRow.classList.remove("diagnostic--selected");
+      this.selectedRow.setAttribute("aria-pressed", "false");
+    }
+    if (clearing) {
+      this.selectedRow = null;
+      this.onSelect(null);
+      return;
+    }
+    this.selectedRow = row;
+    row.classList.add("diagnostic--selected");
+    row.setAttribute("aria-pressed", "true");
+    this.onSelect([...obligationIds]);
   }
 
   // Emphasize the lanes that bear on a selected obligation and dim the rest; a
@@ -142,6 +167,21 @@ export class CertificateLanes {
     const row = document.createElement("div");
     row.className = "diagnostic";
     row.dataset.obligations = record.obligationIds.join(" ");
+    // A lane that bears on obligations is selectable: activating it reveals which
+    // obligations the measured signal supports. Lanes with none stay inert.
+    if (record.obligationIds.length > 0) {
+      row.classList.add("diagnostic--selectable");
+      row.setAttribute("role", "button");
+      row.setAttribute("aria-pressed", "false");
+      row.tabIndex = 0;
+      row.addEventListener("click", () => this.toggleSelect(row, record.obligationIds));
+      row.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          this.toggleSelect(row, record.obligationIds);
+        }
+      });
+    }
 
     const head = document.createElement("div");
     head.className = "diagnostic__head";
