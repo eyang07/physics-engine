@@ -161,6 +161,9 @@ export class VerificationPanel {
     };
 
     root.append(this.renderHeader(problem, sections));
+    if (problem.obligations.length > 0) {
+      root.append(this.renderObligationLedger(problem));
+    }
     if (problem.dynamics) {
       root.append(this.renderDynamics(problem));
     }
@@ -241,6 +244,46 @@ export class VerificationPanel {
     const chip = el("span", "verif-count", text);
     chip.dataset.count = label;
     return chip;
+  }
+
+  // An at-a-glance, honestly labeled safety picture: one row per obligation with
+  // its worst measured outcome and a reminder that it still awaits external
+  // discharge. Each row jumps to the obligation's full card. The measured
+  // outcome is evidence only — never a proof.
+  private renderObligationLedger(problem: VerificationProblem): HTMLElement {
+    const node = section("Obligations at a glance", "verifLedger");
+    node.append(
+      el(
+        "p",
+        "verif-meta",
+        "Measured outcomes only — a clean sample is not a proof; every obligation still awaits external discharge.",
+      ),
+    );
+
+    // Worst measured outcome per obligation: a violation dominates a hold, and an
+    // obligation with no sampled status reads as not sampled.
+    const rank = (status: string): number =>
+      status === "measured-violated" ? 2 : status === "measured-holds" ? 1 : 0;
+    const outcomeByObligation = new Map<string, string>();
+    for (const status of problem.proofStatuses) {
+      const prev = outcomeByObligation.get(status.obligationId);
+      if (prev === undefined || rank(status.status) > rank(prev)) {
+        outcomeByObligation.set(status.obligationId, status.status);
+      }
+    }
+
+    const list = el("ul", "verif-ledger");
+    problem.obligations.forEach((obligation) => {
+      const row = el("li", "verif-ledger__row");
+      const name = el("button", "verif-ledger__name", obligation.name);
+      name.type = "button";
+      name.addEventListener("click", () => this.jumpToObligation(obligation.id));
+      const outcome = outcomeByObligation.get(obligation.id) ?? "external-required";
+      row.append(name, this.proofStatusBadge(outcome), rigorBadge(obligation.rigor));
+      list.append(row);
+    });
+    node.append(list);
+    return node;
   }
 
   private renderDynamics(problem: VerificationProblem): HTMLElement {

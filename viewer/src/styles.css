@@ -521,6 +521,46 @@ select {
   color: var(--text-muted);
 }
 
+.verif-ledger {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.verif-ledger__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.verif-ledger__name {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dotted transparent;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.verif-ledger__name:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.verif-ledger__name:focus-visible {
+  outline: none;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .verif-meta {
   margin: 0;
   color: var(--text-muted);

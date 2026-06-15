@@ -847,6 +847,62 @@ for (const viewport of [
     });
   });
 
+  test(`Verification obligation ledger summarizes outcomes and navigates at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    // One ledger row per obligation. The pendulum's obligations all hold on
+    // samples but still await external discharge — measured, never proved.
+    const rows = page.locator("#verifLedger .verif-ledger__row");
+    await expect(rows).toHaveCount(3);
+    await expect(
+      page.locator("#verifLedger .verif-status", { hasText: "holds on samples" }),
+    ).toHaveCount(3);
+    await expect(
+      page.locator("#verifLedger .verif-badge", { hasText: "external-required" }),
+    ).toHaveCount(3);
+
+    // A ledger row navigates to the obligation's full card.
+    await page.locator("#verifLedger .verif-ledger__name").first().click();
+    const targeted = page.locator("#verifObligations .verif-card--targeted");
+    await expect(targeted).toHaveCount(1);
+    await expect(targeted).toBeInViewport();
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-ledger.png`),
+    });
+  });
+
+  test(`Verification obligation ledger reads unsampled obligations as not sampled at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Inject an obligation with no measured status; its ledger row must read as
+    // not sampled rather than implying any measured outcome.
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.obligations.push({ id: "extra-untested" });
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    await expect(page.locator("#verifLedger .verif-ledger__row")).toHaveCount(4);
+    const row = page.locator("#verifLedger .verif-ledger__row", {
+      has: page.locator(".verif-ledger__name", { hasText: "extra-untested" }),
+    });
+    await expect(row.locator(".verif-status")).toHaveText("not sampled");
+  });
+
   test(`Verification header echoes the selected problem counts at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

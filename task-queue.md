@@ -32,22 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-013: Add a per-obligation status ledger to the Verification doc**
-   - Goal: Give the problem an at-a-glance, honestly labeled safety picture: one
-     compact ledger row per obligation showing its measured outcome
-     (holds/violated/not sampled), rigor badge, and standing `external-required`
-     status, so the rigor ladder (VISION §7) is legible without scanning cards.
-   - Scope: `viewer/src/verificationPanel.ts` (derive the ledger from
-     `obligations` + `proofStatuses`, placed near the header), each row links to
-     its obligation card (reuse the existing obligation-card anchors),
-     `viewer/src/styles.css`, and
-     visual coverage in `viewer/tests/visual.spec.ts`.
-   - Acceptance: Every obligation appears once with its measured outcome and a
-     never-"proved" status, obligations with no sampled status read as "not
-     sampled", a row navigates to its card, and visual tests assert the ledger
-     contents. Frontend-only — no new exported fields.
-
-2. **FE-014: Surface the rigor ladder and the problem's current level**
+1. **FE-014: Surface the rigor ladder and the problem's current level**
    - Goal: Make the four-level rigor ladder (VISION §7) explicit in the
      Verification domain and mark where the current problem sits (level 1 —
      measured evidence with `external-required` obligations) so "measured" can
@@ -61,8 +46,8 @@ Each task should use this structure:
      certification, and visual tests assert the marked level and labels.
      Frontend-only — derives level from already-exported rigor fields.
 
-3. **FE-015: Tie measured evidence to the obligation it bears on**
-   - Goal: Let selecting an obligation (from its card or the FE-013 ledger)
+2. **FE-015: Tie measured evidence to the obligation it bears on**
+   - Goal: Let selecting an obligation (from its card or the obligation ledger)
      highlight the certificate lane(s) and comparison baseline that bear on it —
      via `certificateSeries[].obligationIds` and `comparisonBaselines` — so a user
      sees which measured signal supports which obligation (VISION §6 legibility).
@@ -74,7 +59,7 @@ Each task should use this structure:
      referencing lane stay interaction-free, and visual tests cover the
      emphasis/clear behavior. Frontend-only — uses already-exported links.
 
-4. **FE-016: Download the selected verification problem as a backend-agnostic
+3. **FE-016: Download the selected verification problem as a backend-agnostic
    artifact**
    - Goal: Realize the Definition of Success "export a backend-agnostic
      verification problem that an external tool can attempt to discharge" by
