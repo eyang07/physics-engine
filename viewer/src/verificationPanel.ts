@@ -41,6 +41,33 @@ const ROLE_LABEL: Record<string, string> = {
   domain: "domain",
 };
 
+// The four-level rigor ladder (VISION §7), in order. The engine operates at
+// level 1 (measured evidence); levels 2-4 are reached only by routing exported
+// artifacts to external backends, never by the engine itself. The copy must
+// never imply this engine proves or certifies anything.
+const RIGOR_LADDER: ReadonlyArray<{ level: number; title: string; note: string }> = [
+  {
+    level: 1,
+    title: "Measured / simulation-supported",
+    note: "Behavior observed in numerical runs — exploratory evidence only, not a proof.",
+  },
+  {
+    level: 2,
+    title: "Certified numerical bounds",
+    note: "Rigorous enclosures from validated numerics, under stated assumptions.",
+  },
+  {
+    level: 3,
+    title: "Reachability / SOS / barrier / Lyapunov-certified",
+    note: "A certificate accepted by a sound method, under stated assumptions.",
+  },
+  {
+    level: 4,
+    title: "Deductively proved",
+    note: "A theorem established in a prover or proof calculus.",
+  },
+];
+
 // The rigor ladder, rendered honestly. The engine never emits "proved" or
 // "certified"; these are the only labels it can produce, and we surface them
 // verbatim with a plain-language gloss.
@@ -161,6 +188,7 @@ export class VerificationPanel {
     };
 
     root.append(this.renderHeader(problem, sections));
+    root.append(this.renderRigorLadder(problem));
     if (problem.obligations.length > 0) {
       root.append(this.renderObligationLedger(problem));
     }
@@ -244,6 +272,53 @@ export class VerificationPanel {
     const chip = el("span", "verif-count", text);
     chip.dataset.count = label;
     return chip;
+  }
+
+  // The rigor level this problem currently sits at. The engine emits only
+  // measured evidence, so unless a status reports an external discharge the
+  // problem is at level 1. Levels 2-4 are reached only through external
+  // backends, never inferred from the engine's own output.
+  private currentRigorLevel(problem: VerificationProblem): number {
+    const discharged = problem.proofStatuses.some(
+      (status) => status.externalStatus !== "" && status.externalStatus !== "external-required",
+    );
+    return discharged ? 0 : 1;
+  }
+
+  // The four-level rigor ladder with the problem's current level marked, so a
+  // measured outcome can never be read as a proof or certificate (VISION §7).
+  private renderRigorLadder(problem: VerificationProblem): HTMLElement {
+    const node = section("Rigor level", "verifRigorLadder");
+    node.append(
+      el(
+        "p",
+        "verif-meta",
+        "The engine generates candidates and obligations; external sound methods discharge them. This problem sits at the measured level — evidence, not proof.",
+      ),
+    );
+
+    const current = this.currentRigorLevel(problem);
+    const list = el("ol", "verif-ladder");
+    RIGOR_LADDER.forEach((step) => {
+      const item = el("li", "verif-ladder__step");
+      item.dataset.level = String(step.level);
+      const isCurrent = step.level === current;
+      if (isCurrent) {
+        item.classList.add("verif-ladder__step--current");
+        item.setAttribute("aria-current", "step");
+      }
+      const head = el("div", "verif-ladder__head");
+      head.append(el("span", "verif-ladder__rank", String(step.level)));
+      head.append(el("span", "verif-ladder__title", step.title));
+      if (isCurrent) {
+        head.append(el("span", "verif-ladder__here", "current"));
+      }
+      item.append(head);
+      item.append(el("p", "verif-ladder__note", step.note));
+      list.append(item);
+    });
+    node.append(list);
+    return node;
   }
 
   // An at-a-glance, honestly labeled safety picture: one row per obligation with

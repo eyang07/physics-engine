@@ -32,21 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-014: Surface the rigor ladder and the problem's current level**
-   - Goal: Make the four-level rigor ladder (VISION §7) explicit in the
-     Verification domain and mark where the current problem sits (level 1 —
-     measured evidence with `external-required` obligations) so "measured" can
-     never be read as "proved".
-   - Scope: `viewer/src/verificationPanel.ts` (a rigor-ladder legend that derives
-     the current level from the problem's statuses/obligation rigor),
-     `viewer/src/styles.css`, and visual coverage in
-     `viewer/tests/visual.spec.ts`.
-   - Acceptance: The ladder lists all four levels with the current one marked at
-     level 1 for the exported case studies, the copy never implies proof or
-     certification, and visual tests assert the marked level and labels.
-     Frontend-only — derives level from already-exported rigor fields.
-
-2. **FE-015: Tie measured evidence to the obligation it bears on**
+1. **FE-015: Tie measured evidence to the obligation it bears on**
    - Goal: Let selecting an obligation (from its card or the obligation ledger)
      highlight the certificate lane(s) and comparison baseline that bear on it —
      via `certificateSeries[].obligationIds` and `comparisonBaselines` — so a user
@@ -59,7 +45,7 @@ Each task should use this structure:
      referencing lane stay interaction-free, and visual tests cover the
      emphasis/clear behavior. Frontend-only — uses already-exported links.
 
-3. **FE-016: Download the selected verification problem as a backend-agnostic
+2. **FE-016: Download the selected verification problem as a backend-agnostic
    artifact**
    - Goal: Realize the Definition of Success "export a backend-agnostic
      verification problem that an external tool can attempt to discharge" by

@@ -903,6 +903,34 @@ for (const viewport of [
     await expect(row.locator(".verif-status")).toHaveText("not sampled");
   });
 
+  test(`Verification rigor ladder marks the problem at the measured level at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    // All four rigor levels are listed.
+    const steps = page.locator("#verifRigorLadder .verif-ladder__step");
+    await expect(steps).toHaveCount(4);
+
+    // Exactly one is marked current, and it is level 1 (measured evidence).
+    const current = page.locator("#verifRigorLadder .verif-ladder__step--current");
+    await expect(current).toHaveCount(1);
+    await expect(current).toHaveAttribute("data-level", "1");
+    await expect(current).toContainText("Measured");
+
+    // The current marker must never imply proof or certification.
+    const currentText = ((await current.textContent()) ?? "").toLowerCase();
+    expect(currentText).not.toContain("proved");
+    expect(currentText).not.toContain("certified");
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-rigor-ladder.png`),
+    });
+  });
+
   test(`Verification header echoes the selected problem counts at ${viewport.name}`, async ({
     page,
   }, testInfo) => {
