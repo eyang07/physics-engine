@@ -789,6 +789,64 @@ for (const viewport of [
     await expect(page.locator("button.verif-card__name--jump")).toHaveCount(3);
   });
 
+  test(`Verification obligations without assumptions show no assumption affordance at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    // The exported case studies carry no assumptions, so obligation cards expose
+    // no "assumes:" affordance — and no broken chrome.
+    await expect(
+      page.locator("#verifObligations .verif-card__links-label", { hasText: "assumes:" }),
+    ).toHaveCount(0);
+  });
+
+  test(`Verification obligation assumption link jumps to its assumption card at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Inject an assumption plus an obligation that depends on it (and on an
+    // unknown assumption id), since the exported problems carry none.
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.assumptions = [{ id: "small-angle", description: "theta stays near upright" }];
+      json.obligations[0].assumptionIds = ["small-angle", "ghost-assumption"];
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    // The known assumption is an interactive jump; the unknown id stays inert.
+    const known = page.locator("#verifObligations button.verif-link--jump", {
+      hasText: "small-angle",
+    });
+    await expect(known).toHaveCount(1);
+    await expect(
+      page.locator("#verifObligations code.verif-link", { hasText: "ghost-assumption" }),
+    ).toHaveCount(1);
+    await expect(
+      page.locator("#verifObligations button.verif-link--jump", { hasText: "ghost-assumption" }),
+    ).toHaveCount(0);
+
+    // Activating the known assumption scrolls to and emphasizes its card.
+    await known.click();
+    const card = page.locator("#verif-assumption-small-angle");
+    await expect(card).toHaveClass(/verif-card--targeted/);
+    await expect(card).toBeInViewport();
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-assumption-jump.png`),
+    });
+  });
+
   test(`Verification header echoes the selected problem counts at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

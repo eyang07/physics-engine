@@ -98,6 +98,12 @@ function obligationCardId(obligationId: string): string {
   return `verif-obligation-${obligationId.replace(/[^a-z0-9-]/gi, "-")}`;
 }
 
+// A stable DOM id for an assumption card so an obligation's assumption links can
+// scroll to it.
+function assumptionCardId(assumptionId: string): string {
+  return `verif-assumption-${assumptionId.replace(/[^a-z0-9-]/gi, "-")}`;
+}
+
 function section(title: string, id?: string): HTMLElement {
   const node = el("section", "verif-section");
   if (id) {
@@ -118,14 +124,17 @@ function comparisonLatex(comparison: string): string {
 }
 
 export class VerificationPanel {
-  // Obligation id -> its rendered card, rebuilt per problem so cross-references
-  // (candidate obligation links today) can scroll to and emphasize the target.
+  // Card registries (id -> rendered card), rebuilt per problem so cross-references
+  // can scroll to and emphasize their target: obligation cards (candidate and
+  // measured-status links) and assumption cards (obligation assumption links).
   private readonly obligationCards = new Map<string, HTMLElement>();
+  private readonly assumptionCards = new Map<string, HTMLElement>();
 
   constructor(private readonly container: HTMLElement) {}
 
   clear(): void {
     this.obligationCards.clear();
+    this.assumptionCards.clear();
     this.container.replaceChildren();
   }
 
@@ -139,6 +148,7 @@ export class VerificationPanel {
 
   render(problem: VerificationProblem): void {
     this.obligationCards.clear();
+    this.assumptionCards.clear();
     this.container.replaceChildren();
     const root = el("article", "verif-doc");
 
@@ -330,12 +340,25 @@ export class VerificationPanel {
   private renderObligations(problem: VerificationProblem): HTMLElement {
     const node = section("Proof obligations", "verifObligations");
     const regionName = new Map(problem.regions.map((region) => [region.id, region.name]));
+    const assumptionIds = new Set(problem.assumptions.map((assumption) => assumption.id));
     const list = el("div", "verif-cards");
     problem.obligations.forEach((obligation) => {
-      list.append(this.obligationCard(obligation, regionName));
+      list.append(this.obligationCard(obligation, regionName, assumptionIds));
     });
     node.append(list);
     return node;
+  }
+
+  // A reference from an obligation to an assumption it depends on. A known
+  // assumption scrolls to its card; an unknown id stays an inert code label.
+  private assumptionLink(assumptionId: string, assumptionIds: Set<string>): HTMLElement {
+    if (!assumptionIds.has(assumptionId)) {
+      return el("code", "verif-link", assumptionId);
+    }
+    const link = el("button", "verif-link verif-link--jump", assumptionId);
+    link.type = "button";
+    link.addEventListener("click", () => this.jumpToAssumption(assumptionId));
+    return link;
   }
 
   // A reference to an obligation from another card. When the obligation is part
@@ -351,10 +374,17 @@ export class VerificationPanel {
     return link;
   }
 
-  // Scroll the matching obligation card into view and re-trigger a brief pulse so
-  // the navigated-to obligation is locatable.
   private jumpToObligation(obligationId: string): void {
-    const card = this.obligationCards.get(obligationId);
+    this.emphasizeCard(this.obligationCards.get(obligationId));
+  }
+
+  private jumpToAssumption(assumptionId: string): void {
+    this.emphasizeCard(this.assumptionCards.get(assumptionId));
+  }
+
+  // Scroll a referenced card into view and re-trigger a brief pulse so the
+  // navigated-to card is locatable. A missing card is a no-op.
+  private emphasizeCard(card: HTMLElement | undefined): void {
     if (!card) {
       return;
     }
@@ -372,6 +402,7 @@ export class VerificationPanel {
   private obligationCard(
     obligation: IrObligation,
     regionName: Map<string, string>,
+    assumptionIds: Set<string>,
   ): HTMLElement {
     const card = el("div", "verif-card");
     card.id = obligationCardId(obligation.id);
@@ -398,6 +429,18 @@ export class VerificationPanel {
       meta.textContent = `on ${name}`;
     }
     card.append(meta);
+
+    // The assumptions this obligation depends on: "valid only under stated
+    // assumptions". Linked to their cards when present; absent when there are
+    // none, so no empty affordance is shown.
+    if (obligation.assumptionIds.length > 0) {
+      const assumptions = el("p", "verif-card__links");
+      assumptions.append(el("span", "verif-card__links-label", "assumes:"));
+      obligation.assumptionIds.forEach((id) => {
+        assumptions.append(this.assumptionLink(id, assumptionIds));
+      });
+      card.append(assumptions);
+    }
 
     if (obligation.description) {
       card.append(el("p", "verif-card__desc", obligation.description));
@@ -495,6 +538,8 @@ export class VerificationPanel {
     const list = el("div", "verif-cards");
     problem.assumptions.forEach((assumption) => {
       const card = el("div", "verif-card");
+      card.id = assumptionCardId(assumption.id);
+      this.assumptionCards.set(assumption.id, card);
       card.append(el("strong", "verif-card__name", assumption.id));
       if (assumption.expression) {
         const expr = el("div", "verif-card__set");
