@@ -19,6 +19,20 @@ _ASSUMPTION_COMPARISONS = (*_ORDER_COMPARISONS, "=", "!=")
 _PROOF_STATUSES = ("external-required", "measured-holds", "measured-violated")
 
 
+def _require(data: Mapping[str, Any], key: str, owner: str) -> Any:
+    """Fetch a required key, raising a clear ``ValueError`` if it is absent."""
+
+    if not isinstance(data, Mapping):
+        raise ValueError(f"{owner} payload must be a mapping")
+    if key not in data:
+        raise ValueError(f"{owner} payload missing required key {key!r}")
+    return data[key]
+
+
+def _floats(values: Any) -> tuple[float, ...]:
+    return tuple(float(value) for value in values)
+
+
 @dataclass(frozen=True)
 class ExpressionSpec:
     """A symbolic expression encoded for transport, not execution."""
@@ -36,6 +50,15 @@ class ExpressionSpec:
             "latex": self.latex,
         }
 
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "ExpressionSpec":
+        return cls(
+            format=_require(data, "format", "expression"),
+            source=_require(data, "source", "expression"),
+            display=_require(data, "display", "expression"),
+            latex=_require(data, "latex", "expression"),
+        )
+
 
 @dataclass(frozen=True)
 class VariableSpec:
@@ -44,6 +67,10 @@ class VariableSpec:
 
     def to_dict(self) -> dict[str, str]:
         return {"name": self.name, "latex": self.latex}
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "VariableSpec":
+        return cls(name=_require(data, "name", "variable"), latex=_require(data, "latex", "variable"))
 
 
 @dataclass(frozen=True)
@@ -57,6 +84,15 @@ class ParameterSpec:
         if self.value is not None:
             payload["value"] = self.value
         return payload
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "ParameterSpec":
+        value = data.get("value")
+        return cls(
+            name=_require(data, "name", "parameter"),
+            latex=_require(data, "latex", "parameter"),
+            value=None if value is None else float(value),
+        )
 
 
 @dataclass(frozen=True)
@@ -86,6 +122,18 @@ class InputSpec:
         if self.upper is not None:
             payload["upper"] = self.upper
         return payload
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "InputSpec":
+        lower = data.get("lower")
+        upper = data.get("upper")
+        return cls(
+            name=_require(data, "name", "input"),
+            latex=_require(data, "latex", "input"),
+            role=_require(data, "role", "input"),
+            lower=None if lower is None else float(lower),
+            upper=None if upper is None else float(upper),
+        )
 
 
 @dataclass(frozen=True)
@@ -133,6 +181,25 @@ class DynamicsSpec:
             payload["update"] = [expression.to_dict() for expression in self.rhs]
         return payload
 
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "DynamicsSpec":
+        kind = _require(data, "kind", "dynamics")
+        if kind == "continuous":
+            time_variable = _require(data, "timeVariable", "continuous dynamics")
+            rhs_key = "rhs"
+        elif kind == "discrete":
+            time_variable = _require(data, "stepVariable", "discrete dynamics")
+            rhs_key = "update"
+        else:
+            raise ValueError("dynamics kind must be 'continuous' or 'discrete'")
+        return cls(
+            kind=kind,
+            time_variable=time_variable,
+            state=tuple(_require(data, "state", "dynamics")),
+            rhs=tuple(ExpressionSpec.from_dict(item) for item in _require(data, rhs_key, "dynamics")),
+            inputs=tuple(InputSpec.from_dict(item) for item in data.get("inputs", ())),
+        )
+
 
 @dataclass(frozen=True)
 class CandidateSpec:
@@ -170,6 +237,20 @@ class CandidateSpec:
             payload["regionId"] = self.region_id
         return payload
 
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "CandidateSpec":
+        equilibrium = data.get("equilibrium")
+        return cls(
+            id=_require(data, "id", "candidate"),
+            name=_require(data, "name", "candidate"),
+            kind=_require(data, "kind", "candidate"),
+            expression=ExpressionSpec.from_dict(_require(data, "expression", "candidate")),
+            obligation_ids=tuple(_require(data, "obligationIds", "candidate")),
+            equilibrium=None if equilibrium is None else _floats(equilibrium),
+            region_id=data.get("regionId"),
+            status=data.get("status", "candidate"),
+        )
+
 
 @dataclass(frozen=True)
 class RegionSpec:
@@ -203,6 +284,19 @@ class RegionSpec:
             "level": self.level,
             "convention": self.convention,
         }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "RegionSpec":
+        return cls(
+            id=_require(data, "id", "region"),
+            name=_require(data, "name", "region"),
+            kind=_require(data, "kind", "region"),
+            role=_require(data, "role", "region"),
+            variables=tuple(_require(data, "variables", "region")),
+            expression=ExpressionSpec.from_dict(_require(data, "expression", "region")),
+            level=float(_require(data, "level", "region")),
+            convention=data.get("convention", "expression <= level"),
+        )
 
 
 @dataclass(frozen=True)
@@ -291,6 +385,33 @@ class RegionGeometrySpec:
             "note": self.note,
         }
 
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "RegionGeometrySpec":
+        plane = _require(data, "plane", "region geometry")
+        grid = _require(data, "grid", "region geometry")
+        plane_variables = tuple(_require(plane, "variables", "region geometry plane"))
+        state_axes = tuple(_require(plane, "stateAxes", "region geometry plane"))
+        return cls(
+            region_id=_require(data, "regionId", "region geometry"),
+            role=_require(data, "role", "region geometry"),
+            projection=_require(data, "projection", "region geometry"),
+            plane_variables=plane_variables,  # type: ignore[arg-type]
+            state_axes=state_axes,  # type: ignore[arg-type]
+            variable_to_state_axis=dict(_require(plane, "variableToStateAxis", "region geometry plane")),
+            x_values=_floats(_require(grid, "x", "region geometry grid")),
+            y_values=_floats(_require(grid, "y", "region geometry grid")),
+            values=tuple(_floats(row) for row in _require(grid, "values", "region geometry grid")),
+            level=float(_require(data, "level", "region geometry")),
+            convention=_require(data, "convention", "region geometry"),
+            boundary_polylines=tuple(
+                tuple((float(point[0]), float(point[1])) for point in polyline)
+                for polyline in data.get("boundaryPolylines", ())
+            ),
+            kind=data.get("kind", "scalar-field-grid"),
+            rigor=data.get("rigor", "measured"),
+            note=data.get("note", ""),
+        )
+
 
 @dataclass(frozen=True)
 class AssumptionSpec:
@@ -328,6 +449,19 @@ class AssumptionSpec:
             "variables": list(self.variables),
             "description": self.description,
         }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "AssumptionSpec":
+        return cls(
+            id=_require(data, "id", "assumption"),
+            name=_require(data, "name", "assumption"),
+            expression=ExpressionSpec.from_dict(_require(data, "expression", "assumption")),
+            comparison=_require(data, "comparison", "assumption"),
+            rhs=float(data.get("rhs", 0.0)),
+            variables=tuple(data.get("variables", ())),
+            role=data.get("role", "domain"),
+            description=data.get("description", ""),
+        )
 
 
 @dataclass(frozen=True)
@@ -369,6 +503,21 @@ class ObligationSpec:
         if self.region_id is not None:
             payload["regionId"] = self.region_id
         return payload
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "ObligationSpec":
+        return cls(
+            id=_require(data, "id", "obligation"),
+            name=_require(data, "name", "obligation"),
+            expression=ExpressionSpec.from_dict(_require(data, "expression", "obligation")),
+            comparison=_require(data, "comparison", "obligation"),
+            rhs=float(data.get("rhs", 0.0)),
+            region_id=data.get("regionId"),
+            excluded_points=tuple(_floats(point) for point in data.get("excludedPoints", ())),
+            assumption_ids=tuple(data.get("assumptionIds", ())),
+            description=data.get("description", ""),
+            rigor=data.get("rigor", "external-required"),
+        )
 
 
 @dataclass(frozen=True)
@@ -475,6 +624,37 @@ class ProofStatusSpec:
                 worst["time"] = self.worst_time
             payload["worst"] = worst
         return payload
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "ProofStatusSpec":
+        evaluation = _require(data, "evaluation", "proof status")
+        worst = data.get("worst") or {}
+        variable_to_state_axis = evaluation.get("variableToStateAxis")
+        worst_value = worst.get("value")
+        worst_point = worst.get("point")
+        worst_time = worst.get("time")
+        return cls(
+            id=_require(data, "id", "proof status"),
+            obligation_id=_require(data, "obligationId", "proof status"),
+            status=_require(data, "status", "proof status"),
+            evaluation_kind=_require(evaluation, "kind", "proof status evaluation"),
+            sample_count=int(_require(evaluation, "sampleCount", "proof status evaluation")),
+            comparison=_require(data, "comparison", "proof status"),
+            rhs=float(data.get("rhs", 0.0)),
+            candidate_id=data.get("candidateId"),
+            region_id=data.get("regionId"),
+            system=evaluation.get("system"),
+            variables=tuple(evaluation.get("variables", ())),
+            state_axes=tuple(evaluation.get("stateAxes", ())),
+            variable_to_state_axis=None if variable_to_state_axis is None else dict(variable_to_state_axis),
+            source=evaluation.get("source", ""),
+            worst_value=None if worst_value is None else float(worst_value),
+            worst_point=None if worst_point is None else _floats(worst_point),
+            worst_time=None if worst_time is None else float(worst_time),
+            rigor=data.get("rigor", "measured"),
+            external_status=data.get("externalStatus", "external-required"),
+            note=data.get("note", ""),
+        )
 
 
 @dataclass(frozen=True)
@@ -653,6 +833,43 @@ class VerificationProblem:
         output_path = Path(path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "VerificationProblem":
+        """Reconstruct a problem from its ``to_dict`` payload.
+
+        The inverse of :meth:`to_dict`: ``from_dict(to_dict(problem))`` returns an
+        equal problem. Invariants are re-checked by each spec's ``__post_init__``,
+        so a malformed payload raises ``ValueError``.
+        """
+
+        if not isinstance(data, Mapping):
+            raise ValueError("verification problem payload must be a mapping")
+        dynamics = data.get("dynamics")
+        open_loop = data.get("openLoopDynamics")
+        metadata = data.get("metadata")
+        return cls(
+            id=_require(data, "id", "verification problem"),
+            name=_require(data, "name", "verification problem"),
+            source=_require(data, "source", "verification problem"),
+            variables=tuple(VariableSpec.from_dict(item) for item in data.get("variables", ())),
+            parameters=tuple(ParameterSpec.from_dict(item) for item in data.get("parameters", ())),
+            regions=tuple(RegionSpec.from_dict(item) for item in data.get("regions", ())),
+            obligations=tuple(ObligationSpec.from_dict(item) for item in data.get("obligations", ())),
+            assumptions=tuple(AssumptionSpec.from_dict(item) for item in data.get("assumptions", ())),
+            dynamics=None if dynamics is None else DynamicsSpec.from_dict(dynamics),
+            open_loop_dynamics=None if open_loop is None else DynamicsSpec.from_dict(open_loop),
+            candidates=tuple(CandidateSpec.from_dict(item) for item in data.get("candidates", ())),
+            system=data.get("system"),
+            region_geometry=tuple(
+                RegionGeometrySpec.from_dict(item) for item in data.get("regionGeometry", ())
+            ),
+            proof_statuses=tuple(
+                ProofStatusSpec.from_dict(item) for item in data.get("proofStatuses", ())
+            ),
+            metadata=None if metadata is None else dict(metadata),
+            schema_version=data.get("schemaVersion", SCHEMA_VERSION),
+        )
 
 
 def problem_from_parts(

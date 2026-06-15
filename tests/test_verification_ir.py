@@ -21,6 +21,7 @@ from engine.verification import (
     AdapterCapabilities,
     CandidateSpec,
     DynamicsSpec,
+    ExpressionSpec,
     InputSpec,
     MALFORMED_OBLIGATION_TARGETS,
     OBLIGATION_TARGETS,
@@ -46,6 +47,11 @@ from engine.verification import (
     verification_problem_from_discrete_lyapunov,
     verification_problem_from_lyapunov,
     verification_problem_from_obligations,
+)
+from scripts.export_verification_problems import (
+    controlled_discrete_decay_problem,
+    controlled_spring_problem,
+    upright_pendulum_problem,
 )
 from systems.controlled_pendulum import build_system
 
@@ -1217,3 +1223,66 @@ def test_controlled_discrete_barrier_export_records_disturbance_law() -> None:
     assert payload["metadata"]["feedbackLaw"]["control"]["u"]["display"] == "-x/2"
     assert payload["metadata"]["feedbackLaw"]["disturbance"]["d"]["display"] == "0"
     assert payload["obligations"][0]["regionId"] == "domain-unit-interval-region"
+
+
+@pytest.mark.parametrize(
+    "build_problem",
+    [
+        upright_pendulum_problem,
+        controlled_spring_problem,
+        controlled_discrete_decay_problem,
+    ],
+    ids=["upright-pendulum", "controlled-spring", "controlled-discrete-decay"],
+)
+def test_from_dict_round_trips_exported_case_studies(build_problem) -> None:
+    problem = build_problem()
+    # The exported case studies exercise regions, geometry, candidates,
+    # assumptions, dynamics, open-loop dynamics, and measured proof statuses.
+    restored = VerificationProblem.from_dict(problem.to_dict())
+    assert restored == problem
+    # The reconstruction must itself be serializable to the same payload.
+    assert restored.to_dict() == problem.to_dict()
+
+
+def test_from_dict_round_trips_through_json() -> None:
+    problem = upright_pendulum_problem()
+    restored = VerificationProblem.from_dict(json.loads(json.dumps(problem.to_dict())))
+    assert restored == problem
+
+
+def test_from_dict_rejects_non_mapping_payloads() -> None:
+    with pytest.raises(ValueError, match="must be a mapping"):
+        VerificationProblem.from_dict(["not", "a", "mapping"])  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="expression payload must be a mapping"):
+        ExpressionSpec.from_dict("x")  # type: ignore[arg-type]
+
+
+def test_from_dict_reports_missing_required_keys() -> None:
+    payload = upright_pendulum_problem().to_dict()
+    del payload["obligations"][0]["expression"]
+    with pytest.raises(ValueError, match="obligation payload missing required key 'expression'"):
+        VerificationProblem.from_dict(payload)
+
+
+def test_from_dict_rejects_unknown_dynamics_kind() -> None:
+    payload = upright_pendulum_problem().to_dict()
+    payload["dynamics"]["kind"] = "hybrid"
+    with pytest.raises(ValueError, match="continuous.*discrete"):
+        VerificationProblem.from_dict(payload)
+
+
+def test_from_dict_re_enforces_spec_invariants() -> None:
+    payload = upright_pendulum_problem().to_dict()
+    # An out-of-range comparison must be rejected by the obligation invariant,
+    # not silently reconstructed.
+    payload["obligations"][0]["comparison"] = "=="
+    with pytest.raises(ValueError, match="comparison must be one of"):
+        VerificationProblem.from_dict(payload)
+
+
+def test_from_dict_re_enforces_problem_level_invariants() -> None:
+    payload = upright_pendulum_problem().to_dict()
+    # A dangling region reference must trip the problem-level cross-checks.
+    payload["obligations"][0]["regionId"] = "no-such-region"
+    with pytest.raises(ValueError, match="unknown obligation region id"):
+        VerificationProblem.from_dict(payload)

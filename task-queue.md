@@ -37,18 +37,7 @@ Do not add frontend tasks for now._
 
 ## Backend Queue
 
-1. **BE-033: Add a verification-problem IR loader (`from_dict`) + round-trip**
-   - Goal: Make the published backend-agnostic IR re-readable in Python so
-     external adapters and round-trip tests can consume it (today only
-     `to_dict`/`write_json` exist; nothing parses the IR back).
-   - Scope: `engine/verification/ir.py` (a `VerificationProblem.from_dict` plus
-     the spec `from_dict`s it needs), `engine/verification/__init__.py` export,
-     and `tests/test_verification_ir.py`.
-   - Acceptance: `from_dict(to_dict(problem))` reconstructs an equal problem for
-     the exported case studies (round-trip), malformed/unknown payloads raise
-     clear `ValueError`s, and the verification IR tests pass.
-
-2. **BE-034: Attach stated domain assumptions to the exported case studies**
+1. **BE-034: Attach stated domain assumptions to the exported case studies**
    - Goal: Give each obligation the domain assumptions its candidate
      construction actually relies on (e.g. validity near the Hurwitz / upright
      equilibrium, control within actuator bounds), so VISION §6's "valid only
@@ -61,7 +50,7 @@ Do not add frontend tasks for now._
      assumptions, each obligation references the assumptions it depends on, the
      export contract still validates, and focused tests pass.
 
-3. **BE-035: Publish a discrete-time verification case study to the viewer**
+2. **BE-035: Publish a discrete-time verification case study to the viewer**
    - Goal: Exercise the discrete IR path end-to-end by promoting the existing
      backend-only discrete example (`controlled_discrete_decay_problem`) into a
      viewer case study so the dashboard renders a discrete-time problem.
@@ -73,7 +62,7 @@ Do not add frontend tasks for now._
      with a self-contained trajectory and certificate series, the export contract
      validates it, and focused tests pass. Keep generated data uncommitted.
 
-4. **BE-036: Export measured safety-margin diagnostics per obligation**
+3. **BE-036: Export measured safety-margin diagnostics per obligation**
    - Goal: Enrich the measured evidence with a per-obligation worst margin to the
      boundary (and a time-to-first-violation when violated) so the honesty
      surface — and a future "margin over time" view — can show how close a run
@@ -85,7 +74,7 @@ Do not add frontend tasks for now._
      time when `measured-violated`), validation accepts well-formed values and
      rejects bad shapes, generated examples validate, and focused tests pass.
 
-5. **BE-037: Add a third controlled case study (cart-pole)**
+4. **BE-037: Add a third controlled case study (cart-pole)**
    - Goal: Grow the controlled case-study library (VISION §13) with a cart-pole:
      controlled dynamics, a safe set, a candidate Lyapunov/barrier, and proof
      obligations, exported to the viewer so the hero has richer content.
@@ -97,7 +86,7 @@ Do not add frontend tasks for now._
      candidate, obligations, and a stabilizing controlled trajectory; the export
      contract validates it; and focused tests pass.
 
-6. **BE-038: Symbolic Lyapunov/barrier decrease-condition checker (first
+5. **BE-038: Symbolic Lyapunov/barrier decrease-condition checker (first
    discharge attempt)**
    - Goal: Take the first honest step on the "dispose" half of the pipeline — an
      in-engine adapter that *attempts* a candidate's decrease condition
