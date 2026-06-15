@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { expect, type Page, test } from "@playwright/test";
 
 async function expectCanvasNonBlank(page: Page, selector: string) {
@@ -1019,6 +1021,62 @@ for (const viewport of [
     ).toHaveCount(0);
     // The three lane-backed obligations still expose the affordance.
     await expect(page.locator("#verifObligations .verif-evidence-toggle")).toHaveCount(3);
+  });
+
+  test(`Verification problem downloads its backend-agnostic IR artifact at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    // The download targets the IR artifact (.ir.json), not the viewer payload.
+    const download = page.locator(".verif-download-ir");
+    await expect(download).toBeVisible();
+    await expect(download).toHaveAttribute("href", /upright-pendulum-safety\.ir\.json$/);
+
+    const [downloaded] = await Promise.all([
+      page.waitForEvent("download"),
+      download.click(),
+    ]);
+    expect(downloaded.suggestedFilename()).toBe(
+      "upright-pendulum-safety.verification-problem.json",
+    );
+
+    // The downloaded artifact is the backend-agnostic IR: the problem structure
+    // without the viewer-only trajectory.
+    const path = await downloaded.path();
+    const ir = JSON.parse(readFileSync(path, "utf-8"));
+    expect(ir).not.toHaveProperty("trajectory");
+    expect(ir).toHaveProperty("obligations");
+    expect(ir.id).toBe("upright-pendulum-safety");
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-download-ir.png`),
+    });
+  });
+
+  test(`Verification problem shows no download when no IR is published at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Strip irPath from the index (older export with no published IR); the
+    // download affordance must be absent rather than point nowhere.
+    await page.route("**/data/verification/index.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.problems.forEach((problem: { irPath?: string }) => delete problem.irPath);
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    await expect(page.locator(".verif-download-ir")).toHaveCount(0);
   });
 
   test(`Verification header echoes the selected problem counts at ${viewport.name}`, async ({

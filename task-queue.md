@@ -32,21 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-016: Download the selected verification problem as a backend-agnostic
-   artifact**
-   - Goal: Realize the Definition of Success "export a backend-agnostic
-     verification problem that an external tool can attempt to discharge" by
-     offering, in the Verification domain, a control to download/copy the
-     canonical IR artifact for the selected problem.
-   - Scope: `viewer/src/verificationPanel.ts` or `viewer/src/main.ts` (fetch and
-     download/copy the published IR artifact), `viewer/src/styles.css`, and visual
-     coverage in `viewer/tests/visual.spec.ts`.
-   - Acceptance: The control downloads the backend-agnostic IR JSON (not the
-     viewer-shaped payload) for the active problem, is absent/inert when no IR
-     artifact is published, and visual tests cover the affordance. **Depends on
-     BE-032** publishing the IR artifact and a path to it in the viewer export.
-
-2. **FE-017: Reverse-link a certificate lane to the obligations it bears on**
+1. **FE-017: Reverse-link a certificate lane to the obligations it bears on**
    - Goal: Complete the bidirectional evidence↔obligation mapping started in
      FE-015 — selecting a certificate lane emphasizes the obligation rows/cards it
      references (via the lane's `data-obligations`), so a measured signal leads
@@ -61,6 +47,20 @@ Each task should use this structure:
      selection clears when the problem changes, lanes with no obligation stay
      interaction-free, and visual tests cover the emphasis/clear behavior.
      Frontend-only — uses already-exported links.
+
+2. **FE-018: Show honest empty states across the Verification surfaces**
+   - Goal: Make absence legible rather than silent — when a problem exports no
+     certificate series (or no proof statuses), show an explicit honest
+     placeholder instead of an empty panel, so a reader can tell "no measured
+     evidence" apart from a rendering gap (VISION §6 legibility/honesty).
+   - Scope: `viewer/src/certificateLanes.ts` and/or `viewer/src/verificationStage.ts`
+     (placeholder when no lanes), `viewer/src/verificationPanel.ts` (placeholder
+     when a section is empty), `viewer/src/styles.css`, and visual coverage in
+     `viewer/tests/visual.spec.ts`.
+   - Acceptance: A problem with no certificate series shows an explicit "no
+     measured certificate series" note, the populated case is unchanged, the copy
+     never implies a result, and visual tests cover the empty/populated paths.
+     Frontend-only — no new exported fields.
 
 ## Backend Queue
 

@@ -296,7 +296,7 @@ async function selectVerificationProblem(problemId: string) {
     // A stale click (the user moved on) should not overwrite the newer problem.
     if (selectedProblemId === summary.id) {
       verificationStage.show(problem);
-      verificationPanel.render(problem);
+      verificationPanel.render(problem, summary.irPath);
     }
   } catch (error) {
     console.warn("Verification problem unavailable:", error);

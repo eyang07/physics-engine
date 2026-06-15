@@ -179,7 +179,7 @@ export class VerificationPanel {
     this.container.append(empty);
   }
 
-  render(problem: VerificationProblem): void {
+  render(problem: VerificationProblem, irPath: string | null = null): void {
     this.obligationCards.clear();
     this.assumptionCards.clear();
     this.selectedEvidenceObligation = null;
@@ -194,7 +194,7 @@ export class VerificationPanel {
       obligations: problem.obligations.length > 0 ? this.renderObligations(problem) : null,
     };
 
-    root.append(this.renderHeader(problem, sections));
+    root.append(this.renderHeader(problem, sections, irPath));
     root.append(this.renderRigorLadder(problem));
     if (problem.obligations.length > 0) {
       root.append(this.renderObligationLedger(problem));
@@ -222,7 +222,11 @@ export class VerificationPanel {
     this.container.scrollTop = 0;
   }
 
-  private renderHeader(problem: VerificationProblem, sections: CountSections): HTMLElement {
+  private renderHeader(
+    problem: VerificationProblem,
+    sections: CountSections,
+    irPath: string | null,
+  ): HTMLElement {
     const header = el("header", "verif-header");
     header.append(el("p", "eyebrow", "Verification problem"));
     header.append(el("h1", "verif-header__title", problem.name));
@@ -251,6 +255,16 @@ export class VerificationPanel {
         ? problem.metadata.note
         : "Verification-problem IR only: every obligation awaits external sound discharge. This is candidate metadata, not certification.";
     header.append(el("p", "verif-note", note));
+
+    // The backend-agnostic IR artifact, offered for routing to an external
+    // backend. Absent when the export published no IR (older data); the link
+    // downloads the IR JSON, not the viewer-shaped payload.
+    if (irPath) {
+      const download = el("a", "verif-download-ir", "Download problem (IR)");
+      download.href = irPath;
+      download.download = `${problem.id}.verification-problem.json`;
+      header.append(download);
+    }
     return header;
   }
 

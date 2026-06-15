@@ -521,6 +521,28 @@ select {
   color: var(--text-muted);
 }
 
+.verif-download-ir {
+  justify-self: start;
+  margin-top: var(--space-1);
+  padding: 5px 12px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-decoration: none;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.verif-download-ir:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.verif-download-ir:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .verif-evidence-toggle {
   justify-self: start;
   margin: 0;

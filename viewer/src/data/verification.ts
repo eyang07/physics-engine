@@ -214,6 +214,8 @@ export interface VerificationProblemSummary {
   status: string;
   schemaVersion: string | null;
   dataPath: string;
+  /** The backend-agnostic IR artifact path, when the export published one. */
+  irPath: string | null;
   counts: { regions: number; obligations: number; candidates: number };
 }
 
@@ -535,6 +537,7 @@ function parseSummary(value: unknown): VerificationProblemSummary | null {
     status: asString(record.status, "candidate"),
     schemaVersion: asOptionalString(record.schemaVersion),
     dataPath: record.dataPath,
+    irPath: asOptionalString(record.irPath),
     counts: {
       regions: asOptionalNumber(counts.regions) ?? 0,
       obligations: asOptionalNumber(counts.obligations) ?? 0,
