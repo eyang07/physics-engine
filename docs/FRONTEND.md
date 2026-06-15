@@ -11,15 +11,22 @@ and trajectory data; it must not re-derive physics.
   into the Systems workbench — no splash gate.
 - Systems domain laid out as a three-pane workbench: an always-visible catalog
   rail that swaps the stage directly, the visualization stage, and an inspector.
-- Verification domain with a read-only inspector for the exported
-  verification-problem IR: a problem catalog rail plus a rendered document
-  showing the dynamics, regions (safe/unsafe/initial/domain, color-coded),
-  candidate certificates with their linked obligations, and the proof
-  obligations themselves — every claim rendered with KaTeX and every status
-  labeled honestly by rigor (`candidate` / `external-required`, never "proved").
-  Data comes from `scripts/generate_verification_problems.py`
+- Verification domain laid out as a verdict-first dashboard: a problem catalog
+  rail, a large animated phase-plane **hero** (framed to the trajectory plus its
+  safe/initial sets, with a color→role legend), a concise **summary** rail
+  (compact rigor-level chip, the "safety properties (measured)" ledger,
+  candidate-certificate lanes, and a backend-agnostic IR download), and a
+  collapsed **"Problem details (IR)"** band holding the full IR: dynamics,
+  regions, candidate certificates, proof obligations, measured statuses,
+  assumptions, and the four-level rigor ladder. Every claim renders with KaTeX
+  and every status is labeled honestly by rigor (`candidate` /
+  `external-required` / measured, never "proved"). Cross-links navigate within the
+  document (and auto-open the collapsed details), and selecting an obligation's
+  evidence ↔ a certificate lane emphasizes the matching counterpart. Data comes
+  from `scripts/generate_verification_problems.py`
   (`viewer/public/data/verification/`).
-- Playback controls.
+- Playback controls; both the Systems and Verification stages loop continuously
+  (a finished run wraps and restarts rather than pausing at the end).
 - Parameter-family switch: for systems exporting manifest `variants` (e.g. the
   Lorenz rho family and ideal-spring stiffness family), the inspector loads each
   backend-generated variant's data in place — no browser-side regeneration.
@@ -35,24 +42,24 @@ and trajectory data; it must not re-derive physics.
   exported `(x, p_x)` crossings on the `y = 0` surface; crossings accrete as
   playback reaches each backend-located crossing time. Reads
   `metadata.poincareSections` only — no browser-side section finding.
-- Systems↔Verification cross-linking. A system with a linked verification
-  problem (manifest `verificationProblems`) shows a jump button to that problem,
-  and the verification document links back to its system (`system`). On the
-  pendulum's phase lens a "Show safety regions" toggle overlays the IR's
-  safe/unsafe/initial/domain set geometry — the backend-sampled
-  `regionGeometry` scalar fields, color-coded by role and honoring each set's
-  `convention` — beneath the trajectory. The viewer shades the exported grids
-  only; it never evaluates the symbolic sets.
-- Measured certificate diagnostics. When a system links a verification problem,
-  the diagnostics panel adds candidate-certificate lanes — the barrier/Lyapunov
-  value `B(x(t))` and its flow derivative, read from the exported
-  `metadata.certificateSeries` and drawn against the obligation threshold (e.g.
-  `\dot B \le 0`), qualitatively and with no decimals. The Verification document
-  adds a "Measured status" surface rendering the problem's `proofStatuses`:
-  per-obligation sampled outcomes (`holds`/`violated`/`not sampled`) with the
-  evaluation source, sample count, and worst sample. Both surfaces stay honest —
-  a clean sample is evidence, never a discharge, and every obligation remains
-  `external-required`.
+- Systems and Verification are decoupled domains. The Systems workbench renders
+  physics visuals only; all safety/verification surfaces (region geometry,
+  candidate-certificate lanes, measured statuses) live entirely in the
+  Verification domain. There is intentionally no Systems-side safety overlay and
+  no cross-link between the two domains.
+- Safety geometry on the Verification hero. The phase plane shades the exported
+  `regionGeometry` set boundaries color-coded by role (safe/unsafe/initial),
+  honoring each set's `convention`; the viewer draws the exported grids only and
+  never evaluates the symbolic sets. Measured violations are marked on the stage
+  with a focusable legend.
+- Measured certificate lanes + status. The summary rail draws each candidate
+  certificate's value `B(x(t))` and its flow derivative against the obligation
+  threshold (e.g. `\dot B \le 0`), qualitatively and with no decimals, read from
+  the exported `certificateSeries`. The IR details render the problem's
+  `proofStatuses`: per-obligation sampled outcomes (`holds`/`violated`/`not
+  sampled`) with the evaluation source, sample count, and worst sample. Both stay
+  honest — a clean sample is evidence, never a discharge, and every obligation
+  remains `external-required`.
 - Three.js scenes for configuration-space, phase-space, orbit, field, spring,
   and attractor views.
 - Renderer-hint-based camera framing and a fit-to-system reset control.
@@ -89,11 +96,13 @@ The Vite main-bundle chunk-size warning is known and non-fatal.
 
 ## Next Work
 
-1. Generalize the safety surfaces beyond the single `pendulum` ↔
-   `upright-pendulum-safety` pair as the backend links more systems: the region
-   overlay is currently specific to the pendulum phase lens, and the certificate
-   lanes assume a 2-D phase projection. Drive both from the linked problem's
-   declared projection/state axes instead.
-2. Once a `proofStatuses` record reports `measured-violated`, surface where on
-   the stage the violating sample sits (e.g. mark the unsafe-set entry alongside
-   the trajectory) rather than only listing it in the Verification document.
+1. Make the hero slot pluggable so a richer renderer (e.g. a drone's physical
+   motion with geofence/obstacles + brief verification stats) can replace the
+   phase-plane animation per system, driven by each problem's declared
+   projection/state axes.
+2. Generalize the safety surfaces across more exported problems (3-state and
+   discrete-time cases) as the backend adds them; the certificate lanes still
+   assume a 2-D phase projection.
+3. Consider a complementary "safety margin over time" read (e.g. barrier value
+   vs its threshold) alongside the hero for a clearer at-a-glance "is it staying
+   safe?" signal.

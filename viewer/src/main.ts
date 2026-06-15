@@ -80,7 +80,8 @@ const aboutDialog = requireElement<HTMLDialogElement>("#aboutDialog");
 const aboutClose = requireElement<HTMLButtonElement>("#aboutClose");
 const systemCatalog = requireElement<HTMLElement>("#systemCatalog");
 const verificationCatalog = requireElement<HTMLElement>("#verificationCatalog");
-const verificationContent = requireElement<HTMLElement>("#verificationContent");
+const verificationSummary = requireElement<HTMLElement>("#verificationSummary");
+const verificationDetails = requireElement<HTMLElement>("#verificationDetails");
 const verificationCanvas = requireElement<HTMLCanvasElement>("#verificationCanvas");
 const verificationPlayButton = requireElement<HTMLButtonElement>("#verificationPlayButton");
 const verificationSpeedControl = requireElement<HTMLInputElement>("#verificationSpeedControl");
@@ -112,7 +113,7 @@ const threeScene = new ThreeScene(threeCanvas);
 const trajectorySource = new StaticSource();
 const structurePanel = new StructurePanel(principlesPanel, invariantsPanel, parametersPanel, loopPhaseArc);
 const diagnosticsPanel = new DiagnosticsPanel(diagnosticsSection, diagnosticsPanel_);
-const verificationPanel = new VerificationPanel(verificationContent);
+const verificationPanel = new VerificationPanel(verificationSummary, verificationDetails);
 const verificationStage = new VerificationStage(
   verificationCanvas,
   verificationPlayButton,

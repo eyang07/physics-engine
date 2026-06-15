@@ -17,14 +17,6 @@ import type {
 } from "./data/verification";
 import { formatMeasured } from "./util";
 
-// The count-bearing sections a header chip can scroll to. A null entry means
-// that section was not rendered for this problem, so its count stays inert.
-type CountSections = {
-  regions: HTMLElement | null;
-  candidates: HTMLElement | null;
-  obligations: HTMLElement | null;
-};
-
 const COMPARISON_LATEX: Record<string, string> = {
   "<=": "\\le",
   ">=": "\\ge",
@@ -163,97 +155,82 @@ export class VerificationPanel {
   private selectedEvidenceObligation: string | null = null;
   onEvidenceSelect: (obligationId: string | null) => void = () => {};
 
-  constructor(private readonly container: HTMLElement) {}
+  constructor(
+    private readonly summaryEl: HTMLElement,
+    private readonly detailsEl: HTMLElement,
+  ) {}
 
   clear(): void {
     this.obligationCards.clear();
     this.assumptionCards.clear();
-    this.container.replaceChildren();
+    this.summaryEl.replaceChildren();
+    this.detailsEl.replaceChildren();
   }
 
   renderEmpty(message: string): void {
-    this.container.replaceChildren();
+    this.obligationCards.clear();
+    this.assumptionCards.clear();
+    this.detailsEl.replaceChildren();
     const empty = el("div", "verif-empty");
     empty.append(el("p", "verif-empty__title", "No verification problems"));
     empty.append(el("p", "verif-empty__copy", message));
-    this.container.append(empty);
+    this.summaryEl.replaceChildren(empty);
   }
 
+  // Verdict-first: a concise summary (what's being proved + measured outcome +
+  // rigor) is always visible; the full IR math lives in a collapsed details band.
   render(problem: VerificationProblem, irPath: string | null = null): void {
     this.obligationCards.clear();
     this.assumptionCards.clear();
     this.selectedEvidenceObligation = null;
-    this.container.replaceChildren();
-    const root = el("article", "verif-doc");
 
-    // Build the count-bearing sections first so the header counts can link to
-    // the ones that actually render; an absent section keeps its count inert.
-    const sections: CountSections = {
-      regions: problem.regions.length > 0 ? this.renderRegions(problem.regions) : null,
-      candidates: problem.candidates.length > 0 ? this.renderCandidates(problem) : null,
-      obligations: problem.obligations.length > 0 ? this.renderObligations(problem) : null,
-    };
-
-    root.append(this.renderHeader(problem, sections, irPath));
-    root.append(this.renderRigorLadder(problem));
+    // Summary rail.
+    const summary = el("div", "verif-summary");
+    summary.append(this.renderSummaryHeader(problem, irPath));
     if (problem.obligations.length > 0) {
-      root.append(this.renderObligationLedger(problem));
+      summary.append(this.renderObligationLedger(problem));
     }
+    this.summaryEl.replaceChildren(summary);
+
+    // Collapsible IR detail.
+    const details = el("details", "verif-details");
+    details.append(el("summary", "verif-details__summary", "Problem details (IR)"));
+    const body = el("div", "verif-details__body");
     if (problem.dynamics) {
-      root.append(this.renderDynamics(problem));
+      body.append(this.renderDynamics(problem));
     }
-    if (sections.regions) {
-      root.append(sections.regions);
+    if (problem.regions.length > 0) {
+      body.append(this.renderRegions(problem.regions));
     }
-    if (sections.candidates) {
-      root.append(sections.candidates);
-    }
-    if (sections.obligations) {
-      root.append(sections.obligations);
+    if (problem.candidates.length > 0) {
+      body.append(this.renderCandidates(problem));
     }
     if (problem.obligations.length > 0) {
-      root.append(this.renderProofStatuses(problem));
+      body.append(this.renderObligations(problem));
+      body.append(this.renderProofStatuses(problem));
     }
     if (problem.assumptions.length > 0) {
-      root.append(this.renderAssumptions(problem));
+      body.append(this.renderAssumptions(problem));
     }
-
-    this.container.append(root);
-    this.container.scrollTop = 0;
+    body.append(this.renderRigorLadder(problem));
+    details.append(body);
+    this.detailsEl.replaceChildren(details);
   }
 
-  private renderHeader(
+  private renderSummaryHeader(
     problem: VerificationProblem,
-    sections: CountSections,
     irPath: string | null,
   ): HTMLElement {
-    const header = el("header", "verif-header");
+    const header = el("header", "verif-summary__header");
     header.append(el("p", "eyebrow", "Verification problem"));
-    header.append(el("h1", "verif-header__title", problem.name));
-
-    // Echo the selected problem's scope so its size is visible at the stage
-    // without scanning back to the catalog; counts mirror the catalog badges.
-    const counts = el("div", "verif-counts");
-    counts.append(
-      this.countChip("regions", problem.regions.length, sections.regions),
-      this.countChip("obligations", problem.obligations.length, sections.obligations),
-      this.countChip("candidates", problem.candidates.length, sections.candidates),
-    );
-    header.append(counts);
-
-    const chips = el("div", "verif-chips");
-    chips.append(this.chip("id", problem.id));
-    if (problem.source) {
-      chips.append(this.chip("source", problem.source));
-    }
-    chips.append(this.chip("schema", problem.schemaVersion));
-    header.append(chips);
+    header.append(el("h1", "verif-summary__title", problem.name));
+    header.append(this.renderRigorChip(problem));
 
     // The honesty banner: nothing here is proved; external discharge is required.
     const note =
       typeof problem.metadata.note === "string"
         ? problem.metadata.note
-        : "Verification-problem IR only: every obligation awaits external sound discharge. This is candidate metadata, not certification.";
+        : "Measured evidence only — every obligation awaits external sound discharge; nothing here is certified.";
     header.append(el("p", "verif-note", note));
 
     // The backend-agnostic IR artifact, offered for routing to an external
@@ -268,30 +245,18 @@ export class VerificationPanel {
     return header;
   }
 
-  private chip(label: string, value: string): HTMLElement {
-    const chip = el("span", "verif-chip");
-    chip.append(el("span", "verif-chip__label", label));
-    chip.append(el("span", "verif-chip__value", value));
-    return chip;
-  }
-
-  // A scope count. When its section was rendered, the chip becomes a button that
-  // scrolls the doc to that section so the scope summary is a way into the
-  // detail; when the section is absent (zero count) it stays an inert label so
-  // there is no affordance leading nowhere.
-  private countChip(label: string, value: number, target: HTMLElement | null): HTMLElement {
-    const text = `${value} ${label}`;
-    if (target && value > 0) {
-      const link = el("button", "verif-count verif-count--link", text);
-      link.type = "button";
-      link.dataset.count = label;
-      link.addEventListener("click", () => {
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-      return link;
-    }
-    const chip = el("span", "verif-count", text);
-    chip.dataset.count = label;
+  // A compact, always-visible rigor indicator; the full four-level ladder lives
+  // in the details. Keeps "measured" from being mistaken for "proved".
+  private renderRigorChip(problem: VerificationProblem): HTMLElement {
+    const level = this.currentRigorLevel(problem);
+    const step = RIGOR_LADDER.find((entry) => entry.level === level) ?? RIGOR_LADDER[0];
+    const chip = el(
+      "span",
+      "verif-rigor-chip",
+      `Rigor: level ${step.level} — ${step.title.toLowerCase()}`,
+    );
+    chip.title = step.note;
+    chip.dataset.level = String(step.level);
     return chip;
   }
 
@@ -347,12 +312,12 @@ export class VerificationPanel {
   // discharge. Each row jumps to the obligation's full card. The measured
   // outcome is evidence only — never a proof.
   private renderObligationLedger(problem: VerificationProblem): HTMLElement {
-    const node = section("Obligations at a glance", "verifLedger");
+    const node = section("Safety properties (measured)", "verifLedger");
     node.append(
       el(
         "p",
         "verif-meta",
-        "Measured outcomes only — a clean sample is not a proof; every obligation still awaits external discharge.",
+        "What we're checking and how it measured — a clean sample is evidence, not a proof; every obligation still awaits external discharge.",
       ),
     );
 
@@ -532,7 +497,7 @@ export class VerificationPanel {
     this.obligationCards.forEach((card, id) => {
       card.classList.toggle("verif-card--referenced", targeted !== null && targeted.has(id));
     });
-    this.container
+    this.summaryEl
       .querySelectorAll<HTMLElement>(".verif-ledger__row")
       .forEach((row) => {
         const id = row.dataset.obligation;
@@ -548,10 +513,16 @@ export class VerificationPanel {
   }
 
   // Scroll a referenced card into view and re-trigger a brief pulse so the
-  // navigated-to card is locatable. A missing card is a no-op.
+  // navigated-to card is locatable. A missing card is a no-op. Cards live inside
+  // the collapsible details, so open any closed <details> ancestor first.
   private emphasizeCard(card: HTMLElement | undefined): void {
     if (!card) {
       return;
+    }
+    for (let node: HTMLElement | null = card; node; node = node.parentElement) {
+      if (node instanceof HTMLDetailsElement) {
+        node.open = true;
+      }
     }
     card.scrollIntoView({ behavior: "smooth", block: "center" });
     card.classList.remove("verif-card--targeted");
@@ -631,7 +602,7 @@ export class VerificationPanel {
   private toggleEvidence(obligationId: string): void {
     this.selectedEvidenceObligation =
       this.selectedEvidenceObligation === obligationId ? null : obligationId;
-    this.container
+    this.detailsEl
       .querySelectorAll<HTMLButtonElement>(".verif-evidence-toggle")
       .forEach((toggle) => {
         toggle.setAttribute(

@@ -220,10 +220,10 @@ select {
 
 .verif-stage {
   display: grid;
-  grid-template-columns: minmax(360px, 1fr) minmax(260px, 340px);
+  grid-template-columns: minmax(360px, 1fr) minmax(300px, 380px);
   grid-template-areas:
-    "workspace signals"
-    "content content";
+    "workspace summary"
+    "details details";
   gap: 0;
   min-width: 0;
   height: 100%;
@@ -236,15 +236,16 @@ select {
 .verif-stage__workspace {
   position: relative;
   grid-area: workspace;
-  min-height: 430px;
+  min-height: 540px;
   border-bottom: 1px solid var(--hairline);
+  border-right: 1px solid var(--hairline);
 }
 
 .verif-stage__canvas {
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 430px;
+  min-height: 540px;
 }
 
 .verif-violation-legend {
@@ -410,30 +411,84 @@ select {
   text-transform: uppercase;
 }
 
+/* Summary rail: concise safety verdict + certificate lanes, beside the hero. */
+.verif-stage__summary {
+  grid-area: summary;
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-width: 0;
+  min-height: 540px;
+  padding: 22px 20px;
+  border-bottom: 1px solid var(--hairline);
+  background: rgba(10, 15, 20, 0.38);
+  overflow-y: auto;
+}
+
 .verif-stage__signals {
-  grid-area: signals;
   display: grid;
   align-content: start;
   gap: var(--space-3);
   min-width: 0;
-  min-height: 430px;
-  padding: 22px 18px;
-  border-bottom: 1px solid var(--hairline);
-  border-left: 1px solid var(--hairline);
-  background: rgba(10, 15, 20, 0.38);
 }
 
-.verif-content {
-  grid-area: content;
-  height: 100%;
+/* Collapsible IR detail band, full width under the hero + summary. */
+.verif-details-band {
+  grid-area: details;
 }
 
-.verif-doc {
+.verif-details {
+  border-top: 1px solid var(--hairline);
+}
+
+.verif-details__summary {
+  padding: 14px 24px;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.verif-details__summary:hover {
+  color: var(--text-primary);
+}
+
+.verif-details__body {
   display: grid;
   gap: var(--space-5);
   width: min(820px, calc(100% - 64px));
   margin: 0 auto;
-  padding: 40px 0 64px;
+  padding: 8px 0 64px;
+}
+
+.verif-summary {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.verif-summary__header {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.verif-summary__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.verif-rigor-chip {
+  justify-self: start;
+  padding: 3px 10px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-pill);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
 }
 
 .verif-empty {
@@ -1644,8 +1699,8 @@ input[type="range"]::-moz-range-thumb {
     grid-template-columns: 1fr;
     grid-template-areas:
       "workspace"
-      "signals"
-      "content";
+      "summary"
+      "details";
   }
 
   .verif-stage__workspace,
@@ -1653,9 +1708,12 @@ input[type="range"]::-moz-range-thumb {
     min-height: 360px;
   }
 
-  .verif-stage__signals {
+  .verif-stage__workspace {
+    border-right: 0;
+  }
+
+  .verif-stage__summary {
     min-height: 0;
-    border-left: 0;
   }
 
   .verif-stage__controls {

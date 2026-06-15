@@ -43,6 +43,14 @@ async function expectCanvasNonBlank(page: Page, selector: string) {
   expect(nonBlankPixels).toBeGreaterThan(200);
 }
 
+// The verbose IR (obligation/candidate/assumption cards, evidence toggles) lives
+// in a collapsed <details>; open it before interacting with those elements.
+async function openVerificationDetails(page: Page) {
+  await page.locator(".verif-details").evaluate((node) => {
+    (node as HTMLDetailsElement).open = true;
+  });
+}
+
 async function expectFitToSystemKeepsSceneRendered(page: Page) {
   await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
   await expect(page.locator("#fitToSystem")).toBeVisible();
@@ -226,7 +234,7 @@ for (const viewport of [
     // renders the exported verification-problem IR read-only.
     await page.getByRole("button", { name: "Verification" }).click();
     await page.waitForSelector("#verificationDomain.domain--active");
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
     await expect(
       page.getByRole("heading", { name: /upright pendulum safety/i }),
     ).toBeVisible();
@@ -263,15 +271,15 @@ for (const viewport of [
     // default problem read-only.
     await page.getByRole("button", { name: "Verification" }).click();
     await page.waitForSelector("#verificationDomain.domain--active");
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
     await expect(
       page.getByRole("heading", { name: /upright pendulum safety/i }),
     ).toBeVisible();
 
-    // The measured proof-status surface renders sampled obligation outcomes,
+    // The summary leads with the safety properties and their measured outcomes,
     // honestly labeled (a clean sample is evidence, never a discharge).
-    await expect(page.getByRole("heading", { name: /measured status/i })).toBeVisible();
-    await expect(page.locator(".verif-status").first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /safety properties/i })).toBeVisible();
+    await expect(page.locator("#verifLedger .verif-status").first()).toBeVisible();
 
     // Switching back returns to the Systems workbench on the default pendulum.
     await page.getByRole("button", { name: "Systems" }).click();
@@ -289,7 +297,7 @@ for (const viewport of [
     // Enter the Verification workbench and let its stage animation spin up.
     await page.getByRole("button", { name: "Verification" }).click();
     await page.waitForSelector("#verificationDomain.domain--active");
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     // The catalog lists every exported problem; the first is active by default.
     const catalogItems = page.locator("#verificationCatalog .catalog-item");
@@ -324,8 +332,8 @@ for (const viewport of [
       route.abort(),
     );
     await catalogItems.nth(0).click();
-    await expect(page.locator("#verificationContent .verif-empty")).toBeVisible();
-    await expect(page.locator("#verificationContent .verif-empty__copy")).toContainText(
+    await expect(page.locator("#verificationSummary .verif-empty")).toBeVisible();
+    await expect(page.locator("#verificationSummary .verif-empty__copy")).toContainText(
       /could not load/i,
     );
     await expect(certificateLanes).toHaveCount(0);
@@ -345,7 +353,7 @@ for (const viewport of [
     // zero violation markers.
     await page.getByRole("button", { name: "Verification" }).click();
     await page.waitForSelector("#verificationDomain.domain--active");
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
     await expect(page.locator("#verificationCanvas")).toHaveAttribute(
       "data-violation-markers",
       "0",
@@ -395,7 +403,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
     await expect(page.locator("#verificationCanvas")).toHaveAttribute(
       "data-violation-markers",
       "1",
@@ -413,7 +421,7 @@ for (const viewport of [
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
     await page.waitForSelector("#verificationDomain.domain--active");
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     const items = page.locator("#verificationCatalog .catalog-item");
     await expect(items).toHaveCount(2);
@@ -434,7 +442,7 @@ for (const viewport of [
     await expect(items.nth(1)).not.toHaveClass(/catalog-item--active/);
 
     await items.nth(1).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
     await expect(items.nth(1)).toHaveClass(/catalog-item--active/);
     await expect(items.nth(0)).not.toHaveClass(/catalog-item--active/);
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-catalog.png`) });
@@ -451,7 +459,7 @@ for (const viewport of [
     // draws no markers and shows no legend.
     await page.getByRole("button", { name: "Verification" }).click();
     await page.waitForSelector("#verificationDomain.domain--active");
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
     await expect(page.locator(".verif-violation-legend")).toBeHidden();
 
     // Violation path: inject a mappable measured-violated sample referencing a
@@ -481,7 +489,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     const legend = page.locator(".verif-violation-legend");
     await expect(legend).toBeVisible();
@@ -532,7 +540,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     const canvas = page.locator("#verificationCanvas");
     const entries = page.locator(".verif-violation-legend__entry");
@@ -564,7 +572,7 @@ for (const viewport of [
     await entries.nth(0).click();
     await expect(canvas).toHaveAttribute("data-focused-violation", "1");
     await page.locator("#verificationCatalog .catalog-item").nth(1).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
     await expect(canvas).toHaveAttribute("data-focused-violation", "");
   });
 
@@ -608,7 +616,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     const entries = page.locator(".verif-violation-legend__entry");
     await expect(entries).toHaveCount(2);
@@ -628,60 +636,6 @@ for (const viewport of [
     });
   });
 
-  test(`Verification header obligation count scrolls to the obligations section at ${viewport.name}`, async ({
-    page,
-  }, testInfo) => {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await page.goto("/");
-    await page.waitForSelector("#systemsDomain.domain--active");
-    await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationDomain.domain--active");
-    await page.waitForSelector("#verificationContent .verif-doc");
-
-    // The obligations section sits far below the header, so it starts out of
-    // view at the top of the doc.
-    const obligations = page.locator("#verifObligations");
-    await expect(obligations).not.toBeInViewport();
-
-    // The obligation count is an interactive control that moves the doc to that
-    // section.
-    const count = page.locator('.verif-header .verif-count[data-count="obligations"]');
-    await expect(count).toHaveText(/\d+ obligations/);
-    await count.click();
-    await expect(obligations).toBeInViewport();
-    await page.screenshot({
-      path: testInfo.outputPath(`${viewport.name}-verification-obligations-scroll.png`),
-    });
-  });
-
-  test(`Verification obligation count stays inert without obligations at ${viewport.name}`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-
-    // A problem with no obligations renders no obligations section, so the count
-    // must stay a plain label rather than a link pointing nowhere.
-    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
-      const response = await route.fetch();
-      const json = await response.json();
-      json.obligations = [];
-      await route.fulfill({ response, json });
-    });
-
-    await page.goto("/");
-    await page.waitForSelector("#systemsDomain.domain--active");
-    await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
-
-    await expect(page.locator("#verifObligations")).toHaveCount(0);
-    const count = page.locator('.verif-header .verif-count[data-count="obligations"]');
-    await expect(count).toHaveText("0 obligations");
-    // The chip is an inert <span>, not the interactive <button> form.
-    await expect(page.locator('.verif-header button.verif-count[data-count="obligations"]')).toHaveCount(
-      0,
-    );
-  });
-
   test(`Verification candidate obligation link jumps to its obligation card at ${viewport.name}`, async ({
     page,
   }, testInfo) => {
@@ -689,10 +643,11 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     // A candidate's obligation links are interactive; activating one scrolls to
     // and emphasizes the matching obligation card further down the doc.
+    await openVerificationDetails(page);
     const jump = page.locator("#verifCandidates button.verif-link--jump").first();
     const obligationId = (await jump.textContent())?.trim() ?? "";
     expect(obligationId).not.toEqual("");
@@ -723,7 +678,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     await expect(
       page.locator("#verifCandidates code.verif-link", { hasText: "ghost-obligation" }),
@@ -742,10 +697,11 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     // Each measured-status card names the obligation it sampled; activating that
     // name scrolls to and emphasizes the matching obligation card.
+    await openVerificationDetails(page);
     const statusName = page.locator("button.verif-card__name--jump").first();
     await statusName.click();
 
@@ -779,7 +735,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     await expect(
       page.locator("strong.verif-card__name", { hasText: "ghost-obligation" }),
@@ -798,7 +754,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     // The exported case studies carry no assumptions, so obligation cards expose
     // no "assumes:" affordance — and no broken chrome.
@@ -825,9 +781,10 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     // The known assumption is an interactive jump; the unknown id stays inert.
+    await openVerificationDetails(page);
     const known = page.locator("#verifObligations button.verif-link--jump", {
       hasText: "small-angle",
     });
@@ -856,7 +813,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     // One ledger row per obligation. The pendulum's obligations all hold on
     // samples but still await external discharge — measured, never proved.
@@ -896,7 +853,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     await expect(page.locator("#verifLedger .verif-ledger__row")).toHaveCount(4);
     const row = page.locator("#verifLedger .verif-ledger__row", {
@@ -912,7 +869,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     // All four rigor levels are listed.
     const steps = page.locator("#verifRigorLadder .verif-ladder__step");
@@ -940,7 +897,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     // No lane emphasis until an obligation's evidence is selected.
     await expect(page.locator("#verificationCertificateLanes .diagnostic--emphasized")).toHaveCount(
@@ -949,6 +906,7 @@ for (const viewport of [
 
     // The non-increase obligation bears on exactly the flow-derivative lane;
     // selecting its evidence emphasizes only that lane and dims the rest.
+    await openVerificationDetails(page);
     const toggle = page.locator(
       '#verif-obligation-energy-barrier-non-increase .verif-evidence-toggle',
     );
@@ -980,8 +938,9 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
+    await openVerificationDetails(page);
     await page
       .locator("#verif-obligation-energy-barrier-non-increase .verif-evidence-toggle")
       .click();
@@ -991,7 +950,7 @@ for (const viewport of [
 
     // Switching problems rebuilds the lanes, dropping any prior emphasis.
     await page.locator("#verificationCatalog .catalog-item").nth(1).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
     await expect(page.locator("#verificationCertificateLanes .diagnostic--emphasized")).toHaveCount(
       0,
     );
@@ -1014,7 +973,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     await expect(
       page.locator("#verif-obligation-extra-untested .verif-evidence-toggle"),
@@ -1030,7 +989,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     // The download targets the IR artifact (.ir.json), not the viewer payload.
     const download = page.locator(".verif-download-ir");
@@ -1074,7 +1033,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     await expect(page.locator(".verif-download-ir")).toHaveCount(0);
   });
@@ -1086,10 +1045,10 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     // No obligation is referenced until a lane is selected.
-    await expect(page.locator("#verificationContent .verif-card--referenced")).toHaveCount(0);
+    await expect(page.locator("#verificationDetails .verif-card--referenced")).toHaveCount(0);
 
     // The flow-derivative lane bears on the non-increase obligation; selecting it
     // emphasizes exactly that obligation card and ledger row.
@@ -1101,7 +1060,7 @@ for (const viewport of [
     await expect(
       page.locator("#verif-obligation-energy-barrier-non-increase"),
     ).toHaveClass(/verif-card--referenced/);
-    await expect(page.locator("#verificationContent .verif-card--referenced")).toHaveCount(1);
+    await expect(page.locator("#verificationDetails .verif-card--referenced")).toHaveCount(1);
     await expect(
       page.locator("#verifLedger .verif-ledger__row--referenced"),
     ).toHaveCount(1);
@@ -1112,7 +1071,7 @@ for (const viewport of [
     // Re-selecting the lane clears the emphasis.
     await lane.click();
     await expect(lane).toHaveAttribute("aria-pressed", "false");
-    await expect(page.locator("#verificationContent .verif-card--referenced")).toHaveCount(0);
+    await expect(page.locator("#verificationDetails .verif-card--referenced")).toHaveCount(0);
   });
 
   test(`Verification lane selection clears when the problem changes at ${viewport.name}`, async ({
@@ -1122,16 +1081,16 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     await page
       .locator('#verificationCertificateLanes [data-obligations~="energy-barrier-non-increase"]')
       .click();
-    await expect(page.locator("#verificationContent .verif-card--referenced")).toHaveCount(1);
+    await expect(page.locator("#verificationDetails .verif-card--referenced")).toHaveCount(1);
 
     await page.locator("#verificationCatalog .catalog-item").nth(1).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
-    await expect(page.locator("#verificationContent .verif-card--referenced")).toHaveCount(0);
+    await page.waitForSelector("#verificationSummary .verif-summary");
+    await expect(page.locator("#verificationDetails .verif-card--referenced")).toHaveCount(0);
   });
 
   test(`Verification certificate lane with no obligation stays inert at ${viewport.name}`, async ({
@@ -1157,7 +1116,7 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     await expect(page.locator("#verificationCertificateLanes .diagnostic")).toHaveCount(3);
     // Only the two obligation-backed lanes are selectable.
@@ -1183,13 +1142,13 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     // The absence is stated rather than left as empty panels.
     await expect(page.locator("#verificationCertificateLanes .diagnostic-empty")).toHaveText(
       /no measured certificate series/i,
     );
-    await expect(page.locator("#verificationContent .verif-empty-note")).toContainText(
+    await expect(page.locator("#verificationDetails .verif-empty-note")).toContainText(
       /no measured status sampled/i,
     );
     // No certificate lanes rendered.
@@ -1206,63 +1165,33 @@ for (const viewport of [
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
     // The default problem has measured series and statuses, so no placeholders.
     await expect(page.locator("#verificationCertificateLanes .diagnostic-empty")).toHaveCount(0);
-    await expect(page.locator("#verificationContent .verif-empty-note")).toHaveCount(0);
+    await expect(page.locator("#verificationDetails .verif-empty-note")).toHaveCount(0);
     await expect(
       page.locator("#verificationCertificateLanes .diagnostic"),
     ).not.toHaveCount(0);
   });
 
-  test(`Verification header echoes the selected problem counts at ${viewport.name}`, async ({
+  test(`Verification IR details are collapsed by default and open on jump at ${viewport.name}`, async ({
     page,
-  }, testInfo) => {
+  }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
-    await page.waitForSelector("#verificationDomain.domain--active");
-    await page.waitForSelector("#verificationContent .verif-doc");
+    await page.waitForSelector("#verificationSummary .verif-summary");
 
-    const header = page.locator(".verif-header");
-    await expect(header.locator('.verif-count[data-count="regions"]')).toHaveText(/\d+ regions/);
-    await expect(header.locator('.verif-count[data-count="obligations"]')).toHaveText(
-      /\d+ obligations/,
-    );
-    await expect(header.locator('.verif-count[data-count="candidates"]')).toHaveText(
-      /\d+ candidates/,
-    );
+    // The verbose IR lives in a collapsed details band by default.
+    const details = page.locator(".verif-details");
+    await expect(details).toHaveJSProperty("open", false);
 
-    // The header counts must agree with the active catalog item's badges.
-    const headerObligations = await header
-      .locator('.verif-count[data-count="obligations"]')
-      .textContent();
-    const catalogObligations = await page
-      .locator(
-        '#verificationCatalog .catalog-item--active .catalog-item__count[data-count="obligations"]',
-      )
-      .textContent();
-    expect(headerObligations).toBe(catalogObligations);
-
-    // Selecting another problem re-renders the header with that problem's counts.
-    await page.locator("#verificationCatalog .catalog-item").nth(1).click();
-    await page.waitForSelector("#verificationContent .verif-doc");
-    await expect(header.locator('.verif-count[data-count="obligations"]')).toHaveText(
-      /\d+ obligations/,
-    );
-    const headerObligations2 = await header
-      .locator('.verif-count[data-count="obligations"]')
-      .textContent();
-    const catalogObligations2 = await page
-      .locator(
-        '#verificationCatalog .catalog-item--active .catalog-item__count[data-count="obligations"]',
-      )
-      .textContent();
-    expect(headerObligations2).toBe(catalogObligations2);
-    await page.screenshot({
-      path: testInfo.outputPath(`${viewport.name}-verification-header-counts.png`),
-    });
+    // Jumping from a summary safety-property row opens the details and brings its
+    // obligation card into view.
+    await page.locator("#verifLedger .verif-ledger__name").first().click();
+    await expect(details).toHaveJSProperty("open", true);
+    await expect(page.locator("#verifObligations .verif-card--targeted")).toBeInViewport();
   });
 }
