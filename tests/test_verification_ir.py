@@ -993,6 +993,115 @@ def test_explicit_assumptions_are_serialized_and_linked_to_obligations() -> None
     assert payload["obligations"][0]["assumptionIds"] == ["time-step-positive"]
 
 
+def test_obligation_assumptions_link_each_obligation_to_its_dependencies() -> None:
+    x = sp.Symbol("x", real=True)
+    system = FirstOrderSystem(state=(x,), rhs=(-x,))
+    domain = AssumptionSpec(
+        id="domain",
+        name="operating domain",
+        role="domain",
+        expression=expression_spec(x**2),
+        comparison="<=",
+        rhs=1.0,
+        variables=("x",),
+    )
+    model = AssumptionSpec(
+        id="model",
+        name="control admissible",
+        role="model",
+        expression=expression_spec(x),
+        comparison="<=",
+        rhs=2.0,
+        variables=("x",),
+    )
+    obligations = (
+        ProofObligation(name="dynamical", state=(x,), expression=x**2, comparison="<="),
+        ProofObligation(name="static", state=(x,), expression=-(x**2), comparison="<="),
+    )
+
+    problem = verification_problem_from_obligations(
+        "per obligation",
+        obligations,
+        system=system,
+        assumptions=(domain, model),
+        obligation_assumptions={
+            "dynamical": ("domain", "model"),
+            "static": ("domain",),
+        },
+    )
+
+    by_name = {obligation.name: obligation for obligation in problem.obligations}
+    assert by_name["dynamical"].assumption_ids == ("domain", "model")
+    assert by_name["static"].assumption_ids == ("domain",)
+
+
+def test_obligation_assumptions_reject_unknown_references() -> None:
+    x = sp.Symbol("x", real=True)
+    system = FirstOrderSystem(state=(x,), rhs=(-x,))
+    domain = AssumptionSpec(
+        id="domain",
+        name="operating domain",
+        role="domain",
+        expression=expression_spec(x**2),
+        comparison="<=",
+        rhs=1.0,
+        variables=("x",),
+    )
+    obligation = ProofObligation(name="claim", state=(x,), expression=x**2, comparison="<=")
+
+    with pytest.raises(ValueError, match="unknown obligation"):
+        verification_problem_from_obligations(
+            "bad name",
+            (obligation,),
+            system=system,
+            assumptions=(domain,),
+            obligation_assumptions={"missing": ("domain",)},
+        )
+    with pytest.raises(ValueError, match="unknown assumption ids"):
+        verification_problem_from_obligations(
+            "bad id",
+            (obligation,),
+            system=system,
+            assumptions=(domain,),
+            obligation_assumptions={"claim": ("nope",)},
+        )
+
+
+def test_parameter_assumptions_stay_global_under_obligation_map() -> None:
+    x = sp.Symbol("x", real=True)
+    k = sp.Symbol("k", positive=True)
+    system = FirstOrderSystem(state=(x,), rhs=(-k * x,), parameters=(k,))
+    domain = AssumptionSpec(
+        id="domain",
+        name="operating domain",
+        role="domain",
+        expression=expression_spec(x**2),
+        comparison="<=",
+        rhs=1.0,
+        variables=("x",),
+    )
+    obligations = (
+        ProofObligation(name="alpha", state=(x,), expression=k * x**2, comparison="<="),
+        ProofObligation(name="beta", state=(x,), expression=-(x**2), comparison="<="),
+    )
+
+    problem = verification_problem_from_obligations(
+        "global parameters",
+        obligations,
+        system=system,
+        assumptions=(domain,),
+        obligation_assumptions={"alpha": ("domain",), "beta": ()},
+    )
+
+    by_name = {obligation.name: obligation for obligation in problem.obligations}
+    # The auto-derived parameter-domain assumption is a global fact: it attaches
+    # to every obligation even though the map only governs explicit assumptions.
+    assert "parameter-k-positive" in by_name["alpha"].assumption_ids
+    assert "parameter-k-positive" in by_name["beta"].assumption_ids
+    assert "domain" in by_name["alpha"].assumption_ids
+    assert "domain" not in by_name["beta"].assumption_ids
+
+
 def test_dynamics_spec_from_controlled_encodes_bounds() -> None:
     pendulum = build_system(mass=1.0, length=1.0, gravity=9.81, damping=0.1, torque_bound=2.0)
     spec = dynamics_spec_from_controlled(pendulum)

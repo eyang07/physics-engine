@@ -43,29 +43,16 @@ against unstable package data; don't add other frontend tasks for now._
 
 _Direction (VISION §11): stop expanding the IR in the abstract. The whole queue
 now drives **one flagship controlled system end-to-end** — backend model →
-verification package → (later) frontend. The package contract now exists
-(BE-039, done: `engine/export/verification_package.py`), proven on the existing
-pendulum/spring problems; tasks 1–2 enrich what the package carries; tasks 3–7
-build the flagship drone point-mass (cart-pole/pendulum fallback) and route it
-through a complete package. Keep generated data uncommitted. Never label anything
-proved/certified — the engine proposes; external backends dispose._
+verification package → (later) frontend. The package contract exists (BE-039),
+and the existing case studies now carry per-obligation stated assumptions
+(BE-034); both are proven on the pendulum/spring problems. Task 1 finishes
+enriching what the package carries (measured margins); tasks 2–6 build the
+flagship drone point-mass (cart-pole/pendulum fallback) and route it through a
+complete package. The flagship's concrete model is incoming from the maintainer —
+hold BE-040..BE-044 until then. Keep generated data uncommitted. Never label
+anything proved/certified — the engine proposes; external backends dispose._
 
-1. **BE-034: Attach stated domain assumptions to the exported case studies**
-   - Goal: Give each obligation the domain assumptions its candidate
-     construction actually relies on (e.g. validity near the Hurwitz / upright
-     equilibrium, control within actuator bounds), in the BE-039
-     package-compatible format, so VISION §6's "valid only under stated
-     assumptions" is concrete instead of empty — and so the verification package
-     has real assumptions to carry.
-   - Scope: `scripts/export_verification_problems.py` (define `AssumptionSpec`s
-     and link them via obligation `assumption_ids`), the relevant
-     `verification_problem_from_*` builders in `engine/verification/` if they need
-     to thread assumptions, and `tests/`.
-   - Acceptance: the pendulum and spring viewer problems export non-empty
-     assumptions, each obligation references the assumptions it depends on, the
-     package and export contract still validate, and focused tests pass.
-
-2. **BE-036: Export measured safety-margin diagnostics per obligation**
+1. **BE-036: Export measured safety-margin diagnostics per obligation**
    - Goal: Enrich the measured evidence with a per-obligation worst margin to the
      boundary (and a time-to-first-violation when violated) so the package's
      measured-diagnostics component shows how close a run gets, all still labeled
@@ -77,7 +64,7 @@ proved/certified — the engine proposes; external backends dispose._
      time when `measured-violated`), validation accepts well-formed values and
      rejects bad shapes, generated examples validate, and focused tests pass.
 
-3. **BE-040: Flagship drone point-mass controlled dynamics**
+2. **BE-040: Flagship drone point-mass controlled dynamics**
    - Goal: Introduce the committed flagship as a thin symbolic point-mass drone
      (translational position+velocity state, thrust/acceleration controls with
      bounds, optional disturbance) reduced to controlled continuous dynamics via
@@ -90,7 +77,7 @@ proved/certified — the engine proposes; external backends dispose._
      box control bounds and a deterministic closed-loop rollout under a
      stabilizing feedback law; focused tests pass.
 
-4. **BE-041: Drone safe/unsafe sets, admissible controls, and candidate**
+3. **BE-041: Drone safe/unsafe sets, admissible controls, and candidate**
    - Goal: Give the flagship its safety structure — a geofence/buffer safe set
      (and an obstacle/unsafe set), admissible-control bounds, and a candidate
      Lyapunov/barrier — all candidate / external-required only, never certified.
@@ -101,7 +88,7 @@ proved/certified — the engine proposes; external backends dispose._
      rendering geometry, admissible controls, and a labeled candidate; rigor stays
      candidate; the export contract validates; focused tests pass.
 
-5. **BE-042: Drone proof obligations and measured rollout diagnostics**
+4. **BE-042: Drone proof obligations and measured rollout diagnostics**
    - Goal: Generate the drone's explicit proof obligations (safe-set
      invariance / barrier non-increase / Lyapunov decrease as *obligations*, not
      discharged) and collect measured diagnostics — worst margins and violation
@@ -113,7 +100,7 @@ proved/certified — the engine proposes; external backends dispose._
      `proofStatuses` carry margins/violation times, nothing is labeled proved, the
      export contract validates, and focused tests pass.
 
-6. **BE-043: Assemble and export the flagship drone verification package**
+5. **BE-043: Assemble and export the flagship drone verification package**
    - Goal: Route the drone end-to-end into one BE-039 verification package —
      manifest, dynamics, assumptions, safe/unsafe sets, candidates, obligations,
      measured traces/diagnostics, and visualization data — completing the VISION
@@ -125,7 +112,7 @@ proved/certified — the engine proposes; external backends dispose._
      claims proof/certification; generated data stays uncommitted; focused tests
      pass.
 
-7. **BE-044: Backend adapter stubs in the verification package**
+6. **BE-044: Backend adapter stubs in the verification package**
    - Goal: Include optional adapter-stub descriptors in the package describing how
      external backend *categories* (reachability, SOS/certificate synthesis,
      deductive prover) would consume each obligation — descriptors of target and

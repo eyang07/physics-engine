@@ -221,6 +221,7 @@ def verification_problem_from_obligations(
     specification: SafetySpecification | None = None,
     substitutions: Mapping[sp.Symbol, float] | None = None,
     assumptions: Sequence[AssumptionSpec] = (),
+    obligation_assumptions: Mapping[str, Sequence[str]] | None = None,
     metadata: Mapping[str, Any] | None = None,
 ) -> VerificationProblem:
     """Package proof obligations as a backend-agnostic verification problem.
@@ -230,6 +231,13 @@ def verification_problem_from_obligations(
     candidate that generated the obligations and is linked to all of them.
     The resulting problem records claims for external discharge; it does not
     include proof results and does not mark any obligation certified.
+
+    ``obligation_assumptions`` optionally states which assumptions each
+    obligation depends on, keyed by the obligation's name. When omitted, every
+    assumption links to every obligation (the historical behavior). When given,
+    an obligation references the explicit assumptions named for it, and any
+    parameter-domain assumptions (which are global facts about the parameters)
+    still attach to every obligation.
     """
 
     obligation_tuple = tuple(obligations)
@@ -321,7 +329,40 @@ def verification_problem_from_obligations(
         for symbol in parameter_symbols
     )
     assumption_specs = _parameter_assumptions(parameter_symbols, assumptions)
-    assumption_ids = tuple(assumption.id for assumption in assumption_specs)
+    all_assumption_ids = tuple(assumption.id for assumption in assumption_specs)
+    explicit_assumption_ids = {assumption.id for assumption in assumptions}
+    # Parameter-domain assumptions are global facts about the parameters, so they
+    # attach to every obligation even when per-obligation linking is requested.
+    global_assumption_ids = tuple(
+        assumption_id
+        for assumption_id in all_assumption_ids
+        if assumption_id not in explicit_assumption_ids
+    )
+
+    obligation_names = {obligation.name for obligation in obligation_tuple}
+    if obligation_assumptions is not None:
+        known_assumption_ids = set(all_assumption_ids)
+        for obligation_name, assumption_ids in obligation_assumptions.items():
+            if obligation_name not in obligation_names:
+                raise ValueError(
+                    "obligation assumption map references unknown obligation: "
+                    f"{obligation_name!r}"
+                )
+            unknown = set(assumption_ids) - known_assumption_ids
+            if unknown:
+                raise ValueError(
+                    f"obligation {obligation_name!r} references unknown assumption "
+                    f"ids: {sorted(unknown)}"
+                )
+
+    def _assumption_ids_for(obligation: ProofObligation) -> tuple[str, ...]:
+        if obligation_assumptions is None:
+            return all_assumption_ids
+        linked = list(global_assumption_ids)
+        for assumption_id in obligation_assumptions.get(obligation.name, ()):
+            if assumption_id not in linked:
+                linked.append(assumption_id)
+        return tuple(linked)
 
     used_obligation_ids: set[str] = set()
     obligation_specs = []
@@ -342,7 +383,7 @@ def verification_problem_from_obligations(
                     if obligation.excluded_point is not None
                     else ()
                 ),
-                assumption_ids=assumption_ids,
+                assumption_ids=_assumption_ids_for(obligation),
                 description=obligation.description,
             )
         )
@@ -404,6 +445,7 @@ def verification_problem_from_barrier(
     specification: SafetySpecification | None = None,
     substitutions: Mapping[sp.Symbol, float] | None = None,
     assumptions: Sequence[AssumptionSpec] = (),
+    obligation_assumptions: Mapping[str, Sequence[str]] | None = None,
     metadata: Mapping[str, Any] | None = None,
 ) -> VerificationProblem:
     return verification_problem_from_obligations(
@@ -414,6 +456,7 @@ def verification_problem_from_barrier(
         specification=specification,
         substitutions=substitutions,
         assumptions=assumptions,
+        obligation_assumptions=obligation_assumptions,
         metadata=metadata,
     )
 

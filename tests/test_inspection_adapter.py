@@ -1029,6 +1029,38 @@ def test_controlled_spring_problem_exports_viewer_contract() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    "build_problem",
+    [upright_pendulum_problem, controlled_spring_problem],
+    ids=["upright-pendulum", "controlled-spring"],
+)
+def test_case_study_obligations_reference_stated_assumptions(build_problem) -> None:
+    problem = build_problem()
+
+    # Each case study now states the domain assumptions its candidate relies on.
+    assert problem.assumptions, "case study must export stated assumptions"
+    roles = {assumption.role for assumption in problem.assumptions}
+    assert {"domain", "model"} <= roles
+    assumption_ids = {assumption.id for assumption in problem.assumptions}
+    domain_ids = {a.id for a in problem.assumptions if a.role == "domain"}
+    model_ids = {a.id for a in problem.assumptions if a.role == "model"}
+
+    for obligation in problem.obligations:
+        assert obligation.assumption_ids, f"{obligation.id} must reference assumptions"
+        assert set(obligation.assumption_ids) <= assumption_ids
+        # Every claim is valid only within the stated operating domain.
+        assert domain_ids <= set(obligation.assumption_ids)
+
+    # The dynamical non-increase claim additionally depends on the actuator
+    # (model) assumption; the static value claims do not.
+    non_increase = next(o for o in problem.obligations if o.id.endswith("non-increase"))
+    assert model_ids <= set(non_increase.assumption_ids)
+    for obligation in problem.obligations:
+        if obligation.id.endswith("non-increase"):
+            continue
+        assert not (model_ids & set(obligation.assumption_ids))
+
+
 def test_generate_verification_problems_writes_self_contained_index(tmp_path) -> None:
     generated_dir = tmp_path / "generated"
     viewer_dir = tmp_path / "viewer"

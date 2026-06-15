@@ -27,9 +27,11 @@ from engine.dynamics import (
 from engine.export import PackageManifest, write_package
 from engine.numerics import integrate_fixed_step
 from engine.verification import (
+    AssumptionSpec,
     InspectionAdapterReport,
     VerificationProblem,
     certificate_series_for_trajectory,
+    expression_spec,
     scalar_field_region_geometries,
     sampled_region_proof_statuses,
     verification_problem_from_barrier,
@@ -104,11 +106,50 @@ def upright_pendulum_problem() -> VerificationProblem:
         name="energy-barrier",
     )
 
+    # The candidate construction is only valid under stated assumptions: the pole
+    # stays in the upright corridor, and the PD command stays within the assumed
+    # actuator bound (so the closed loop matches the model). The dynamical
+    # non-increase claim depends on both; the static value claims only on the
+    # operating domain.
+    corridor = AssumptionSpec(
+        id="operating-corridor-near-upright",
+        name="state stays in the upright corridor",
+        role="domain",
+        expression=expression_spec(d**2),
+        comparison="<=",
+        rhs=0.25,
+        variables=("theta", "omega"),
+        description=(
+            "Analysis is valid only while the pole stays within the safe corridor "
+            "about the upright equilibrium theta = pi."
+        ),
+    )
+    actuator_bound = AssumptionSpec(
+        id="pd-command-within-actuator-bound",
+        name="PD command stays within the actuator bound",
+        role="model",
+        expression=expression_spec((-20 * d - 5 * omega) ** 2),
+        comparison="<=",
+        rhs=625.0,
+        variables=("theta", "omega"),
+        description=(
+            "The PD law's commanded torque stays within the assumed actuator limit, "
+            "so the closed-loop field matches the modeled dynamics."
+        ),
+    )
+    obligation_assumptions = {
+        "energy-barrier:non-increase": (corridor.id, actuator_bound.id),
+        "energy-barrier:initial-containment": (corridor.id,),
+        "energy-barrier:excludes:near-bottom": (corridor.id,),
+    }
+
     problem = verification_problem_from_barrier(
         "upright pendulum safety",
         closed,
         barrier,
         specification=specification,
+        assumptions=(corridor, actuator_bound),
+        obligation_assumptions=obligation_assumptions,
         metadata={"verificationModel": "controlled-pendulum-closed-loop"},
     )
     geometry = scalar_field_region_geometries(
@@ -197,11 +238,49 @@ def controlled_spring_problem() -> VerificationProblem:
         name="regulated-energy-barrier",
     )
 
+    # Stated assumptions the candidate relies on: the state stays within the
+    # regulated-energy envelope, and the regulator command stays within the
+    # assumed actuator bound. Only the dynamical non-increase claim depends on
+    # the actuator bound; the value claims depend on the operating envelope.
+    envelope = AssumptionSpec(
+        id="operating-within-energy-envelope",
+        name="state stays within the energy envelope",
+        role="domain",
+        expression=expression_spec(regulated_energy),
+        comparison="<=",
+        rhs=1.0,
+        variables=("x", "v"),
+        description=(
+            "Analysis is valid only while the state stays within the regulated-energy "
+            "envelope where the quadratic barrier governs the motion."
+        ),
+    )
+    actuator_bound = AssumptionSpec(
+        id="regulator-command-within-actuator-bound",
+        name="regulator command stays within the actuator bound",
+        role="model",
+        expression=expression_spec((-x - sp.Rational(13, 5) * v) ** 2),
+        comparison="<=",
+        rhs=9.0,
+        variables=("x", "v"),
+        description=(
+            "The regulator's commanded force stays within the assumed actuator limit, "
+            "so the closed-loop field matches the modeled dynamics."
+        ),
+    )
+    obligation_assumptions = {
+        "regulated-energy-barrier:non-increase": (envelope.id, actuator_bound.id),
+        "regulated-energy-barrier:initial-containment": (envelope.id,),
+        "regulated-energy-barrier:excludes:outside-energy-envelope": (envelope.id,),
+    }
+
     problem = verification_problem_from_barrier(
         "controlled spring regulator safety",
         closed,
         barrier,
         specification=specification,
+        assumptions=(envelope, actuator_bound),
+        obligation_assumptions=obligation_assumptions,
         metadata={"verificationModel": "controlled-spring-regulator"},
     )
     geometry = scalar_field_region_geometries(
