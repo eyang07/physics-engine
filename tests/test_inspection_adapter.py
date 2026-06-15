@@ -1850,6 +1850,40 @@ def test_validate_viewer_verification_index_rejects_invalid_payloads(
             },
             "certificateSeries 0 problemId does not match containing problem",
         ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "trajectory": {
+                    **_valid_viewer_verification_trajectory(),
+                    "certificateSeries": [
+                        {
+                            **_valid_viewer_verification_trajectory()[
+                                "certificateSeries"
+                            ][0],
+                            "label": "",
+                        }
+                    ],
+                },
+            },
+            "certificateSeries 0 label is invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "trajectory": {
+                    **_valid_viewer_verification_trajectory(),
+                    "certificateSeries": [
+                        {
+                            **_valid_viewer_verification_trajectory()[
+                                "certificateSeries"
+                            ][0],
+                            "label": 5,
+                        }
+                    ],
+                },
+            },
+            "certificateSeries 0 label is invalid",
+        ),
     ],
 )
 def test_validate_viewer_verification_problem_payload_rejects_bad_links(

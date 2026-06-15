@@ -64,11 +64,4 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-031: Add verification certificate-series label guard**
-   - Goal: Keep each certificate-series carrying a human-readable lane label so
-     the viewer never renders an unlabeled certificate lane.
-   - Scope: `engine/export/verification_contract.py` and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: Problem payload validation rejects empty or non-string
-     certificate-series `label`, accepts the generated viewer examples, and
-     focused verification export tests pass.
+_No backend tasks queued (pending discussion)._
