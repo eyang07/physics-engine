@@ -22,6 +22,9 @@ from scripts.export_verification_problems import (
     verification_package_inputs,
     write_verification_packages,
 )
+from scripts.generate_verification_problems import (
+    write_verification_packages_for_examples,
+)
 
 
 def _inputs_by_id() -> dict:
@@ -175,3 +178,55 @@ def test_manifest_requires_the_core_components() -> None:
 def test_component_rejects_unknown_kind() -> None:
     with pytest.raises(ValueError, match="unknown verification package component kind"):
         PackageComponent(kind="mystery", path="mystery.json")
+
+
+def test_generation_publishes_complete_drone_package(tmp_path) -> None:
+    # The generation entry point bundles the flagship drone end-to-end (BE-043).
+    manifests = write_verification_packages_for_examples(tmp_path)
+    drone = next(m for m in manifests if m.problem_id == "drone-geofence-axis")
+    assert drone.model == "drone-geofence-axis"
+    # Nothing in the package claims a discharged result.
+    assert drone.status == "candidate"
+
+    package = read_package(tmp_path / "drone-geofence-axis")
+    problem = package.problem
+
+    # Every VISION §13 milestone component is present and re-reads in Python.
+    assert {component.kind for component in package.manifest.components} == {
+        COMPONENT_IR,
+        COMPONENT_TRAJECTORY,
+    }
+    assert problem.dynamics is not None and problem.dynamics.kind == "discrete"
+    assert {assumption.id for assumption in problem.assumptions} == {
+        "speed-within-half-guard-reach",
+        "velocity-within-self-reproducing-bound",
+        "timestep-small-vs-guard-band",
+        "linear-drift-within-inner-interval",
+    }
+    assert any(region.role == "safe" for region in problem.regions)
+    assert {candidate.id for candidate in problem.candidates} == {
+        "geofence-barrier",
+        "velocity-bound-barrier",
+        "inner-set-barrier",
+    }
+    # The (q1, v1) visualization covers every region.
+    assert {geometry.region_id for geometry in problem.region_geometry} == {
+        region.id for region in problem.regions
+    }
+    assert all(
+        geometry.plane_variables == ("q1", "v1")
+        for geometry in problem.region_geometry
+    )
+    # Measured traces: a verdict ledger per obligation and a candidate-value series.
+    assert {status.obligation_id for status in problem.proof_statuses} == {
+        obligation.id for obligation in problem.obligations
+    }
+    assert package.trajectory["series"]
+
+    # The engine proposes; it never disposes. Obligations stay external-required,
+    # candidates stay candidate, and measured evidence stays measured.
+    assert {obligation.rigor for obligation in problem.obligations} == {
+        "external-required"
+    }
+    assert {candidate.status for candidate in problem.candidates} == {"candidate"}
+    assert {status.rigor for status in problem.proof_statuses} == {"measured"}

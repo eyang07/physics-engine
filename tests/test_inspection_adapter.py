@@ -67,6 +67,7 @@ from scripts.export_verification_problems import (
 )
 from scripts.generate_verification_problems import (
     DEFAULT_GENERATED_DIR as VIEWER_VERIFICATION_GENERATED_DIR,
+    DEFAULT_PACKAGE_DIR as VIEWER_VERIFICATION_PACKAGE_DIR,
     DEFAULT_VIEWER_DIR as VIEWER_VERIFICATION_VIEWER_DIR,
     INDEX_VERSION,
     parse_args as parse_generate_verification_args,
@@ -1089,18 +1090,53 @@ def test_drone_geofence_problem_exports_viewer_contract() -> None:
         assert geometry["plane"]["variables"] == ["q1", "v1"]
         assert geometry["plane"]["variableToStateAxis"] == {"q1": "q1", "v1": "v1"}
 
-    # A labeled, candidate-only barrier.
-    assert [candidate["id"] for candidate in payload["candidates"]] == ["geofence-barrier"]
-    assert payload["candidates"][0]["status"] == "candidate"
+    # The three Tier-1 barrier candidates (geofence, velocity, inner-set), each
+    # candidate-only and linked to its own obligation(s).
+    candidates = {candidate["id"]: candidate for candidate in payload["candidates"]}
+    assert set(candidates) == {
+        "geofence-barrier",
+        "velocity-bound-barrier",
+        "inner-set-barrier",
+    }
+    assert {candidate["status"] for candidate in candidates.values()} == {"candidate"}
+    assert candidates["velocity-bound-barrier"]["obligationIds"] == [
+        "velocity-bound-one-step-invariance"
+    ]
+    assert candidates["inner-set-barrier"]["obligationIds"] == [
+        "inner-set-one-step-invariance"
+    ]
 
-    # The honest forward-invariance claim (not the box barrier's false non-increase),
-    # external-required, depending on the stated speed bound; the static initial
-    # containment claim does not.
+    # The full spec-G assumption set: speedBound, velBound, dtSmall, driftBound.
+    assert {assumption["id"] for assumption in payload["assumptions"]} == {
+        "speed-within-half-guard-reach",
+        "velocity-within-self-reproducing-bound",
+        "timestep-small-vs-guard-band",
+        "linear-drift-within-inner-interval",
+    }
+
+    # Every obligation is external-required; each cites the spec-G assumptions it
+    # depends on (P1 forward invariance needs speedBound + dtSmall; the static
+    # initial containment needs none; P2 needs velBound; S_in needs driftBound).
     obligations = {obligation["id"]: obligation for obligation in payload["obligations"]}
+    assert set(obligations) == {
+        "geofence-barrier-forward-invariance",
+        "geofence-barrier-initial-containment",
+        "velocity-bound-one-step-invariance",
+        "inner-set-one-step-invariance",
+    }
     assert {obligation["rigor"] for obligation in obligations.values()} == {"external-required"}
     forward = obligations["geofence-barrier-forward-invariance"]
-    assert forward["assumptionIds"] == ["speed-within-half-guard-reach"]
+    assert forward["assumptionIds"] == [
+        "speed-within-half-guard-reach",
+        "timestep-small-vs-guard-band",
+    ]
     assert obligations["geofence-barrier-initial-containment"]["assumptionIds"] == []
+    assert obligations["velocity-bound-one-step-invariance"]["assumptionIds"] == [
+        "velocity-within-self-reproducing-bound"
+    ]
+    assert obligations["inner-set-one-step-invariance"]["assumptionIds"] == [
+        "linear-drift-within-inner-interval"
+    ]
 
     # Measured verdict ledger: one region-grid status per obligation, rigor
     # 'measured' (never proved), each carrying a signed worst margin.
@@ -1127,6 +1163,14 @@ def test_drone_geofence_problem_exports_viewer_contract() -> None:
     assert initial_status["status"] == "measured-holds"
     assert "stated assumption region" not in initial_status["note"]
 
+    # P2 and S_in are likewise measured only inside their stated bounds.
+    velocity_status = statuses_by_obligation["velocity-bound-one-step-invariance"]
+    assert velocity_status["status"] == "measured-holds"
+    assert "velocity-within-self-reproducing-bound" in velocity_status["note"]
+    inner_status = statuses_by_obligation["inner-set-one-step-invariance"]
+    assert inner_status["status"] == "measured-holds"
+    assert "linear-drift-within-inner-interval" in inner_status["note"]
+
     # The viewer contract accepts the Max/Piecewise-backed problem.
     validate_viewer_verification_problems([problem])
 
@@ -1143,11 +1187,22 @@ def test_certificate_series_supports_discrete_dynamics() -> None:
         variable_to_state_axis={"q1": "q1", "v1": "v1"},
     )
     # Discrete problems get the candidate VALUE series only (the flow derivative
-    # is a continuous-time notion).
+    # is a continuous-time notion); one per Tier-1 barrier candidate.
     assert {record["kind"] for record in diagnostics.metadata} == {"candidate-value"}
-    assert set(diagnostics.series) == {"certificate_geofence_barrier_value"}
-    # B(x(t)) stays <= 0 along the safe rollout (measured evidence).
+    assert set(diagnostics.series) == {
+        "certificate_geofence_barrier_value",
+        "certificate_velocity_bound_barrier_value",
+        "certificate_inner_set_barrier_value",
+    }
+    # The geofence and velocity barriers stay <= 0 along the safe rollout: the
+    # drone stays inside the geofence and within the velocity bound (measured
+    # evidence).
     assert max(diagnostics.series["certificate_geofence_barrier_value"]) <= 1e-9
+    assert max(diagnostics.series["certificate_velocity_bound_barrier_value"]) <= 1e-9
+    # But it coasts into the guard band, so it leaves the inner set S_in: the
+    # inner-set barrier value goes positive. S_in is a one-step invariant under
+    # driftBound, not a property of this outward-coasting trajectory.
+    assert max(diagnostics.series["certificate_inner_set_barrier_value"]) > 0.0
 
 
 @pytest.mark.parametrize(
@@ -1338,15 +1393,19 @@ def test_generate_verification_problems_default_dirs_are_ignored_paths() -> None
 
     assert args.generated_dir == VIEWER_VERIFICATION_GENERATED_DIR
     assert args.viewer_dir == VIEWER_VERIFICATION_VIEWER_DIR
+    assert args.package_dir == VIEWER_VERIFICATION_PACKAGE_DIR
 
     gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
     assert "data/generated/" in gitignore
     assert "viewer/public/data/verification/" in gitignore
+    # The default package dir lives under the ignored generated tree.
+    assert str(VIEWER_VERIFICATION_PACKAGE_DIR).startswith("data/generated/")
 
 
 def test_generate_verification_problems_cli_writes_custom_output_dirs(tmp_path) -> None:
     generated_dir = tmp_path / "generated-verification"
     viewer_dir = tmp_path / "viewer-verification"
+    package_dir = tmp_path / "packages"
 
     result = subprocess.run(
         [
@@ -1357,6 +1416,8 @@ def test_generate_verification_problems_cli_writes_custom_output_dirs(tmp_path) 
             str(generated_dir),
             "--viewer-dir",
             str(viewer_dir),
+            "--package-dir",
+            str(package_dir),
         ],
         cwd=REPO_ROOT,
         check=True,
@@ -1369,8 +1430,13 @@ def test_generate_verification_problems_cli_writes_custom_output_dirs(tmp_path) 
         f"wrote {len(expected_ids)} verification problem(s): {', '.join(expected_ids)}",
         f"generated dir: {generated_dir}",
         f"viewer dir: {viewer_dir}",
+        f"wrote {len(expected_ids)} verification package(s): {package_dir}",
     ]
     assert result.stderr == ""
+
+    # Every example is bundled as a re-readable package.
+    for problem_id in expected_ids:
+        assert (package_dir / problem_id / "package.json").is_file()
 
     expected_names = _viewer_verification_expected_filenames()
     assert _directory_filenames(generated_dir) == expected_names

@@ -28,14 +28,17 @@ from engine.export import (
     validate_viewer_verification_problems,
     validate_viewer_verification_trajectory,
 )
+from engine.export import PackageManifest
 from engine.verification import VerificationProblem
 from scripts.export_verification_problems import (
     controlled_trajectory_payload,
     viewer_verification_examples,
+    write_verification_packages,
 )
 
 DEFAULT_GENERATED_DIR = Path("data/generated/verification")
 DEFAULT_VIEWER_DIR = Path("viewer/public/data/verification")
+DEFAULT_PACKAGE_DIR = Path("data/generated/verification/packages")
 INDEX_VERSION = 1
 
 
@@ -117,6 +120,19 @@ def write_verification_problems(
     return [summary["id"] for summary in summaries]
 
 
+def write_verification_packages_for_examples(
+    package_dir: Path = DEFAULT_PACKAGE_DIR,
+) -> list[PackageManifest]:
+    """Bundle every viewer example into a self-contained BE-039 package.
+
+    Each package lands under ``package_dir/<problem_id>/`` (IR, viewer
+    trajectory, and a manifest). Output is deterministic and regenerable; keep it
+    uncommitted like the other generated verification data.
+    """
+
+    return write_verification_packages(package_dir)
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -131,6 +147,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_VIEWER_DIR,
         help="directory for ignored viewer verification files",
     )
+    parser.add_argument(
+        "--package-dir",
+        type=Path,
+        default=DEFAULT_PACKAGE_DIR,
+        help="directory for ignored self-contained verification packages",
+    )
     return parser.parse_args(argv)
 
 
@@ -144,6 +166,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     print(f"wrote {len(ids)} verification problem(s): {', '.join(ids)}")
     print(f"generated dir: {args.generated_dir}")
     print(f"viewer dir: {args.viewer_dir}")
+
+    manifests = write_verification_packages_for_examples(args.package_dir)
+    print(f"wrote {len(manifests)} verification package(s): {args.package_dir}")
 
 
 if __name__ == "__main__":

@@ -29,6 +29,7 @@ from engine.export import PackageManifest, write_package
 from engine.numerics import integrate_fixed_step
 from engine.verification import (
     AssumptionSpec,
+    CandidateSpec,
     InspectionAdapterReport,
     VerificationProblem,
     certificate_series_for_trajectory,
@@ -332,13 +333,20 @@ def _drone_rational(value: float) -> sp.Expr:
 
 
 def drone_geofence_problem(params: DroneParams = DroneParams()) -> VerificationProblem:
-    """Tier-1 geofence safety for the flagship drone's horizontal axis.
+    """Flagship Tier-1 verification problem for the drone's horizontal axis.
 
-    The decoupled `(q1, v1)` guard-band closed loop with the geofence box barrier
-    `B(q1) = max(q1Min - q1, q1 - q1Max)` (candidate only). The forward-invariance
-    obligation states the actual Tier-1 claim (`B(F(x)) <= 0` on `{B <= 0}` under
-    the speed bound), not the stronger non-increase condition the box barrier does
-    not satisfy. Renders on the `(q1, v1)` phase plane (spec M).
+    The decoupled `(q1, v1)` guard-band closed loop, carrying the full set of
+    spec-G assumptions and the three Tier-1 barrier candidates with their
+    one-step invariance obligations (spec K, L):
+
+    - geofence barrier `B = max(q1Min - q1, q1 - q1Max)` with P1 forward
+      invariance under `speedBound` + `dtSmall`, plus initial containment;
+    - velocity barrier `B_vel = |v1| - Bh` with P2 self-reproducing velocity
+      invariance under `velBound`;
+    - inner-set barrier `B_in` with S_in one-step invariance under `driftBound`.
+
+    Every obligation is `external-required`; the candidates are proposals only.
+    Renders on the `(q1, v1)` phase plane (spec M).
     """
 
     q1 = DRONE_STATE[0]
@@ -348,7 +356,9 @@ def drone_geofence_problem(params: DroneParams = DroneParams()) -> VerificationP
     q1_min, q1_max = params.q1_bounds
     band = params.horizontal_band
     velocity_bound = params.horizontal_velocity_bound
+    half_reach = params.horizontal_thrust * params.timestep / 2
     r = _drone_rational
+    dt = r(params.timestep)
 
     barrier_expression = sp.Max(r(q1_min) - q1, q1 - r(q1_max))
     barrier = BarrierCandidate(
@@ -357,15 +367,20 @@ def drone_geofence_problem(params: DroneParams = DroneParams()) -> VerificationP
     safe_set = SublevelSet(
         state=(q1, v1), expression=barrier_expression, level=0.0, name="geofence"
     )
+    inner_start_expression = sp.Max(
+        r(q1_min) + r(band) - q1,
+        q1 - (r(q1_max) - r(band)),
+        sp.Abs(v1) - r(velocity_bound),
+    )
     inner_start_set = SublevelSet(
+        state=(q1, v1), expression=inner_start_expression, level=0.0, name="inner-start"
+    )
+    velocity_barrier_expression = sp.Abs(v1) - r(velocity_bound)
+    velocity_bound_set = SublevelSet(
         state=(q1, v1),
-        expression=sp.Max(
-            r(q1_min) + r(band) - q1,
-            q1 - (r(q1_max) - r(band)),
-            sp.Abs(v1) - r(velocity_bound),
-        ),
+        expression=velocity_barrier_expression,
         level=0.0,
-        name="inner-start",
+        name="velocity-bound",
     )
     specification = SafetySpecification(
         state=(q1, v1), safe_set=safe_set, initial_set=inner_start_set
@@ -391,34 +406,158 @@ def drone_geofence_problem(params: DroneParams = DroneParams()) -> VerificationP
         region=inner_start_set,
         description="B <= 0 on the inner start set: the initial set lies inside the geofence.",
     )
+    velocity_invariance = ProofObligation(
+        name="velocity-bound:one-step-invariance",
+        state=(q1, v1),
+        expression=velocity_barrier_expression.subs(next_state, simultaneous=True),
+        comparison="<=",
+        region=velocity_bound_set,
+        description=(
+            "B_vel(F(x)) <= 0 on {|v1| <= Bh}: the per-axis velocity bound Bh = uh*dt "
+            "is self-reproducing under one closed-loop step (Tier-1 P2)."
+        ),
+    )
+    inner_set_invariance = ProofObligation(
+        name="inner-set:one-step-invariance",
+        state=(q1, v1),
+        expression=inner_start_expression.subs(next_state, simultaneous=True),
+        comparison="<=",
+        region=inner_start_set,
+        description=(
+            "B_in(F(x)) <= 0 on {B_in <= 0}: one step keeps the drone in the inner "
+            "set S_in, the supporting invariant for recovery (Tier-1 P3 support)."
+        ),
+    )
+
+    drift = q1 + dt * v1
     speed_bound = AssumptionSpec(
         id="speed-within-half-guard-reach",
         name="per-step speed within half the guard reach",
         role="domain",
         expression=expression_spec(sp.Abs(v1)),
         comparison="<=",
-        rhs=float(params.horizontal_thrust * params.timestep / 2),
+        rhs=float(half_reach),
         variables=("v1",),
         description=(
             "Speed stays within uh*dt/2 so corrective thrust arrests outward motion "
-            "before the wall (spec G speedBound)."
+            "before the wall (spec G speedBound; precondition of P1)."
+        ),
+    )
+    velocity_bound_assumption = AssumptionSpec(
+        id="velocity-within-self-reproducing-bound",
+        name="speed within the self-reproducing velocity bound",
+        role="domain",
+        expression=expression_spec(sp.Abs(v1)),
+        comparison="<=",
+        rhs=float(velocity_bound),
+        variables=("v1",),
+        description=(
+            "Speed stays within Bh = uh*dt, the per-axis bound the closed loop "
+            "preserves (spec G velBound; invariant established by P2)."
+        ),
+    )
+    timestep_small = AssumptionSpec(
+        id="timestep-small-vs-guard-band",
+        name="one step's braking displacement fits the guard band",
+        role="parameter-domain",
+        expression=expression_spec(r(params.horizontal_thrust) * dt**2 / 2),
+        comparison="<=",
+        rhs=float(band),
+        variables=(),
+        description=(
+            "uh*dt^2/2 <= dh: one step's worst corrective displacement fits inside "
+            "the guard band (spec G dtSmall; precondition of P1)."
+        ),
+    )
+    drift_bound = AssumptionSpec(
+        id="linear-drift-within-inner-interval",
+        name="linear drift stays in the inner interval",
+        role="domain",
+        expression=expression_spec(
+            sp.Max(r(q1_min) + r(band) - drift, drift - (r(q1_max) - r(band)))
+        ),
+        comparison="<=",
+        rhs=0.0,
+        variables=("q1", "v1"),
+        description=(
+            "q1Min+dh <= q1 + dt*v1 <= q1Max-dh: the linear drift stays in the inner "
+            "interval (spec G driftBound; precondition of S_in invariance)."
         ),
     )
 
     problem = verification_problem_from_obligations(
         "drone geofence axis",
-        (forward_invariance, initial_containment),
+        (
+            forward_invariance,
+            initial_containment,
+            velocity_invariance,
+            inner_set_invariance,
+        ),
         system=closed,
         open_loop_system=open_loop,
-        candidate=barrier,
         specification=specification,
-        assumptions=(speed_bound,),
+        assumptions=(
+            speed_bound,
+            velocity_bound_assumption,
+            timestep_small,
+            drift_bound,
+        ),
         obligation_assumptions={
-            "geofence-barrier:forward-invariance": ("speed-within-half-guard-reach",),
+            "geofence-barrier:forward-invariance": (
+                "speed-within-half-guard-reach",
+                "timestep-small-vs-guard-band",
+            ),
             "geofence-barrier:initial-containment": (),
+            "velocity-bound:one-step-invariance": (
+                "velocity-within-self-reproducing-bound",
+            ),
+            "inner-set:one-step-invariance": ("linear-drift-within-inner-interval",),
         },
         metadata={"verificationModel": "drone-geofence-axis"},
     )
+
+    # Attach the three Tier-1 barrier candidates, each linked only to its own
+    # obligation(s) (the single-candidate adapter would link one barrier to all
+    # obligations, which would mislabel the velocity and inner-set certificates).
+    region_id_by_name = {region.name: region.id for region in problem.regions}
+    obligation_id_by_name = {
+        obligation.name: obligation.id for obligation in problem.obligations
+    }
+    candidates = (
+        CandidateSpec(
+            id="geofence-barrier",
+            name="geofence-barrier",
+            kind="barrier",
+            expression=expression_spec(barrier_expression),
+            obligation_ids=(
+                obligation_id_by_name["geofence-barrier:forward-invariance"],
+                obligation_id_by_name["geofence-barrier:initial-containment"],
+            ),
+            region_id=region_id_by_name["geofence-barrier:region"],
+        ),
+        CandidateSpec(
+            id="velocity-bound-barrier",
+            name="velocity-bound-barrier",
+            kind="barrier",
+            expression=expression_spec(velocity_barrier_expression),
+            obligation_ids=(
+                obligation_id_by_name["velocity-bound:one-step-invariance"],
+            ),
+            region_id=region_id_by_name["velocity-bound"],
+        ),
+        CandidateSpec(
+            id="inner-set-barrier",
+            name="inner-set-barrier",
+            kind="barrier",
+            expression=expression_spec(inner_start_expression),
+            obligation_ids=(
+                obligation_id_by_name["inner-set:one-step-invariance"],
+            ),
+            region_id=region_id_by_name["inner-start"],
+        ),
+    )
+    problem = replace(problem, candidates=candidates)
+
     geometry = scalar_field_region_geometries(
         problem.regions,
         projection="phase",
@@ -429,9 +568,9 @@ def drone_geofence_problem(params: DroneParams = DroneParams()) -> VerificationP
         samples=(81, 81),
     )
     problem = replace(problem, region_geometry=geometry)
-    # The forward-invariance claim is asserted only under the stated speed bound,
-    # so sample its grid honestly within that assumption region rather than over
-    # all velocities (where one guard-band step can overshoot the wall).
+    # Each one-step invariance claim is asserted only under its stated assumption
+    # (speedBound, velBound, driftBound); sample within that region rather than
+    # over all velocities, where a single guard-band step can overshoot.
     return replace(
         problem,
         proof_statuses=sampled_region_proof_statuses(

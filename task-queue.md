@@ -74,23 +74,21 @@ plane-expressible domain assumptions hold; the drone uses it so forward-invarian
 is measured inside `speedBound` (where one guard-band step holds the geofence,
 margin >= 0) instead of over all velocities (where it overshoots). Both statuses
 carry BE-036 margins at rigor `measured`; pendulum/spring sampling is unchanged.
-The optional P2 / admissibility obligations were left out (not needed for the
-ledger) and remain available for BE-043 if the package wants them.
 
-1. **BE-043: Assemble and export the flagship drone verification package**
-   - Goal: Route the drone end-to-end into one BE-039 verification package —
-     manifest, dynamics, assumptions (spec G: `speedBound`, `velBound`, `dtSmall`,
-     `driftBound`), safe set, candidate, obligations, measured traces/diagnostics,
-     and `(q1, v1)` visualization — completing the VISION §13 milestone on the
-     backend side.
-   - Scope: `scripts/export_verification_problems.py` and
-     `scripts/generate_verification_problems.py`, and `tests/`.
-   - Acceptance: generation publishes a complete, contract-valid drone package
-     that re-reads in Python and contains every milestone component; nothing
-     claims proof/certification; generated data stays uncommitted; focused tests
-     pass.
+BE-043 is done: the drone is now a complete flagship verification package.
+`drone_geofence_problem` carries the full spec-G assumption set (`speedBound`,
+`velBound`, `dtSmall`, `driftBound`) and the three Tier-1 barrier candidates with
+their one-step invariance obligations — geofence P1 forward-invariance (+ initial
+containment), velocity P2 self-reproducing bound, and S_in inner-set invariance —
+each obligation citing the assumptions it needs and measured-holding within its
+stated region. `generate_verification_problems` now also writes one BE-039
+package per example (`--package-dir`, default `data/generated/verification/
+packages`, ignored); the drone package re-reads in Python with manifest,
+discrete dynamics, assumptions, safe set, three candidates, four obligations,
+per-obligation measured `proofStatuses`, three candidate-value series, and full
+`(q1, v1)` geometry. Nothing claims proof/certification.
 
-2. **BE-044: Backend adapter stubs in the verification package**
+1. **BE-044: Backend adapter stubs in the verification package**
    - Goal: Include optional adapter-stub descriptors in the package describing how
      external backend *categories* (reachability, SOS/certificate synthesis,
      deductive prover) would consume each obligation — descriptors of target and
@@ -101,3 +99,31 @@ ledger) and remain available for BE-043 if the package wants them.
    - Acceptance: the drone package lists adapter stubs naming a target backend
      category and the obligation shape it would need, all honestly
      non-discharging; the export contract validates; focused tests pass.
+
+2. **BE-045: Verification-package discovery index**
+   - Goal: Write a deterministic discovery index alongside the generated packages
+     (mirroring the inspection-artifact and viewer indexes) so external tools and
+     the viewer can enumerate every package without walking the directory tree —
+     one entry per package naming its `package.json` path, model, status, and
+     component/obligation counts. Pure cataloging; it claims nothing beyond the
+     rigor of the packages it lists.
+   - Scope: `engine/export/verification_package.py` (an index builder/validator
+     beside the manifest), `scripts/generate_verification_problems.py` (write the
+     index next to the packages), and `tests/`.
+   - Acceptance: package generation also writes a contract-valid index that
+     re-reads in Python and references every written package's manifest; the index
+     round-trips; generated data stays uncommitted; focused tests pass.
+
+3. **BE-046: Vertical altitude-axis (q3, v3) Tier-1 geofence package**
+   - Goal: Add the decoupled vertical altitude axis as a second flagship package,
+     reusing the BE-043 structure but exercising the asymmetric vertical regime —
+     gravity, hover thrust, floor/ceiling guard bands, and the `[u3Min, u3Max]`
+     thrust box — with the P1 floor/ceiling invariance and P2 vertical velocity
+     bound (spec E `B3`) obligations under the corresponding spec-G assumptions.
+   - Scope: `systems/drone_point_mass.py` (a `vertical_axis_*` sub-dynamics
+     mirror of the horizontal axis), `scripts/export_verification_problems.py`,
+     and `tests/`.
+   - Acceptance: generation publishes a complete, contract-valid vertical-axis
+     package with measured `proofStatuses`, rendering on the `(q3, v3)` plane;
+     nothing claims proof/certification; generated data stays uncommitted; focused
+     tests pass.
