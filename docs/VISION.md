@@ -30,6 +30,9 @@ and visualization of proof-relevant geometry.
 - a structure-aware engine for analytical mechanics and dynamical systems;
 - a generator of *models*, *certificate candidates*, and *proof obligations* for
   mechanics-based systems;
+- a generator of self-contained **verification packages** — model, assumptions,
+  safe/unsafe sets, candidates, obligations, measured diagnostics, and
+  visualization data bundled together — that an external tool can consume;
 - a mathematical viewer for trajectories, phase-space structure, diagnostics, and
   (eventually) safe/unsafe geometry and certificate status;
 - a backend-agnostic front end that can export verification problems to external
@@ -75,6 +78,7 @@ analytical mechanics
 -> simulation and visualization
 -> certificate candidates
 -> proof obligations
+-> verification package (one self-contained bundle of all of the above)
 -> optional backend adapters for verification / certification
 ```
 
@@ -85,8 +89,13 @@ verification-problem IR, and a stub inspection adapter that writes problems out
 for external inspection also exist in backend form, and the first linked pair
 (`pendulum` ↔ `upright-pendulum-safety`) now surfaces its safe/unsafe geometry,
 candidate-certificate values, and a measured proof-status view in the viewer.
-Real external verification backends and actual proof discharge remain roadmap
-items.
+
+The **verification package** is the new connective artifact: a single,
+re-readable bundle that gathers a flagship system's model, assumptions, sets,
+candidates, obligations, measured diagnostics, and visualization data so the same
+artifact feeds both the viewer and any external backend. Real external
+verification backends and actual proof discharge remain roadmap items — the
+engine produces the package; it does not discharge it.
 
 ## 5. Target Domain: Mechanics-Based CPS and Robotics
 
@@ -249,55 +258,83 @@ appear as *future adapters* or as *examples of backend categories*
 (reachability, SOS/certificate synthesis, deductive provers), never as the
 foundation.
 
+**Maturity note (direction correction).** The IR is now mature enough that
+further refinement must be **case-study-driven**, not abstract. The IR exists to
+carry a concrete flagship system end-to-end (§11); new fields and schema versions
+should be motivated by a real package that needs them, not added speculatively.
+Depth on one routed system now outranks breadth of IR surface area.
+
 ## 11. Near-Term Roadmap
 
-In priority order:
+**Foundations now exist (done).** Continuous and discrete controlled dynamics,
+safe/unsafe sets, candidate Lyapunov/barrier generators, proof obligations, the
+backend-agnostic verification-problem IR (v3, with `to_dict`/`from_dict`
+round-trip), the stub inspection adapter, and two self-contained viewer case
+studies are all implemented backend-only. (See `engine/dynamics/controlled.py`,
+`discrete.py`, `safety.py`, `candidates.py`, and `engine/verification/`.)
 
-1. **Controlled dynamics.** Extend the dynamics layer to `x' = f(x, u, d; θ)`
-   (and a discrete analogue), with admissible-control and disturbance sets. This
-   is the prerequisite for any honest notion of "safety."
-   *Status: continuous case implemented backend-only
-   (`engine/dynamics/controlled.py`, spec in `docs/controlled-dynamics.md`);
-   discrete analogue implemented backend-only (`engine/dynamics/discrete.py`,
-   spec in `docs/discrete-dynamics.md`).*
-2. **Safety / certificate metadata.** Add safe/unsafe sets, obstacles, and
-   *candidate* barrier / Lyapunov / invariant representations as structured data
-   — candidates only, clearly labeled, not certified.
-   *Status: candidate metadata implemented backend-only
-   (`engine/dynamics/safety.py`, spec in `docs/safety-certificates.md`),
-   plus simple candidate generators — quadratic Lyapunov from a Hurwitz
-   linearization and sublevel barriers (`engine/dynamics/candidates.py`,
-   spec in `docs/candidate-generation.md`), and event-based unsafe-set entry
-   detection with integrator-located entry times
-   (`SafetySpecification.event_entry_report`, spec in
-   `docs/event-detection.md`). Continuous and discrete Lyapunov/barrier
-   proof obligations are implemented; SOS-style synthesis and proof discharge
-   remain open.*
-3. **Verification-problem IR.** Define and serialize the IR above, even if
-   the only adapter is a stub that writes the problem out for inspection.
-   *Status: v3 implemented (`engine/verification/`, spec in
-   `docs/verification-ir.md`) with continuous and discrete dynamics,
-   control/disturbance channels, explicit assumptions, first-class candidate
-   certificates, the stub inspection adapter
-   (`engine/verification/inspection_adapter.py`), and viewer-facing
-   visualization hooks: self-contained measured `regionGeometry`
-   grids/boundary polylines, controlled trajectories, candidate certificate
-   trajectory series, and sampled `proofStatuses`. Real external backends and
-   proof discharge remain open.*
-4. **Backend robustness before deeper case studies.** Keep strengthening the
-   IR, assumptions, safety metadata, deterministic exports, and validation so a
-   future controlled case study is mostly composition rather than invention.
-5. **Frontend safety surfaces.** Safe/unsafe-set rendering, certificate-value
-   display, and a proof-status panel that respects the rigor ladder (showing
-   "candidate" / "measured" honestly).
-   *Status: the backend now exports two self-contained controlled verification
-   case studies with the metadata these surfaces need. Generalizing the
-   frontend across those problems, driven by each problem's declared
-   projection/state axes, is the next step.*
+**The realignment.** The verification IR is mature enough. The next milestone is
+*not* more abstract IR or schema expansion, and *not* an in-engine prover — it is
+**one flagship controlled system, routed all the way through**: backend model →
+verification package → frontend visualization. Depth on one system now outranks
+breadth.
 
-External verification integrations come *after* controlled dynamics and IR
-exist — not before. Building serious adapters against an unstable model would be
-premature.
+### 11.1 Build a robust backend first
+
+Frontend feature work is paused except for small maintenance; the next
+substantial frontend task is rendering the complete flagship verification
+package. The point is not to invent UI against unstable backend/package data —
+backend robustness comes first. Backend robustness — assumptions, safe/unsafe
+geometry, measured diagnostics, deterministic and re-readable export, and
+validation — is the priority, so that routing the flagship system is mostly
+composition rather than invention.
+
+### 11.2 Verification package export (new connective artifact)
+
+Define a **verification package**: a single, deterministic, re-readable bundle
+(directory or archive) for one system, containing —
+
+- a package **manifest** (ids, schema version, provenance, contents index);
+- the **dynamics** (continuous or discrete, controlled);
+- **assumptions** (state/parameter bounds, timestep if discrete, admissible
+  controls, disturbances);
+- **safe / unsafe sets** and their rendering geometry;
+- **candidate certificates** (barrier / Lyapunov / invariant), candidate-only;
+- explicit **proof obligations**;
+- **measured traces / diagnostics** from simulated rollouts (rigor level 1);
+- **visualization data** (trajectories, region grids, certificate series);
+- optional **backend adapter stubs** describing how an external tool would
+  consume the package.
+
+The package is the IR plus everything a viewer or an external backend needs, in
+one place. It is built from the existing IR and export contracts — it unifies the
+viewer-facing export and the backend-only inspection artifacts into one bundle —
+and it is re-readable in Python. It claims nothing beyond the rigor of each part:
+measured stays measured, candidates stay candidates, obligations stay
+external-required.
+
+### 11.3 Systems and Verification share artifacts
+
+The Systems and Verification *views* stay visually and product-separated, but
+they are **not semantically disconnected**: where appropriate they consume the
+same generated package/model artifacts. The project's thesis is precisely the
+bridge from mechanics structure to a verification package, so the two surfaces
+should draw on shared, deterministic artifacts rather than parallel data paths.
+
+### 11.4 Frontend renders the package (after the backend lands)
+
+Once the flagship package exports and validates, the Verification view renders
+*that package* — its dynamics, sets, candidates, obligations, and measured
+diagnostics — and offers a clear package download / inspection path. Safe/unsafe
+rendering, certificate values, and a proof-status panel must respect the rigor
+ladder ("candidate" / "measured" / "external-required", never "proved").
+
+**Explicitly deferred / dropped.** An in-engine symbolic decrease-condition
+checker (attempting `V̇ ≤ 0`) is **removed from near-term work**. The engine
+*generates* the decrease proof obligation; an external verifier *discharges* it.
+Building even a small in-engine checker would blur the "propose vs. dispose"
+philosophy, so it is postponed indefinitely, not scheduled. External verification
+integrations likewise come only after the flagship package exists.
 
 ## 12. Long-Term Roadmap
 
@@ -334,27 +371,38 @@ wavefront-envelope diagnostics, reusable parameterized media models, and a
 backend-only metric-geometry helper (2-sphere, equatorial Schwarzschild). They
 remain valuable as the structural and diagnostic backbone.
 
-**Controlled systems (first serious target).** Choose **one** small controlled
-mechanical system — controlled pendulum, cart-pole, or a drone point-mass model —
-and push it deeply:
+**Flagship controlled system (the committed next milestone).** The next
+milestone is to push **one** controlled system the whole way through the stack.
+The **preferred target is a drone point-mass model** (it aligns with existing
+drone-verification work); if that proves too large to land soon, fall back to a
+**controlled pendulum or cart-pole** as a smaller canonical benchmark. Whichever
+is chosen, the end-to-end milestone is the same and must include, in order:
 
-- derive or specify the controlled dynamics;
-- define a safe set and admissible controls;
-- generate or represent a barrier / Lyapunov / invariant *candidate*;
-- visualize the trajectory, the safe/unsafe region, certificate values, and
-  proof-relevant geometry;
-- export a verification-problem artifact, even if the first backend adapter is
-  only a stub.
+1. define or derive the controlled dynamics;
+2. define assumptions — state/parameter bounds, timestep if discrete, admissible
+   controls, disturbances if present;
+3. define safe / unsafe sets;
+4. define candidate certificate metadata, **candidate / external-required only**;
+5. generate explicit proof obligations;
+6. simulate rollouts and collect measured diagnostics;
+7. export a **verification package** bundle (manifest, dynamics, assumptions,
+   safe/unsafe sets, candidates, obligations, measured traces/diagnostics,
+   visualization data, and backend adapter stubs if appropriate);
+8. render the same package in the frontend Verification view;
+9. provide a clear package download / inspection path;
+10. claim **no** proof or certification unless an external backend actually
+    discharges it.
 
-Depth on one system is worth more than breadth across many.
+Depth on this one system is worth more than breadth across many. Schema/IR work
+is justified only insofar as it serves this routed package.
 
 **Drone (motivating flagship application).** A drone is a natural flagship
-*application* of the engine, but the engine must not become drone-specific. The
-drone is described as a motivating case study: geofence, obstacles, buffer
-region, controller action, velocity bounds, admissible controls, and safety
-invariants — all expressed through the same general abstractions as any other
-controlled mechanical system. (No drone model exists in this repository yet; it
-is a target, not a current capability.)
+*application* of the engine, and the preferred target above — but the engine must
+not become drone-specific. The drone is modeled as a point mass with the same
+general abstractions as any other controlled mechanical system: geofence,
+obstacles, buffer region, controller action, velocity bounds, admissible
+controls, and safety invariants. (No drone model exists in this repository yet;
+it is the committed target, not a current capability.)
 
 **Reinforcement-learning extension (downstream).** The same mechanics model can
 later be exposed through a Gymnasium-style API with reset / step / reward /
@@ -391,9 +439,11 @@ invariants) — not a generic RL platform. This is an extension, not the core.
 The project succeeds if a user can define a mechanics-based controlled dynamical
 system, inspect its structure, simulate and visualize it reproducibly, see its
 safe/unsafe geometry and invariants, obtain candidate certificates and explicit
-proof obligations, and export a backend-agnostic verification problem that an
-external tool can attempt to discharge — with every claim honestly labeled by its
-level of rigor.
+proof obligations, and export a self-contained backend-agnostic **verification
+package** that the viewer can render and an external tool can attempt to discharge
+— with every claim honestly labeled by its level of rigor. The nearest concrete
+form of success is one flagship controlled system (a drone point-mass, or a
+cart-pole/pendulum fallback) routed end-to-end through that pipeline.
 
 The project should be judged by whether it helps users understand, structure, and
 eventually certify the safety of mechanics-based dynamical systems — not by how
