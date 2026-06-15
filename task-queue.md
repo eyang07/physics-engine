@@ -64,20 +64,14 @@ candidate-value certificate series (`measured.py` now supports discrete dynamics
 It has **no measured `proofStatuses` yet** — that is the remaining gap for full
 viewer parity, handled next.
 
-1. **BE-036: Export measured safety-margin diagnostics per obligation**
-   - Goal: Enrich the measured evidence with a per-obligation worst margin to the
-     boundary (and a time-to-first-violation when violated) so the package's
-     measured-diagnostics component shows how close a run gets, all still labeled
-     measured. (The drone's `(q1, v1)` guard-band approach is the natural margin
-     example.)
-   - Scope: `engine/verification/measured.py` (compute margin / violation time),
-     `engine/export/verification_contract.py` (validate the new fields), and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: `proofStatuses` carry a numeric worst margin (and a violation
-     time when `measured-violated`), validation accepts well-formed values and
-     rejects bad shapes, generated examples validate, and focused tests pass.
+BE-036 is done: region-grid `proofStatuses` now carry a numeric signed worst
+`margin` to the obligation boundary (nonnegative when the sampled check holds,
+negative when violated), the IR round-trips it, and the export contract validates
+the optional `worst` record (value/point/time/margin), rejecting malformed shapes.
+The drone still needs its measured `proofStatuses` populated (next), which will
+attach these margins.
 
-2. **BE-042: Drone measured proof statuses (+ P2 / admissibility obligations)**
+1. **BE-042: Drone measured proof statuses (+ P2 / admissibility obligations)**
    - Goal: Give the drone problem its measured `proofStatuses` so the viewer shows
      the verdict ledger (BE-041 left them empty). Sample the forward-invariance
      and initial-containment obligations on the `(q1, v1)` grid honestly — the
@@ -91,7 +85,7 @@ viewer parity, handled next.
      never proved) with margins; the viewer ledger renders; the export contract
      validates; focused tests pass.
 
-3. **BE-043: Assemble and export the flagship drone verification package**
+2. **BE-043: Assemble and export the flagship drone verification package**
    - Goal: Route the drone end-to-end into one BE-039 verification package —
      manifest, dynamics, assumptions (spec G: `speedBound`, `velBound`, `dtSmall`,
      `driftBound`), safe set, candidate, obligations, measured traces/diagnostics,
@@ -104,7 +98,7 @@ viewer parity, handled next.
      claims proof/certification; generated data stays uncommitted; focused tests
      pass.
 
-4. **BE-044: Backend adapter stubs in the verification package**
+3. **BE-044: Backend adapter stubs in the verification package**
    - Goal: Include optional adapter-stub descriptors in the package describing how
      external backend *categories* (reachability, SOS/certificate synthesis,
      deductive prover) would consume each obligation — descriptors of target and

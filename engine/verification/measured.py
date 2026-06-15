@@ -183,7 +183,9 @@ def sampled_region_proof_statuses(problem: VerificationProblem) -> tuple[ProofSt
             )
             continue
         values = _evaluate_expression(_expression(obligation.expression), symbols, points)
-        status, worst_index = _measured_status(values, obligation.comparison, float(obligation.rhs))
+        status, worst_index, worst_margin = _measured_status(
+            values, obligation.comparison, float(obligation.rhs)
+        )
         statuses.append(
             ProofStatusSpec(
                 id=f"{obligation.id}-region-grid",
@@ -202,6 +204,7 @@ def sampled_region_proof_statuses(problem: VerificationProblem) -> tuple[ProofSt
                 source=f"regionGeometry:{geometry.region_id}",
                 worst_value=float(values[worst_index]),
                 worst_point=tuple(float(value) for value in points[worst_index]),
+                worst_margin=worst_margin,
                 note=_MEASURED_NOTE,
             )
         )
@@ -303,16 +306,26 @@ def _measured_status(
     values: np.ndarray,
     comparison: str,
     rhs: float,
-) -> tuple[str, int]:
+) -> tuple[str, int, float]:
+    """Return the measured verdict, the worst sample index, and its margin.
+
+    The margin is the signed distance to the obligation boundary at the worst
+    sample: ``rhs - value`` for ``<=``/``<`` and ``value - rhs`` for ``>=``/``>``.
+    It is nonnegative when the check holds (the closest the run got) and negative
+    when violated (how far past the boundary).
+    """
+
     if comparison in ("<=", "<"):
         worst_index = int(np.argmax(values - rhs))
+        margin = float(rhs - values[worst_index])
         satisfied = values[worst_index] <= rhs if comparison == "<=" else values[worst_index] < rhs
     elif comparison in (">=", ">"):
         worst_index = int(np.argmin(values - rhs))
+        margin = float(values[worst_index] - rhs)
         satisfied = values[worst_index] >= rhs if comparison == ">=" else values[worst_index] > rhs
     else:
         raise ValueError("comparison must be one of <=, <, >=, >")
-    return ("measured-holds" if bool(satisfied) else "measured-violated"), worst_index
+    return ("measured-holds" if bool(satisfied) else "measured-violated"), worst_index, margin
 
 
 def _evaluate_expression(

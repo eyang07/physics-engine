@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 import subprocess
 import sys
@@ -1122,6 +1123,76 @@ def test_certificate_series_supports_discrete_dynamics() -> None:
     assert set(diagnostics.series) == {"certificate_geofence_barrier_value"}
     # B(x(t)) stays <= 0 along the safe rollout (measured evidence).
     assert max(diagnostics.series["certificate_geofence_barrier_value"]) <= 1e-9
+
+
+@pytest.mark.parametrize(
+    "build_problem",
+    [upright_pendulum_problem, controlled_spring_problem],
+    ids=["upright-pendulum", "controlled-spring"],
+)
+def test_measured_proof_statuses_carry_numeric_worst_margin(build_problem) -> None:
+    problem = build_problem()
+    payload = problem.to_dict()
+
+    statuses = payload["proofStatuses"]
+    assert statuses, "case study must export measured proof statuses"
+    for status in statuses:
+        # Region-grid sampling reports how close the worst sample got to the
+        # boundary, as measured evidence (never a certified bound).
+        assert status["rigor"] == "measured"
+        worst = status["worst"]
+        margin = worst["margin"]
+        assert isinstance(margin, float)
+        assert math.isfinite(margin)
+        # A measured-holds verdict keeps the worst sample on the safe side of the
+        # boundary (nonnegative margin); a violation overshoots it.
+        if status["status"] == "measured-holds":
+            assert margin >= 0.0
+        else:
+            assert margin < 0.0
+
+    # The margin survives the IR round trip.
+    assert VerificationProblem.from_dict(payload) == problem
+
+
+def _proof_status_with_worst(worst: dict) -> dict:
+    payload = _valid_viewer_verification_problem_payload()
+    payload["proofStatuses"][0]["worst"] = worst
+    return payload
+
+
+def test_validate_proof_status_accepts_well_formed_worst() -> None:
+    # A holding region-grid status with a nonnegative margin and worst sample.
+    validate_viewer_verification_problem_payload(
+        _proof_status_with_worst(
+            {"value": -0.25, "point": [0.1, -0.2], "margin": 0.25}
+        )
+    )
+    # A measured-violated status additionally carries a time-to-first-violation.
+    validate_viewer_verification_problem_payload(
+        _proof_status_with_worst(
+            {"value": 0.4, "point": [1.0, 0.0], "margin": -0.4, "time": 1.75}
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("worst", "message"),
+    [
+        ({"value": "nope", "margin": 0.0}, "value must be a finite number"),
+        ({"margin": "nope"}, "margin must be a finite number"),
+        ({"margin": float("inf")}, "margin must be a finite number"),
+        ({"margin": True}, "margin must be a finite number"),
+        ({"time": "soon", "margin": -0.4}, "time must be a finite number"),
+        ({"point": [], "margin": 0.0}, "point must be a non-empty list"),
+        ({"point": [0.1, "x"], "margin": 0.0}, "point must be a non-empty list"),
+        ({"point": 0.1, "margin": 0.0}, "point must be a non-empty list"),
+        (["not", "a", "mapping"], "worst must be an object"),
+    ],
+)
+def test_validate_proof_status_rejects_malformed_worst(worst, message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        validate_viewer_verification_problem_payload(_proof_status_with_worst(worst))
 
 
 def test_generate_verification_problems_writes_self_contained_index(tmp_path) -> None:

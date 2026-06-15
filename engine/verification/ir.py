@@ -546,6 +546,10 @@ class ProofStatusSpec:
     worst_value: float | None = None
     worst_point: tuple[float, ...] | None = None
     worst_time: float | None = None
+    # Signed distance to the obligation boundary at the worst sample: nonnegative
+    # when the sampled check holds (the closest a run got), negative when violated
+    # (how far past the boundary). Measured evidence, never a certified bound.
+    worst_margin: float | None = None
     rigor: str = "measured"
     external_status: str = "external-required"
     note: str = (
@@ -614,7 +618,11 @@ class ProofStatusSpec:
             payload["candidateId"] = self.candidate_id
         if self.region_id is not None:
             payload["regionId"] = self.region_id
-        if self.worst_value is not None or self.worst_point is not None:
+        if (
+            self.worst_value is not None
+            or self.worst_point is not None
+            or self.worst_margin is not None
+        ):
             worst: dict[str, Any] = {}
             if self.worst_value is not None:
                 worst["value"] = self.worst_value
@@ -622,6 +630,8 @@ class ProofStatusSpec:
                 worst["point"] = list(self.worst_point)
             if self.worst_time is not None:
                 worst["time"] = self.worst_time
+            if self.worst_margin is not None:
+                worst["margin"] = self.worst_margin
             payload["worst"] = worst
         return payload
 
@@ -633,6 +643,7 @@ class ProofStatusSpec:
         worst_value = worst.get("value")
         worst_point = worst.get("point")
         worst_time = worst.get("time")
+        worst_margin = worst.get("margin")
         return cls(
             id=_require(data, "id", "proof status"),
             obligation_id=_require(data, "obligationId", "proof status"),
@@ -651,6 +662,7 @@ class ProofStatusSpec:
             worst_value=None if worst_value is None else float(worst_value),
             worst_point=None if worst_point is None else _floats(worst_point),
             worst_time=None if worst_time is None else float(worst_time),
+            worst_margin=None if worst_margin is None else float(worst_margin),
             rigor=data.get("rigor", "measured"),
             external_status=data.get("externalStatus", "external-required"),
             note=data.get("note", ""),

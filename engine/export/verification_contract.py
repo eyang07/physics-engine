@@ -319,6 +319,7 @@ def validate_viewer_verification_problem_payload(payload: Mapping[str, Any]) -> 
                 f"viewer verification problem {problem_id} proof status {status_id} "
                 f"references unknown region: {region_id}"
             )
+        _validate_proof_status_worst(status, problem_id=problem_id, status_id=status_id)
 
     for index, record in enumerate(trajectory["certificateSeries"]):
         kind = record.get("kind")
@@ -587,6 +588,33 @@ def _validate_certificate_comparison_baselines(
                     f"{series_index} comparisonBaseline {baseline_index} references "
                     f"unknown region: {region_id}"
                 )
+
+
+def _validate_proof_status_worst(
+    status: Mapping[str, Any],
+    *,
+    problem_id: str,
+    status_id: str,
+) -> None:
+    """Validate the optional measured ``worst`` record (value/point/time/margin)."""
+
+    worst = status.get("worst")
+    if worst is None:
+        return
+    context = f"viewer verification problem {problem_id} proof status {status_id} worst"
+    if not isinstance(worst, Mapping):
+        raise ValueError(f"{context} must be an object")
+    for key in ("value", "margin", "time"):
+        if key in worst and not _is_number(worst[key]):
+            raise ValueError(f"{context} {key} must be a finite number")
+    if "point" in worst:
+        point = worst["point"]
+        if (
+            not isinstance(point, list)
+            or not point
+            or any(not _is_number(value) for value in point)
+        ):
+            raise ValueError(f"{context} point must be a non-empty list of finite numbers")
 
 
 def _validate_region_geometry(problem: VerificationProblem) -> None:
