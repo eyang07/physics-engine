@@ -1816,6 +1816,40 @@ def test_validate_viewer_verification_index_rejects_invalid_payloads(
             },
             "certificateSeries 0 uses unknown kind: lyapunov-value",
         ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "trajectory": {
+                    **_valid_viewer_verification_trajectory(),
+                    "certificateSeries": [
+                        {
+                            **_valid_viewer_verification_trajectory()[
+                                "certificateSeries"
+                            ][0],
+                            "problemId": "",
+                        }
+                    ],
+                },
+            },
+            "certificateSeries 0 problemId is invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_problem_payload(),
+                "trajectory": {
+                    **_valid_viewer_verification_trajectory(),
+                    "certificateSeries": [
+                        {
+                            **_valid_viewer_verification_trajectory()[
+                                "certificateSeries"
+                            ][0],
+                            "problemId": "other-problem",
+                        }
+                    ],
+                },
+            },
+            "certificateSeries 0 problemId does not match containing problem",
+        ),
     ],
 )
 def test_validate_viewer_verification_problem_payload_rejects_bad_links(

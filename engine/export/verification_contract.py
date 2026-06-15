@@ -332,6 +332,17 @@ def validate_viewer_verification_problem_payload(payload: Mapping[str, Any]) -> 
                 f"viewer verification problem {problem_id} certificateSeries {index} "
                 f"uses unknown kind: {kind}"
             )
+        series_problem_id = record.get("problemId")
+        if not isinstance(series_problem_id, str) or not series_problem_id:
+            raise ValueError(
+                f"viewer verification problem {problem_id} certificateSeries {index} "
+                "problemId is invalid"
+            )
+        if series_problem_id != problem_id:
+            raise ValueError(
+                f"viewer verification problem {problem_id} certificateSeries {index} "
+                f"problemId does not match containing problem: {series_problem_id}"
+            )
         candidate_id = record.get("candidateId")
         if candidate_id is not None and candidate_id not in candidate_ids:
             raise ValueError(

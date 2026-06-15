@@ -64,17 +64,7 @@ Each task should use this structure:
 
 ## Backend Queue
 
-1. **BE-030: Add verification certificate-series problem-id guard**
-   - Goal: Ensure embedded certificate metadata cannot silently point at a
-     different verification problem.
-   - Scope: `engine/export/verification_contract.py` and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: Problem payload validation rejects certificate-series
-     `problemId` values that differ from the containing problem id, rejects empty
-     `problemId`, accepts generated viewer examples, and focused verification
-     export tests pass.
-
-2. **BE-031: Add verification certificate-series label guard**
+1. **BE-031: Add verification certificate-series label guard**
    - Goal: Keep each certificate-series carrying a human-readable lane label so
      the viewer never renders an unlabeled certificate lane.
    - Scope: `engine/export/verification_contract.py` and
