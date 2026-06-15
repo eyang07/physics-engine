@@ -680,6 +680,59 @@ for (const viewport of [
     );
   });
 
+  test(`Verification candidate obligation link jumps to its obligation card at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    // A candidate's obligation links are interactive; activating one scrolls to
+    // and emphasizes the matching obligation card further down the doc.
+    const jump = page.locator("#verifCandidates button.verif-link--jump").first();
+    const obligationId = (await jump.textContent())?.trim() ?? "";
+    expect(obligationId).not.toEqual("");
+    await jump.click();
+
+    const card = page.locator(`#verif-obligation-${obligationId}`);
+    await expect(card).toHaveClass(/verif-card--targeted/);
+    await expect(card).toBeInViewport();
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-obligation-jump.png`),
+    });
+  });
+
+  test(`Verification candidate obligation link stays inert for an unknown obligation at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Inject an obligation id the problem does not define; its link must stay an
+    // inert code label, not a jump button pointing at a missing card.
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.candidates[0].obligationIds.push("ghost-obligation");
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    await expect(
+      page.locator("#verifCandidates code.verif-link", { hasText: "ghost-obligation" }),
+    ).toHaveCount(1);
+    await expect(
+      page.locator("#verifCandidates button.verif-link--jump", { hasText: "ghost-obligation" }),
+    ).toHaveCount(0);
+    // The problem's real obligation links remain interactive jump buttons.
+    await expect(page.locator("#verifCandidates button.verif-link--jump")).toHaveCount(3);
+  });
+
   test(`Verification header echoes the selected problem counts at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

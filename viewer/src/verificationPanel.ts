@@ -91,6 +91,13 @@ function formatNumber(value: number): string {
   return String(value);
 }
 
+// A stable DOM id for an obligation card so other surfaces (candidate links,
+// and later the status ledger) can scroll to it. Obligation ids are already
+// hyphen/alphanumeric, but sanitize defensively.
+function obligationCardId(obligationId: string): string {
+  return `verif-obligation-${obligationId.replace(/[^a-z0-9-]/gi, "-")}`;
+}
+
 function section(title: string, id?: string): HTMLElement {
   const node = el("section", "verif-section");
   if (id) {
@@ -111,9 +118,14 @@ function comparisonLatex(comparison: string): string {
 }
 
 export class VerificationPanel {
+  // Obligation id -> its rendered card, rebuilt per problem so cross-references
+  // (candidate obligation links today) can scroll to and emphasize the target.
+  private readonly obligationCards = new Map<string, HTMLElement>();
+
   constructor(private readonly container: HTMLElement) {}
 
   clear(): void {
+    this.obligationCards.clear();
     this.container.replaceChildren();
   }
 
@@ -126,6 +138,7 @@ export class VerificationPanel {
   }
 
   render(problem: VerificationProblem): void {
+    this.obligationCards.clear();
     this.container.replaceChildren();
     const root = el("article", "verif-doc");
 
@@ -286,6 +299,7 @@ export class VerificationPanel {
 
   private renderCandidates(problem: VerificationProblem): HTMLElement {
     const node = section("Candidate certificates", "verifCandidates");
+    const obligationIds = new Set(problem.obligations.map((obligation) => obligation.id));
     const list = el("div", "verif-cards");
     problem.candidates.forEach((candidate) => {
       const card = el("div", "verif-card");
@@ -303,7 +317,7 @@ export class VerificationPanel {
         const obligations = el("p", "verif-card__links");
         obligations.append(el("span", "verif-card__links-label", "obligations:"));
         candidate.obligationIds.forEach((id) => {
-          obligations.append(el("code", "verif-link", id));
+          obligations.append(this.obligationLink(id, obligationIds));
         });
         card.append(obligations);
       }
@@ -324,11 +338,44 @@ export class VerificationPanel {
     return node;
   }
 
+  // A reference to an obligation from another card. When the obligation is part
+  // of this problem the link scrolls to and emphasizes its card; an id with no
+  // obligation (e.g. stale metadata) stays an inert code label.
+  private obligationLink(obligationId: string, obligationIds: Set<string>): HTMLElement {
+    if (!obligationIds.has(obligationId)) {
+      return el("code", "verif-link", obligationId);
+    }
+    const link = el("button", "verif-link verif-link--jump", obligationId);
+    link.type = "button";
+    link.addEventListener("click", () => this.jumpToObligation(obligationId));
+    return link;
+  }
+
+  // Scroll the matching obligation card into view and re-trigger a brief pulse so
+  // the navigated-to obligation is locatable.
+  private jumpToObligation(obligationId: string): void {
+    const card = this.obligationCards.get(obligationId);
+    if (!card) {
+      return;
+    }
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.remove("verif-card--targeted");
+    void card.offsetWidth; // restart the pulse animation if re-triggered
+    card.classList.add("verif-card--targeted");
+    card.addEventListener(
+      "animationend",
+      () => card.classList.remove("verif-card--targeted"),
+      { once: true },
+    );
+  }
+
   private obligationCard(
     obligation: IrObligation,
     regionName: Map<string, string>,
   ): HTMLElement {
     const card = el("div", "verif-card");
+    card.id = obligationCardId(obligation.id);
+    this.obligationCards.set(obligation.id, card);
     const head = el("div", "verif-card__head");
     head.append(el("strong", "verif-card__name", obligation.name));
     head.append(rigorBadge(obligation.rigor));

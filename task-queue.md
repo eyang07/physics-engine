@@ -32,23 +32,10 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-010: Jump from a candidate's obligation link to its obligation card**
-   - Goal: Let the obligation ids listed on a candidate-certificate card scroll
-     the doc to the matching obligation card so the candidate→obligation link is
-     navigable, reusing the section-anchor pattern from FE-008.
-   - Scope: `viewer/src/verificationPanel.ts` (give each obligation card a stable
-     id, make candidate obligation links scroll/emphasize the target),
-     `viewer/src/styles.css` for the target emphasis, and visual coverage in
-     `viewer/tests/visual.spec.ts`.
-   - Acceptance: Activating a candidate's obligation link brings the matching
-     obligation card into view and briefly emphasizes it, links whose obligation
-     id is missing from the obligations list stay inert, and visual tests cover
-     the navigate/emphasis behavior.
-
-2. **FE-011: Jump from a measured-status card to its obligation card**
+1. **FE-011: Jump from a measured-status card to its obligation card**
    - Goal: Let each measured-status card link to the obligation it sampled so the
      measured evidence is navigable back to the obligation it bears on, reusing
-     the obligation-card ids introduced in FE-010.
+     the obligation-card ids and jump pattern already in `verificationPanel.ts`.
    - Scope: `viewer/src/verificationPanel.ts` (make the measured-status card's
      obligation name scroll/emphasize the matching obligation card),
      `viewer/src/styles.css`, and visual coverage in `viewer/tests/visual.spec.ts`.
@@ -57,7 +44,7 @@ Each task should use this structure:
      obligation id has no obligation card stay inert, and visual tests cover the
      navigate behavior.
 
-3. **FE-012: Show each obligation's stated assumptions on its card**
+2. **FE-012: Show each obligation's stated assumptions on its card**
    - Goal: Make "valid only under stated assumptions" (VISION §6) legible by
      rendering, on each obligation card, the assumptions it depends on via the
      already-exported `assumptionIds`, with a jump to the matching assumption.
@@ -70,21 +57,22 @@ Each task should use this structure:
      ids with no matching assumption stay inert; visual tests cover the
      present/absent and navigate paths. Frontend-only — no new exported fields.
 
-4. **FE-013: Add a per-obligation status ledger to the Verification doc**
+3. **FE-013: Add a per-obligation status ledger to the Verification doc**
    - Goal: Give the problem an at-a-glance, honestly labeled safety picture: one
      compact ledger row per obligation showing its measured outcome
      (holds/violated/not sampled), rigor badge, and standing `external-required`
      status, so the rigor ladder (VISION §7) is legible without scanning cards.
    - Scope: `viewer/src/verificationPanel.ts` (derive the ledger from
      `obligations` + `proofStatuses`, placed near the header), each row links to
-     its obligation card (reuse FE-010 anchors), `viewer/src/styles.css`, and
+     its obligation card (reuse the existing obligation-card anchors),
+     `viewer/src/styles.css`, and
      visual coverage in `viewer/tests/visual.spec.ts`.
    - Acceptance: Every obligation appears once with its measured outcome and a
      never-"proved" status, obligations with no sampled status read as "not
      sampled", a row navigates to its card, and visual tests assert the ledger
      contents. Frontend-only — no new exported fields.
 
-5. **FE-014: Surface the rigor ladder and the problem's current level**
+4. **FE-014: Surface the rigor ladder and the problem's current level**
    - Goal: Make the four-level rigor ladder (VISION §7) explicit in the
      Verification domain and mark where the current problem sits (level 1 —
      measured evidence with `external-required` obligations) so "measured" can
@@ -98,7 +86,7 @@ Each task should use this structure:
      certification, and visual tests assert the marked level and labels.
      Frontend-only — derives level from already-exported rigor fields.
 
-6. **FE-015: Tie measured evidence to the obligation it bears on**
+5. **FE-015: Tie measured evidence to the obligation it bears on**
    - Goal: Let selecting an obligation (from its card or the FE-013 ledger)
      highlight the certificate lane(s) and comparison baseline that bear on it —
      via `certificateSeries[].obligationIds` and `comparisonBaselines` — so a user
@@ -111,7 +99,7 @@ Each task should use this structure:
      referencing lane stay interaction-free, and visual tests cover the
      emphasis/clear behavior. Frontend-only — uses already-exported links.
 
-7. **FE-016: Download the selected verification problem as a backend-agnostic
+6. **FE-016: Download the selected verification problem as a backend-agnostic
    artifact**
    - Goal: Realize the Definition of Success "export a backend-agnostic
      verification problem that an external tool can attempt to discharge" by

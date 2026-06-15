@@ -615,6 +615,40 @@ select {
   font-size: var(--text-xs);
 }
 
+.verif-link--jump {
+  cursor: pointer;
+  background: none;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.verif-link--jump:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.verif-link--jump:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+@keyframes verif-card-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(240, 180, 106, 0);
+    border-color: var(--accent);
+  }
+  25% {
+    box-shadow: 0 0 0 3px rgba(240, 180, 106, 0.35);
+    border-color: var(--accent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(240, 180, 106, 0);
+  }
+}
+
+.verif-card--targeted {
+  animation: verif-card-pulse 1.2s ease;
+}
+
 /* Region role tags: the proof-relevant geometry, color-coded. */
 .verif-role {
   padding: 3px 10px;
