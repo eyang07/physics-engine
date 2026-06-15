@@ -1,9 +1,12 @@
 """Generate verification-problem IR for the viewer (backend-only data).
 
-Writes the same backend-agnostic verification-problem IR the inspection adapter
-emits into the viewer's data directory, plus a small index the Verification
-domain lists. Like the trajectory generators, output is deterministic and
-regenerable; nothing here is committed and nothing claims proof discharge.
+Writes, per problem, a viewer-shaped payload (the verification-problem IR plus a
+self-contained controlled trajectory) and the backend-agnostic IR artifact on
+its own (the same serialization the inspection adapter emits, without the viewer
+trajectory) so the viewer can offer it for external discharge, plus a small index
+the Verification domain lists. Like the trajectory generators, output is
+deterministic and regenerable; nothing here is committed and nothing claims proof
+discharge.
 
 The IR carries candidate certificates and proof obligations only — every
 obligation is labeled ``external-required`` and the viewer renders that honesty
@@ -38,7 +41,7 @@ DEFAULT_VIEWER_DIR = Path("viewer/public/data/verification")
 INDEX_VERSION = 1
 
 
-def _problem_summary(payload: dict, data_path: str) -> dict:
+def _problem_summary(payload: dict, data_path: str, ir_path: str) -> dict:
     """A thin catalog entry the viewer lists; the detail lives in the IR file."""
 
     metadata = payload.get("metadata") or {}
@@ -49,6 +52,7 @@ def _problem_summary(payload: dict, data_path: str) -> dict:
         "status": metadata.get("status", "candidate"),
         "schemaVersion": payload.get("schemaVersion"),
         "dataPath": data_path,
+        "irPath": ir_path,
         "counts": {
             "regions": len(payload.get("regions", [])),
             "obligations": len(payload.get("obligations", [])),
@@ -104,24 +108,35 @@ def write_verification_problems(
     summaries: list[dict] = []
     records: list[tuple[str, dict]] = []
     payloads_by_data_path: dict[str, dict] = {}
+    ir_payloads_by_ir_path: dict[str, dict] = {}
     for example, problem in zip(examples, problems, strict=True):
-        payload = problem.to_dict()
-        payload["trajectory"] = _controlled_trajectory_payload(problem, example)
+        # The backend-agnostic IR is the problem serialization without the
+        # viewer-only trajectory; the viewer payload is that IR plus trajectory.
+        ir_payload = problem.to_dict()
+        payload = {
+            **ir_payload,
+            "trajectory": _controlled_trajectory_payload(problem, example),
+        }
         validate_viewer_verification_trajectory(
             payload["trajectory"],
             problem_id=problem.id,
         )
         filename = f"{payload['id']}.json"
         data_path = f"/data/verification/{filename}"
+        ir_filename = f"{payload['id']}.ir.json"
+        ir_path = f"/data/verification/{ir_filename}"
         payloads_by_data_path[data_path] = payload
+        ir_payloads_by_ir_path[ir_path] = ir_payload
         records.append((filename, payload))
-        summaries.append(_problem_summary(payload, data_path))
+        records.append((ir_filename, ir_payload))
+        summaries.append(_problem_summary(payload, data_path, ir_path))
 
     index_payload = {"version": INDEX_VERSION, "problems": summaries}
     validate_viewer_verification_export(
         index_payload,
         payloads_by_data_path,
         version=INDEX_VERSION,
+        ir_payloads_by_ir_path=ir_payloads_by_ir_path,
     )
     for filename, payload in records:
         text = json.dumps(payload, indent=2) + "\n"

@@ -79,9 +79,9 @@ def _viewer_verification_expected_ids() -> list[str]:
 
 
 def _viewer_verification_expected_filenames() -> set[str]:
-    filenames = {
-        f"{problem_id}.json" for problem_id in _viewer_verification_expected_ids()
-    }
+    ids = _viewer_verification_expected_ids()
+    filenames = {f"{problem_id}.json" for problem_id in ids}
+    filenames |= {f"{problem_id}.ir.json" for problem_id in ids}
     filenames.add("index.json")
     return filenames
 
@@ -158,6 +158,7 @@ def _valid_viewer_verification_index() -> dict:
                 "status": "candidate",
                 "schemaVersion": SCHEMA_VERSION,
                 "dataPath": "/data/verification/example-problem.json",
+                "irPath": "/data/verification/example-problem.ir.json",
                 "counts": {"regions": 1, "obligations": 2, "candidates": 1},
             }
         ],
@@ -1052,11 +1053,29 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
     )
     index = json.loads((viewer_dir / "index.json").read_text(encoding="utf-8"))
     validate_viewer_verification_index(index, version=INDEX_VERSION)
+    ir_payloads = {
+        entry["irPath"]: json.loads(
+            (viewer_dir / Path(entry["irPath"]).name).read_text(encoding="utf-8")
+        )
+        for entry in index["problems"]
+    }
     validate_viewer_verification_export(
         index,
         _viewer_problem_payloads_by_data_path(index, viewer_dir),
         version=INDEX_VERSION,
+        ir_payloads_by_ir_path=ir_payloads,
     )
+
+    # The published backend-agnostic IR is the problem serialization without the
+    # viewer-only trajectory; reading it back yields exactly that.
+    assert [problem["irPath"] for problem in index["problems"]] == [
+        "/data/verification/upright-pendulum-safety.ir.json",
+        "/data/verification/controlled-spring-regulator-safety.ir.json",
+    ]
+    pendulum_ir = ir_payloads["/data/verification/upright-pendulum-safety.ir.json"]
+    assert "trajectory" not in pendulum_ir
+    assert pendulum_ir == {key: value for key, value in payload.items() if key != "trajectory"}
+    assert _directory_filenames(generated_dir) == _directory_filenames(viewer_dir)
 
     assert payload["system"] is None
     assert payload["regionGeometry"]
@@ -1298,6 +1317,62 @@ def test_validate_viewer_verification_export_rejects_data_path_basename_mismatch
         )
 
 
+def test_validate_viewer_verification_export_rejects_ir_path_basename_mismatch() -> None:
+    index_payload = {
+        **_valid_viewer_verification_index(),
+        "problems": [
+            {
+                **_valid_viewer_verification_index()["problems"][0],
+                "irPath": "/data/verification/wrong-file.ir.json",
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match="irPath basename must match problem id"):
+        validate_viewer_verification_export(
+            index_payload,
+            {
+                "/data/verification/example-problem.json": (
+                    _valid_viewer_verification_problem_payload()
+                )
+            },
+            version=INDEX_VERSION,
+        )
+
+
+def test_validate_viewer_verification_export_rejects_missing_ir_file() -> None:
+    with pytest.raises(ValueError, match="missing IR file"):
+        validate_viewer_verification_export(
+            _valid_viewer_verification_index(),
+            {
+                "/data/verification/example-problem.json": (
+                    _valid_viewer_verification_problem_payload()
+                )
+            },
+            version=INDEX_VERSION,
+            ir_payloads_by_ir_path={},
+        )
+
+
+def test_validate_viewer_verification_export_rejects_ir_with_embedded_trajectory() -> None:
+    with pytest.raises(ValueError, match="must not embed the viewer trajectory"):
+        validate_viewer_verification_export(
+            _valid_viewer_verification_index(),
+            {
+                "/data/verification/example-problem.json": (
+                    _valid_viewer_verification_problem_payload()
+                )
+            },
+            version=INDEX_VERSION,
+            ir_payloads_by_ir_path={
+                "/data/verification/example-problem.ir.json": {
+                    "id": "example-problem",
+                    "trajectory": {},
+                }
+            },
+        )
+
+
 @pytest.mark.parametrize(
     ("index_payload", "problem_payload", "message"),
     [
@@ -1498,6 +1573,33 @@ def test_validate_viewer_verification_export_rejects_status_mismatches(
                 ],
             },
             "count obligations is invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    {
+                        key: value
+                        for key, value in _valid_viewer_verification_index()["problems"][
+                            0
+                        ].items()
+                        if key != "irPath"
+                    }
+                ],
+            },
+            "irPath is invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    {
+                        **_valid_viewer_verification_index()["problems"][0],
+                        "irPath": "/data/verification/example-problem.json",
+                    }
+                ],
+            },
+            "irPath is invalid",
         ),
     ],
 )

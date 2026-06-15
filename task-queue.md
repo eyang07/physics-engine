@@ -82,18 +82,3 @@ Each task should use this structure:
    - Acceptance: Problem payload validation rejects empty or non-string
      certificate-series `label`, accepts the generated viewer examples, and
      focused verification export tests pass.
-
-3. **BE-032: Publish the backend-agnostic verification-problem IR for the viewer**
-   - Goal: Support FE-016 by making each problem's canonical backend-agnostic IR
-     artifact (the inspection adapter's problem JSON, distinct from the
-     viewer-shaped payload) reachable by the viewer, so the frontend can offer it
-     for routing to an external backend.
-   - Scope: `scripts/generate_verification_problems.py` (also write the IR
-     artifact under the viewer data dir), `engine/export/verification_contract.py`
-     (record/validate an `irPath` or equivalent in the index/payload), and
-     `tests/test_inspection_adapter.py`.
-   - Acceptance: Generation publishes a backend-agnostic IR JSON per problem
-     alongside the viewer payload, the export contract validates its presence and
-     basename like the existing data-path checks, the published IR round-trips
-     through the IR loader, and focused verification export tests pass. Keep the
-     IR artifact out of committed generated data per repository policy.

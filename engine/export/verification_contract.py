@@ -83,6 +83,19 @@ def validate_viewer_verification_index(
                 f"viewer verification index problem {problem_id} dataPath is invalid"
             )
 
+        # The backend-agnostic IR artifact (problem IR without the viewer
+        # trajectory), published so the viewer can offer it for external
+        # discharge. Distinct from the viewer-shaped dataPath payload.
+        ir_path = entry.get("irPath")
+        if (
+            not isinstance(ir_path, str)
+            or not ir_path.startswith("/data/verification/")
+            or not ir_path.endswith(".ir.json")
+        ):
+            raise ValueError(
+                f"viewer verification index problem {problem_id} irPath is invalid"
+            )
+
         counts = entry.get("counts")
         if not isinstance(counts, Mapping):
             raise ValueError(
@@ -106,8 +119,15 @@ def validate_viewer_verification_export(
     problem_payloads_by_data_path: Mapping[str, Mapping[str, Any]],
     *,
     version: int,
+    ir_payloads_by_ir_path: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> None:
-    """Validate the viewer verification index against referenced problem files."""
+    """Validate the viewer verification index against referenced problem files.
+
+    When ``ir_payloads_by_ir_path`` is given, the published backend-agnostic IR
+    artifacts are checked the same way as the viewer payloads: every referenced
+    IR file must be present, carry no viewer trajectory, and none may be
+    unreferenced.
+    """
 
     validate_viewer_verification_index(index_payload, version=version)
     problems = index_payload["problems"]
@@ -118,6 +138,15 @@ def validate_viewer_verification_export(
             "viewer verification export includes unreferenced problem files: "
             f"{sorted(extra_data_paths)}"
         )
+
+    if ir_payloads_by_ir_path is not None:
+        referenced_ir_paths = {entry["irPath"] for entry in problems}
+        extra_ir_paths = set(ir_payloads_by_ir_path) - referenced_ir_paths
+        if extra_ir_paths:
+            raise ValueError(
+                "viewer verification export includes unreferenced IR files: "
+                f"{sorted(extra_ir_paths)}"
+            )
 
     for entry in problems:
         problem_id = entry["id"]
@@ -133,6 +162,30 @@ def validate_viewer_verification_export(
                 f"viewer verification index problem {problem_id} references "
                 f"missing problem file {data_path}"
             )
+
+        ir_path = entry["irPath"]
+        if ir_path.rsplit("/", maxsplit=1)[-1] != f"{problem_id}.ir.json":
+            raise ValueError(
+                f"viewer verification problem {problem_id} irPath basename "
+                "must match problem id"
+            )
+        if ir_payloads_by_ir_path is not None:
+            ir_payload = ir_payloads_by_ir_path.get(ir_path)
+            if not isinstance(ir_payload, Mapping):
+                raise ValueError(
+                    f"viewer verification index problem {problem_id} references "
+                    f"missing IR file {ir_path}"
+                )
+            if "trajectory" in ir_payload:
+                raise ValueError(
+                    f"viewer verification problem {problem_id} IR artifact must not "
+                    "embed the viewer trajectory"
+                )
+            if ir_payload.get("id") != problem_id:
+                raise ValueError(
+                    f"viewer verification problem {problem_id} IR artifact id does "
+                    "not match index"
+                )
 
         if entry["schemaVersion"] != SCHEMA_VERSION:
             raise ValueError(
