@@ -14,6 +14,10 @@ from systems.drone_point_mass import (
     closed_loop,
     guard_band_control_law,
     guard_band_controller,
+    horizontal_axis_closed_loop,
+    horizontal_axis_control_law,
+    horizontal_axis_rollout,
+    horizontal_axis_system,
     safe_rollout,
 )
 
@@ -155,3 +159,41 @@ def test_velocity_bounds_match_the_spec_formulas() -> None:
     assert params.vertical_velocity_bound == pytest.approx(0.25)  # B3 = max(1, 1)*dt
     assert params.velocity_bound == pytest.approx(0.25)  # Vmax
     assert params.hover_thrust == pytest.approx(1.0)  # cancels gravity
+
+
+def test_horizontal_axis_system_is_the_decoupled_q1_v1_subsystem() -> None:
+    system = horizontal_axis_system()
+    q1, v1 = DRONE_STATE[0], DRONE_STATE[3]
+    u1 = DRONE_CONTROLS[0]
+    assert system.state == (q1, v1)
+    assert system.controls == (u1,)
+    dt = sp.Rational(1, 4)
+    assert sp.simplify(system.update[0] - (q1 + dt * v1 + dt**2 / 2 * u1)) == 0
+    assert sp.simplify(system.update[1] - (v1 + dt * u1)) == 0
+    assert system.control_bounds == Box(lower=(-1.0,), upper=(1.0,))
+
+
+def test_horizontal_axis_closed_loop_matches_the_full_system_on_axis_1() -> None:
+    closed = horizontal_axis_closed_loop()
+    q1, v1 = DRONE_STATE[0], DRONE_STATE[3]
+    assert isinstance(closed, DiscreteSystem)
+    assert closed.state == (q1, v1)
+    # Axis-1 law agrees with the full guard-band law's first component.
+    full = guard_band_control_law()[DRONE_CONTROLS[0]]
+    axis = horizontal_axis_control_law()[DRONE_CONTROLS[0]]
+    sample = {q1: 0.8, v1: 0.25}
+    assert axis.subs(sample) == full.subs({**sample, DRONE_STATE[1]: 0, DRONE_STATE[2]: 1,
+                                           DRONE_STATE[4]: 0, DRONE_STATE[5]: 0})
+
+
+def test_horizontal_axis_rollout_stays_in_geofence_and_brakes() -> None:
+    params = DroneParams()
+    result = horizontal_axis_rollout(params)
+    q1 = result.states[:, 0]
+    v1 = result.states[:, 1]
+    q1_min, q1_max = params.q1_bounds
+    assert np.all((q1 >= q1_min) & (q1 <= q1_max))  # P1 on axis 1
+    assert np.all(np.abs(v1) <= params.horizontal_velocity_bound + 1e-9)  # P2
+    assert q1.max() > q1_max - params.horizontal_band  # entered the guard band
+    assert np.any(result.controls[:, 0] < 0)  # braked
+    assert result.control_violation == 0.0

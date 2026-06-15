@@ -13,6 +13,7 @@ from engine.export import (
     validate_viewer_verification_export,
     validate_viewer_verification_index,
     validate_viewer_verification_problem_payload,
+    validate_viewer_verification_problems,
     validate_viewer_verification_trajectory,
 )
 from engine.dynamics import (
@@ -39,6 +40,7 @@ from engine.verification import (
     ObligationSpec,
     ParameterSpec,
     VariableSpec,
+    certificate_series_for_trajectory,
     dynamics_spec_from_controlled_discrete,
     dynamics_spec_from_discrete,
     expression_spec,
@@ -54,6 +56,8 @@ from scripts.export_verification_problems import (
     INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION,
     controlled_discrete_decay_problem,
     controlled_spring_problem,
+    drone_geofence_problem,
+    drone_geofence_trajectory,
     export_inspection_artifacts,
     inspection_artifact_problems,
     main,
@@ -75,6 +79,7 @@ def _viewer_verification_expected_ids() -> list[str]:
     return [
         "upright-pendulum-safety",
         "controlled-spring-regulator-safety",
+        "drone-geofence-axis",
     ]
 
 
@@ -1061,6 +1066,64 @@ def test_case_study_obligations_reference_stated_assumptions(build_problem) -> N
         assert not (model_ids & set(obligation.assumption_ids))
 
 
+def test_drone_geofence_problem_exports_viewer_contract() -> None:
+    problem = drone_geofence_problem()
+    assert problem.id == "drone-geofence-axis"
+    assert problem.system is None
+
+    # The discrete guard-band closed loop is the problem dynamics.
+    assert problem.dynamics is not None
+    assert problem.dynamics.kind == "discrete"
+    assert problem.dynamics.state == ("q1", "v1")
+
+    payload = problem.to_dict()
+    assert payload["metadata"]["verificationModel"] == "drone-geofence-axis"
+
+    # Geofence safe set, the inner start set, and the candidate domain, each with
+    # rendering geometry on the (q1, v1) phase plane.
+    regions_by_role = {region["role"]: region for region in payload["regions"]}
+    assert {"safe", "initial", "domain"} <= set(regions_by_role)
+    assert len(payload["regionGeometry"]) == len(payload["regions"])
+    for geometry in payload["regionGeometry"]:
+        assert geometry["plane"]["variables"] == ["q1", "v1"]
+        assert geometry["plane"]["variableToStateAxis"] == {"q1": "q1", "v1": "v1"}
+
+    # A labeled, candidate-only barrier.
+    assert [candidate["id"] for candidate in payload["candidates"]] == ["geofence-barrier"]
+    assert payload["candidates"][0]["status"] == "candidate"
+
+    # The honest forward-invariance claim (not the box barrier's false non-increase),
+    # external-required, depending on the stated speed bound; the static initial
+    # containment claim does not.
+    obligations = {obligation["id"]: obligation for obligation in payload["obligations"]}
+    assert {obligation["rigor"] for obligation in obligations.values()} == {"external-required"}
+    forward = obligations["geofence-barrier-forward-invariance"]
+    assert forward["assumptionIds"] == ["speed-within-half-guard-reach"]
+    assert obligations["geofence-barrier-initial-containment"]["assumptionIds"] == []
+
+    # The viewer contract accepts the Max/Piecewise-backed problem.
+    validate_viewer_verification_problems([problem])
+
+
+def test_certificate_series_supports_discrete_dynamics() -> None:
+    problem = drone_geofence_problem()
+    time, states = drone_geofence_trajectory()
+
+    diagnostics = certificate_series_for_trajectory(
+        problem,
+        time=time,
+        states=states,
+        state_names=("q1", "v1"),
+        variable_to_state_axis={"q1": "q1", "v1": "v1"},
+    )
+    # Discrete problems get the candidate VALUE series only (the flow derivative
+    # is a continuous-time notion).
+    assert {record["kind"] for record in diagnostics.metadata} == {"candidate-value"}
+    assert set(diagnostics.series) == {"certificate_geofence_barrier_value"}
+    # B(x(t)) stays <= 0 along the safe rollout (measured evidence).
+    assert max(diagnostics.series["certificate_geofence_barrier_value"]) <= 1e-9
+
+
 def test_generate_verification_problems_writes_self_contained_index(tmp_path) -> None:
     generated_dir = tmp_path / "generated"
     viewer_dir = tmp_path / "viewer"
@@ -1103,6 +1166,7 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
     assert [problem["irPath"] for problem in index["problems"]] == [
         "/data/verification/upright-pendulum-safety.ir.json",
         "/data/verification/controlled-spring-regulator-safety.ir.json",
+        "/data/verification/drone-geofence-axis.ir.json",
     ]
     pendulum_ir = ir_payloads["/data/verification/upright-pendulum-safety.ir.json"]
     assert "trajectory" not in pendulum_ir
@@ -1160,15 +1224,14 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
     assert [problem["model"] for problem in index["problems"]] == [
         "controlled-pendulum-closed-loop",
         "controlled-spring-regulator",
+        "drone-geofence-axis",
     ]
     assert [problem["dataPath"] for problem in index["problems"]] == [
-        "/data/verification/upright-pendulum-safety.json",
-        "/data/verification/controlled-spring-regulator-safety.json",
+        f"/data/verification/{problem_id}.json" for problem_id in expected_ids
     ]
     assert [problem["id"] for problem in index["problems"]] == expected_ids
     assert [problem["schemaVersion"] for problem in index["problems"]] == [
-        SCHEMA_VERSION,
-        SCHEMA_VERSION,
+        SCHEMA_VERSION for _ in expected_ids
     ]
     assert payload["schemaVersion"] == SCHEMA_VERSION
     assert spring_payload["schemaVersion"] == SCHEMA_VERSION
@@ -1207,7 +1270,7 @@ def test_generate_verification_problems_cli_writes_custom_output_dirs(tmp_path) 
 
     expected_ids = _viewer_verification_expected_ids()
     assert result.stdout.splitlines() == [
-        f"wrote 2 verification problem(s): {', '.join(expected_ids)}",
+        f"wrote {len(expected_ids)} verification problem(s): {', '.join(expected_ids)}",
         f"generated dir: {generated_dir}",
         f"viewer dir: {viewer_dir}",
     ]

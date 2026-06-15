@@ -49,8 +49,10 @@ def certificate_series_for_trajectory(
 
     if problem.dynamics is None:
         raise ValueError("candidate trajectory series require problem dynamics")
-    if problem.dynamics.kind != "continuous":
-        raise ValueError("candidate flow-derivative series require continuous dynamics")
+    # The candidate value B(x(t)) is well-defined for any dynamics; only the
+    # flow derivative dB/dt is a continuous-time notion, so discrete problems get
+    # the value series alone.
+    is_continuous = problem.dynamics.kind == "continuous"
 
     time_array = np.asarray(time, dtype=float)
     state_array = np.asarray(states, dtype=float)
@@ -65,7 +67,11 @@ def certificate_series_for_trajectory(
         variable_to_state_axis=variable_to_state_axis,
     )
     variables = _symbols_for_names(variable_names, _problem_expressions(problem))
-    rhs = tuple(_expression(expression) for expression in problem.dynamics.rhs)
+    rhs = (
+        tuple(_expression(expression) for expression in problem.dynamics.rhs)
+        if is_continuous
+        else ()
+    )
     obligations_by_id = {obligation.id: obligation for obligation in problem.obligations}
 
     series: dict[str, tuple[float, ...]] = {}
@@ -77,6 +83,25 @@ def certificate_series_for_trajectory(
             float(value)
             for value in _evaluate_expression(candidate_expression, variables, problem_points)
         )
+        value_obligations = _matching_obligation_ids(
+            candidate,
+            obligations_by_id,
+            candidate_expression,
+        )
+        metadata.append(
+            _certificate_series_record(
+                problem=problem,
+                candidate=candidate,
+                kind="candidate-value",
+                label="B(x(t))",
+                series_name=value_series_name,
+                obligation_ids=value_obligations,
+                obligations_by_id=obligations_by_id,
+            )
+        )
+
+        if not is_continuous:
+            continue
 
         flow_derivative = sp.simplify(
             sum(
@@ -89,38 +114,21 @@ def certificate_series_for_trajectory(
             float(value)
             for value in _evaluate_expression(flow_derivative, variables, problem_points)
         )
-
-        value_obligations = _matching_obligation_ids(
-            candidate,
-            obligations_by_id,
-            candidate_expression,
-        )
         derivative_obligations = _matching_obligation_ids(
             candidate,
             obligations_by_id,
             flow_derivative,
         )
-        metadata.extend(
-            [
-                _certificate_series_record(
-                    problem=problem,
-                    candidate=candidate,
-                    kind="candidate-value",
-                    label="B(x(t))",
-                    series_name=value_series_name,
-                    obligation_ids=value_obligations,
-                    obligations_by_id=obligations_by_id,
-                ),
-                _certificate_series_record(
-                    problem=problem,
-                    candidate=candidate,
-                    kind="flow-derivative",
-                    label="dB/dt along verification dynamics",
-                    series_name=derivative_series_name,
-                    obligation_ids=derivative_obligations,
-                    obligations_by_id=obligations_by_id,
-                ),
-            ]
+        metadata.append(
+            _certificate_series_record(
+                problem=problem,
+                candidate=candidate,
+                kind="flow-derivative",
+                label="dB/dt along verification dynamics",
+                series_name=derivative_series_name,
+                obligation_ids=derivative_obligations,
+                obligations_by_id=obligations_by_id,
+            )
         )
 
     return CertificateTrajectoryDiagnostics(series=series, metadata=tuple(metadata))

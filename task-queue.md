@@ -55,23 +55,16 @@ Tier-2 obstacle (P4) and Tier-3 disturbance come later. Keep generated data
 uncommitted. Never label anything proved/certified — the engine proposes; external
 backends dispose._
 
-1. **BE-041: Drone geofence safe set, guard-band closed loop, and barrier candidate**
-   - Goal: Build the Tier-1 drone verification problem from the discrete plant:
-     the geofence safe box `S` (and the inner set / guard band), the guard-band
-     closed loop (`closed_loop`), and the box-barrier candidate
-     `B_geofence(q) = max(...)` plus the per-axis velocity-bound candidate — all
-     candidate / external-required only, never certified. Project the 6-D state to
-     the `(q1, v1)` phase plane for region geometry (spec M).
-   - Scope: `systems/drone_point_mass.py` (sublevel-set / barrier helpers if
-     needed), `engine/verification/` discrete-barrier builder usage,
-     `scripts/export_verification_problems.py` (a `drone_geofence_problem`), and
-     `tests/`. Confirm `Max`/`Piecewise` flow through region geometry and sampling.
-   - Acceptance: the drone problem exports geofence safe/inner regions with
-     rendering geometry on `(q1, v1)`, the admissible control box, and a labeled
-     barrier candidate; rigor stays candidate; the export contract validates;
-     focused tests pass.
+BE-041 is done: the Tier-1 **drone geofence problem** (`drone_geofence_problem`,
+the decoupled `(q1, v1)` horizontal axis) is published to the viewer with the
+geofence safe/inner regions, `(q1, v1)` geometry, the box-barrier candidate, the
+honest forward-invariance + initial-containment obligations (the box barrier's
+non-increase condition is false, so it is not used), and a discrete
+candidate-value certificate series (`measured.py` now supports discrete dynamics).
+It has **no measured `proofStatuses` yet** — that is the remaining gap for full
+viewer parity, handled next.
 
-2. **BE-036: Export measured safety-margin diagnostics per obligation**
+1. **BE-036: Export measured safety-margin diagnostics per obligation**
    - Goal: Enrich the measured evidence with a per-obligation worst margin to the
      boundary (and a time-to-first-violation when violated) so the package's
      measured-diagnostics component shows how close a run gets, all still labeled
@@ -84,20 +77,21 @@ backends dispose._
      time when `measured-violated`), validation accepts well-formed values and
      rejects bad shapes, generated examples validate, and focused tests pass.
 
-3. **BE-042: Drone proof obligations and measured rollout diagnostics**
-   - Goal: Generate the drone's explicit Tier-1 obligations as *obligations* (not
-     discharged): controller admissibility, P1 one-step geofence invariance
-     (`q in S => q+ in S`), and P2 one-step velocity invariance (spec K 1–3), and
-     collect measured diagnostics — worst margins and violation times (reusing
-     BE-036) — from the deterministic guard-band rollout.
-   - Scope: the discrete-barrier builders in `engine/verification/`,
-     `engine/verification/measured.py`,
-     `scripts/export_verification_problems.py`, and `tests/`.
-   - Acceptance: obligations export as `external-required`, measured
-     `proofStatuses` carry margins/violation times, nothing is labeled proved, the
-     export contract validates, and focused tests pass.
+2. **BE-042: Drone measured proof statuses (+ P2 / admissibility obligations)**
+   - Goal: Give the drone problem its measured `proofStatuses` so the viewer shows
+     the verdict ledger (BE-041 left them empty). Sample the forward-invariance
+     and initial-containment obligations on the `(q1, v1)` grid honestly — the
+     forward-invariance claim holds only under `speedBound`, so sample within that
+     restricted region (or report the margin honestly) rather than over all
+     velocities. Optionally add the P2 one-step velocity invariance and controller
+     admissibility obligations (spec K 1, 3), and attach the BE-036 margins.
+   - Scope: `engine/verification/measured.py` (sampling that respects assumption
+     regions), `scripts/export_verification_problems.py`, and `tests/`.
+   - Acceptance: the drone exports measured `proofStatuses` (rigor `measured`,
+     never proved) with margins; the viewer ledger renders; the export contract
+     validates; focused tests pass.
 
-4. **BE-043: Assemble and export the flagship drone verification package**
+3. **BE-043: Assemble and export the flagship drone verification package**
    - Goal: Route the drone end-to-end into one BE-039 verification package —
      manifest, dynamics, assumptions (spec G: `speedBound`, `velBound`, `dtSmall`,
      `driftBound`), safe set, candidate, obligations, measured traces/diagnostics,
@@ -110,7 +104,7 @@ backends dispose._
      claims proof/certification; generated data stays uncommitted; focused tests
      pass.
 
-5. **BE-044: Backend adapter stubs in the verification package**
+4. **BE-044: Backend adapter stubs in the verification package**
    - Goal: Include optional adapter-stub descriptors in the package describing how
      external backend *categories* (reachability, SOS/certificate synthesis,
      deductive prover) would consume each obligation — descriptors of target and

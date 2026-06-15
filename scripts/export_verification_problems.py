@@ -21,6 +21,7 @@ from engine.dynamics import (
     Box,
     ControlledDiscreteSystem,
     LyapunovCandidate,
+    ProofObligation,
     SafetySpecification,
     SublevelSet,
 )
@@ -36,10 +37,19 @@ from engine.verification import (
     sampled_region_proof_statuses,
     verification_problem_from_barrier,
     verification_problem_from_controlled_discrete_lyapunov,
+    verification_problem_from_obligations,
     write_inspection_artifacts,
 )
 from systems.controlled_pendulum import build_system
 from systems.controlled_spring import build_system as build_spring_system
+from systems.drone_point_mass import (
+    DRONE_CONTROLS,
+    DRONE_STATE,
+    DroneParams,
+    horizontal_axis_closed_loop,
+    horizontal_axis_rollout,
+    horizontal_axis_system,
+)
 
 DEFAULT_OUTPUT_DIR = "data/generated/verification"
 INSPECTION_ARTIFACT_INDEX_FILENAME = "inspection-artifacts.index.json"
@@ -50,6 +60,8 @@ INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION = "verification-inspection-artifacts/v1
 # manifest system.
 _PHASE_AXES = {"theta": "theta", "omega": "omega"}
 _SPRING_PHASE_AXES = {"x": "x", "v": "v"}
+# The flagship drone's geofence problem is the decoupled (q1, v1) horizontal axis.
+_DRONE_PHASE_AXES = {"q1": "q1", "v1": "v1"}
 
 
 @dataclass(frozen=True)
@@ -315,6 +327,125 @@ def controlled_spring_trajectory(
     return time, states
 
 
+def _drone_rational(value: float) -> sp.Expr:
+    return sp.nsimplify(value, rational=True)
+
+
+def drone_geofence_problem(params: DroneParams = DroneParams()) -> VerificationProblem:
+    """Tier-1 geofence safety for the flagship drone's horizontal axis.
+
+    The decoupled `(q1, v1)` guard-band closed loop with the geofence box barrier
+    `B(q1) = max(q1Min - q1, q1 - q1Max)` (candidate only). The forward-invariance
+    obligation states the actual Tier-1 claim (`B(F(x)) <= 0` on `{B <= 0}` under
+    the speed bound), not the stronger non-increase condition the box barrier does
+    not satisfy. Renders on the `(q1, v1)` phase plane (spec M).
+    """
+
+    q1 = DRONE_STATE[0]
+    v1 = DRONE_STATE[3]
+    open_loop = horizontal_axis_system(params)
+    closed = horizontal_axis_closed_loop(params)
+    q1_min, q1_max = params.q1_bounds
+    band = params.horizontal_band
+    velocity_bound = params.horizontal_velocity_bound
+    r = _drone_rational
+
+    barrier_expression = sp.Max(r(q1_min) - q1, q1 - r(q1_max))
+    barrier = BarrierCandidate(
+        state=(q1, v1), function=barrier_expression, name="geofence-barrier"
+    )
+    safe_set = SublevelSet(
+        state=(q1, v1), expression=barrier_expression, level=0.0, name="geofence"
+    )
+    inner_start_set = SublevelSet(
+        state=(q1, v1),
+        expression=sp.Max(
+            r(q1_min) + r(band) - q1,
+            q1 - (r(q1_max) - r(band)),
+            sp.Abs(v1) - r(velocity_bound),
+        ),
+        level=0.0,
+        name="inner-start",
+    )
+    specification = SafetySpecification(
+        state=(q1, v1), safe_set=safe_set, initial_set=inner_start_set
+    )
+
+    next_state = {q1: closed.update[0], v1: closed.update[1]}
+    forward_invariance = ProofObligation(
+        name="geofence-barrier:forward-invariance",
+        state=(q1, v1),
+        expression=barrier_expression.subs(next_state, simultaneous=True),
+        comparison="<=",
+        region=barrier.candidate_region(),
+        description=(
+            "B(F(x)) <= 0 on {B <= 0}: one guard-band step keeps the drone inside "
+            "the geofence (Tier-1 P1)."
+        ),
+    )
+    initial_containment = ProofObligation(
+        name="geofence-barrier:initial-containment",
+        state=(q1, v1),
+        expression=barrier_expression,
+        comparison="<=",
+        region=inner_start_set,
+        description="B <= 0 on the inner start set: the initial set lies inside the geofence.",
+    )
+    speed_bound = AssumptionSpec(
+        id="speed-within-half-guard-reach",
+        name="per-step speed within half the guard reach",
+        role="domain",
+        expression=expression_spec(sp.Abs(v1)),
+        comparison="<=",
+        rhs=float(params.horizontal_thrust * params.timestep / 2),
+        variables=("v1",),
+        description=(
+            "Speed stays within uh*dt/2 so corrective thrust arrests outward motion "
+            "before the wall (spec G speedBound)."
+        ),
+    )
+
+    problem = verification_problem_from_obligations(
+        "drone geofence axis",
+        (forward_invariance, initial_containment),
+        system=closed,
+        open_loop_system=open_loop,
+        candidate=barrier,
+        specification=specification,
+        assumptions=(speed_bound,),
+        obligation_assumptions={
+            "geofence-barrier:forward-invariance": ("speed-within-half-guard-reach",),
+            "geofence-barrier:initial-containment": (),
+        },
+        metadata={"verificationModel": "drone-geofence-axis"},
+    )
+    geometry = scalar_field_region_geometries(
+        problem.regions,
+        projection="phase",
+        plane_variables=("q1", "v1"),
+        variable_to_state_axis=_DRONE_PHASE_AXES,
+        x_range=(-1.1, 1.1),
+        y_range=(-0.35, 0.35),
+        samples=(81, 81),
+    )
+    return replace(problem, region_geometry=geometry)
+
+
+def drone_geofence_trajectory(
+    params: DroneParams = DroneParams(),
+) -> tuple[np.ndarray, np.ndarray]:
+    """Integrate the axis-1 guard-band closed loop; columns ``(q1, v1)``.
+
+    The drone coasts outward at the velocity bound, reaches the guard band, and
+    brakes — staying strictly inside the geofence. Discrete-time axis: step `k`
+    maps to time `k * dt`.
+    """
+
+    result = horizontal_axis_rollout(params)
+    time = result.steps.astype(float) * params.timestep
+    return time, result.states
+
+
 def viewer_verification_examples() -> tuple[ViewerVerificationExample, ...]:
     """Every self-contained verification problem exported to the viewer."""
 
@@ -328,6 +459,11 @@ def viewer_verification_examples() -> tuple[ViewerVerificationExample, ...]:
             problem_factory=controlled_spring_problem,
             trajectory_factory=controlled_spring_trajectory,
             variable_to_state_axis=_SPRING_PHASE_AXES,
+        ),
+        ViewerVerificationExample(
+            problem_factory=drone_geofence_problem,
+            trajectory_factory=drone_geofence_trajectory,
+            variable_to_state_axis=_DRONE_PHASE_AXES,
         ),
     )
 

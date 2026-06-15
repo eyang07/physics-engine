@@ -270,4 +270,91 @@ def safe_rollout(
     )
 
 
+# --- Decoupled horizontal-axis sub-dynamics --------------------------------
+#
+# Under the Tier-1 guard-band law each axis is independent: the (q1, v1)
+# dynamics and the axis-1 controller depend only on (q1, v1). This exact 2-D
+# sub-system is the natural geofence verification problem and renders directly on
+# the (q1, v1) phase plane (spec M), with no projection of the 6-D state.
+
+_AXIS1_POSITION = DRONE_STATE[0]
+_AXIS1_VELOCITY = DRONE_STATE[3]
+_AXIS1_CONTROL = DRONE_CONTROLS[0]
+
+
+def horizontal_axis_system(
+    params: DroneParams = DroneParams(),
+) -> ControlledDiscreteSystem:
+    """The decoupled ``(q1, v1)`` horizontal sub-dynamics (open loop)."""
+
+    dt = _rational(params.timestep)
+    update = (
+        _AXIS1_POSITION + dt * _AXIS1_VELOCITY + dt**2 / 2 * _AXIS1_CONTROL,
+        _AXIS1_VELOCITY + dt * _AXIS1_CONTROL,
+    )
+    return ControlledDiscreteSystem(
+        state=(_AXIS1_POSITION, _AXIS1_VELOCITY),
+        controls=(_AXIS1_CONTROL,),
+        update=update,
+        control_bounds=Box(
+            lower=(-params.horizontal_thrust,),
+            upper=(params.horizontal_thrust,),
+        ),
+    )
+
+
+def horizontal_axis_control_law(
+    params: DroneParams = DroneParams(),
+) -> dict[sp.Symbol, sp.Expr]:
+    """The axis-1 guard-band feedback law ``u1 = g1(q1, v1)``."""
+
+    q1_min, q1_max = params.q1_bounds
+    return {
+        _AXIS1_CONTROL: _horizontal_law(
+            _AXIS1_POSITION, _AXIS1_VELOCITY, q1_min, q1_max, params
+        )
+    }
+
+
+def horizontal_axis_closed_loop(params: DroneParams = DroneParams()) -> DiscreteSystem:
+    """The autonomous ``(q1, v1)`` closed loop under the guard-band law."""
+
+    return horizontal_axis_system(params).closed_loop(horizontal_axis_control_law(params))
+
+
+def horizontal_axis_controller(
+    params: DroneParams = DroneParams(),
+) -> Callable[[int, Sequence[float]], tuple[float, ...]]:
+    """A numeric ``(step, (q1, v1)) -> (u1,)`` law for axis-1 rollouts."""
+
+    law = horizontal_axis_control_law(params)[_AXIS1_CONTROL]
+    compiled = sp.lambdify((_AXIS1_POSITION, _AXIS1_VELOCITY), law, "numpy")
+
+    def controller(step: int, state: Sequence[float]) -> tuple[float, ...]:
+        return (float(compiled(state[0], state[1])),)
+
+    return controller
+
+
+# A safe axis-1 start inside the inner interval, coasting outward at the
+# velocity bound (the (q1, v1) slice of DEFAULT_INITIAL_STATE).
+DEFAULT_AXIS_INITIAL_STATE: tuple[float, ...] = (0.0, 0.25)
+
+
+def horizontal_axis_rollout(
+    params: DroneParams = DroneParams(),
+    *,
+    initial_state: Sequence[float] = DEFAULT_AXIS_INITIAL_STATE,
+    step_count: int = DEFAULT_STEP_COUNT,
+) -> DiscreteRolloutResult:
+    """Deterministically iterate the axis-1 guard-band closed loop."""
+
+    return discrete_rollout(
+        horizontal_axis_system(params),
+        horizontal_axis_controller(params),
+        initial_state=initial_state,
+        step_count=step_count,
+    )
+
+
 system = build_system()
