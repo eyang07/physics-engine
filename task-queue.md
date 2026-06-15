@@ -32,19 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-018: Show honest empty states across the Verification surfaces**
-   - Goal: Make absence legible rather than silent — when a problem exports no
-     certificate series (or no proof statuses), show an explicit honest
-     placeholder instead of an empty panel, so a reader can tell "no measured
-     evidence" apart from a rendering gap (VISION §6 legibility/honesty).
-   - Scope: `viewer/src/certificateLanes.ts` and/or `viewer/src/verificationStage.ts`
-     (placeholder when no lanes), `viewer/src/verificationPanel.ts` (placeholder
-     when a section is empty), `viewer/src/styles.css`, and visual coverage in
-     `viewer/tests/visual.spec.ts`.
-   - Acceptance: A problem with no certificate series shows an explicit "no
-     measured certificate series" note, the populated case is unchanged, the copy
-     never implies a result, and visual tests cover the empty/populated paths.
-     Frontend-only — no new exported fields.
+_No frontend tasks queued (pending discussion)._
 
 ## Backend Queue
 

@@ -1166,6 +1166,56 @@ for (const viewport of [
     ).toHaveCount(2);
   });
 
+  test(`Verification surfaces show honest empty states at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // A problem with no measured certificate series and no proof statuses.
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.trajectory.certificateSeries = [];
+      json.proofStatuses = [];
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    // The absence is stated rather than left as empty panels.
+    await expect(page.locator("#verificationCertificateLanes .diagnostic-empty")).toHaveText(
+      /no measured certificate series/i,
+    );
+    await expect(page.locator("#verificationContent .verif-empty-note")).toContainText(
+      /no measured status sampled/i,
+    );
+    // No certificate lanes rendered.
+    await expect(page.locator("#verificationCertificateLanes .diagnostic")).toHaveCount(0);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-empty-states.png`),
+    });
+  });
+
+  test(`Verification populated case shows no empty-state notes at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    // The default problem has measured series and statuses, so no placeholders.
+    await expect(page.locator("#verificationCertificateLanes .diagnostic-empty")).toHaveCount(0);
+    await expect(page.locator("#verificationContent .verif-empty-note")).toHaveCount(0);
+    await expect(
+      page.locator("#verificationCertificateLanes .diagnostic"),
+    ).not.toHaveCount(0);
+  });
+
   test(`Verification header echoes the selected problem counts at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

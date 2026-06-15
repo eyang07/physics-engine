@@ -113,6 +113,14 @@ export class CertificateLanes {
   show(series: Record<string, number[]>, records: CertificateSeries[]): void {
     this.clear();
     records.forEach((record) => this.buildRow(record, series));
+    if (this.lanes.length === 0) {
+      // Make the absence legible: a problem can simply carry no measured
+      // certificate series. State that rather than leaving an empty panel.
+      const empty = document.createElement("p");
+      empty.className = "diagnostic-empty";
+      empty.textContent = "No measured certificate series for this problem.";
+      this.container.append(empty);
+    }
   }
 
   update(phase: number): void {

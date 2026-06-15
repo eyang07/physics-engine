@@ -211,7 +211,7 @@ export class VerificationPanel {
     if (sections.obligations) {
       root.append(sections.obligations);
     }
-    if (problem.proofStatuses.length > 0) {
+    if (problem.obligations.length > 0) {
       root.append(this.renderProofStatuses(problem));
     }
     if (problem.assumptions.length > 0) {
@@ -648,6 +648,18 @@ export class VerificationPanel {
   // never mistaken for a proof.
   private renderProofStatuses(problem: VerificationProblem): HTMLElement {
     const node = section("Measured status");
+    if (problem.proofStatuses.length === 0) {
+      // Obligations exist but none was sampled: say so rather than omit the
+      // surface, so "no measured evidence" is not mistaken for a rendering gap.
+      node.append(
+        el(
+          "p",
+          "verif-empty-note",
+          "No measured status sampled for this problem; every obligation still awaits external discharge.",
+        ),
+      );
+      return node;
+    }
     const intro = el(
       "p",
       "verif-meta",
