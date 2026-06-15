@@ -132,14 +132,30 @@ const ROLE_RGB: Record<string, string> = {
 
 const ROLE_DRAW_ORDER = ["domain", "safe", "initial", "unsafe"];
 
-// A phase-plane window covering every region grid, so the safe corridor (around
-// upright) and the unsafe bottom are both visible behind the trajectory.
-function boundsFromRegions(regions: RegionGeometry[]): Bounds | null {
+// The trajectory is drawn with the theme accent; mirror it in the legend.
+const TRAJECTORY_RGB = "240, 180, 106";
+
+// Frame the stage to the action: the trajectory plus the safe/initial sets it is
+// meant to stay within. The far unsafe/domain grids are deliberately excluded
+// from framing (they otherwise dominate and squash the motion into a corner);
+// their boundaries still draw where they fall inside the clipped plot.
+const FOCUS_ROLES = new Set(["safe", "initial"]);
+
+function boundsForFocus(trajectory: Trajectory, regions: RegionGeometry[]): Bounds {
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
+  for (const state of trajectory.states) {
+    minX = Math.min(minX, state[0] ?? 0);
+    maxX = Math.max(maxX, state[0] ?? 0);
+    minY = Math.min(minY, state[1] ?? 0);
+    maxY = Math.max(maxY, state[1] ?? 0);
+  }
   for (const region of regions) {
+    if (!FOCUS_ROLES.has(region.role)) {
+      continue;
+    }
     for (const x of region.grid.x) {
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x);
@@ -150,34 +166,11 @@ function boundsFromRegions(regions: RegionGeometry[]): Bounds | null {
     }
   }
   if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
-    return null;
+    return { minX: -1, maxX: 1, minY: -1, maxY: 1 };
   }
-  return { minX, maxX, minY, maxY };
-}
-
-function boundsFromTrajectory(trajectory: Trajectory): Bounds {
-  const xValues = trajectory.states.map((state) => state[0] ?? 0);
-  const yValues = trajectory.states.map((state) => state[1] ?? 0);
-  const xSpan = Math.max(...xValues) - Math.min(...xValues);
-  const ySpan = Math.max(...yValues) - Math.min(...yValues);
-  const xPad = Math.max(0.1, xSpan * 0.08);
-  const yPad = Math.max(0.1, ySpan * 0.08);
-  return {
-    minX: Math.min(...xValues) - xPad,
-    maxX: Math.max(...xValues) + xPad,
-    minY: Math.min(...yValues) - yPad,
-    maxY: Math.max(...yValues) + yPad,
-  };
-}
-
-function isInsideRegion(value: number, level: number, convention: string | null): boolean {
-  if (!Number.isFinite(value)) {
-    return false;
-  }
-  if (convention && /(^|[^<])>=?/.test(convention)) {
-    return value >= level;
-  }
-  return value <= level;
+  const xPad = Math.max(0.1, (maxX - minX) * 0.1);
+  const yPad = Math.max(0.1, (maxY - minY) * 0.1);
+  return { minX: minX - xPad, maxX: maxX + xPad, minY: minY - yPad, maxY: maxY + yPad };
 }
 
 function drawRegionGeometry(
@@ -198,32 +191,12 @@ function drawRegionGeometry(
     ...regions.filter((region) => !ROLE_DRAW_ORDER.includes(region.role)),
   ];
 
-  ordered.forEach((region) => {
-    const { x, y, values } = region.grid;
-    if (x.length < 2 || y.length < 2 || values.length === 0) {
-      return;
-    }
-    const level = region.level ?? 0;
-    ctx.fillStyle = `rgba(${ROLE_RGB[region.role] ?? ROLE_RGB.domain}, 0.16)`;
-    for (let row = 0; row < y.length - 1 && row < values.length; row += 1) {
-      const valueRow = values[row];
-      for (let col = 0; col < x.length - 1 && col < valueRow.length; col += 1) {
-        if (!isInsideRegion(valueRow[col], level, region.convention)) {
-          continue;
-        }
-        const x0 = mapX(x[col]);
-        const x1 = mapX(x[col + 1]);
-        const y0 = mapY(y[row]);
-        const y1 = mapY(y[row + 1]);
-        ctx.fillRect(x0, Math.min(y0, y1), Math.max(1, x1 - x0), Math.max(1, Math.abs(y0 - y1)));
-      }
-    }
-  });
-
-  ctx.lineWidth = 1.4;
+  // Outlines only — the per-cell shading read as visual noise. Each region's
+  // boundary is drawn in its role color; the legend names what each color means.
+  ctx.lineWidth = 1.6;
   ctx.lineJoin = "round";
   ordered.forEach((region) => {
-    ctx.strokeStyle = `rgba(${ROLE_RGB[region.role] ?? ROLE_RGB.domain}, 0.88)`;
+    ctx.strokeStyle = `rgba(${ROLE_RGB[region.role] ?? ROLE_RGB.domain}, 0.9)`;
     region.boundaryPolylines.forEach((polyline) => {
       ctx.beginPath();
       polyline.forEach(([x, y], index) => {
@@ -317,6 +290,7 @@ export class VerificationStage {
   private readonly clock = new PlaybackClock();
   private readonly certificateLanes: CertificateLanes;
   private readonly legend: HTMLElement;
+  private readonly rolesLegend: HTMLElement;
   private trajectory: Trajectory | null = null;
   private bounds: Bounds | null = null;
   private regions: RegionGeometry[] = [];
@@ -343,6 +317,12 @@ export class VerificationStage {
     this.legend.className = "verif-violation-legend";
     this.legend.hidden = true;
     canvas.parentElement?.append(this.legend);
+    // A small key for the phase-plane colors (region roles + trajectory), shown
+    // whenever a problem is on the stage.
+    this.rolesLegend = document.createElement("div");
+    this.rolesLegend.className = "verif-roles-legend";
+    this.rolesLegend.hidden = true;
+    canvas.parentElement?.append(this.rolesLegend);
     this.playButton.addEventListener("click", () => this.togglePlay());
   }
 
@@ -355,6 +335,7 @@ export class VerificationStage {
       this.trajectory = null;
       this.bounds = null;
       this.regions = [];
+      this.renderRolesLegend([]);
       this.setViolations([]);
       this.syncPlayButton();
       return;
@@ -367,7 +348,8 @@ export class VerificationStage {
       metadata: {},
     };
     this.regions = problem.regionGeometry;
-    this.bounds = boundsFromRegions(problem.regionGeometry) ?? boundsFromTrajectory(this.trajectory);
+    this.bounds = boundsForFocus(this.trajectory, problem.regionGeometry);
+    this.renderRolesLegend(problem.regionGeometry);
     const obligationName = new Map(
       problem.obligations.map((obligation) => [obligation.id, obligation.name]),
     );
@@ -453,6 +435,32 @@ export class VerificationStage {
     this.legend.hidden = false;
   }
 
+  // A small key for the phase-plane colors: each region role present plus the
+  // trajectory, so a reader can tell the safe corridor from the unsafe set.
+  private renderRolesLegend(regions: RegionGeometry[]): void {
+    this.rolesLegend.replaceChildren();
+    const roles = ROLE_DRAW_ORDER.filter((role) => regions.some((region) => region.role === role));
+    if (roles.length === 0) {
+      this.rolesLegend.hidden = true;
+      return;
+    }
+    const entry = (rgb: string, label: string): HTMLElement => {
+      const row = document.createElement("div");
+      row.className = "verif-roles-legend__entry";
+      const swatch = document.createElement("span");
+      swatch.className = "verif-roles-legend__swatch";
+      swatch.style.background = `rgb(${rgb})`;
+      const name = document.createElement("span");
+      name.className = "verif-roles-legend__name";
+      name.textContent = label;
+      row.append(swatch, name);
+      return row;
+    };
+    roles.forEach((role) => this.rolesLegend.append(entry(ROLE_RGB[role] ?? ROLE_RGB.domain, role)));
+    this.rolesLegend.append(entry(TRAJECTORY_RGB, "trajectory"));
+    this.rolesLegend.hidden = false;
+  }
+
   /** Emphasize the certificate lanes bearing on an obligation (null clears). */
   emphasizeCertificates(obligationId: string | null): void {
     this.certificateLanes.setEmphasis(obligationId);
@@ -471,6 +479,7 @@ export class VerificationStage {
     this.trajectory = null;
     this.bounds = null;
     this.regions = [];
+    this.renderRolesLegend([]);
     this.setViolations([]);
     this.syncPlayButton();
     this.resize();
@@ -503,22 +512,13 @@ export class VerificationStage {
   }
 
   private togglePlay(): void {
-    const duration = this.trajectory ? trajectoryDuration(this.trajectory) : 0;
-    if (!this.clock.playing && duration > 0 && this.clock.time >= duration) {
-      this.clock.reset();
-    } else {
-      this.clock.toggle();
-    }
+    this.clock.toggle();
     this.syncPlayButton();
   }
 
   private syncPlayButton(): void {
-    const duration = this.trajectory ? trajectoryDuration(this.trajectory) : 0;
-    if (!this.clock.playing && duration > 0 && this.clock.time >= duration) {
-      this.playButton.textContent = "Replay";
-    } else {
-      this.playButton.textContent = this.clock.playing ? "Pause" : "Play";
-    }
+    // Playback loops continuously, so the control is only ever Play/Pause.
+    this.playButton.textContent = this.clock.playing ? "Pause" : "Play";
   }
 
   private readonly loop = (now: number): void => {
@@ -543,11 +543,8 @@ export class VerificationStage {
 
     const time = this.clock.advance(now, Number(this.speedControl.value));
     const duration = trajectoryDuration(this.trajectory);
-    if (duration > 0 && time >= duration && this.clock.playing) {
-      this.clock.pause();
-      this.syncPlayButton();
-    }
-    const sample = sampleTrajectory(this.trajectory, time);
+    // Loop continuously: wrap the elapsed time so the run restarts at the end.
+    const sample = sampleTrajectory(this.trajectory, duration > 0 ? time % duration : time);
     drawVerificationPhaseScene(
       this.ctx,
       this.trajectory,

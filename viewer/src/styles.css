@@ -267,6 +267,44 @@ select {
   display: none;
 }
 
+.verif-roles-legend {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost-strong);
+  backdrop-filter: blur(20px);
+  pointer-events: none;
+}
+
+.verif-roles-legend[hidden] {
+  display: none;
+}
+
+.verif-roles-legend__entry {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.verif-roles-legend__swatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.verif-roles-legend__name {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: lowercase;
+}
+
 .verif-violation-legend__title {
   margin: 0;
   color: var(--text-faint);

@@ -3,8 +3,8 @@
  *
  * Time advances independently of rendering; the clock is the single source of
  * the animation's progress, and `sampleTrajectory` interpolates the exported
- * state until the final sample. The viewer treats the data span as one complete
- * run of the example instead of wrapping early.
+ * state (clamped to the data span). Callers loop playback by wrapping elapsed
+ * time modulo the trajectory duration, so a finished run restarts continuously.
  */
 import type { Trajectory } from "./data/trajectory";
 import { clamp } from "./util";

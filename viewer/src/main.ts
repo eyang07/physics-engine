@@ -145,21 +145,12 @@ let verificationProblems: VerificationProblemSummary[] = [];
 let selectedProblemId: string | null = null;
 
 function syncPlayButton() {
-  const duration = trajectory ? trajectoryDuration(trajectory) : 0;
-  if (!clock.playing && duration > 0 && clock.time >= duration) {
-    playButton.textContent = "Replay";
-  } else {
-    playButton.textContent = clock.playing ? "Pause" : "Play";
-  }
+  // Playback loops continuously, so the control is only ever Play/Pause.
+  playButton.textContent = clock.playing ? "Pause" : "Play";
 }
 
 playButton.addEventListener("click", () => {
-  const duration = trajectory ? trajectoryDuration(trajectory) : 0;
-  if (!clock.playing && duration > 0 && clock.time >= duration) {
-    clock.reset();
-  } else {
-    clock.toggle();
-  }
+  clock.toggle();
   syncPlayButton();
 });
 
@@ -509,11 +500,9 @@ function render(now: number) {
 
   const time = clock.advance(now, Number(speedControl.value));
   const duration = trajectoryDuration(trajectory);
-  if (duration > 0 && time >= duration && clock.playing) {
-    clock.pause();
-    syncPlayButton();
-  }
-  const current = sampleTrajectory(trajectory, time);
+  // Loop continuously: wrap the elapsed time so a finished run restarts instead
+  // of dead-ending at the final sample.
+  const current = sampleTrajectory(trajectory, duration > 0 ? time % duration : time);
   if (selectedVisualization.id === "pendulumMotionPhase") {
     resize2dCanvas();
     drawPendulumScene(ctx, trajectory, pendulumBounds, current, canvas.clientWidth, canvas.clientHeight);
