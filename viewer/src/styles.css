@@ -564,6 +564,28 @@ select {
   font-size: 16px;
 }
 
+.verif-card__name--jump {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px dotted var(--hairline-strong);
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.verif-card__name--jump:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.verif-card__name--jump:focus-visible {
+  outline: none;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .verif-card__set {
   overflow-x: auto;
   overflow-y: hidden;

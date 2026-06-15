@@ -733,6 +733,62 @@ for (const viewport of [
     await expect(page.locator("#verifCandidates button.verif-link--jump")).toHaveCount(3);
   });
 
+  test(`Verification measured-status card jumps to its obligation card at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    // Each measured-status card names the obligation it sampled; activating that
+    // name scrolls to and emphasizes the matching obligation card.
+    const statusName = page.locator("button.verif-card__name--jump").first();
+    await statusName.click();
+
+    const targeted = page.locator("#verifObligations .verif-card--targeted");
+    await expect(targeted).toHaveCount(1);
+    await expect(targeted).toBeInViewport();
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-status-jump.png`),
+    });
+  });
+
+  test(`Verification measured-status card stays inert for an unknown obligation at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Inject a measured status referencing an obligation the problem does not
+    // define; its name must stay an inert heading, not a jump to a missing card.
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.proofStatuses.push({
+        id: "injected-status-ghost",
+        obligationId: "ghost-obligation",
+        status: "measured-holds",
+        evaluation: { kind: "region-grid", sampleCount: 5, source: "injected" },
+      });
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationContent .verif-doc");
+
+    await expect(
+      page.locator("strong.verif-card__name", { hasText: "ghost-obligation" }),
+    ).toHaveCount(1);
+    await expect(
+      page.locator("button.verif-card__name--jump", { hasText: "ghost-obligation" }),
+    ).toHaveCount(0);
+    // The problem's real measured-status names remain interactive jumps.
+    await expect(page.locator("button.verif-card__name--jump")).toHaveCount(3);
+  });
+
   test(`Verification header echoes the selected problem counts at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

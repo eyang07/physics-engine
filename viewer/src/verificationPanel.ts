@@ -428,6 +428,24 @@ export class VerificationPanel {
     return node;
   }
 
+  // The obligation a measured status sampled. When that obligation is part of
+  // this problem the name jumps to its card so the measured evidence is
+  // navigable back to the obligation it bears on; an unknown obligation id stays
+  // an inert heading.
+  private statusObligationName(
+    status: ProofStatus,
+    obligationName: Map<string, string>,
+  ): HTMLElement {
+    const label = obligationName.get(status.obligationId) ?? status.obligationId;
+    if (!obligationName.has(status.obligationId)) {
+      return el("strong", "verif-card__name", label);
+    }
+    const link = el("button", "verif-card__name verif-card__name--jump", label);
+    link.type = "button";
+    link.addEventListener("click", () => this.jumpToObligation(status.obligationId));
+    return link;
+  }
+
   private proofStatusCard(
     status: ProofStatus,
     obligationName: Map<string, string>,
@@ -435,7 +453,7 @@ export class VerificationPanel {
   ): HTMLElement {
     const card = el("div", "verif-card");
     const head = el("div", "verif-card__head");
-    head.append(el("strong", "verif-card__name", obligationName.get(status.obligationId) ?? status.obligationId));
+    head.append(this.statusObligationName(status, obligationName));
     head.append(this.proofStatusBadge(status.status));
     card.append(head);
 

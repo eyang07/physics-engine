@@ -32,19 +32,7 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-1. **FE-011: Jump from a measured-status card to its obligation card**
-   - Goal: Let each measured-status card link to the obligation it sampled so the
-     measured evidence is navigable back to the obligation it bears on, reusing
-     the obligation-card ids and jump pattern already in `verificationPanel.ts`.
-   - Scope: `viewer/src/verificationPanel.ts` (make the measured-status card's
-     obligation name scroll/emphasize the matching obligation card),
-     `viewer/src/styles.css`, and visual coverage in `viewer/tests/visual.spec.ts`.
-   - Acceptance: Activating a measured-status card's obligation link brings the
-     matching obligation card into view and emphasizes it, status rows whose
-     obligation id has no obligation card stay inert, and visual tests cover the
-     navigate behavior.
-
-2. **FE-012: Show each obligation's stated assumptions on its card**
+1. **FE-012: Show each obligation's stated assumptions on its card**
    - Goal: Make "valid only under stated assumptions" (VISION §6) legible by
      rendering, on each obligation card, the assumptions it depends on via the
      already-exported `assumptionIds`, with a jump to the matching assumption.
@@ -57,7 +45,7 @@ Each task should use this structure:
      ids with no matching assumption stay inert; visual tests cover the
      present/absent and navigate paths. Frontend-only — no new exported fields.
 
-3. **FE-013: Add a per-obligation status ledger to the Verification doc**
+2. **FE-013: Add a per-obligation status ledger to the Verification doc**
    - Goal: Give the problem an at-a-glance, honestly labeled safety picture: one
      compact ledger row per obligation showing its measured outcome
      (holds/violated/not sampled), rigor badge, and standing `external-required`
@@ -72,7 +60,7 @@ Each task should use this structure:
      sampled", a row navigates to its card, and visual tests assert the ledger
      contents. Frontend-only — no new exported fields.
 
-4. **FE-014: Surface the rigor ladder and the problem's current level**
+3. **FE-014: Surface the rigor ladder and the problem's current level**
    - Goal: Make the four-level rigor ladder (VISION §7) explicit in the
      Verification domain and mark where the current problem sits (level 1 —
      measured evidence with `external-required` obligations) so "measured" can
@@ -86,7 +74,7 @@ Each task should use this structure:
      certification, and visual tests assert the marked level and labels.
      Frontend-only — derives level from already-exported rigor fields.
 
-5. **FE-015: Tie measured evidence to the obligation it bears on**
+4. **FE-015: Tie measured evidence to the obligation it bears on**
    - Goal: Let selecting an obligation (from its card or the FE-013 ledger)
      highlight the certificate lane(s) and comparison baseline that bear on it —
      via `certificateSeries[].obligationIds` and `comparisonBaselines` — so a user
@@ -99,7 +87,7 @@ Each task should use this structure:
      referencing lane stay interaction-free, and visual tests cover the
      emphasis/clear behavior. Frontend-only — uses already-exported links.
 
-6. **FE-016: Download the selected verification problem as a backend-agnostic
+5. **FE-016: Download the selected verification problem as a backend-agnostic
    artifact**
    - Goal: Realize the Definition of Success "export a backend-agnostic
      verification problem that an external tool can attempt to discharge" by
