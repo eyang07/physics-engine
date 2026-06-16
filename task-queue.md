@@ -387,26 +387,23 @@ largest set one disturbed step keeps within `Bh(3)`), not self-reproducing from
 `Bh(3)` itself. The existing robust P1 and initial-containment obligations are
 unchanged. Nothing claims proof/certification.
 
-1. **BE-054: Discovery-index Tier/regime metadata for the package catalog**
-   - Goal: The package discovery index (`packages.index.json`, BE-045) lists every
-     package by model/status/counts, but a reader cannot tell a Tier-1 nominal
-     geofence package from a Tier-3 disturbance-robust one without opening each
-     manifest. The flagship now spans nominal (Tier-1/2) and robust (Tier-3)
-     regimes across five drone packages; surface that. Add an optional, honest
-     descriptor to each index entry — e.g. whether the package carries a
-     disturbance parameter / set-valued dynamics and a quantified-over-disturbance
-     obligation — derived only from data already in the IR. Pure cataloging; claim
-     nothing beyond the rigor of the packages it lists.
-   - Scope: `engine/export/verification_package.py` (extend `PackageIndexEntry`
-     and `build_package_index` with the derived descriptor, keeping it optional and
-     backward-compatible; `read_package_index` validates it), and `tests/`.
-   - Acceptance: the discovery index records the new descriptor for every package,
-     correctly distinguishing the disturbance-robust packages from the nominal ones
-     from IR data alone; `read_package_index` round-trips and validates it; nothing
-     claims proof/certification; generated data stays uncommitted; focused tests
-     pass.
+BE-054 is done: the package discovery index now records an IR-derived Tier/regime
+descriptor. `engine/export/verification_package.py` gained a `PackageRegime`
+value object (`nominal` vs `disturbance-robust`, with the disturbance parameter
+names and the obligation ids quantified over them) and a `_problem_regime` helper
+that classifies a problem from its IR alone — a package is disturbance-robust when
+it carries a bounded disturbance-set assumption whose parameters the set-valued
+dynamics range over and that at least one obligation cites; otherwise nominal
+(reading neither the model name nor the package id, so a frozen-velocity coasting
+parameter is correctly *not* mistaken for a disturbance). `build_package_manifest`
+derives the regime, `PackageManifest`/`PackageIndexEntry` carry it optionally and
+backward-compatibly (absent on older indexes), `build_package_index` propagates it,
+and both `read_package` (entry vs IR) and `read_package_index` (entry vs manifest)
+reject regime drift. The three disturbance-robust drone packages are distinguished
+from the six nominal ones from IR data alone. Pure cataloging; nothing claims
+proof/certification.
 
-2. **BE-055: Robust self-reproducing velocity-bound (P2) for the disturbed
+1. **BE-055: Robust self-reproducing velocity-bound (P2) for the disturbed
    vertical axis**
    - Goal: Mirror BE-053 to the vertical disturbed package
      (`drone_vertical_disturbed_geofence_problem`, BE-051), which proves robust
@@ -427,7 +424,7 @@ unchanged. Nothing claims proof/certification.
      unchanged; nothing claims proof/certification; generated data stays
      uncommitted; focused tests pass.
 
-3. **BE-056: Export the Tier-2 boundary-corner violation reference scenario**
+2. **BE-056: Export the Tier-2 boundary-corner violation reference scenario**
    - Goal: Every published package only *holds*, so the engine's measured-violation
      surface is never exercised end-to-end. Export the DRONE_MODEL_SPEC §L.2 / Tier-2
      "load-bearing diagonal corner" scenario as a second trajectory on the obstacle
@@ -447,7 +444,7 @@ unchanged. Nothing claims proof/certification.
      the violation is labeled measured evidence only; nothing claims
      proof/certification; generated data stays uncommitted; focused tests pass.
 
-4. **BE-057: Cross-package consistency validator for the drone flagship**
+3. **BE-057: Cross-package consistency validator for the drone flagship**
    - Goal: The flagship now spans seven drone packages sharing one model
      (DRONE_MODEL_SPEC §N cross-artifact consistency), but nothing checks that they
      agree. Add a helper that validates all drone packages against a single
@@ -462,7 +459,7 @@ unchanged. Nothing claims proof/certification.
      mismatch; nothing claims proof/certification; generated data stays uncommitted;
      focused tests pass.
 
-5. **BE-058: Encode the full `Obstacle.Valid` assumption triple on the keep-out
+4. **BE-058: Encode the full `Obstacle.Valid` assumption triple on the keep-out
    package**
    - Goal: The obstacle keep-out package (BE-048) cites only a standoff-sizing
      precondition, but DRONE_MODEL_SPEC §337/§711 requires the full `Obstacle.Valid`
@@ -482,7 +479,7 @@ unchanged. Nothing claims proof/certification.
      unchanged where it already held; nothing claims proof/certification; generated
      data stays uncommitted; focused tests pass.
 
-6. **BE-059: Boundary-approaching margin scenario for the Tier-1 geofence axis**
+5. **BE-059: Boundary-approaching margin scenario for the Tier-1 geofence axis**
    - Goal: The Tier-1 geofence rollout sits comfortably inside the safe set, so its
      measured holds-margin is large and uninformative (and gives FE-021 little to
      show). Export the DRONE_MODEL_SPEC §L.2 boundary-approaching scenario: a second
@@ -498,7 +495,7 @@ unchanged. Nothing claims proof/certification.
      existing scenario is unchanged; nothing claims proof/certification; generated
      data stays uncommitted; focused tests pass.
 
-7. **BE-060: Robustness-aware adapter stubs for quantified-over-disturbance
+6. **BE-060: Robustness-aware adapter stubs for quantified-over-disturbance
    obligations**
    - Goal: The adapter-stub catalog (BE-044) derives reachability/SOS/deductive
      stubs from each obligation's classified target, but a Tier-3 robust obligation
@@ -516,7 +513,7 @@ unchanged. Nothing claims proof/certification.
      obligations stay `external-required`; nothing claims proof/certification;
      generated data stays uncommitted; focused tests pass.
 
-8. **BE-061: Cross-package human-readable catalog summary report**
+7. **BE-061: Cross-package human-readable catalog summary report**
    - Goal: The discovery index (BE-045) is machine-readable, but there is no
      human-readable cross-package summary like the inspection adapter's per-problem
      report. Add a writer that emits one deterministic summary across all packages —
@@ -531,7 +528,7 @@ unchanged. Nothing claims proof/certification.
      manifests; it is deterministic and re-readable; nothing claims
      proof/certification; generated data stays uncommitted; focused tests pass.
 
-9. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
+8. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
     - Goal: BE-050 publishes the nominal geofence∩obstacle intersection and
       BE-049/052 publish Tier-3 robust geofence and obstacle packages, but there is
       no robust *intersection* package. Combine them: on the coupled `(q1, q2)`

@@ -15,9 +15,12 @@ from engine.export import (
     PACKAGE_INDEX_SCHEMA_VERSION,
     PACKAGE_MANIFEST_FILENAME,
     PACKAGE_SCHEMA_VERSION,
+    REGIME_DISTURBANCE_ROBUST,
+    REGIME_NOMINAL,
     PackageComponent,
     PackageIndex,
     PackageManifest,
+    PackageRegime,
     build_package_index,
     read_package,
     read_package_index,
@@ -142,6 +145,120 @@ def test_package_index_entry_rejects_bad_manifest_path(tmp_path) -> None:
     index_path.write_text(json.dumps(payload, indent=2) + "\n")
     with pytest.raises(ValueError, match="manifestPath must be"):
         read_package_index(tmp_path)
+
+
+# BE-054: the discovery index records an IR-derived Tier/regime descriptor so a
+# reader can tell a nominal package from a disturbance-robust one without opening
+# each manifest. Pure cataloging; it claims nothing beyond the rigor of the
+# packages it lists.
+_EXPECTED_REGIMES = {
+    "upright-pendulum-safety": REGIME_NOMINAL,
+    "controlled-spring-regulator-safety": REGIME_NOMINAL,
+    "drone-geofence-axis": REGIME_NOMINAL,
+    "drone-vertical-axis": REGIME_NOMINAL,
+    "drone-obstacle-keepout": REGIME_NOMINAL,
+    "drone-geofence-obstacle": REGIME_NOMINAL,
+    "drone-disturbed-geofence-axis": REGIME_DISTURBANCE_ROBUST,
+    "drone-disturbed-vertical-geofence-axis": REGIME_DISTURBANCE_ROBUST,
+    "drone-disturbed-obstacle-keepout": REGIME_DISTURBANCE_ROBUST,
+}
+
+
+def test_package_index_records_regime_for_every_entry(tmp_path) -> None:
+    manifests = write_verification_packages(tmp_path)
+    index = read_package_index(tmp_path)
+
+    # Every entry's regime matches its manifest's regime and the expected
+    # classification, distinguishing the disturbance-robust packages from the
+    # nominal ones from IR data alone.
+    by_id = {manifest.problem_id: manifest for manifest in manifests}
+    for entry in index.entries:
+        assert entry.regime is not None
+        assert entry.regime == by_id[entry.problem_id].regime
+        assert entry.regime.kind == _EXPECTED_REGIMES[entry.problem_id]
+
+    # The disturbance-robust packages name the disturbance parameter(s) the
+    # set-valued dynamics range over and the obligation(s) quantified over them.
+    horizontal = index.entry("drone-disturbed-geofence-axis")
+    assert horizontal.regime.kind == REGIME_DISTURBANCE_ROBUST
+    assert horizontal.regime.disturbance_parameters == ("w1",)
+    assert horizontal.regime.robust_obligation_ids  # at least one robust obligation
+
+    planar = index.entry("drone-disturbed-obstacle-keepout")
+    assert planar.regime.disturbance_parameters == ("w1", "w2")
+
+    # A nominal package -- even one carrying a frozen-velocity parameter (the
+    # coupled coasting plane) -- lists no disturbance parameters or robust
+    # obligations: a bounded coasting parameter is not an adversarial disturbance.
+    coupled = index.entry("drone-geofence-obstacle")
+    assert coupled.regime.kind == REGIME_NOMINAL
+    assert coupled.regime.disturbance_parameters == ()
+    assert coupled.regime.robust_obligation_ids == ()
+
+
+def test_package_regime_round_trips() -> None:
+    for regime in (
+        PackageRegime(kind=REGIME_NOMINAL),
+        PackageRegime(
+            kind=REGIME_DISTURBANCE_ROBUST,
+            disturbance_parameters=("w1", "w2"),
+            robust_obligation_ids=("some-robust-obligation",),
+        ),
+    ):
+        assert PackageRegime.from_dict(regime.to_dict()) == regime
+    # The nominal regime stays minimal on disk (no empty parameter/obligation keys).
+    assert PackageRegime(kind=REGIME_NOMINAL).to_dict() == {"kind": REGIME_NOMINAL}
+
+
+@pytest.mark.parametrize(
+    "kwargs, message",
+    [
+        ({"kind": "tier-9"}, "regime kind must be one of"),
+        (
+            {"kind": REGIME_NOMINAL, "disturbance_parameters": ("w1",)},
+            "nominal package regime must not list",
+        ),
+        (
+            {"kind": REGIME_DISTURBANCE_ROBUST, "robust_obligation_ids": ("o1",)},
+            "must list its disturbance parameter",
+        ),
+        (
+            {"kind": REGIME_DISTURBANCE_ROBUST, "disturbance_parameters": ("w1",)},
+            "must list at least one",
+        ),
+    ],
+)
+def test_package_regime_validates_invariants(kwargs, message) -> None:
+    with pytest.raises(ValueError, match=message):
+        PackageRegime(**kwargs)
+
+
+def test_read_package_index_rejects_regime_drift(tmp_path) -> None:
+    write_verification_packages(tmp_path)
+    index_path = tmp_path / PACKAGE_INDEX_FILENAME
+    payload = json.loads(index_path.read_text())
+    # Flip one nominal entry's regime to robust without touching its manifest; the
+    # index must no longer validate against the on-disk package.
+    entry = next(p for p in payload["packages"] if p["problemId"] == "drone-geofence-axis")
+    entry["regime"] = {
+        "kind": REGIME_DISTURBANCE_ROBUST,
+        "disturbanceParameters": ["w1"],
+        "robustObligationIds": ["fabricated"],
+    }
+    index_path.write_text(json.dumps(payload, indent=2) + "\n")
+    with pytest.raises(ValueError, match="regime does not match"):
+        read_package_index(tmp_path)
+
+
+def test_read_package_rejects_regime_drift_from_ir(tmp_path) -> None:
+    problem, trajectory = _inputs_by_id()["drone-disturbed-geofence-axis"]
+    write_package(problem, trajectory, tmp_path / "pkg")
+    manifest_path = tmp_path / "pkg" / PACKAGE_MANIFEST_FILENAME
+    payload = json.loads(manifest_path.read_text())
+    payload["regime"] = {"kind": REGIME_NOMINAL}
+    manifest_path.write_text(json.dumps(payload, indent=2) + "\n")
+    with pytest.raises(ValueError, match="manifest regime does not match the IR"):
+        read_package(tmp_path / "pkg")
 
 
 def test_package_output_is_deterministic(tmp_path) -> None:

@@ -76,6 +76,20 @@ _COMPONENT_DESCRIPTIONS = {
 }
 _COUNT_KEYS = ("regions", "obligations", "candidates")
 
+# Regime descriptor: an honest, IR-derived classification of whether a package is
+# nominal (Tier-1/2) or disturbance-robust (Tier-3). A disturbance-robust package
+# carries a bounded disturbance set the dynamics are set-valued over and at least
+# one obligation quantified over it. It claims nothing beyond the rigor of the
+# package: a robust obligation is still external-required, not discharged.
+REGIME_NOMINAL = "nominal"
+REGIME_DISTURBANCE_ROBUST = "disturbance-robust"
+PACKAGE_REGIME_KINDS = (REGIME_NOMINAL, REGIME_DISTURBANCE_ROBUST)
+# The convention the drone packages use to mark a bounded disturbance/wind set:
+# the assumption id carries this marker (e.g. 'disturbance-within-wind-bound',
+# 'planar-disturbance-within-wind-bound'). Detecting the regime keys off the IR's
+# own assumptions, never off the package id or the model name.
+_DISTURBANCE_ASSUMPTION_MARKER = "disturbance"
+
 
 def _dump_json(payload: Any) -> str:
     """Deterministic JSON text matching the generators' formatting."""
@@ -114,6 +128,83 @@ class PackageComponent:
 
 
 @dataclass(frozen=True)
+class PackageRegime:
+    """An IR-derived classification of a package's disturbance regime.
+
+    ``kind`` is nominal (Tier-1/2) or disturbance-robust (Tier-3). For a
+    disturbance-robust package, ``disturbance_parameters`` are the IR parameters
+    the set-valued dynamics range over and ``robust_obligation_ids`` are the
+    obligations quantified over that disturbance set. Cataloging only; a robust
+    obligation stays external-required, never discharged.
+    """
+
+    kind: str
+    disturbance_parameters: tuple[str, ...] = ()
+    robust_obligation_ids: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.kind not in PACKAGE_REGIME_KINDS:
+            raise ValueError(
+                f"package regime kind must be one of {list(PACKAGE_REGIME_KINDS)}, "
+                f"got {self.kind!r}"
+            )
+        for label, names in (
+            ("disturbance_parameters", self.disturbance_parameters),
+            ("robust_obligation_ids", self.robust_obligation_ids),
+        ):
+            if any(not isinstance(name, str) or not name for name in names):
+                raise ValueError(f"package regime {label} must be non-empty strings")
+            if len(names) != len(set(names)):
+                raise ValueError(f"package regime {label} must be unique")
+        if self.kind == REGIME_NOMINAL:
+            if self.disturbance_parameters or self.robust_obligation_ids:
+                raise ValueError(
+                    "nominal package regime must not list disturbance parameters or "
+                    "robust obligations"
+                )
+        else:
+            if not self.disturbance_parameters:
+                raise ValueError(
+                    "disturbance-robust package regime must list its disturbance "
+                    "parameter(s)"
+                )
+            if not self.robust_obligation_ids:
+                raise ValueError(
+                    "disturbance-robust package regime must list at least one "
+                    "obligation quantified over the disturbance"
+                )
+
+    @property
+    def is_disturbance_robust(self) -> bool:
+        return self.kind == REGIME_DISTURBANCE_ROBUST
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"kind": self.kind}
+        if self.disturbance_parameters:
+            payload["disturbanceParameters"] = list(self.disturbance_parameters)
+        if self.robust_obligation_ids:
+            payload["robustObligationIds"] = list(self.robust_obligation_ids)
+        return payload
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "PackageRegime":
+        if not isinstance(data, Mapping):
+            raise ValueError("package regime must be a mapping")
+        kind = data.get("kind")
+        if not isinstance(kind, str) or not kind:
+            raise ValueError("package regime kind is invalid")
+        parameters = data.get("disturbanceParameters", [])
+        obligations = data.get("robustObligationIds", [])
+        if not isinstance(parameters, list) or not isinstance(obligations, list):
+            raise ValueError("package regime parameter/obligation lists are invalid")
+        return cls(
+            kind=kind,
+            disturbance_parameters=tuple(parameters),
+            robust_obligation_ids=tuple(obligations),
+        )
+
+
+@dataclass(frozen=True)
 class PackageManifest:
     """The index of one verification package's contents."""
 
@@ -123,6 +214,7 @@ class PackageManifest:
     status: str
     counts: Mapping[str, int]
     components: tuple[PackageComponent, ...]
+    regime: PackageRegime | None = None
     schema_version: str = PACKAGE_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -160,7 +252,7 @@ class PackageManifest:
         return None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "schemaVersion": self.schema_version,
             "problemId": self.problem_id,
             "name": self.name,
@@ -169,6 +261,9 @@ class PackageManifest:
             "counts": {key: int(self.counts[key]) for key in _COUNT_KEYS},
             "components": [component.to_dict() for component in self.components],
         }
+        if self.regime is not None:
+            payload["regime"] = self.regime.to_dict()
+        return payload
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "PackageManifest":
@@ -180,6 +275,7 @@ class PackageManifest:
         components = data.get("components")
         if not isinstance(components, list):
             raise ValueError("package manifest components must be a list")
+        regime = data.get("regime")
         return cls(
             problem_id=_require_string(data, "problemId", "package manifest"),
             name=_require_string(data, "name", "package manifest"),
@@ -187,6 +283,7 @@ class PackageManifest:
             status=_require_string(data, "status", "package manifest"),
             counts={key: _require_int(counts, key, "package manifest counts") for key in _COUNT_KEYS},
             components=tuple(PackageComponent.from_dict(item) for item in components),
+            regime=None if regime is None else PackageRegime.from_dict(regime),
             schema_version=data.get("schemaVersion", PACKAGE_SCHEMA_VERSION),
         )
 
@@ -213,6 +310,7 @@ class PackageIndexEntry:
     manifest_path: str
     component_kinds: tuple[str, ...]
     counts: Mapping[str, int]
+    regime: PackageRegime | None = None
 
     def __post_init__(self) -> None:
         for label, value in (
@@ -250,7 +348,7 @@ class PackageIndexEntry:
                 raise ValueError(f"package index entry count {key} must be a nonnegative int")
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "problemId": self.problem_id,
             "name": self.name,
             "model": self.model,
@@ -259,6 +357,9 @@ class PackageIndexEntry:
             "componentKinds": list(self.component_kinds),
             "counts": {key: int(self.counts[key]) for key in _COUNT_KEYS},
         }
+        if self.regime is not None:
+            payload["regime"] = self.regime.to_dict()
+        return payload
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "PackageIndexEntry":
@@ -270,6 +371,7 @@ class PackageIndexEntry:
         counts = data.get("counts")
         if not isinstance(counts, Mapping):
             raise ValueError("package index entry counts are invalid")
+        regime = data.get("regime")
         return cls(
             problem_id=_require_string(data, "problemId", "package index entry"),
             name=_require_string(data, "name", "package index entry"),
@@ -278,6 +380,7 @@ class PackageIndexEntry:
             manifest_path=_require_string(data, "manifestPath", "package index entry"),
             component_kinds=tuple(component_kinds),
             counts={key: _require_int(counts, key, "package index entry counts") for key in _COUNT_KEYS},
+            regime=None if regime is None else PackageRegime.from_dict(regime),
         )
 
 
@@ -333,6 +436,7 @@ def build_package_index(manifests: "list[PackageManifest] | tuple[PackageManifes
             manifest_path=f"{manifest.problem_id}/{PACKAGE_MANIFEST_FILENAME}",
             component_kinds=tuple(component.kind for component in manifest.components),
             counts=dict(manifest.counts),
+            regime=manifest.regime,
         )
         for manifest in manifests
     )
@@ -383,6 +487,11 @@ def read_package_index(directory: str | Path) -> PackageIndex:
                 f"verification package index entry {entry.problem_id!r} references manifest "
                 f"with problemId {manifest.problem_id!r}"
             )
+        if entry.regime != manifest.regime:
+            raise ValueError(
+                f"verification package index entry {entry.problem_id!r} regime does not "
+                "match its manifest regime"
+            )
     return index
 
 
@@ -406,6 +515,50 @@ def _problem_counts(problem: VerificationProblem) -> dict[str, int]:
         "obligations": len(problem.obligations),
         "candidates": len(problem.candidates),
     }
+
+
+def _problem_regime(problem: VerificationProblem) -> PackageRegime:
+    """Classify a problem's disturbance regime from its IR alone.
+
+    A package is disturbance-robust when it carries a bounded disturbance set --
+    an assumption marked as a disturbance/wind bound -- whose parameters the
+    dynamics range over and that at least one obligation is quantified over.
+    Otherwise it is nominal. Derived purely from the IR's assumptions, parameters,
+    and obligation citations; it reads neither the model name nor the package id.
+    """
+
+    disturbance_assumptions = {
+        assumption.id
+        for assumption in problem.assumptions
+        if _DISTURBANCE_ASSUMPTION_MARKER in assumption.id
+    }
+    if not disturbance_assumptions:
+        return PackageRegime(kind=REGIME_NOMINAL)
+
+    parameter_names = {parameter.name for parameter in problem.parameters}
+    disturbance_parameters = tuple(
+        dict.fromkeys(
+            name
+            for assumption in problem.assumptions
+            if assumption.id in disturbance_assumptions
+            for name in assumption.variables
+            if name in parameter_names
+        )
+    )
+    robust_obligation_ids = tuple(
+        obligation.id
+        for obligation in problem.obligations
+        if disturbance_assumptions.intersection(obligation.assumption_ids)
+    )
+    # A package that merely names a disturbance bound but ranges no parameter over
+    # it, or quantifies no obligation over it, is not robust in any honest sense.
+    if not disturbance_parameters or not robust_obligation_ids:
+        return PackageRegime(kind=REGIME_NOMINAL)
+    return PackageRegime(
+        kind=REGIME_DISTURBANCE_ROBUST,
+        disturbance_parameters=disturbance_parameters,
+        robust_obligation_ids=robust_obligation_ids,
+    )
 
 
 def _problem_model_and_status(problem: VerificationProblem) -> tuple[str, str]:
@@ -451,6 +604,7 @@ def build_package_manifest(
         status=status,
         counts=_problem_counts(problem),
         components=components,
+        regime=_problem_regime(problem),
     )
 
 
@@ -533,6 +687,11 @@ def read_package(directory: str | Path) -> VerificationPackage:
     if dict(manifest.counts) != expected_counts:
         raise ValueError(
             f"verification package {manifest.problem_id!r} manifest counts do not "
+            "match the IR"
+        )
+    if manifest.regime is not None and manifest.regime != _problem_regime(problem):
+        raise ValueError(
+            f"verification package {manifest.problem_id!r} manifest regime does not "
             "match the IR"
         )
 
