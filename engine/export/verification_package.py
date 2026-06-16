@@ -37,6 +37,13 @@ from engine.verification.adapter_stubs import (
 PACKAGE_SCHEMA_VERSION = "verification-package/v1"
 PACKAGE_MANIFEST_FILENAME = "package.json"
 
+# A deterministic discovery index written beside the generated packages so
+# external tools and the viewer can enumerate every package without walking the
+# directory tree. It catalogs only; it claims nothing beyond the rigor of the
+# packages it lists.
+PACKAGE_INDEX_SCHEMA_VERSION = "verification-packages/v1"
+PACKAGE_INDEX_FILENAME = "packages.index.json"
+
 # Component kinds the manifest may index, with their on-disk filenames. The IR
 # and the viewer trajectory are required; the inspection report and the
 # adapter-stub descriptors are optional.
@@ -193,6 +200,190 @@ class VerificationPackage:
     trajectory: Mapping[str, Any]
     inspection: Mapping[str, Any] | None = None
     adapter_stubs: Mapping[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class PackageIndexEntry:
+    """One package's summary in the discovery index."""
+
+    problem_id: str
+    name: str
+    model: str
+    status: str
+    manifest_path: str
+    component_kinds: tuple[str, ...]
+    counts: Mapping[str, int]
+
+    def __post_init__(self) -> None:
+        for label, value in (
+            ("problem_id", self.problem_id),
+            ("name", self.name),
+            ("model", self.model),
+            ("status", self.status),
+            ("manifest_path", self.manifest_path),
+        ):
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"package index entry {label} must be a non-empty string")
+        expected_path = f"{self.problem_id}/{PACKAGE_MANIFEST_FILENAME}"
+        if self.manifest_path != expected_path:
+            raise ValueError(
+                f"package index entry manifestPath must be {expected_path!r}, "
+                f"got {self.manifest_path!r}"
+            )
+        if not self.component_kinds:
+            raise ValueError("package index entry must list at least one component kind")
+        unknown = set(self.component_kinds) - set(PACKAGE_COMPONENT_KINDS)
+        if unknown:
+            raise ValueError(f"package index entry has unknown component kinds: {sorted(unknown)}")
+        if len(self.component_kinds) != len(set(self.component_kinds)):
+            raise ValueError("package index entry component kinds must be unique")
+        missing = set(_REQUIRED_COMPONENT_KINDS) - set(self.component_kinds)
+        if missing:
+            raise ValueError(
+                f"package index entry missing required component kinds: {sorted(missing)}"
+            )
+        if set(self.counts) != set(_COUNT_KEYS):
+            raise ValueError(f"package index entry counts must have keys {list(_COUNT_KEYS)}")
+        for key in _COUNT_KEYS:
+            count = self.counts[key]
+            if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+                raise ValueError(f"package index entry count {key} must be a nonnegative int")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "problemId": self.problem_id,
+            "name": self.name,
+            "model": self.model,
+            "status": self.status,
+            "manifestPath": self.manifest_path,
+            "componentKinds": list(self.component_kinds),
+            "counts": {key: int(self.counts[key]) for key in _COUNT_KEYS},
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "PackageIndexEntry":
+        if not isinstance(data, Mapping):
+            raise ValueError("package index entry must be a mapping")
+        component_kinds = data.get("componentKinds")
+        if not isinstance(component_kinds, list):
+            raise ValueError("package index entry componentKinds must be a list")
+        counts = data.get("counts")
+        if not isinstance(counts, Mapping):
+            raise ValueError("package index entry counts are invalid")
+        return cls(
+            problem_id=_require_string(data, "problemId", "package index entry"),
+            name=_require_string(data, "name", "package index entry"),
+            model=_require_string(data, "model", "package index entry"),
+            status=_require_string(data, "status", "package index entry"),
+            manifest_path=_require_string(data, "manifestPath", "package index entry"),
+            component_kinds=tuple(component_kinds),
+            counts={key: _require_int(counts, key, "package index entry counts") for key in _COUNT_KEYS},
+        )
+
+
+@dataclass(frozen=True)
+class PackageIndex:
+    """The discovery catalog of every generated verification package."""
+
+    entries: tuple[PackageIndexEntry, ...]
+    schema_version: str = PACKAGE_INDEX_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != PACKAGE_INDEX_SCHEMA_VERSION:
+            raise ValueError(f"package index schema_version must be {PACKAGE_INDEX_SCHEMA_VERSION!r}")
+        ids = [entry.problem_id for entry in self.entries]
+        if len(ids) != len(set(ids)):
+            raise ValueError("package index entries must have unique problem ids")
+
+    def entry(self, problem_id: str) -> PackageIndexEntry | None:
+        for entry in self.entries:
+            if entry.problem_id == problem_id:
+                return entry
+        return None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schemaVersion": self.schema_version,
+            "packages": [entry.to_dict() for entry in self.entries],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "PackageIndex":
+        if not isinstance(data, Mapping):
+            raise ValueError("package index payload must be a mapping")
+        if data.get("schemaVersion") != PACKAGE_INDEX_SCHEMA_VERSION:
+            raise ValueError("package index schemaVersion is invalid")
+        packages = data.get("packages")
+        if not isinstance(packages, list):
+            raise ValueError("package index packages must be a list")
+        return cls(
+            entries=tuple(PackageIndexEntry.from_dict(item) for item in packages),
+        )
+
+
+def build_package_index(manifests: "list[PackageManifest] | tuple[PackageManifest, ...]") -> PackageIndex:
+    """Catalog a set of written package manifests into a discovery index."""
+
+    entries = tuple(
+        PackageIndexEntry(
+            problem_id=manifest.problem_id,
+            name=manifest.name,
+            model=manifest.model,
+            status=manifest.status,
+            manifest_path=f"{manifest.problem_id}/{PACKAGE_MANIFEST_FILENAME}",
+            component_kinds=tuple(component.kind for component in manifest.components),
+            counts=dict(manifest.counts),
+        )
+        for manifest in manifests
+    )
+    return PackageIndex(entries=entries)
+
+
+def write_package_index(
+    directory: str | Path,
+    manifests: "list[PackageManifest] | tuple[PackageManifest, ...]",
+) -> PackageIndex:
+    """Write the discovery index beside the generated packages.
+
+    Output is deterministic and regenerable; keep it uncommitted with the rest of
+    the generated verification data.
+    """
+
+    index = build_package_index(manifests)
+    output_dir = Path(directory)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / PACKAGE_INDEX_FILENAME).write_text(
+        _dump_json(index.to_dict()), encoding="utf-8"
+    )
+    return index
+
+
+def read_package_index(directory: str | Path) -> PackageIndex:
+    """Read and validate the discovery index from ``directory``.
+
+    Re-checks the index shape and that every referenced package manifest exists
+    on disk and matches the entry's ``problemId``. Missing files or drift raise
+    ``ValueError``.
+    """
+
+    package_dir = Path(directory)
+    index_path = package_dir / PACKAGE_INDEX_FILENAME
+    if not index_path.is_file():
+        raise ValueError(f"verification package index missing {PACKAGE_INDEX_FILENAME} in {package_dir}")
+    index = PackageIndex.from_dict(_read_json(index_path))
+    for entry in index.entries:
+        manifest_path = package_dir / entry.manifest_path
+        if not manifest_path.is_file():
+            raise ValueError(
+                f"verification package index references missing manifest {entry.manifest_path}"
+            )
+        manifest = PackageManifest.from_dict(_read_json(manifest_path))
+        if manifest.problem_id != entry.problem_id:
+            raise ValueError(
+                f"verification package index entry {entry.problem_id!r} references manifest "
+                f"with problemId {manifest.problem_id!r}"
+            )
+    return index
 
 
 def _require_string(data: Mapping[str, Any], key: str, owner: str) -> str:

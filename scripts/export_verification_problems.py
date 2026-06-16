@@ -25,7 +25,7 @@ from engine.dynamics import (
     SafetySpecification,
     SublevelSet,
 )
-from engine.export import PackageManifest, write_package
+from engine.export import PackageManifest, write_package, write_package_index
 from engine.numerics import integrate_fixed_step
 from engine.verification import (
     AssumptionSpec,
@@ -658,8 +658,11 @@ def verification_package_inputs() -> tuple[tuple[VerificationProblem, dict], ...
 def write_verification_packages(directory: str | Path) -> list[PackageManifest]:
     """Write one self-contained verification package per viewer example.
 
-    Each package lands under ``directory/<problem_id>/``. Output is deterministic
-    and regenerable; keep it uncommitted like the other generated data.
+    Each package lands under ``directory/<problem_id>/`` and a discovery index
+    (``packages.index.json``) is written beside them so external tools and the
+    viewer can enumerate every package without walking the tree. Output is
+    deterministic and regenerable; keep it uncommitted like the other generated
+    data.
     """
 
     output_dir = Path(directory)
@@ -673,6 +676,7 @@ def write_verification_packages(directory: str | Path) -> list[PackageManifest]:
                 include_adapter_stubs=True,
             )
         )
+    write_package_index(output_dir, manifests)
     return manifests
 
 

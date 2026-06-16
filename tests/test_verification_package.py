@@ -11,11 +11,16 @@ from engine.export import (
     COMPONENT_INSPECTION,
     COMPONENT_IR,
     COMPONENT_TRAJECTORY,
+    PACKAGE_INDEX_FILENAME,
+    PACKAGE_INDEX_SCHEMA_VERSION,
     PACKAGE_MANIFEST_FILENAME,
     PACKAGE_SCHEMA_VERSION,
     PackageComponent,
+    PackageIndex,
     PackageManifest,
+    build_package_index,
     read_package,
+    read_package_index,
     write_package,
 )
 from engine.verification import obligation_adapter_stubs, write_inspection_artifacts
@@ -74,6 +79,69 @@ def test_write_verification_packages_covers_every_example(tmp_path) -> None:
     for manifest in manifests:
         package = read_package(tmp_path / manifest.problem_id)
         assert package.problem.id == manifest.problem_id
+
+
+def test_write_verification_packages_writes_discovery_index(tmp_path) -> None:
+    manifests = write_verification_packages(tmp_path)
+
+    # The index lands beside the packages and references every written package.
+    assert (tmp_path / PACKAGE_INDEX_FILENAME).is_file()
+    index = read_package_index(tmp_path)
+    assert index.schema_version == PACKAGE_INDEX_SCHEMA_VERSION
+    assert [entry.problem_id for entry in index.entries] == [
+        manifest.problem_id for manifest in manifests
+    ]
+    # Each entry summarizes its package and points at the on-disk manifest.
+    for manifest, entry in zip(manifests, index.entries, strict=True):
+        assert entry.model == manifest.model
+        assert entry.status == manifest.status
+        assert entry.manifest_path == f"{manifest.problem_id}/{PACKAGE_MANIFEST_FILENAME}"
+        assert entry.component_kinds == tuple(c.kind for c in manifest.components)
+        assert dict(entry.counts) == dict(manifest.counts)
+        # The referenced manifest re-reads as a real package.
+        package = read_package(tmp_path / entry.problem_id)
+        assert package.problem.id == entry.problem_id
+
+
+def test_package_index_round_trips() -> None:
+    manifest = PackageManifest(
+        problem_id="demo",
+        name="Demo",
+        model="demo-model",
+        status="candidate",
+        counts={"regions": 1, "obligations": 2, "candidates": 1},
+        components=(
+            PackageComponent(kind=COMPONENT_IR, path="problem.ir.json"),
+            PackageComponent(kind=COMPONENT_TRAJECTORY, path="trajectory.json"),
+        ),
+    )
+    index = build_package_index([manifest])
+    assert PackageIndex.from_dict(index.to_dict()) == index
+
+
+def test_read_package_index_requires_index_file(tmp_path) -> None:
+    (tmp_path / "empty").mkdir()
+    with pytest.raises(ValueError, match=f"missing {PACKAGE_INDEX_FILENAME}"):
+        read_package_index(tmp_path / "empty")
+
+
+def test_read_package_index_rejects_missing_manifest(tmp_path) -> None:
+    write_verification_packages(tmp_path)
+    first_id = verification_package_inputs()[0][0].id
+    # Drop one referenced package's manifest; the index must no longer validate.
+    (tmp_path / first_id / PACKAGE_MANIFEST_FILENAME).unlink()
+    with pytest.raises(ValueError, match="references missing manifest"):
+        read_package_index(tmp_path)
+
+
+def test_package_index_entry_rejects_bad_manifest_path(tmp_path) -> None:
+    write_verification_packages(tmp_path)
+    index_path = tmp_path / PACKAGE_INDEX_FILENAME
+    payload = json.loads(index_path.read_text())
+    payload["packages"][0]["manifestPath"] = "wrong/path.json"
+    index_path.write_text(json.dumps(payload, indent=2) + "\n")
+    with pytest.raises(ValueError, match="manifestPath must be"):
+        read_package_index(tmp_path)
 
 
 def test_package_output_is_deterministic(tmp_path) -> None:

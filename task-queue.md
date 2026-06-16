@@ -140,21 +140,18 @@ yield no applicable stub. The package writer indexes them as an optional
 `read_package` validates the descriptors against the IR. Every stub is honestly
 non-discharging (`discharges: false`) and obligations stay `external-required`.
 
-1. **BE-045: Verification-package discovery index**
-   - Goal: Write a deterministic discovery index alongside the generated packages
-     (mirroring the inspection-artifact and viewer indexes) so external tools and
-     the viewer can enumerate every package without walking the directory tree —
-     one entry per package naming its `package.json` path, model, status, and
-     component/obligation counts. Pure cataloging; it claims nothing beyond the
-     rigor of the packages it lists.
-   - Scope: `engine/export/verification_package.py` (an index builder/validator
-     beside the manifest), `scripts/generate_verification_problems.py` (write the
-     index next to the packages), and `tests/`.
-   - Acceptance: package generation also writes a contract-valid index that
-     re-reads in Python and references every written package's manifest; the index
-     round-trips; generated data stays uncommitted; focused tests pass.
+BE-045 is done: package generation now writes a deterministic discovery index
+(`packages.index.json`) beside the packages. `engine/export/verification_package.py`
+gained `PackageIndexEntry`/`PackageIndex` plus `build_package_index`,
+`write_package_index`, and `read_package_index`; `write_verification_packages`
+writes the index alongside every package (so both the data and viewer package
+trees carry it). Each entry names the package's `<id>/package.json` path, model,
+status, component kinds, and region/obligation/candidate counts. `read_package_index`
+re-reads the index, validates its shape, and checks every referenced manifest
+exists on disk with a matching `problemId`. Pure cataloging; it claims nothing
+beyond the rigor of the packages it lists.
 
-2. **BE-046: Vertical altitude-axis (q3, v3) Tier-1 geofence package**
+1. **BE-046: Vertical altitude-axis (q3, v3) Tier-1 geofence package**
    - Goal: Add the decoupled vertical altitude axis as a second flagship package,
      reusing the BE-043 structure but exercising the asymmetric vertical regime —
      gravity, hover thrust, floor/ceiling guard bands, and the `[u3Min, u3Max]`
@@ -167,3 +164,19 @@ non-discharging (`discharges: false`) and obligations stay `external-required`.
      package with measured `proofStatuses`, rendering on the `(q3, v3)` plane;
      nothing claims proof/certification; generated data stays uncommitted; focused
      tests pass.
+
+2. **BE-047: Publish the package discovery index to the viewer data tree**
+   - Goal: The BE-045 discovery index (`packages.index.json`) is written beside
+     the generated packages, but the viewer-served verification index
+     (`validate_viewer_verification_index`) still enumerates problems without a
+     pointer to it. Add an optional `packageIndexPath` to the viewer verification
+     index so the Verification view can fetch the package catalog directly,
+     mirroring how `packagePath` already points at each problem's manifest. Pure
+     wiring; it claims nothing beyond the rigor of the packages it lists.
+   - Scope: `engine/export/verification_contract.py` (validate the optional
+     `packageIndexPath`), `scripts/generate_verification_problems.py` (emit it and
+     copy the index into the viewer package tree), and `tests/`.
+   - Acceptance: the generated viewer index carries a contract-valid
+     `packageIndexPath` resolving to the published `packages.index.json`; the
+     export validator accepts indexes with and without it; generated data stays
+     uncommitted; focused tests pass.
