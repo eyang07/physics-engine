@@ -535,3 +535,60 @@ def test_generation_publishes_complete_disturbance_robust_package(tmp_path) -> N
     assert "drone-disturbed-geofence-axis" in {
         entry.problem_id for entry in index.entries
     }
+
+
+def test_generation_publishes_complete_geofence_obstacle_package(tmp_path) -> None:
+    # The first intersection-safe-set problem (BE-050): one coupled (q1, q2)
+    # package carrying both the geofence box barrier and the obstacle keep-out
+    # barrier, so the drone stays inside the geofence AND outside the obstacle.
+    manifests = write_verification_packages_for_examples(tmp_path)
+    coupled = next(m for m in manifests if m.problem_id == "drone-geofence-obstacle")
+    assert coupled.model == "drone-geofence-obstacle"
+    assert coupled.status == "candidate"
+
+    package = read_package(tmp_path / "drone-geofence-obstacle")
+    problem = package.problem
+
+    # Two candidate barriers over the coupled position plane; the coasting
+    # velocity is a bounded parameter of the one-step kinematics.
+    assert problem.dynamics is not None and problem.dynamics.kind == "discrete"
+    assert {variable.name for variable in problem.variables} == {"q1", "q2"}
+    assert {parameter.name for parameter in problem.parameters} == {"v1", "v2"}
+    assert {candidate.id for candidate in problem.candidates} == {
+        "geofence-box-barrier",
+        "obstacle-keepout-barrier",
+    }
+    # The safe set is the intersection of the two candidate regions.
+    safe = next(region for region in problem.regions if region.role == "safe")
+    assert safe.name == "geofence-and-keepout"
+    # It renders on the (q1, q2) plane, covering every region.
+    assert {geometry.region_id for geometry in problem.region_geometry} == {
+        region.id for region in problem.regions
+    }
+    assert all(
+        geometry.plane_variables == ("q1", "q2")
+        for geometry in problem.region_geometry
+    )
+
+    # The engine proposes; it never disposes.
+    assert {obligation.rigor for obligation in problem.obligations} == {
+        "external-required"
+    }
+    assert {candidate.status for candidate in problem.candidates} == {"candidate"}
+    assert {status.rigor for status in problem.proof_statuses} == {"measured"}
+
+    # Both the geofence and keep-out one-step obligations measure-hold within
+    # their assumption regions, with nonnegative signed margins.
+    for obligation_id in (
+        "geofence-box-one-step-forward-invariance",
+        "obstacle-keepout-one-step-avoidance",
+    ):
+        status = next(
+            s for s in problem.proof_statuses if s.obligation_id == obligation_id
+        )
+        assert status.status == "measured-holds"
+        assert status.worst_margin is not None and status.worst_margin >= 0.0
+        assert status.sample_count > 0
+
+    index = read_package_index(tmp_path)
+    assert "drone-geofence-obstacle" in {entry.problem_id for entry in index.entries}

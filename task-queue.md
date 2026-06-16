@@ -204,25 +204,22 @@ the robust braking margin) plus an initial-containment obligation, and measured
 worst-case signed margin. The disturbance bound `|w1| <= w` is non-plane and left
 for external discharge. Nothing claims proof/certification.
 
-1. **BE-050: Coupled obstacle + geofence keep-out on the horizontal plane**
-   - Goal: The Tier-2 obstacle package (BE-048) measures avoidance only within the
-     geofence interior, leaving the geofence walls to the decoupled axis problems.
-     Add a single coupled `(q1, q2)` problem that carries *both* the obstacle
-     keep-out barrier and the geofence box barrier together, so one package shows
-     the drone staying inside the geofence and outside the obstacle under the same
-     guard-band law — the first problem whose safe set is an intersection of two
-     candidate regions. Keep candidates candidate and obligations external-required.
-   - Scope: `scripts/export_verification_problems.py` (extend the obstacle problem
-     or add a companion problem assembling the geofence box barrier alongside the
-     keep-out barrier on the coupled plane, reusing the BE-048 dynamics and
-     assumptions), and `tests/`.
-   - Acceptance: generation publishes a complete, contract-valid coupled package
-     with measured `proofStatuses` for both the geofence and keep-out obligations
-     on the `(q1, q2)` plane, each holding within its assumption region; nothing
-     claims proof/certification; generated data stays uncommitted; focused tests
-     pass.
+BE-050 is done: the first intersection-safe-set problem is published.
+`scripts/export_verification_problems.py` added `drone_geofence_obstacle_problem`
++ its trajectory, registered as a seventh viewer example, reusing the BE-048
+coupled `(q1, q2)` coasting kinematics (planar velocity a bounded parameter) and
+assumptions. The published `drone-geofence-obstacle` package carries two barrier
+candidates together — the geofence box barrier `B_geo = max(q1Min-q1, q1-q1Max,
+q2Min-q2, q2-q2Max)` and the keep-out barrier `B_obs = rho - |q - c|` — whose safe
+set is the intersection `{max(B_geo, B_obs) <= 0}` (inside the geofence box AND
+outside the obstacle). Each barrier carries a worst-case one-step obligation
+(`B + dt*Vmax <= 0`) plus an initial-containment obligation; the geofence claim
+holds within the inner interval and the keep-out claim within the standoff annulus,
+both in the guard-band interior, with measured nonnegative signed margins. Every
+obligation is `external-required` and both barriers are candidates only. Nothing
+claims proof/certification.
 
-2. **BE-051: Tier-3 disturbance-robust vertical altitude geofence package**
+1. **BE-051: Tier-3 disturbance-robust vertical altitude geofence package**
    - Goal: BE-049 made the horizontal axis disturbance-robust; the asymmetric
      vertical altitude axis is still nominal. Add the Tier-3 analogue on the
      `(q3, v3)` axis: the matched additive disturbance `w3` on the vertical
@@ -241,3 +238,23 @@ for external discharge. Nothing claims proof/certification.
      disturbance set, holding within its assumption region on the `(q3, v3)` plane;
      nothing claims proof/certification; generated data stays uncommitted; focused
      tests pass.
+
+2. **BE-052: Tier-3 disturbance-robust obstacle keep-out on the coupled plane**
+   - Goal: BE-048 keeps the drone clear of the obstacle against a *nominal* coasting
+     plant; BE-049 made the geofence axis disturbance-robust. Combine them: add a
+     Tier-3 obstacle keep-out on the coupled `(q1, q2)` plane where the coasting
+     step gains the matched additive disturbance, so the keep-out avoidance
+     obligation is *robust* — the worst-case one-step displacement absorbs both the
+     bounded velocity and the disturbance (`rho - |q - c| + dt*Vmax + dt^2/2*sqrt(2)*w`).
+     This is the first coupled worst-case avoidance problem. Keep candidates
+     candidate and obligations external-required.
+   - Scope: `systems/drone_point_mass.py` (a disturbed coupled `(q1, q2)` coasting
+     sub-dynamics carrying the planar disturbance and its bound),
+     `scripts/export_verification_problems.py` (the robust keep-out problem reusing
+     the BE-048 standoff/interior assumptions plus the disturbance bound, and a
+     nominal trajectory), and `tests/`.
+   - Acceptance: generation publishes a complete, contract-valid robust keep-out
+     package whose avoidance obligation cites the disturbance bound and measures
+     worst-case margin across the disturbance set, holding within the standoff
+     annulus on the `(q1, q2)` plane; nothing claims proof/certification; generated
+     data stays uncommitted; focused tests pass.
