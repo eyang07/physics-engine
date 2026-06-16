@@ -422,17 +422,22 @@ export class VerificationPanel {
       }
     }
 
-    const assumptionIds = new Set(problem.assumptions.map((assumption) => assumption.id));
     const list = el("ul", "verif-ledger");
     problem.obligations.forEach((obligation) => {
       const row = el("li", "verif-ledger__row");
       row.dataset.obligation = obligation.id;
+
+      // The obligation name wraps freely on its own line; its measured outcome
+      // and rigor badges sit on a row beneath it, so a long name never collides
+      // with a badge in the narrow summary rail.
       const head = el("div", "verif-ledger__head");
       const name = el("button", "verif-ledger__name", obligation.name);
       name.type = "button";
       name.addEventListener("click", () => this.jumpToObligation(obligation.id));
       const outcome = outcomeByObligation.get(obligation.id) ?? "external-required";
-      head.append(name, this.proofStatusBadge(outcome), rigorBadge(obligation.rigor));
+      const badges = el("div", "verif-ledger__badges");
+      badges.append(this.proofStatusBadge(outcome), rigorBadge(obligation.rigor));
+      head.append(name, badges);
       row.append(head);
 
       // The measured detail line: the signed safety margin and the assumption
@@ -448,11 +453,13 @@ export class VerificationPanel {
         meta.append(chip);
       }
       if (obligation.assumptionIds.length > 0) {
+        // The assumption region as a light inline footnote; the full, navigable
+        // assumption cards live in the obligation detail below.
         const within = el("span", "verif-ledger__within");
-        within.append(el("span", "verif-ledger__within-label", "within"));
-        obligation.assumptionIds.forEach((id) => {
-          within.append(this.assumptionLink(id, assumptionIds));
-        });
+        within.append(el("span", "verif-ledger__within-label", "within "));
+        within.append(
+          el("span", "verif-ledger__within-ids", obligation.assumptionIds.join(", ")),
+        );
         meta.append(within);
       }
       if (meta.childElementCount > 0) {

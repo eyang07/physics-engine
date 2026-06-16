@@ -860,25 +860,41 @@ select {
   flex-direction: column;
   align-items: stretch;
   gap: 4px;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--hairline);
 }
 
+.verif-ledger__row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* Name wraps freely on its own; the outcome + rigor badges sit on a row beneath
+   it so a long name never collides with a badge in the narrow rail. */
 .verif-ledger__head {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.verif-ledger__badges {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
 }
 
 /* The measured detail line: signed margin + the assumption region the evidence
-   was restricted to. Indented to read as a sub-line of its obligation. */
+   was restricted to. */
 .verif-ledger__meta {
   margin: 0;
-  padding-left: var(--space-2);
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--space-2);
+  gap: 4px var(--space-2);
   color: var(--text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
 }
 
 .verif-ledger__margin {
@@ -886,19 +902,20 @@ select {
   color: var(--text-primary);
 }
 
+/* Assumption region: a light inline footnote, not a stack of boxed chips. */
 .verif-ledger__within {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px;
+  min-width: 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
 }
 
-.verif-ledger__within-label {
+.verif-ledger__within-ids {
+  font-family: var(--font-mono, monospace);
   color: var(--text-muted);
 }
 
 .verif-ledger__name {
-  flex: 1;
+  align-self: stretch;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -907,7 +924,10 @@ select {
   background: none;
   color: var(--text-primary);
   font: inherit;
+  font-weight: var(--weight-medium, 500);
+  line-height: 1.35;
   text-align: left;
+  overflow-wrap: anywhere;
   cursor: pointer;
   transition: color 120ms ease, border-color 120ms ease;
 }

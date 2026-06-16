@@ -907,7 +907,7 @@ for (const viewport of [
       page.locator("#verifLedger .verif-ledger__within-label", { hasText: "within" }),
     ).toHaveCount(3);
     await expect(
-      page.locator("#verifLedger .verif-ledger__within button.verif-link", {
+      page.locator("#verifLedger .verif-ledger__within-ids", {
         hasText: "speed-within-half-guard-reach",
       }),
     ).toBeVisible();
