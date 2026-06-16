@@ -129,19 +129,18 @@ discrete dynamics, assumptions, safe set, three candidates, four obligations,
 per-obligation measured `proofStatuses`, three candidate-value series, and full
 `(q1, v1)` geometry. Nothing claims proof/certification.
 
-1. **BE-044: Backend adapter stubs in the verification package**
-   - Goal: Include optional adapter-stub descriptors in the package describing how
-     external backend *categories* (reachability, SOS/certificate synthesis,
-     deductive prover) would consume each obligation — descriptors of target and
-     required shape only, no discharge, preserving the tool-agnostic posture.
-   - Scope: `engine/verification/` (adapter-stub descriptors alongside the
-     existing capability/target-requirement modules), the package writer in
-     `engine/export/verification_package.py`, and `tests/`.
-   - Acceptance: the drone package lists adapter stubs naming a target backend
-     category and the obligation shape it would need, all honestly
-     non-discharging; the export contract validates; focused tests pass.
+BE-044 is done: the package now carries optional non-discharging adapter-stub
+descriptors. `engine/verification/adapter_stubs.py` catalogs three external
+backend *categories* (reachability, SOS/certificate synthesis, deductive prover)
+and derives, per obligation, one stub per category that could consume its
+classified target — naming the category, the target, and the obligation shape
+(region-scoping, assumptions, ...) it would have to handle. Malformed targets
+yield no applicable stub. The package writer indexes them as an optional
+`adapter-stubs` component (generation enables them via `include_adapter_stubs`);
+`read_package` validates the descriptors against the IR. Every stub is honestly
+non-discharging (`discharges: false`) and obligations stay `external-required`.
 
-2. **BE-045: Verification-package discovery index**
+1. **BE-045: Verification-package discovery index**
    - Goal: Write a deterministic discovery index alongside the generated packages
      (mirroring the inspection-artifact and viewer indexes) so external tools and
      the viewer can enumerate every package without walking the directory tree —
@@ -155,7 +154,7 @@ per-obligation measured `proofStatuses`, three candidate-value series, and full
      re-reads in Python and references every written package's manifest; the index
      round-trips; generated data stays uncommitted; focused tests pass.
 
-3. **BE-046: Vertical altitude-axis (q3, v3) Tier-1 geofence package**
+2. **BE-046: Vertical altitude-axis (q3, v3) Tier-1 geofence package**
    - Goal: Add the decoupled vertical altitude axis as a second flagship package,
      reusing the BE-043 structure but exercising the asymmetric vertical regime —
      gravity, hover thrust, floor/ceiling guard bands, and the `[u3Min, u3Max]`

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from engine.export import (
+    COMPONENT_ADAPTER_STUBS,
     COMPONENT_INSPECTION,
     COMPONENT_IR,
     COMPONENT_TRAJECTORY,
@@ -17,7 +18,7 @@ from engine.export import (
     read_package,
     write_package,
 )
-from engine.verification import write_inspection_artifacts
+from engine.verification import obligation_adapter_stubs, write_inspection_artifacts
 from scripts.export_verification_problems import (
     verification_package_inputs,
     write_verification_packages,
@@ -103,6 +104,49 @@ def test_package_carries_optional_inspection_report(tmp_path) -> None:
     assert package.inspection is not None
     assert package.inspection["adapter"] == report.adapter
     assert package.inspection["problemId"] == problem.id
+
+
+def test_package_carries_optional_adapter_stubs(tmp_path) -> None:
+    problem, trajectory = verification_package_inputs()[0]
+
+    manifest = write_package(
+        problem,
+        trajectory,
+        tmp_path / "pkg",
+        include_adapter_stubs=True,
+    )
+    assert manifest.component(COMPONENT_ADAPTER_STUBS) is not None
+
+    package = read_package(tmp_path / "pkg")
+    assert package.adapter_stubs is not None
+    assert package.adapter_stubs == obligation_adapter_stubs(problem).to_dict()
+    assert package.adapter_stubs["problemId"] == problem.id
+    # Every listed stub names a backend category and discharges nothing.
+    assert package.adapter_stubs["stubs"]
+    for stub in package.adapter_stubs["stubs"]:
+        assert stub["category"] in {category["category"] for category in package.adapter_stubs["categories"]}
+        assert stub["discharges"] is False
+
+
+def test_package_omits_adapter_stubs_by_default(tmp_path) -> None:
+    problem, trajectory = verification_package_inputs()[0]
+    write_package(problem, trajectory, tmp_path / "pkg")
+
+    package = read_package(tmp_path / "pkg")
+    assert package.adapter_stubs is None
+    assert package.manifest.component(COMPONENT_ADAPTER_STUBS) is None
+    assert not (tmp_path / "pkg" / "adapter-stubs.json").exists()
+
+
+def test_read_package_rejects_adapter_stub_id_mismatch(tmp_path) -> None:
+    problem, trajectory = verification_package_inputs()[0]
+    write_package(problem, trajectory, tmp_path / "pkg", include_adapter_stubs=True)
+    stub_path = tmp_path / "pkg" / "adapter-stubs.json"
+    payload = json.loads(stub_path.read_text())
+    payload["problemId"] = "some-other-problem"
+    stub_path.write_text(json.dumps(payload, indent=2) + "\n")
+    with pytest.raises(ValueError, match="adapter stubs problemId"):
+        read_package(tmp_path / "pkg")
 
 
 def test_write_package_requires_verification_model(tmp_path) -> None:
@@ -192,9 +236,11 @@ def test_generation_publishes_complete_drone_package(tmp_path) -> None:
     problem = package.problem
 
     # Every VISION §13 milestone component is present and re-reads in Python.
+    # The generated package also carries the BE-044 adapter-stub descriptors.
     assert {component.kind for component in package.manifest.components} == {
         COMPONENT_IR,
         COMPONENT_TRAJECTORY,
+        COMPONENT_ADAPTER_STUBS,
     }
     assert problem.dynamics is not None and problem.dynamics.kind == "discrete"
     assert {assumption.id for assumption in problem.assumptions} == {
@@ -230,3 +276,20 @@ def test_generation_publishes_complete_drone_package(tmp_path) -> None:
     }
     assert {candidate.status for candidate in problem.candidates} == {"candidate"}
     assert {status.rigor for status in problem.proof_statuses} == {"measured"}
+
+    # BE-044: the package lists adapter stubs naming a target backend category
+    # and the obligation shape it would need — honestly non-discharging.
+    assert package.adapter_stubs is not None
+    stubs = package.adapter_stubs
+    assert {category["category"] for category in stubs["categories"]} == {
+        "reachability",
+        "sos-certificate-synthesis",
+        "deductive-prover",
+    }
+    stubbed_obligation_ids = {stub["obligationId"] for stub in stubs["stubs"]}
+    assert stubbed_obligation_ids == {obligation.id for obligation in problem.obligations}
+    for stub in stubs["stubs"]:
+        assert stub["target"] == "discrete-barrier"
+        assert "region-scoped" in stub["requiredShapeFeatures"]
+        assert stub["applicable"] is True
+        assert stub["discharges"] is False

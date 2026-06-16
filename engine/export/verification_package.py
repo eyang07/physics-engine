@@ -29,31 +29,43 @@ from engine.export.verification_contract import (
     validate_viewer_verification_trajectory,
 )
 from engine.verification import VerificationProblem
+from engine.verification.adapter_stubs import (
+    AdapterStubReport,
+    obligation_adapter_stubs,
+)
 
 PACKAGE_SCHEMA_VERSION = "verification-package/v1"
 PACKAGE_MANIFEST_FILENAME = "package.json"
 
 # Component kinds the manifest may index, with their on-disk filenames. The IR
-# and the viewer trajectory are required; the inspection report is optional.
+# and the viewer trajectory are required; the inspection report and the
+# adapter-stub descriptors are optional.
 COMPONENT_IR = "problem-ir"
 COMPONENT_TRAJECTORY = "viewer-trajectory"
 COMPONENT_INSPECTION = "inspection-report"
+COMPONENT_ADAPTER_STUBS = "adapter-stubs"
 
 PACKAGE_COMPONENT_KINDS = (
     COMPONENT_IR,
     COMPONENT_TRAJECTORY,
     COMPONENT_INSPECTION,
+    COMPONENT_ADAPTER_STUBS,
 )
 _REQUIRED_COMPONENT_KINDS = (COMPONENT_IR, COMPONENT_TRAJECTORY)
 _COMPONENT_FILENAMES = {
     COMPONENT_IR: "problem.ir.json",
     COMPONENT_TRAJECTORY: "trajectory.json",
     COMPONENT_INSPECTION: "inspection.json",
+    COMPONENT_ADAPTER_STUBS: "adapter-stubs.json",
 }
 _COMPONENT_DESCRIPTIONS = {
     COMPONENT_IR: "Backend-agnostic verification-problem IR (no viewer trajectory).",
     COMPONENT_TRAJECTORY: "Self-contained controlled trajectory and certificate series.",
     COMPONENT_INSPECTION: "Stub inspection-adapter report; no obligation discharged.",
+    COMPONENT_ADAPTER_STUBS: (
+        "Non-discharging adapter-stub descriptors: how external backend "
+        "categories would consume each obligation."
+    ),
 }
 _COUNT_KEYS = ("regions", "obligations", "candidates")
 
@@ -180,6 +192,7 @@ class VerificationPackage:
     problem: VerificationProblem
     trajectory: Mapping[str, Any]
     inspection: Mapping[str, Any] | None = None
+    adapter_stubs: Mapping[str, Any] | None = None
 
 
 def _require_string(data: Mapping[str, Any], key: str, owner: str) -> str:
@@ -222,6 +235,7 @@ def build_package_manifest(
     problem: VerificationProblem,
     *,
     include_inspection: bool = False,
+    include_adapter_stubs: bool = False,
 ) -> PackageManifest:
     """Build the manifest indexing a problem's package components."""
 
@@ -229,6 +243,8 @@ def build_package_manifest(
     component_kinds = [COMPONENT_IR, COMPONENT_TRAJECTORY]
     if include_inspection:
         component_kinds.append(COMPONENT_INSPECTION)
+    if include_adapter_stubs:
+        component_kinds.append(COMPONENT_ADAPTER_STUBS)
     components = tuple(
         PackageComponent(
             kind=kind,
@@ -253,12 +269,15 @@ def write_package(
     directory: str | Path,
     *,
     inspection: Mapping[str, Any] | None = None,
+    include_adapter_stubs: bool = False,
 ) -> PackageManifest:
     """Write a self-contained verification package to ``directory``.
 
     Validates the problem and trajectory against the export contract before
-    writing, so a package never persists internally inconsistent data. Returns
-    the manifest. Output is deterministic and regenerable.
+    writing, so a package never persists internally inconsistent data. When
+    ``include_adapter_stubs`` is set, also writes the non-discharging
+    adapter-stub descriptors derived from the obligations. Returns the manifest.
+    Output is deterministic and regenerable.
     """
 
     validate_viewer_verification_problems([problem])
@@ -268,7 +287,11 @@ def write_package(
     ir_payload = problem.to_dict()
     validate_viewer_verification_problem_payload({**ir_payload, "trajectory": dict(trajectory)})
 
-    manifest = build_package_manifest(problem, include_inspection=inspection is not None)
+    manifest = build_package_manifest(
+        problem,
+        include_inspection=inspection is not None,
+        include_adapter_stubs=include_adapter_stubs,
+    )
 
     output_dir = Path(directory)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -281,6 +304,11 @@ def write_package(
     if inspection is not None:
         (output_dir / _COMPONENT_FILENAMES[COMPONENT_INSPECTION]).write_text(
             _dump_json(dict(inspection)), encoding="utf-8"
+        )
+    if include_adapter_stubs:
+        adapter_stubs = obligation_adapter_stubs(problem).to_dict()
+        (output_dir / _COMPONENT_FILENAMES[COMPONENT_ADAPTER_STUBS]).write_text(
+            _dump_json(adapter_stubs), encoding="utf-8"
         )
     (output_dir / PACKAGE_MANIFEST_FILENAME).write_text(
         _dump_json(manifest.to_dict()), encoding="utf-8"
@@ -326,11 +354,30 @@ def read_package(directory: str | Path) -> VerificationPackage:
     if manifest.component(COMPONENT_INSPECTION) is not None:
         inspection = _read_component(package_dir, manifest, COMPONENT_INSPECTION)
 
+    adapter_stubs: Mapping[str, Any] | None = None
+    if manifest.component(COMPONENT_ADAPTER_STUBS) is not None:
+        adapter_stubs = _read_component(package_dir, manifest, COMPONENT_ADAPTER_STUBS)
+        # Structural round-trip validation; reject stubs that drift from the IR.
+        report = AdapterStubReport.from_dict(adapter_stubs)
+        if report.problem_id != problem.id:
+            raise ValueError(
+                f"verification package adapter stubs problemId {report.problem_id!r} "
+                f"does not match the IR id {problem.id!r}"
+            )
+        obligation_ids = {obligation.id for obligation in problem.obligations}
+        unknown = {stub.obligation_id for stub in report.stubs} - obligation_ids
+        if unknown:
+            raise ValueError(
+                f"verification package adapter stubs reference unknown obligations: "
+                f"{sorted(unknown)}"
+            )
+
     return VerificationPackage(
         manifest=manifest,
         problem=problem,
         trajectory=trajectory,
         inspection=inspection,
+        adapter_stubs=adapter_stubs,
     )
 
 

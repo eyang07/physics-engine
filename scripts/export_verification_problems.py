@@ -665,7 +665,14 @@ def write_verification_packages(directory: str | Path) -> list[PackageManifest]:
     output_dir = Path(directory)
     manifests: list[PackageManifest] = []
     for problem, trajectory in verification_package_inputs():
-        manifests.append(write_package(problem, trajectory, output_dir / problem.id))
+        manifests.append(
+            write_package(
+                problem,
+                trajectory,
+                output_dir / problem.id,
+                include_adapter_stubs=True,
+            )
+        )
     return manifests
 
 

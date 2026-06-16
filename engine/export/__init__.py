@@ -20,6 +20,7 @@ from engine.export.verification_contract import (
     validate_viewer_verification_trajectory,
 )
 from engine.export.verification_package import (
+    COMPONENT_ADAPTER_STUBS,
     COMPONENT_INSPECTION,
     COMPONENT_IR,
     COMPONENT_TRAJECTORY,
@@ -35,6 +36,7 @@ from engine.export.verification_package import (
 )
 
 __all__ = [
+    "COMPONENT_ADAPTER_STUBS",
     "COMPONENT_INSPECTION",
     "COMPONENT_IR",
     "COMPONENT_TRAJECTORY",

@@ -1,5 +1,17 @@
 """Backend-agnostic verification problem IR."""
 
+from engine.verification.adapter_stubs import (
+    ADAPTER_STUB_SCHEMA_VERSION,
+    BACKEND_CATEGORIES,
+    BACKEND_CATEGORY_STUBS,
+    CATEGORY_DEDUCTIVE_PROVER,
+    CATEGORY_REACHABILITY,
+    CATEGORY_SOS_SYNTHESIS,
+    AdapterStubReport,
+    BackendCategoryStub,
+    ObligationAdapterStub,
+    obligation_adapter_stubs,
+)
 from engine.verification.capabilities import (
     CANDIDATE_KINDS,
     DYNAMICS_KINDS,
@@ -81,11 +93,19 @@ from engine.verification.target_requirements import (
 __all__ = [
     "ADAPTER_NAME",
     "ADAPTER_CAPABILITIES",
+    "ADAPTER_STUB_SCHEMA_VERSION",
     "ARTIFACT_INSPECTION_OUTCOME_JSON",
     "ARTIFACT_PROBLEM_JSON",
     "ARTIFACT_REPORT_MARKDOWN",
     "AdapterCapabilities",
+    "AdapterStubReport",
     "AssumptionSpec",
+    "BACKEND_CATEGORIES",
+    "BACKEND_CATEGORY_STUBS",
+    "BackendCategoryStub",
+    "CATEGORY_DEDUCTIVE_PROVER",
+    "CATEGORY_REACHABILITY",
+    "CATEGORY_SOS_SYNTHESIS",
     "CANDIDATE_KINDS",
     "CandidateSpec",
     "CapabilityAssessment",
@@ -101,6 +121,7 @@ __all__ = [
     "MALFORMED_OBLIGATION_TARGETS",
     "OBLIGATION_SHAPE_FEATURES",
     "OBLIGATION_TARGETS",
+    "ObligationAdapterStub",
     "ObligationClassification",
     "ObligationSpec",
     "ParameterSpec",
@@ -123,6 +144,7 @@ __all__ = [
     "dynamics_spec_from_system",
     "expression_spec",
     "inspection_diagnostics",
+    "obligation_adapter_stubs",
     "obligation_classifications",
     "render_inspection_markdown",
     "scalar_field_region_geometries",
