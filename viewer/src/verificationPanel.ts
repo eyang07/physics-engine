@@ -15,7 +15,7 @@ import type {
   RegionRole,
   VerificationProblem,
 } from "./data/verification";
-import { formatMeasured } from "./util";
+import { formatMeasured, formatSignedMeasured } from "./util";
 
 const COMPARISON_LATEX: Record<string, string> = {
   "<=": "\\le",
@@ -326,22 +326,59 @@ export class VerificationPanel {
     const rank = (status: string): number =>
       status === "measured-violated" ? 2 : status === "measured-holds" ? 1 : 0;
     const outcomeByObligation = new Map<string, string>();
+    // The signed worst margin (BE-036) per obligation: the tightest (most
+    // negative) margin across its sampled statuses, so the ledger headlines the
+    // closest the measured evidence came to the obligation boundary.
+    const marginByObligation = new Map<string, number>();
     for (const status of problem.proofStatuses) {
       const prev = outcomeByObligation.get(status.obligationId);
       if (prev === undefined || rank(status.status) > rank(prev)) {
         outcomeByObligation.set(status.obligationId, status.status);
       }
+      if (status.worstMargin !== null) {
+        const prevMargin = marginByObligation.get(status.obligationId);
+        if (prevMargin === undefined || status.worstMargin < prevMargin) {
+          marginByObligation.set(status.obligationId, status.worstMargin);
+        }
+      }
     }
 
+    const assumptionIds = new Set(problem.assumptions.map((assumption) => assumption.id));
     const list = el("ul", "verif-ledger");
     problem.obligations.forEach((obligation) => {
       const row = el("li", "verif-ledger__row");
       row.dataset.obligation = obligation.id;
+      const head = el("div", "verif-ledger__head");
       const name = el("button", "verif-ledger__name", obligation.name);
       name.type = "button";
       name.addEventListener("click", () => this.jumpToObligation(obligation.id));
       const outcome = outcomeByObligation.get(obligation.id) ?? "external-required";
-      row.append(name, this.proofStatusBadge(outcome), rigorBadge(obligation.rigor));
+      head.append(name, this.proofStatusBadge(outcome), rigorBadge(obligation.rigor));
+      row.append(head);
+
+      // The measured detail line: the signed safety margin and the assumption
+      // region the evidence was restricted to. Either may be absent (an
+      // unsampled obligation, or one with no domain assumptions), so the line is
+      // built only from what is present rather than showing empty affordances.
+      const meta = el("p", "verif-ledger__meta");
+      const margin = marginByObligation.get(obligation.id);
+      if (margin !== undefined) {
+        const chip = el("span", "verif-ledger__margin");
+        chip.textContent = `margin ${formatSignedMeasured(margin)}`;
+        chip.title = "signed worst margin to the obligation boundary — measured, not a proof";
+        meta.append(chip);
+      }
+      if (obligation.assumptionIds.length > 0) {
+        const within = el("span", "verif-ledger__within");
+        within.append(el("span", "verif-ledger__within-label", "within"));
+        obligation.assumptionIds.forEach((id) => {
+          within.append(this.assumptionLink(id, assumptionIds));
+        });
+        meta.append(within);
+      }
+      if (meta.childElementCount > 0) {
+        row.append(meta);
+      }
       list.append(row);
     });
     node.append(list);
@@ -691,11 +728,29 @@ export class VerificationPanel {
       card.append(el("p", "verif-card__meta", where.join(" · ")));
     }
 
-    if (status.worstValue !== null) {
+    // The signed worst margin to the obligation boundary (BE-036): the headline
+    // measured quantity. Nonnegative is slack inside the boundary; negative is a
+    // violation. The raw worst sample rides along for context.
+    if (status.worstMargin !== null) {
+      const margin = el("p", "verif-card__meta");
+      margin.textContent = `margin: ${formatSignedMeasured(status.worstMargin)}`;
+      if (status.worstValue !== null) {
+        const sense = status.status === "measured-violated" ? "worst (violating) sample" : "worst sample";
+        margin.textContent += ` · ${sense}: ${formatMeasured(status.worstValue)}`;
+      }
+      card.append(margin);
+    } else if (status.worstValue !== null) {
       const worst = el("p", "verif-card__meta");
       const sense = status.status === "measured-violated" ? "worst (violating) sample" : "worst sample";
       worst.textContent = `${sense}: ${formatMeasured(status.worstValue)}`;
       card.append(worst);
+    }
+
+    // The sampling note states the assumption region the evidence was restricted
+    // to (BE-042/BE-043) and reiterates that a clean sample is not a proof. Show
+    // it verbatim when present so the measured scope is never hidden.
+    if (status.note) {
+      card.append(el("p", "verif-card__desc", status.note));
     }
 
     // The standing obligation: measured outcome never changes this.

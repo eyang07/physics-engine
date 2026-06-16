@@ -158,6 +158,12 @@ export interface ProofStatus {
   sampleCount: number;
   source: string | null;
   worstValue: number | null;
+  /**
+   * The signed worst margin to the obligation boundary (BE-036): nonnegative
+   * when the sampled check held, negative when a sample violated it. Null when
+   * the backend exported no worst record.
+   */
+  worstMargin: number | null;
   /** The worst sampled point, in `projection.variables` order; null if absent. */
   worstPoint: number[] | null;
   /** The sampled point's projection onto state axes; null when not exported. */
@@ -407,6 +413,7 @@ function parseProofStatus(value: unknown): ProofStatus | null {
     sampleCount: asOptionalNumber(evaluation.sampleCount) ?? 0,
     source: asOptionalString(evaluation.source),
     worstValue: worst ? asOptionalNumber(worst.value) : null,
+    worstMargin: worst ? asOptionalNumber(worst.margin) : null,
     worstPoint: worstPoint.length > 0 ? worstPoint : null,
     projection:
       projectionVariables.length > 0

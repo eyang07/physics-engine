@@ -301,7 +301,7 @@ for (const viewport of [
 
     // The catalog lists every exported problem; the first is active by default.
     const catalogItems = page.locator("#verificationCatalog .catalog-item");
-    await expect(catalogItems).toHaveCount(2);
+    await expect(catalogItems).toHaveCount(3);
     await expect(page.locator("#verificationCatalog .catalog-item--active")).toHaveCount(1);
 
     // The default problem animates its controlled trajectory on the exported
@@ -424,10 +424,10 @@ for (const viewport of [
     await page.waitForSelector("#verificationSummary .verif-summary");
 
     const items = page.locator("#verificationCatalog .catalog-item");
-    await expect(items).toHaveCount(2);
+    await expect(items).toHaveCount(3);
 
     // Every item carries its obligation/candidate counts from the index summary.
-    for (let index = 0; index < 2; index += 1) {
+    for (let index = 0; index < 3; index += 1) {
       await expect(
         items.nth(index).locator('.catalog-item__count[data-count="obligations"]'),
       ).toHaveText(/\d+ obligations/);
@@ -751,13 +751,25 @@ for (const viewport of [
     page,
   }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // An obligation with no assumptions must expose no "assumes:" affordance — and
+    // no broken chrome. The exported problems all carry assumptions now (BE-034),
+    // so clear them on the payload to exercise the empty branch deterministically.
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      for (const obligation of json.obligations) {
+        obligation.assumptionIds = [];
+      }
+      await route.fulfill({ response, json });
+    });
+
     await page.goto("/");
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
     await page.waitForSelector("#verificationSummary .verif-summary");
 
-    // The exported case studies carry no assumptions, so obligation cards expose
-    // no "assumes:" affordance — and no broken chrome.
+    await openVerificationDetails(page);
     await expect(
       page.locator("#verifObligations .verif-card__links-label", { hasText: "assumes:" }),
     ).toHaveCount(0);
@@ -834,6 +846,86 @@ for (const viewport of [
     await page.screenshot({
       path: testInfo.outputPath(`${viewport.name}-verification-ledger.png`),
     });
+  });
+
+  test(`Verification renders the flagship drone with margins and assumption regions at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // The drone is the first problem with multiple barrier candidates and an
+    // assumption-restricted measured ledger; its generic rendering must stay
+    // honest and free of console errors.
+    const consoleErrors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") {
+        consoleErrors.push(message.text());
+      }
+    });
+    page.on("pageerror", (error) => consoleErrors.push(error.message));
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // Select the drone (third catalog entry) and confirm it loads.
+    await page.locator("#verificationCatalog .catalog-item").nth(2).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+
+    // The (q1, v1) phase plane animates the controlled rollout on its region
+    // geometry: the stage canvas must paint, not stay blank.
+    await page.waitForTimeout(600);
+    await expectCanvasNonBlank(page, "#verificationCanvas");
+
+    // Three barrier candidates -> three certificate lanes (geofence, velocity,
+    // inner-set). The inner-set value coasts positive as the rollout leaves S_in;
+    // the lane renders that measured signal honestly (the verdict lives in the
+    // ledger, not the lane).
+    const certificateLanes = page.locator("#verificationCertificateLanes .diagnostic__certificate");
+    await expect(certificateLanes).toHaveCount(3);
+    await expectCanvasNonBlank(page, "#verificationCertificateLanes .diagnostic__certificate >> nth=0");
+
+    // Four obligations, each measured-holding within its stated region, every row
+    // surfacing a signed margin (BE-036). Measured evidence — still external.
+    const rows = page.locator("#verifLedger .verif-ledger__row");
+    await expect(rows).toHaveCount(4);
+    await expect(
+      page.locator("#verifLedger .verif-status", { hasText: "holds on samples" }),
+    ).toHaveCount(4);
+    await expect(page.locator("#verifLedger .verif-ledger__margin")).toHaveCount(4);
+    await expect(page.locator("#verifLedger .verif-ledger__margin").first()).toContainText(
+      /margin [+-]/,
+    );
+
+    // The obligations sampled under spec-G assumptions name the assumption region
+    // their evidence was restricted to (forward-invariance, velocity, inner-set);
+    // initial-containment carries no domain assumption, so it shows no region.
+    await expect(
+      page.locator("#verifLedger .verif-ledger__within-label", { hasText: "within" }),
+    ).toHaveCount(3);
+    await expect(
+      page.locator("#verifLedger .verif-ledger__within button.verif-link", {
+        hasText: "speed-within-half-guard-reach",
+      }),
+    ).toBeVisible();
+
+    // The measured-status cards (in the IR detail) carry the same signed margin
+    // and the verbatim sampling note stating the assumption region.
+    await openVerificationDetails(page);
+    await expect(
+      page.locator("#verificationDetails .verif-card__meta", { hasText: /margin: [+-]/ }).first(),
+    ).toBeVisible();
+    await expect(
+      page.locator("#verificationDetails .verif-card__desc", {
+        hasText: /Sampled only where the stated assumption region holds/i,
+      }).first(),
+    ).toBeVisible();
+
+    expect(consoleErrors).toEqual([]);
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-drone.png`) });
   });
 
   test(`Verification obligation ledger reads unsampled obligations as not sampled at ${viewport.name}`, async ({

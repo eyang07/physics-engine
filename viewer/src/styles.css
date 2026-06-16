@@ -799,8 +799,44 @@ select {
 
 .verif-ledger__row {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.verif-ledger__head {
+  display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* The measured detail line: signed margin + the assumption region the evidence
+   was restricted to. Indented to read as a sub-line of its obligation. */
+.verif-ledger__meta {
+  margin: 0;
+  padding-left: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.verif-ledger__margin {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.verif-ledger__within {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.verif-ledger__within-label {
+  color: var(--text-muted);
 }
 
 .verif-ledger__name {

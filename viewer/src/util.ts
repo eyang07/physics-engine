@@ -14,3 +14,11 @@ export function formatMeasured(value: number): string {
   }
   return Number(value.toPrecision(3)).toString();
 }
+
+// Like `formatMeasured`, but always carries an explicit sign so a signed margin
+// reads unambiguously (e.g. `+0.01` of slack vs. `-0.01` of violation). Negative
+// values already render with a leading "-"; positive ones gain a leading "+".
+export function formatSignedMeasured(value: number): string {
+  const formatted = formatMeasured(value);
+  return Number.isFinite(value) && value > 0 ? `+${formatted}` : formatted;
+}
