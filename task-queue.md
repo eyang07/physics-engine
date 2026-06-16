@@ -173,23 +173,21 @@ an optional top-level `packageIndexPath` (validated against the published
 package writer already publishes `packages.index.json` into the viewer package
 tree. Pure wiring; it claims nothing beyond the rigor of the packages it lists.
 
-1. **BE-048: Tier-2 horizontal obstacle keep-out (P4) candidate package**
-   - Goal: With both Tier-1 axes published, add the first Tier-2 problem: a
-     keep-out barrier around a circular obstacle in the coupled `(q1, q2)`
-     horizontal plane (spec P4), with the one-step avoidance obligation under the
-     guard-band law and the spec-G assumptions. This is the first problem that is
-     not a single decoupled axis, so it exercises the 2-D coupled regime end to
-     end. Keep candidates candidate and obligations external-required.
-   - Scope: `systems/drone_point_mass.py` (a `horizontal_plane_*` coupled
-     `(q1, q2, v1, v2)` sub-dynamics and obstacle geometry),
-     `scripts/export_verification_problems.py` (the obstacle keep-out problem and
-     trajectory), and `tests/`.
-   - Acceptance: generation publishes a complete, contract-valid obstacle keep-out
-     package with a measured avoidance `proofStatus`, rendering on the `(q1, q2)`
-     plane; nothing claims proof/certification; generated data stays uncommitted;
-     focused tests pass.
+BE-048 is done: the first Tier-2 problem is published. `systems/drone_point_mass.py`
+gained the coupled `horizontal_plane_*` `(q1, q2, v1, v2)` sub-dynamics (per-axis
+guard-band law, pure coasting in the interior) and an `ObstacleSpec` circular
+keep-out geometry. `scripts/export_verification_problems.py` added
+`drone_obstacle_keepout_problem` + its trajectory, registered as a fifth viewer
+example. The published `drone-obstacle-keepout` package carries the signed-distance
+keep-out barrier candidate (coupling `q1`/`q2`), a worst-case one-step avoidance
+obligation and an initial-containment obligation, the spec-G assumptions (planar
+velocity bound left for external discharge, the standoff annulus and geofence
+interior plane-sampled, plus the standoff-sizing precondition), coasting kinematics
+with the planar velocity as a bounded parameter, and measured `proofStatuses` that
+hold within the standoff annulus, rendering on the `(q1, q2)` plane. Nothing claims
+proof/certification.
 
-2. **BE-049: Tier-3 disturbance-robust horizontal geofence package**
+1. **BE-049: Tier-3 disturbance-robust horizontal geofence package**
    - Goal: The Tier-1 geofence holds the guard-band law against a *nominal* plant.
      Add the first Tier-3 problem: a bounded additive disturbance `w` (within the
      spec-G `driftBound`) on the horizontal `(q1, v1)` zero-order-hold step, with a
@@ -207,3 +205,21 @@ tree. Pure wiring; it claims nothing beyond the rigor of the packages it lists.
      the disturbance bound and measures worst-case margin across the disturbance
      set; nothing claims proof/certification; generated data stays uncommitted;
      focused tests pass.
+
+2. **BE-050: Coupled obstacle + geofence keep-out on the horizontal plane**
+   - Goal: The Tier-2 obstacle package (BE-048) measures avoidance only within the
+     geofence interior, leaving the geofence walls to the decoupled axis problems.
+     Add a single coupled `(q1, q2)` problem that carries *both* the obstacle
+     keep-out barrier and the geofence box barrier together, so one package shows
+     the drone staying inside the geofence and outside the obstacle under the same
+     guard-band law — the first problem whose safe set is an intersection of two
+     candidate regions. Keep candidates candidate and obligations external-required.
+   - Scope: `scripts/export_verification_problems.py` (extend the obstacle problem
+     or add a companion problem assembling the geofence box barrier alongside the
+     keep-out barrier on the coupled plane, reusing the BE-048 dynamics and
+     assumptions), and `tests/`.
+   - Acceptance: generation publishes a complete, contract-valid coupled package
+     with measured `proofStatuses` for both the geofence and keep-out obligations
+     on the `(q1, q2)` plane, each holding within its assumption region; nothing
+     claims proof/certification; generated data stays uncommitted; focused tests
+     pass.

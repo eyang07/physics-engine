@@ -86,6 +86,7 @@ def _viewer_verification_expected_ids() -> list[str]:
         "controlled-spring-regulator-safety",
         "drone-geofence-axis",
         "drone-vertical-axis",
+        "drone-obstacle-keepout",
     ]
 
 
@@ -1325,6 +1326,7 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         "/data/verification/controlled-spring-regulator-safety.ir.json",
         "/data/verification/drone-geofence-axis.ir.json",
         "/data/verification/drone-vertical-axis.ir.json",
+        "/data/verification/drone-obstacle-keepout.ir.json",
     ]
     pendulum_ir = ir_payloads["/data/verification/upright-pendulum-safety.ir.json"]
     assert "trajectory" not in pendulum_ir
@@ -1384,6 +1386,7 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         "controlled-spring-regulator",
         "drone-geofence-axis",
         "drone-vertical-axis",
+        "drone-obstacle-keepout",
     ]
     assert [problem["dataPath"] for problem in index["problems"]] == [
         f"/data/verification/{problem_id}.json" for problem_id in expected_ids

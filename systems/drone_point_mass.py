@@ -468,4 +468,123 @@ def vertical_axis_rollout(
     )
 
 
+# --- Coupled horizontal-plane sub-dynamics (Tier-2) ------------------------
+#
+# The first non-decoupled regime: both horizontal axes together, (q1, q2, v1,
+# v2), under the per-axis guard-band law. The axes stay dynamically decoupled
+# (each control depends only on its own axis), but a planar keep-out constraint
+# around an obstacle couples q1 and q2 geometrically. This 2-D position plane is
+# the natural stage for the Tier-2 obstacle problem (spec P4): in the geofence
+# interior the guard band commands zero thrust, so the closed-loop step is the
+# exact coasting drift q+ = q + dt v.
+
+_PLANE_STATE = (DRONE_STATE[0], DRONE_STATE[1], DRONE_STATE[3], DRONE_STATE[4])
+_PLANE_CONTROLS = (DRONE_CONTROLS[0], DRONE_CONTROLS[1])
+
+
+@dataclass(frozen=True)
+class ObstacleSpec:
+    """A circular keep-out obstacle in the ``(q1, q2)`` horizontal plane.
+
+    ``standoff_radius`` is the operating-annulus radius the keep-out argument
+    works within: from outside it, one bounded-speed coasting step cannot reach
+    the obstacle. It must exceed the obstacle radius. Defaults place a small
+    obstacle at the geofence center with a standoff that fits the interior.
+    """
+
+    center: tuple[float, float] = (0.0, 0.0)
+    radius: float = 0.25
+    standoff_radius: float = 0.5
+
+    def __post_init__(self) -> None:
+        if self.radius <= 0:
+            raise ValueError("obstacle radius must be positive")
+        if self.standoff_radius <= self.radius:
+            raise ValueError("standoff radius must exceed the obstacle radius")
+
+
+DEFAULT_OBSTACLE = ObstacleSpec()
+
+
+def horizontal_plane_system(
+    params: DroneParams = DroneParams(),
+) -> ControlledDiscreteSystem:
+    """The coupled ``(q1, q2, v1, v2)`` horizontal sub-dynamics (open loop)."""
+
+    q1, q2, v1, v2 = _PLANE_STATE
+    u1, u2 = _PLANE_CONTROLS
+    dt = _rational(params.timestep)
+    update = (
+        q1 + dt * v1 + dt**2 / 2 * u1,
+        q2 + dt * v2 + dt**2 / 2 * u2,
+        v1 + dt * u1,
+        v2 + dt * u2,
+    )
+    return ControlledDiscreteSystem(
+        state=_PLANE_STATE,
+        controls=_PLANE_CONTROLS,
+        update=update,
+        control_bounds=Box(
+            lower=(-params.horizontal_thrust, -params.horizontal_thrust),
+            upper=(params.horizontal_thrust, params.horizontal_thrust),
+        ),
+    )
+
+
+def horizontal_plane_control_law(
+    params: DroneParams = DroneParams(),
+) -> dict[sp.Symbol, sp.Expr]:
+    """The per-axis guard-band law on the coupled plane: ``(u1, u2) = g(q, v)``."""
+
+    q1, q2, v1, v2 = _PLANE_STATE
+    u1, u2 = _PLANE_CONTROLS
+    q1_min, q1_max = params.q1_bounds
+    q2_min, q2_max = params.q2_bounds
+    return {
+        u1: _horizontal_law(q1, v1, q1_min, q1_max, params),
+        u2: _horizontal_law(q2, v2, q2_min, q2_max, params),
+    }
+
+
+def horizontal_plane_closed_loop(params: DroneParams = DroneParams()) -> DiscreteSystem:
+    """The autonomous ``(q1, q2, v1, v2)`` closed loop under the guard-band law."""
+
+    return horizontal_plane_system(params).closed_loop(horizontal_plane_control_law(params))
+
+
+def horizontal_plane_controller(
+    params: DroneParams = DroneParams(),
+) -> Callable[[int, Sequence[float]], tuple[float, ...]]:
+    """A numeric ``(step, (q1, q2, v1, v2)) -> (u1, u2)`` law for plane rollouts."""
+
+    law = horizontal_plane_control_law(params)
+    compiled = sp.lambdify(_PLANE_STATE, [law[symbol] for symbol in _PLANE_CONTROLS], "numpy")
+
+    def controller(step: int, state: Sequence[float]) -> tuple[float, ...]:
+        return tuple(float(value) for value in compiled(*state))
+
+    return controller
+
+
+# A safe planar start: upper-left, coasting in +q1 above the centered obstacle,
+# staying clear of the standoff annulus throughout the pass.
+DEFAULT_PLANE_INITIAL_STATE: tuple[float, ...] = (-0.7, 0.6, 0.25, 0.0)
+
+
+def horizontal_plane_rollout(
+    params: DroneParams = DroneParams(),
+    *,
+    initial_state: Sequence[float] = DEFAULT_PLANE_INITIAL_STATE,
+    step_count: int = DEFAULT_STEP_COUNT,
+) -> DiscreteRolloutResult:
+    """Deterministically iterate the coupled horizontal-plane guard-band loop."""
+
+    return discrete_rollout(
+        horizontal_plane_system(params),
+        horizontal_plane_controller(params),
+        initial_state=initial_state,
+        step_count=step_count,
+    )
+
+
 system = build_system()

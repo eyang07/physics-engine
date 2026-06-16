@@ -414,3 +414,59 @@ def test_generation_publishes_complete_vertical_axis_package(tmp_path) -> None:
     # The discovery index now catalogs both drone axes alongside the case studies.
     index = read_package_index(tmp_path)
     assert "drone-vertical-axis" in {entry.problem_id for entry in index.entries}
+
+
+def test_generation_publishes_complete_obstacle_package(tmp_path) -> None:
+    # The first Tier-2 problem (BE-048): a circular obstacle keep-out on the
+    # coupled (q1, q2) horizontal plane, not a single decoupled axis.
+    manifests = write_verification_packages_for_examples(tmp_path)
+    obstacle = next(m for m in manifests if m.problem_id == "drone-obstacle-keepout")
+    assert obstacle.model == "drone-obstacle-keepout"
+    assert obstacle.status == "candidate"
+
+    package = read_package(tmp_path / "drone-obstacle-keepout")
+    problem = package.problem
+
+    # The keep-out barrier is a candidate over the coupled position plane; the
+    # coasting velocity is a bounded parameter of the one-step kinematics.
+    assert problem.dynamics is not None and problem.dynamics.kind == "discrete"
+    assert {variable.name for variable in problem.variables} == {"q1", "q2"}
+    assert {parameter.name for parameter in problem.parameters} == {"v1", "v2"}
+    assert {candidate.id for candidate in problem.candidates} == {
+        "obstacle-keepout-barrier"
+    }
+    assert {assumption.id for assumption in problem.assumptions} == {
+        "planar-speed-within-velocity-bound",
+        "drone-maintains-obstacle-standoff",
+        "operating-region-within-guard-band-interior",
+        "standoff-exceeds-worst-case-drift",
+    }
+    # It renders on the (q1, q2) plane, covering every region.
+    assert {geometry.region_id for geometry in problem.region_geometry} == {
+        region.id for region in problem.regions
+    }
+    assert all(
+        geometry.plane_variables == ("q1", "q2")
+        for geometry in problem.region_geometry
+    )
+
+    # The engine proposes; it never disposes.
+    assert {obligation.rigor for obligation in problem.obligations} == {
+        "external-required"
+    }
+    assert {candidate.status for candidate in problem.candidates} == {"candidate"}
+    assert {status.rigor for status in problem.proof_statuses} == {"measured"}
+
+    # The measured avoidance status holds within the standoff annulus and the
+    # geofence interior, with a nonnegative signed margin.
+    avoidance = next(
+        status
+        for status in problem.proof_statuses
+        if status.obligation_id == "obstacle-keepout-one-step-avoidance"
+    )
+    assert avoidance.status == "measured-holds"
+    assert avoidance.worst_margin is not None and avoidance.worst_margin >= 0.0
+    assert avoidance.sample_count > 0
+
+    index = read_package_index(tmp_path)
+    assert "drone-obstacle-keepout" in {entry.problem_id for entry in index.entries}

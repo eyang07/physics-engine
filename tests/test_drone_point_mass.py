@@ -7,10 +7,13 @@ import sympy as sp
 from engine.dynamics import Box, ControlledDiscreteSystem, DiscreteSystem
 from systems.drone_point_mass import (
     DEFAULT_INITIAL_STATE,
+    DEFAULT_OBSTACLE,
+    DEFAULT_PLANE_INITIAL_STATE,
     DEFAULT_VERTICAL_AXIS_INITIAL_STATE,
     DRONE_CONTROLS,
     DRONE_STATE,
     DroneParams,
+    ObstacleSpec,
     build_system,
     closed_loop,
     guard_band_control_law,
@@ -19,6 +22,9 @@ from systems.drone_point_mass import (
     horizontal_axis_control_law,
     horizontal_axis_rollout,
     horizontal_axis_system,
+    horizontal_plane_closed_loop,
+    horizontal_plane_rollout,
+    horizontal_plane_system,
     safe_rollout,
     vertical_axis_closed_loop,
     vertical_axis_control_law,
@@ -256,3 +262,60 @@ def test_default_vertical_initial_state_is_inside_the_inner_altitude_set() -> No
     q3, v3 = DEFAULT_VERTICAL_AXIS_INITIAL_STATE
     assert params.q3_bounds[0] + params.floor_band <= q3 <= params.q3_bounds[1] - params.ceiling_band
     assert abs(v3) <= params.vertical_velocity_bound + 1e-9
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "match"),
+    [
+        ({"radius": 0.0}, "obstacle radius must be positive"),
+        ({"standoff_radius": 0.25}, "standoff radius must exceed"),
+    ],
+)
+def test_obstacle_spec_validates_invariants(kwargs, match) -> None:
+    with pytest.raises(ValueError, match=match):
+        ObstacleSpec(**kwargs)
+
+
+def test_horizontal_plane_system_is_the_coupled_q1_q2_subsystem() -> None:
+    system = horizontal_plane_system()
+    q1, q2, v1, v2 = DRONE_STATE[0], DRONE_STATE[1], DRONE_STATE[3], DRONE_STATE[4]
+    u1, u2 = DRONE_CONTROLS[0], DRONE_CONTROLS[1]
+    assert system.state == (q1, q2, v1, v2)
+    assert system.controls == (u1, u2)
+    dt = sp.Rational(1, 4)
+    assert sp.simplify(system.update[0] - (q1 + dt * v1 + dt**2 / 2 * u1)) == 0
+    assert sp.simplify(system.update[2] - (v1 + dt * u1)) == 0
+    assert system.control_bounds == Box(lower=(-1.0, -1.0), upper=(1.0, 1.0))
+
+
+def test_horizontal_plane_closed_loop_matches_the_per_axis_laws() -> None:
+    closed = horizontal_plane_closed_loop()
+    q1, q2, v1, v2 = DRONE_STATE[0], DRONE_STATE[1], DRONE_STATE[3], DRONE_STATE[4]
+    assert isinstance(closed, DiscreteSystem)
+    assert closed.state == (q1, q2, v1, v2)
+    # Each closed-loop axis agrees with the full guard-band law on its own axis:
+    # near the +x wall moving out the law brakes (-1); near the -x wall it pushes
+    # back in (+1).
+    full = guard_band_control_law()
+    sample = {q1: 0.8, q2: -0.8, v1: 0.25, v2: -0.25}
+    rest = {DRONE_STATE[2]: 1, DRONE_STATE[5]: 0}
+    assert full[DRONE_CONTROLS[0]].subs({**sample, **rest}) == sp.Integer(-1)
+    assert full[DRONE_CONTROLS[1]].subs({**sample, **rest}) == sp.Integer(1)
+
+
+def test_horizontal_plane_rollout_coasts_in_interior_and_avoids_the_obstacle() -> None:
+    params = DroneParams()
+    obstacle = DEFAULT_OBSTACLE
+    result = horizontal_plane_rollout(params)
+    q1 = result.states[:, 0]
+    q2 = result.states[:, 1]
+    # Pure coasting in the interior: the guard band commands no thrust and the
+    # velocity stays at the initial value.
+    assert result.control_violation == 0.0
+    assert np.allclose(result.controls, 0.0)
+    assert np.allclose(result.states[:, 2], DEFAULT_PLANE_INITIAL_STATE[2])
+    assert np.allclose(result.states[:, 3], DEFAULT_PLANE_INITIAL_STATE[3])
+    # The path stays outside the obstacle (and even outside the standoff annulus).
+    cx, cy = obstacle.center
+    distances = np.hypot(q1 - cx, q2 - cy)
+    assert np.all(distances >= obstacle.standoff_radius)
