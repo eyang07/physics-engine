@@ -60,6 +60,7 @@ from systems.drone_point_mass import (
     vertical_axis_closed_loop,
     vertical_axis_rollout,
     vertical_axis_system,
+    vertical_disturbed_axis_closed_loop,
 )
 
 DEFAULT_OUTPUT_DIR = "data/generated/verification"
@@ -1527,6 +1528,236 @@ def drone_disturbed_geofence_trajectory(
     return time, result.states
 
 
+def drone_vertical_disturbed_geofence_problem(
+    params: DroneParams = DroneParams(),
+    disturbance: DisturbanceSpec = DEFAULT_DISTURBANCE,
+) -> VerificationProblem:
+    """Tier-3 disturbance-robust altitude problem on the ``(q3, v3)`` axis.
+
+    The vertical analogue of the horizontal BE-049 problem: the asymmetric
+    altitude zero-order-hold step (carrying the gravity offset) gains a bounded
+    additive disturbance ``w3 in W = [-w, w]`` matched to the control, making the
+    closed loop set-valued. The robust floor/ceiling forward-invariance obligation
+    must hold for *every* admissible ``w3``.
+
+    The worst case over ``W`` is exact and baked in analytically: one disturbed
+    step displaces the altitude by at most ``dt^2/2 * w`` toward either bound, so
+    ``max_w B(F(x, g(x), w)) = B(F_nom(x)) + dt^2/2 * w``. The obligation samples
+    that worst-case barrier value within the altitude inner interval (the spec-G
+    ``driftBound`` region, where the guard band commands hover thrust so one
+    disturbed coasting step stays between floor and ceiling) and the robust speed
+    bound ``|v3| <= (a - w) * dt / 2``, where ``a = min(u3Max - g, g - u3Min)`` is
+    the binding *asymmetric* vertical authority margin (unlike the symmetric
+    horizontal reach). The disturbance bound ``|w3| <= w`` is a non-plane
+    assumption left for external discharge.
+
+    Every obligation is ``external-required`` and the geofence barrier is a
+    candidate only. Renders on the ``(q3, v3)`` plane.
+    """
+
+    disturbance.assert_vertical_authority(params)
+    q, v = DRONE_STATE[2], DRONE_STATE[5]
+    dynamics = vertical_disturbed_axis_closed_loop(params, disturbance)
+    w = dynamics.parameters[0]
+    closed = vertical_axis_closed_loop(params)
+    r = _drone_rational
+    dt = r(params.timestep)
+    q_min, q_max = params.q3_bounds
+    floor = r(params.floor_band)
+    ceiling = r(params.ceiling_band)
+    reach = r(params.vertical_reach)
+    authority = r(DisturbanceSpec.vertical_authority_margin(params))
+    w_max = r(disturbance.bound)
+    # Worst-case one-step altitude displacement under the disturbance set.
+    robust_drift = dt**2 / 2 * w_max
+    # Robust speed bound: the binding asymmetric authority margin tightened by the
+    # disturbance, so one disturbed corrective step still arrests outward motion.
+    robust_speed_cap = (authority - w_max) * dt / 2
+
+    barrier_expression = sp.Max(r(q_min) - q, q - r(q_max))
+    barrier = BarrierCandidate(
+        state=(q, v), function=barrier_expression, name="geofence-barrier"
+    )
+    safe_set = SublevelSet(
+        state=(q, v), expression=barrier_expression, level=0.0, name="geofence"
+    )
+    inner_start_expression = sp.Max(
+        r(q_min) + floor - q,
+        q - (r(q_max) - ceiling),
+        sp.Abs(v) - robust_speed_cap,
+    )
+    inner_start_set = SublevelSet(
+        state=(q, v), expression=inner_start_expression, level=0.0, name="inner-start"
+    )
+    specification = SafetySpecification(
+        state=(q, v), safe_set=safe_set, initial_set=inner_start_set
+    )
+
+    nominal_next = {q: closed.update[0], v: closed.update[1]}
+    robust_forward_invariance = ProofObligation(
+        name="geofence-barrier:robust-forward-invariance",
+        state=(q, v),
+        expression=barrier_expression.subs(nominal_next, simultaneous=True) + robust_drift,
+        comparison="<=",
+        region=safe_set,
+        description=(
+            "max_w B(F(x, g(x), w)) = B(F_nom(x)) + dt^2/2*w <= 0 on {B <= 0}: one "
+            "guard-band step keeps the drone between the floor and ceiling for every "
+            "admissible disturbance w in W = [-w, w] (Tier-3 robust P1)."
+        ),
+    )
+    initial_containment = ProofObligation(
+        name="geofence-barrier:initial-containment",
+        state=(q, v),
+        expression=barrier_expression,
+        comparison="<=",
+        region=inner_start_set,
+        description=(
+            "B <= 0 on the inner start set: the initial set lies between the floor "
+            "and ceiling."
+        ),
+    )
+
+    disturbance_bound = AssumptionSpec(
+        id="disturbance-within-wind-bound",
+        name="additive disturbance within the wind bound",
+        role="domain",
+        expression=expression_spec(sp.Abs(w)),
+        comparison="<=",
+        rhs=float(w_max),
+        variables=(w.name,),
+        description=(
+            "|w3| <= w: the additive acceleration disturbance stays within the "
+            "per-axis wind box W = [-w, w]; the robust forward-invariance claim is "
+            "quantified over every admissible w3 in W (spec Tier-3 disturbance set). "
+            "Not plane-expressible in (q3, v3); left for external discharge."
+        ),
+    )
+    robust_speed_bound = AssumptionSpec(
+        id="robust-speed-within-tightened-guard-reach",
+        name="per-step vertical speed within the disturbance-tightened authority",
+        role="domain",
+        expression=expression_spec(sp.Abs(v)),
+        comparison="<=",
+        rhs=float(robust_speed_cap),
+        variables=(v.name,),
+        description=(
+            "Vertical speed stays within (a - w)*dt/2, where a = min(u3Max-g, "
+            "g-u3Min) is the binding asymmetric authority margin tightened by the "
+            "disturbance, so one disturbed corrective step arrests outward motion "
+            "before the bound (robust analogue of spec G speedBound)."
+        ),
+    )
+    drift_inner_interval = AssumptionSpec(
+        id="operating-within-geofence-inner-interval",
+        name="operating region stays in the altitude inner interval",
+        role="domain",
+        expression=expression_spec(
+            sp.Max(r(q_min) + floor - q, q - (r(q_max) - ceiling))
+        ),
+        comparison="<=",
+        rhs=0.0,
+        variables=(q.name,),
+        description=(
+            "q3Min+floor <= q3 <= q3Max-ceiling: the robust claim is asserted within "
+            "the altitude inner interval (spec G driftBound region), where the guard "
+            "band commands hover thrust so one disturbed coasting step stays between "
+            "the floor and ceiling."
+        ),
+    )
+    robust_braking = AssumptionSpec(
+        id="robust-braking-displacement-fits-guard-band",
+        name="one disturbed step's braking displacement fits the guard band",
+        role="parameter-domain",
+        expression=expression_spec((reach + w_max) * dt**2 / 2),
+        comparison="<=",
+        rhs=float(min(params.floor_band, params.ceiling_band)),
+        variables=(),
+        description=(
+            "(max(u3Max-g, g-u3Min) + w)*dt^2/2 <= min(floor, ceiling band): one "
+            "step's worst corrective displacement under the disturbance fits inside "
+            "the guard band (robust analogue of spec G dtSmall)."
+        ),
+    )
+
+    problem = verification_problem_from_obligations(
+        "drone disturbed vertical geofence axis",
+        (robust_forward_invariance, initial_containment),
+        system=dynamics,
+        specification=specification,
+        assumptions=(
+            disturbance_bound,
+            robust_speed_bound,
+            drift_inner_interval,
+            robust_braking,
+        ),
+        obligation_assumptions={
+            "geofence-barrier:robust-forward-invariance": (
+                "disturbance-within-wind-bound",
+                "robust-speed-within-tightened-guard-reach",
+                "operating-within-geofence-inner-interval",
+                "robust-braking-displacement-fits-guard-band",
+            ),
+            "geofence-barrier:initial-containment": (),
+        },
+        metadata={"verificationModel": "drone-disturbed-vertical-geofence-axis"},
+    )
+
+    region_id_by_name = {region.name: region.id for region in problem.regions}
+    obligation_id_by_name = {
+        obligation.name: obligation.id for obligation in problem.obligations
+    }
+    candidates = (
+        CandidateSpec(
+            id="geofence-barrier",
+            name="geofence-barrier",
+            kind="barrier",
+            expression=expression_spec(barrier_expression),
+            obligation_ids=(
+                obligation_id_by_name["geofence-barrier:robust-forward-invariance"],
+                obligation_id_by_name["geofence-barrier:initial-containment"],
+            ),
+            region_id=region_id_by_name["geofence"],
+        ),
+    )
+    problem = replace(problem, candidates=candidates)
+
+    geometry = scalar_field_region_geometries(
+        problem.regions,
+        projection="phase",
+        plane_variables=("q3", "v3"),
+        variable_to_state_axis=_DRONE_VERTICAL_PHASE_AXES,
+        x_range=(-0.1, 2.1),
+        y_range=(-0.35, 0.35),
+        samples=(81, 81),
+    )
+    problem = replace(problem, region_geometry=geometry)
+    # The robust forward-invariance claim is asserted only within the inner
+    # interval and the tightened speed bound; sample within that region (the
+    # disturbance bound is non-plane and external-required).
+    return replace(
+        problem,
+        proof_statuses=sampled_region_proof_statuses(
+            problem, restrict_to_assumption_regions=True
+        ),
+    )
+
+
+def drone_vertical_disturbed_geofence_trajectory(
+    params: DroneParams = DroneParams(),
+) -> tuple[np.ndarray, np.ndarray]:
+    """Integrate the nominal (``w3 = 0``) axis-3 guard-band loop; columns ``(q3, v3)``.
+
+    The animated path is one admissible realization — the nominal undisturbed
+    rollout — that the robust altitude claim must hold around. Discrete-time
+    axis: step ``k`` maps to ``k * dt``.
+    """
+
+    result = vertical_axis_rollout(params)
+    time = result.steps.astype(float) * params.timestep
+    return time, result.states
+
+
 def viewer_verification_examples() -> tuple[ViewerVerificationExample, ...]:
     """Every self-contained verification problem exported to the viewer."""
 
@@ -1565,6 +1796,11 @@ def viewer_verification_examples() -> tuple[ViewerVerificationExample, ...]:
             problem_factory=drone_geofence_obstacle_problem,
             trajectory_factory=drone_geofence_obstacle_trajectory,
             variable_to_state_axis=_DRONE_PLANE_PHASE_AXES,
+        ),
+        ViewerVerificationExample(
+            problem_factory=drone_vertical_disturbed_geofence_problem,
+            trajectory_factory=drone_vertical_disturbed_geofence_trajectory,
+            variable_to_state_axis=_DRONE_VERTICAL_PHASE_AXES,
         ),
     )
 

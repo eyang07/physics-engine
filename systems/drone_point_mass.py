@@ -417,6 +417,29 @@ class DisturbanceSpec:
                 "uh - w > 0"
             )
 
+    def assert_vertical_authority(self, params: DroneParams) -> None:
+        """Check the asymmetric vertical authority condition (spec prop:authority).
+
+        Both corrective margins must beat the worst-case gust: ``u3Max - g - w > 0``
+        (floor: max up-thrust vs gravity + downdraft) and ``g - u3Min - w > 0``
+        (ceiling: min thrust + updraft).
+        """
+
+        if self.bound >= self.vertical_authority_margin(params):
+            raise ValueError(
+                "disturbance bound must stay under the vertical thrust authority: "
+                "u3Max - g - w > 0 and g - u3Min - w > 0"
+            )
+
+    @staticmethod
+    def vertical_authority_margin(params: DroneParams) -> float:
+        """The binding vertical authority margin ``min(u3Max - g, g - u3Min)``."""
+
+        return min(
+            params.vertical_thrust_max - params.gravity,
+            params.gravity - params.vertical_thrust_min,
+        )
+
 
 DEFAULT_DISTURBANCE = DisturbanceSpec()
 
@@ -560,6 +583,73 @@ def vertical_axis_rollout(
         vertical_axis_controller(params),
         initial_state=initial_state,
         step_count=step_count,
+    )
+
+
+# --- Tier-3 disturbance-robust vertical altitude sub-dynamics --------------
+#
+# The vertical analogue of the horizontal Tier-3 regime: the asymmetric
+# `(q3, v3)` altitude step gains the same matched additive disturbance `w3`
+# (`u3 - g -> u3 - g + w3`). The closed loop becomes set-valued — one successor
+# per admissible `w3 in [-w, w]` — and robust safety must hold for every such
+# `w3`. The corrective authority is asymmetric here (`u3Max - g` toward the floor
+# vs `g - u3Min` toward the ceiling), so the authority condition differs from the
+# horizontal axis even though the disturbed map has the same matched form.
+
+_AXIS3_DISTURBANCE = sp.Symbol("w3", real=True)
+
+
+def vertical_disturbed_axis_system(
+    params: DroneParams = DroneParams(),
+    disturbance: DisturbanceSpec = DEFAULT_DISTURBANCE,
+) -> ControlledDiscreteSystem:
+    """The disturbed ``(q3, v3)`` vertical sub-dynamics (open loop).
+
+    Adds the matched additive disturbance ``w3`` to the gravity-offset control
+    channel: ``q3+ = q3 + dt v3 + dt^2/2 (u3 - g + w3)`` and ``v3+ = v3 + dt
+    (u3 - g + w3)``, with the admissible disturbance box ``W = [-w, w]``.
+    """
+
+    disturbance.assert_vertical_authority(params)
+    dt = _rational(params.timestep)
+    g = _rational(params.gravity)
+    w = _AXIS3_DISTURBANCE
+    accel = _AXIS3_CONTROL - g + w
+    update = (
+        _AXIS3_POSITION + dt * _AXIS3_VELOCITY + dt**2 / 2 * accel,
+        _AXIS3_VELOCITY + dt * accel,
+    )
+    return ControlledDiscreteSystem(
+        state=(_AXIS3_POSITION, _AXIS3_VELOCITY),
+        controls=(_AXIS3_CONTROL,),
+        update=update,
+        disturbances=(w,),
+        control_bounds=Box(
+            lower=(params.vertical_thrust_min,),
+            upper=(params.vertical_thrust_max,),
+        ),
+        disturbance_bounds=Box(lower=(-disturbance.bound,), upper=(disturbance.bound,)),
+    )
+
+
+def vertical_disturbed_axis_closed_loop(
+    params: DroneParams = DroneParams(),
+    disturbance: DisturbanceSpec = DEFAULT_DISTURBANCE,
+) -> DiscreteSystem:
+    """The branching ``(q3, v3)`` closed loop, retaining ``w3`` as a parameter.
+
+    Substitutes the vertical guard-band law ``u3 = g3(q3, v3)`` while keeping the
+    disturbance ``w3`` free, so the map is the set-valued Tier-3 successor relation
+    ``{F(x, g(x), w3) : w3 in W}`` parametrized by ``w3``.
+    """
+
+    system = vertical_disturbed_axis_system(params, disturbance)
+    law = vertical_axis_control_law(params)
+    closed_update = tuple(sp.simplify(expr.subs(law)) for expr in system.update)
+    return DiscreteSystem(
+        state=(_AXIS3_POSITION, _AXIS3_VELOCITY),
+        update=closed_update,
+        parameters=(_AXIS3_DISTURBANCE,),
     )
 
 

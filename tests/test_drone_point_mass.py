@@ -33,6 +33,8 @@ from systems.drone_point_mass import (
     vertical_axis_control_law,
     vertical_axis_rollout,
     vertical_axis_system,
+    vertical_disturbed_axis_closed_loop,
+    vertical_disturbed_axis_system,
 )
 
 
@@ -374,4 +376,51 @@ def test_disturbed_closed_loop_retains_w1_as_a_parameter() -> None:
     interior = {q1: sp.Rational(0), v1: sp.Rational(1, 8)}
     assert sp.simplify(
         closed.update[1].subs(interior) - (sp.Rational(1, 8) + dt * w1)
+    ) == 0
+
+
+def test_disturbance_spec_enforces_the_vertical_authority_condition() -> None:
+    params = DroneParams()  # u3Max=2, g=1, u3Min=0 -> margin min(1, 1) = 1
+    assert DisturbanceSpec.vertical_authority_margin(params) == 1.0
+    # A gust matching the corrective margin defeats the floor/ceiling guard band.
+    with pytest.raises(ValueError, match="vertical thrust authority"):
+        DisturbanceSpec(bound=1.0).assert_vertical_authority(params)
+    # A weaker gust leaves authority margin both ways.
+    DisturbanceSpec(bound=0.5).assert_vertical_authority(params)
+
+
+def test_disturbed_vertical_axis_system_adds_matched_disturbance() -> None:
+    disturbance = DisturbanceSpec(bound=0.5)
+    system = vertical_disturbed_axis_system(disturbance=disturbance)
+    q3, v3 = DRONE_STATE[2], DRONE_STATE[5]
+    (u3,) = (DRONE_CONTROLS[2],)
+    assert isinstance(system, ControlledDiscreteSystem)
+    assert system.state == (q3, v3)
+    assert system.controls == (u3,)
+    # The disturbance is a matched additive acceleration channel w3 carrying the
+    # gravity offset, not a state.
+    (w3,) = system.disturbances
+    assert w3.name == "w3"
+    dt = sp.Rational(1, 4)
+    g = sp.Integer(1)
+    assert sp.simplify(
+        system.update[0] - (q3 + dt * v3 + dt**2 / 2 * (u3 - g + w3))
+    ) == 0
+    assert sp.simplify(system.update[1] - (v3 + dt * (u3 - g + w3))) == 0
+    assert system.disturbance_bounds == Box(lower=(-0.5,), upper=(0.5,))
+
+
+def test_disturbed_vertical_closed_loop_retains_w3_as_a_parameter() -> None:
+    closed = vertical_disturbed_axis_closed_loop(disturbance=DisturbanceSpec(bound=0.5))
+    q3, v3 = DRONE_STATE[2], DRONE_STATE[5]
+    assert isinstance(closed, DiscreteSystem)
+    assert closed.state == (q3, v3)
+    (w3,) = closed.parameters
+    assert w3.name == "w3"
+    # In the interior the guard band commands hover thrust (u3 = g), so the
+    # disturbed step is pure coasting plus the matched disturbance.
+    dt = sp.Rational(1, 4)
+    interior = {q3: sp.Integer(1), v3: sp.Rational(1, 8)}
+    assert sp.simplify(
+        closed.update[1].subs(interior) - (sp.Rational(1, 8) + dt * w3)
     ) == 0
