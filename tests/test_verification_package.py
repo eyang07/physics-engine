@@ -470,3 +470,68 @@ def test_generation_publishes_complete_obstacle_package(tmp_path) -> None:
 
     index = read_package_index(tmp_path)
     assert "drone-obstacle-keepout" in {entry.problem_id for entry in index.entries}
+
+
+def test_generation_publishes_complete_disturbance_robust_package(tmp_path) -> None:
+    # The first Tier-3 problem (BE-049): a bounded additive disturbance w1 on the
+    # horizontal (q1, v1) zero-order-hold step, with a robust forward-invariance
+    # obligation quantified over the whole disturbance set.
+    manifests = write_verification_packages_for_examples(tmp_path)
+    disturbed = next(
+        m for m in manifests if m.problem_id == "drone-disturbed-geofence-axis"
+    )
+    assert disturbed.model == "drone-disturbed-geofence-axis"
+    assert disturbed.status == "candidate"
+
+    package = read_package(tmp_path / "drone-disturbed-geofence-axis")
+    problem = package.problem
+
+    # The disturbed closed loop is a set-valued map: the disturbance w1 is a
+    # bounded parameter of the (q1, v1) discrete dynamics, not an extra state.
+    assert problem.dynamics is not None and problem.dynamics.kind == "discrete"
+    assert {variable.name for variable in problem.variables} == {"q1", "v1"}
+    assert {parameter.name for parameter in problem.parameters} == {"w1"}
+    assert {candidate.id for candidate in problem.candidates} == {"geofence-barrier"}
+    assert {assumption.id for assumption in problem.assumptions} == {
+        "disturbance-within-wind-bound",
+        "robust-speed-within-tightened-guard-reach",
+        "operating-within-geofence-inner-interval",
+        "robust-braking-displacement-fits-guard-band",
+    }
+    # It renders on the (q1, v1) plane, covering every region.
+    assert {geometry.region_id for geometry in problem.region_geometry} == {
+        region.id for region in problem.regions
+    }
+    assert all(
+        geometry.plane_variables == ("q1", "v1")
+        for geometry in problem.region_geometry
+    )
+
+    # The engine proposes; it never disposes.
+    assert {obligation.rigor for obligation in problem.obligations} == {
+        "external-required"
+    }
+    assert {candidate.status for candidate in problem.candidates} == {"candidate"}
+    assert {status.rigor for status in problem.proof_statuses} == {"measured"}
+
+    # The robust forward-invariance obligation cites the disturbance bound and
+    # measures a worst-case-over-W signed margin that holds within its region.
+    robust = next(
+        obligation
+        for obligation in problem.obligations
+        if obligation.id == "geofence-barrier-robust-forward-invariance"
+    )
+    assert "disturbance-within-wind-bound" in robust.assumption_ids
+    robust_status = next(
+        status
+        for status in problem.proof_statuses
+        if status.obligation_id == "geofence-barrier-robust-forward-invariance"
+    )
+    assert robust_status.status == "measured-holds"
+    assert robust_status.worst_margin is not None and robust_status.worst_margin >= 0.0
+    assert robust_status.sample_count > 0
+
+    index = read_package_index(tmp_path)
+    assert "drone-disturbed-geofence-axis" in {
+        entry.problem_id for entry in index.entries
+    }

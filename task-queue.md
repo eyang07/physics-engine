@@ -187,26 +187,24 @@ with the planar velocity as a bounded parameter, and measured `proofStatuses` th
 hold within the standoff annulus, rendering on the `(q1, q2)` plane. Nothing claims
 proof/certification.
 
-1. **BE-049: Tier-3 disturbance-robust horizontal geofence package**
-   - Goal: The Tier-1 geofence holds the guard-band law against a *nominal* plant.
-     Add the first Tier-3 problem: a bounded additive disturbance `w` (within the
-     spec-G `driftBound`) on the horizontal `(q1, v1)` zero-order-hold step, with a
-     *robust* one-step forward-invariance obligation that must hold for every
-     admissible `w`, not just the nominal trajectory. This is the first problem
-     whose obligation quantifies over a disturbance set, so it exercises the
-     worst-case regime end to end. Keep candidates candidate and obligations
-     external-required.
-   - Scope: `systems/drone_point_mass.py` (a disturbed `(q1, v1)` sub-dynamics
-     carrying `w` and the admissible disturbance set),
-     `scripts/export_verification_problems.py` (the disturbance-robust problem,
-     its assumption citing `driftBound`, and a nominal trajectory), and `tests/`.
-   - Acceptance: generation publishes a complete, contract-valid
-     disturbance-robust geofence package whose forward-invariance obligation cites
-     the disturbance bound and measures worst-case margin across the disturbance
-     set; nothing claims proof/certification; generated data stays uncommitted;
-     focused tests pass.
+BE-049 is done: the first Tier-3 problem is published. `systems/drone_point_mass.py`
+gained the disturbed `(q1, v1)` sub-dynamics (`DisturbanceSpec` carrying the wind
+box `W = [-w, w]` and its authority condition `uh - w > 0`,
+`horizontal_disturbed_axis_system` adding the matched additive disturbance `w1` to
+the control channel, and `horizontal_disturbed_axis_closed_loop` returning the
+set-valued successor map that retains `w1` as a parameter). `scripts/
+export_verification_problems.py` added `drone_disturbed_geofence_problem` + its
+nominal trajectory, registered as a sixth viewer example. The published
+`drone-disturbed-geofence-axis` package carries the geofence barrier candidate, a
+robust forward-invariance obligation whose expression bakes in the exact
+worst-case-over-`W` term `B(F_nom) + dt^2/2*w` (cites the disturbance bound, the
+disturbance-tightened robust speed bound, the inner-interval driftBound region, and
+the robust braking margin) plus an initial-containment obligation, and measured
+`proofStatuses` that hold within their assumption region with a nonnegative
+worst-case signed margin. The disturbance bound `|w1| <= w` is non-plane and left
+for external discharge. Nothing claims proof/certification.
 
-2. **BE-050: Coupled obstacle + geofence keep-out on the horizontal plane**
+1. **BE-050: Coupled obstacle + geofence keep-out on the horizontal plane**
    - Goal: The Tier-2 obstacle package (BE-048) measures avoidance only within the
      geofence interior, leaving the geofence walls to the decoupled axis problems.
      Add a single coupled `(q1, q2)` problem that carries *both* the obstacle
@@ -223,3 +221,23 @@ proof/certification.
      on the `(q1, q2)` plane, each holding within its assumption region; nothing
      claims proof/certification; generated data stays uncommitted; focused tests
      pass.
+
+2. **BE-051: Tier-3 disturbance-robust vertical altitude geofence package**
+   - Goal: BE-049 made the horizontal axis disturbance-robust; the asymmetric
+     vertical altitude axis is still nominal. Add the Tier-3 analogue on the
+     `(q3, v3)` axis: the matched additive disturbance `w3` on the vertical
+     zero-order-hold step (carrying the gravity offset), with a robust
+     floor/ceiling forward-invariance obligation that holds for every admissible
+     `w3`. The vertical authority condition is asymmetric (`u3Max - g - w > 0` and
+     `g - u3Min - w > 0`), so the disturbance-tightened guard reach differs from the
+     horizontal case. Keep candidates candidate and obligations external-required.
+   - Scope: `systems/drone_point_mass.py` (a disturbed `(q3, v3)` sub-dynamics
+     carrying `w3` and the vertical authority condition),
+     `scripts/export_verification_problems.py` (the vertical disturbance-robust
+     problem and a nominal trajectory), and `tests/`.
+   - Acceptance: generation publishes a complete, contract-valid vertical
+     disturbance-robust package whose floor/ceiling forward-invariance obligation
+     cites the disturbance bound and measures worst-case margin across the
+     disturbance set, holding within its assumption region on the `(q3, v3)` plane;
+     nothing claims proof/certification; generated data stays uncommitted; focused
+     tests pass.

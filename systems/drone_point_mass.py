@@ -380,6 +380,101 @@ def horizontal_axis_rollout(
     )
 
 
+# --- Tier-3 disturbance-robust horizontal-axis sub-dynamics ----------------
+#
+# The first worst-case regime (spec App. `app:tier3`): the same decoupled
+# `(q1, v1)` zero-order-hold step gains a bounded additive acceleration
+# disturbance `w1` (matched to the control, `u1 -> u1 + w1`). The closed loop
+# becomes set-valued / branching — one successor per admissible `w1 in [-w, w]`
+# — so robust safety must hold for *every* such `w1`, not just the nominal path.
+# The dynamics stay a linear double integrator; only the `w1` term is added.
+
+_AXIS1_DISTURBANCE = sp.Symbol("w1", real=True)
+
+
+@dataclass(frozen=True)
+class DisturbanceSpec:
+    """Bounded additive acceleration disturbance for the Tier-3 robust regime.
+
+    ``bound`` is the per-axis wind/disturbance magnitude ``w`` (the box
+    ``W = [-w, w]``). It must satisfy the authority condition ``uh - w > 0`` so
+    corrective thrust still dominates the worst-case gust; the caller pairs it
+    with the :class:`DroneParams` it is checked against.
+    """
+
+    bound: float = 0.5
+
+    def __post_init__(self) -> None:
+        if self.bound <= 0:
+            raise ValueError("disturbance bound must be positive")
+
+    def assert_authority(self, params: DroneParams) -> None:
+        """Check the authority condition ``uh - w > 0`` (spec prop:authority)."""
+
+        if self.bound >= params.horizontal_thrust:
+            raise ValueError(
+                "disturbance bound must stay under the horizontal thrust authority: "
+                "uh - w > 0"
+            )
+
+
+DEFAULT_DISTURBANCE = DisturbanceSpec()
+
+
+def horizontal_disturbed_axis_system(
+    params: DroneParams = DroneParams(),
+    disturbance: DisturbanceSpec = DEFAULT_DISTURBANCE,
+) -> ControlledDiscreteSystem:
+    """The disturbed ``(q1, v1)`` horizontal sub-dynamics (open loop).
+
+    Adds the matched additive disturbance ``w1`` to the control channel:
+    ``q1+ = q1 + dt v1 + dt^2/2 (u1 + w1)`` and ``v1+ = v1 + dt (u1 + w1)``,
+    with the admissible disturbance box ``W = [-w, w]``.
+    """
+
+    disturbance.assert_authority(params)
+    dt = _rational(params.timestep)
+    w = _AXIS1_DISTURBANCE
+    accel = _AXIS1_CONTROL + w
+    update = (
+        _AXIS1_POSITION + dt * _AXIS1_VELOCITY + dt**2 / 2 * accel,
+        _AXIS1_VELOCITY + dt * accel,
+    )
+    return ControlledDiscreteSystem(
+        state=(_AXIS1_POSITION, _AXIS1_VELOCITY),
+        controls=(_AXIS1_CONTROL,),
+        update=update,
+        disturbances=(w,),
+        control_bounds=Box(
+            lower=(-params.horizontal_thrust,),
+            upper=(params.horizontal_thrust,),
+        ),
+        disturbance_bounds=Box(lower=(-disturbance.bound,), upper=(disturbance.bound,)),
+    )
+
+
+def horizontal_disturbed_axis_closed_loop(
+    params: DroneParams = DroneParams(),
+    disturbance: DisturbanceSpec = DEFAULT_DISTURBANCE,
+) -> DiscreteSystem:
+    """The branching ``(q1, v1)`` closed loop, retaining ``w1`` as a parameter.
+
+    Substitutes the guard-band law ``u1 = g1(q1, v1)`` while keeping the
+    disturbance ``w1`` free, so the map is the set-valued Tier-3 successor
+    relation ``{F(x, g(x), w1) : w1 in W}`` parametrized by ``w1`` (rather than
+    zeroing the disturbance as the nominal :meth:`closed_loop` reduction would).
+    """
+
+    system = horizontal_disturbed_axis_system(params, disturbance)
+    law = horizontal_axis_control_law(params)
+    closed_update = tuple(sp.simplify(expr.subs(law)) for expr in system.update)
+    return DiscreteSystem(
+        state=(_AXIS1_POSITION, _AXIS1_VELOCITY),
+        update=closed_update,
+        parameters=(_AXIS1_DISTURBANCE,),
+    )
+
+
 # --- Decoupled vertical altitude-axis sub-dynamics -------------------------
 #
 # The altitude axis is the asymmetric vertical regime: the open-loop map carries

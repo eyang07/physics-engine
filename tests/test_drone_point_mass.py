@@ -12,6 +12,7 @@ from systems.drone_point_mass import (
     DEFAULT_VERTICAL_AXIS_INITIAL_STATE,
     DRONE_CONTROLS,
     DRONE_STATE,
+    DisturbanceSpec,
     DroneParams,
     ObstacleSpec,
     build_system,
@@ -22,6 +23,8 @@ from systems.drone_point_mass import (
     horizontal_axis_control_law,
     horizontal_axis_rollout,
     horizontal_axis_system,
+    horizontal_disturbed_axis_closed_loop,
+    horizontal_disturbed_axis_system,
     horizontal_plane_closed_loop,
     horizontal_plane_rollout,
     horizontal_plane_system,
@@ -319,3 +322,56 @@ def test_horizontal_plane_rollout_coasts_in_interior_and_avoids_the_obstacle() -
     cx, cy = obstacle.center
     distances = np.hypot(q1 - cx, q2 - cy)
     assert np.all(distances >= obstacle.standoff_radius)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "match"),
+    [({"bound": 0.0}, "disturbance bound must be positive")],
+)
+def test_disturbance_spec_validates_invariants(kwargs, match) -> None:
+    with pytest.raises(ValueError, match=match):
+        DisturbanceSpec(**kwargs)
+
+
+def test_disturbance_spec_enforces_the_authority_condition() -> None:
+    params = DroneParams()  # horizontal thrust uh = 1
+    # A gust as strong as the corrective thrust defeats the guard band.
+    with pytest.raises(ValueError, match="thrust authority"):
+        DisturbanceSpec(bound=1.0).assert_authority(params)
+    # A weaker gust leaves authority margin.
+    DisturbanceSpec(bound=0.5).assert_authority(params)
+
+
+def test_disturbed_axis_system_adds_matched_disturbance() -> None:
+    disturbance = DisturbanceSpec(bound=0.5)
+    system = horizontal_disturbed_axis_system(disturbance=disturbance)
+    q1, v1 = DRONE_STATE[0], DRONE_STATE[3]
+    (u1,) = (DRONE_CONTROLS[0],)
+    assert isinstance(system, ControlledDiscreteSystem)
+    assert system.state == (q1, v1)
+    assert system.controls == (u1,)
+    # The disturbance is a matched additive acceleration channel w1, not a state.
+    (w1,) = system.disturbances
+    assert w1.name == "w1"
+    dt = sp.Rational(1, 4)
+    assert sp.simplify(system.update[0] - (q1 + dt * v1 + dt**2 / 2 * (u1 + w1))) == 0
+    assert sp.simplify(system.update[1] - (v1 + dt * (u1 + w1))) == 0
+    assert system.disturbance_bounds == Box(lower=(-0.5,), upper=(0.5,))
+
+
+def test_disturbed_closed_loop_retains_w1_as_a_parameter() -> None:
+    closed = horizontal_disturbed_axis_closed_loop(disturbance=DisturbanceSpec(bound=0.5))
+    q1, v1 = DRONE_STATE[0], DRONE_STATE[3]
+    assert isinstance(closed, DiscreteSystem)
+    assert closed.state == (q1, v1)
+    # The guard-band law is substituted but the disturbance stays free, so the
+    # map is the set-valued Tier-3 successor relation parametrized by w1.
+    (w1,) = closed.parameters
+    assert w1.name == "w1"
+    # In the interior the guard band commands zero thrust: the disturbed step is
+    # pure coasting plus the matched disturbance.
+    dt = sp.Rational(1, 4)
+    interior = {q1: sp.Rational(0), v1: sp.Rational(1, 8)}
+    assert sp.simplify(
+        closed.update[1].subs(interior) - (sp.Rational(1, 8) + dt * w1)
+    ) == 0
