@@ -7,6 +7,7 @@ import sympy as sp
 from engine.dynamics import Box, ControlledDiscreteSystem, DiscreteSystem
 from systems.drone_point_mass import (
     DEFAULT_INITIAL_STATE,
+    DEFAULT_VERTICAL_AXIS_INITIAL_STATE,
     DRONE_CONTROLS,
     DRONE_STATE,
     DroneParams,
@@ -19,6 +20,10 @@ from systems.drone_point_mass import (
     horizontal_axis_rollout,
     horizontal_axis_system,
     safe_rollout,
+    vertical_axis_closed_loop,
+    vertical_axis_control_law,
+    vertical_axis_rollout,
+    vertical_axis_system,
 )
 
 
@@ -197,3 +202,57 @@ def test_horizontal_axis_rollout_stays_in_geofence_and_brakes() -> None:
     assert q1.max() > q1_max - params.horizontal_band  # entered the guard band
     assert np.any(result.controls[:, 0] < 0)  # braked
     assert result.control_violation == 0.0
+
+
+def test_vertical_reach_and_velocity_bound_match_spec() -> None:
+    params = DroneParams()
+    # max(u3Max - g, g - u3Min) = max(2-1, 1-0) = 1; B3 = reach * dt.
+    assert params.vertical_reach == pytest.approx(1.0)
+    assert params.vertical_velocity_bound == pytest.approx(params.vertical_reach * params.timestep)
+
+
+def test_vertical_axis_system_is_the_decoupled_q3_v3_subsystem() -> None:
+    system = vertical_axis_system()
+    q3, v3 = DRONE_STATE[2], DRONE_STATE[5]
+    u3 = DRONE_CONTROLS[2]
+    assert system.state == (q3, v3)
+    assert system.controls == (u3,)
+    dt = sp.Rational(1, 4)
+    # Carries the gravity offset on both the position and velocity updates.
+    assert sp.simplify(system.update[0] - (q3 + dt * v3 + dt**2 / 2 * (u3 - 1))) == 0
+    assert sp.simplify(system.update[1] - (v3 + dt * (u3 - 1))) == 0
+    assert system.control_bounds == Box(lower=(0.0,), upper=(2.0,))
+
+
+def test_vertical_axis_closed_loop_matches_the_full_system_on_axis_3() -> None:
+    closed = vertical_axis_closed_loop()
+    q3, v3 = DRONE_STATE[2], DRONE_STATE[5]
+    assert isinstance(closed, DiscreteSystem)
+    assert closed.state == (q3, v3)
+    # Axis-3 law agrees with the full guard-band law's vertical component.
+    full = guard_band_control_law()[DRONE_CONTROLS[2]]
+    axis = vertical_axis_control_law()[DRONE_CONTROLS[2]]
+    sample = {q3: 1.9, v3: 0.25}  # near the ceiling, ascending -> minimum thrust
+    assert axis.subs(sample) == full.subs(
+        {**sample, DRONE_STATE[0]: 0, DRONE_STATE[1]: 0, DRONE_STATE[3]: 0, DRONE_STATE[4]: 0}
+    )
+
+
+def test_vertical_axis_rollout_stays_between_floor_ceiling_and_brakes() -> None:
+    params = DroneParams()
+    result = vertical_axis_rollout(params)
+    q3 = result.states[:, 0]
+    v3 = result.states[:, 1]
+    q3_min, q3_max = params.q3_bounds
+    assert np.all((q3 >= q3_min) & (q3 <= q3_max))  # P1 floor/ceiling invariance
+    assert np.all(np.abs(v3) <= params.vertical_velocity_bound + 1e-9)  # P2 (B3)
+    assert q3.max() > q3_max - params.ceiling_band  # entered the ceiling guard band
+    assert np.any(result.controls[:, 0] < params.hover_thrust)  # braked below hover
+    assert result.control_violation == 0.0
+
+
+def test_default_vertical_initial_state_is_inside_the_inner_altitude_set() -> None:
+    params = DroneParams()
+    q3, v3 = DEFAULT_VERTICAL_AXIS_INITIAL_STATE
+    assert params.q3_bounds[0] + params.floor_band <= q3 <= params.q3_bounds[1] - params.ceiling_band
+    assert abs(v3) <= params.vertical_velocity_bound + 1e-9

@@ -361,3 +361,56 @@ def test_generation_publishes_complete_drone_package(tmp_path) -> None:
         assert "region-scoped" in stub["requiredShapeFeatures"]
         assert stub["applicable"] is True
         assert stub["discharges"] is False
+
+
+def test_generation_publishes_complete_vertical_axis_package(tmp_path) -> None:
+    # The vertical altitude axis is a second flagship package (BE-046), mirroring
+    # the horizontal BE-043 structure on the asymmetric (q3, v3) regime.
+    manifests = write_verification_packages_for_examples(tmp_path)
+    vertical = next(m for m in manifests if m.problem_id == "drone-vertical-axis")
+    assert vertical.model == "drone-vertical-axis"
+    assert vertical.status == "candidate"
+
+    package = read_package(tmp_path / "drone-vertical-axis")
+    problem = package.problem
+
+    # The vertical axis is a discrete map with the same Tier-1 barrier structure.
+    assert problem.dynamics is not None and problem.dynamics.kind == "discrete"
+    assert {candidate.id for candidate in problem.candidates} == {
+        "geofence-barrier",
+        "velocity-bound-barrier",
+        "inner-set-barrier",
+    }
+    assert {assumption.id for assumption in problem.assumptions} == {
+        "speed-within-half-guard-reach",
+        "velocity-within-self-reproducing-bound",
+        "timestep-small-vs-guard-band",
+        "linear-drift-within-inner-interval",
+    }
+    # It renders on the (q3, v3) altitude plane, covering every region.
+    assert {geometry.region_id for geometry in problem.region_geometry} == {
+        region.id for region in problem.regions
+    }
+    assert all(
+        geometry.plane_variables == ("q3", "v3")
+        for geometry in problem.region_geometry
+    )
+
+    # Measured proof statuses per obligation; nothing claims discharge.
+    assert {status.obligation_id for status in problem.proof_statuses} == {
+        obligation.id for obligation in problem.obligations
+    }
+    assert {obligation.rigor for obligation in problem.obligations} == {
+        "external-required"
+    }
+    assert {candidate.status for candidate in problem.candidates} == {"candidate"}
+    assert {status.rigor for status in problem.proof_statuses} == {"measured"}
+    # Every obligation measured-holds within its assumption region (nonnegative
+    # signed margin), the honest evidence the vertical guard band stays safe.
+    for status in problem.proof_statuses:
+        assert status.status == "measured-holds"
+        assert status.worst_margin is not None and status.worst_margin >= 0.0
+
+    # The discovery index now catalogs both drone axes alongside the case studies.
+    index = read_package_index(tmp_path)
+    assert "drone-vertical-axis" in {entry.problem_id for entry in index.entries}

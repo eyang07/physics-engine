@@ -11,6 +11,8 @@ import sympy as sp
 
 from metadata_assertions import assert_embedded_certificate_trajectory
 from engine.export import (
+    PACKAGE_INDEX_FILENAME,
+    read_package_index,
     validate_viewer_verification_export,
     validate_viewer_verification_index,
     validate_viewer_verification_problem_payload,
@@ -83,6 +85,7 @@ def _viewer_verification_expected_ids() -> list[str]:
         "upright-pendulum-safety",
         "controlled-spring-regulator-safety",
         "drone-geofence-axis",
+        "drone-vertical-axis",
     ]
 
 
@@ -1300,6 +1303,8 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
     )
     index = json.loads((viewer_dir / "index.json").read_text(encoding="utf-8"))
     validate_viewer_verification_index(index, version=INDEX_VERSION)
+    # The catalog points the viewer at the BE-045 package discovery index.
+    assert index["packageIndexPath"] == "/data/verification/packages/packages.index.json"
     ir_payloads = {
         entry["irPath"]: json.loads(
             (viewer_dir / Path(entry["irPath"]).name).read_text(encoding="utf-8")
@@ -1319,6 +1324,7 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         "/data/verification/upright-pendulum-safety.ir.json",
         "/data/verification/controlled-spring-regulator-safety.ir.json",
         "/data/verification/drone-geofence-axis.ir.json",
+        "/data/verification/drone-vertical-axis.ir.json",
     ]
     pendulum_ir = ir_payloads["/data/verification/upright-pendulum-safety.ir.json"]
     assert "trajectory" not in pendulum_ir
@@ -1377,6 +1383,7 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         "controlled-pendulum-closed-loop",
         "controlled-spring-regulator",
         "drone-geofence-axis",
+        "drone-vertical-axis",
     ]
     assert [problem["dataPath"] for problem in index["problems"]] == [
         f"/data/verification/{problem_id}.json" for problem_id in expected_ids
@@ -1479,6 +1486,13 @@ def test_generate_verification_problems_cli_writes_custom_output_dirs(tmp_path) 
             == f"/data/verification/packages/{entry['id']}/package.json"
         )
 
+    # The catalog also points the viewer at the package discovery index, and that
+    # path resolves to the index published under the viewer-served package tree.
+    assert index["packageIndexPath"] == "/data/verification/packages/packages.index.json"
+    assert (viewer_package_dir / PACKAGE_INDEX_FILENAME).is_file()
+    package_index = read_package_index(viewer_package_dir)
+    assert {entry.problem_id for entry in package_index.entries} == set(expected_ids)
+
 
 def test_validate_viewer_verification_index_accepts_export_shape() -> None:
     validate_viewer_verification_index(
@@ -1492,6 +1506,12 @@ def test_validate_viewer_verification_index_accepts_package_path() -> None:
     payload["problems"][0]["packagePath"] = (
         "/data/verification/packages/example-problem/package.json"
     )
+    validate_viewer_verification_index(payload, version=INDEX_VERSION)
+
+
+def test_validate_viewer_verification_index_accepts_package_index_path() -> None:
+    payload = _valid_viewer_verification_index()
+    payload["packageIndexPath"] = "/data/verification/packages/packages.index.json"
     validate_viewer_verification_index(payload, version=INDEX_VERSION)
 
 
@@ -1906,6 +1926,13 @@ def test_validate_viewer_verification_export_rejects_status_mismatches(
                 ],
             },
             "packagePath is invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "packageIndexPath": "/data/verification/packages.index.json",
+            },
+            "packageIndexPath is invalid",
         ),
     ],
 )

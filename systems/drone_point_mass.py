@@ -108,14 +108,23 @@ class DroneParams:
         return self.horizontal_thrust * self.timestep
 
     @property
-    def vertical_velocity_bound(self) -> float:
-        """B3 = max(u3Max - g, g - u3Min) * dt: the vertical velocity bound."""
+    def vertical_reach(self) -> float:
+        """max(u3Max - g, g - u3Min): per-step vertical acceleration capacity.
 
-        reach = max(
+        The net corrective acceleration the guard band can command toward the
+        floor (``u3Max - g``, upward) or ceiling (``g - u3Min``, downward).
+        """
+
+        return max(
             self.vertical_thrust_max - self.gravity,
             self.gravity - self.vertical_thrust_min,
         )
-        return reach * self.timestep
+
+    @property
+    def vertical_velocity_bound(self) -> float:
+        """B3 = max(u3Max - g, g - u3Min) * dt: the vertical velocity bound."""
+
+        return self.vertical_reach * self.timestep
 
     @property
     def velocity_bound(self) -> float:
@@ -184,6 +193,32 @@ def _horizontal_law(
     )
 
 
+def _vertical_law(
+    position: sp.Symbol,
+    velocity: sp.Symbol,
+    params: DroneParams,
+) -> sp.Expr:
+    """Hover in the interior; brake toward the floor/ceiling near the bounds.
+
+    Full upward thrust near the floor (descending) and minimum thrust near the
+    ceiling (ascending); otherwise hover thrust cancels gravity. Asymmetric in
+    both authority and band width, unlike the symmetric horizontal law.
+    """
+
+    q3_min, q3_max = params.q3_bounds
+    return sp.Piecewise(
+        (
+            _rational(params.vertical_thrust_max),
+            sp.And(position <= _rational(q3_min) + _rational(params.floor_band), velocity < 0),
+        ),
+        (
+            _rational(params.vertical_thrust_min),
+            sp.And(position >= _rational(q3_max) - _rational(params.ceiling_band), velocity > 0),
+        ),
+        (_rational(params.hover_thrust), True),
+    )
+
+
 def guard_band_control_law(
     params: DroneParams = DroneParams(),
 ) -> dict[sp.Symbol, sp.Expr]:
@@ -199,23 +234,11 @@ def guard_band_control_law(
     u1, u2, u3 = DRONE_CONTROLS
     q1_min, q1_max = params.q1_bounds
     q2_min, q2_max = params.q2_bounds
-    q3_min, q3_max = params.q3_bounds
 
-    vertical = sp.Piecewise(
-        (
-            _rational(params.vertical_thrust_max),
-            sp.And(q3 <= _rational(q3_min) + _rational(params.floor_band), v3 < 0),
-        ),
-        (
-            _rational(params.vertical_thrust_min),
-            sp.And(q3 >= _rational(q3_max) - _rational(params.ceiling_band), v3 > 0),
-        ),
-        (_rational(params.hover_thrust), True),
-    )
     return {
         u1: _horizontal_law(q1, v1, q1_min, q1_max, params),
         u2: _horizontal_law(q2, v2, q2_min, q2_max, params),
-        u3: vertical,
+        u3: _vertical_law(q3, v3, params),
     }
 
 
@@ -352,6 +375,94 @@ def horizontal_axis_rollout(
     return discrete_rollout(
         horizontal_axis_system(params),
         horizontal_axis_controller(params),
+        initial_state=initial_state,
+        step_count=step_count,
+    )
+
+
+# --- Decoupled vertical altitude-axis sub-dynamics -------------------------
+#
+# The altitude axis is the asymmetric vertical regime: the open-loop map carries
+# the gravity term `u3 - g`, the interior command is hover thrust (`u3 = g`), and
+# the guard band uses floor/ceiling thrust toward the bounds. Under the Tier-1
+# law this `(q3, v3)` axis is independent of the others, giving an exact 2-D
+# sub-system that renders directly on the `(q3, v3)` plane.
+
+_AXIS3_POSITION = DRONE_STATE[2]
+_AXIS3_VELOCITY = DRONE_STATE[5]
+_AXIS3_CONTROL = DRONE_CONTROLS[2]
+
+
+def vertical_axis_system(
+    params: DroneParams = DroneParams(),
+) -> ControlledDiscreteSystem:
+    """The decoupled ``(q3, v3)`` vertical sub-dynamics (open loop).
+
+    Carries the gravity offset: ``q3+ = q3 + dt v3 + dt^2/2 (u3 - g)`` and
+    ``v3+ = v3 + dt (u3 - g)``, with thrust box ``[u3Min, u3Max]``.
+    """
+
+    dt = _rational(params.timestep)
+    g = _rational(params.gravity)
+    update = (
+        _AXIS3_POSITION + dt * _AXIS3_VELOCITY + dt**2 / 2 * (_AXIS3_CONTROL - g),
+        _AXIS3_VELOCITY + dt * (_AXIS3_CONTROL - g),
+    )
+    return ControlledDiscreteSystem(
+        state=(_AXIS3_POSITION, _AXIS3_VELOCITY),
+        controls=(_AXIS3_CONTROL,),
+        update=update,
+        control_bounds=Box(
+            lower=(params.vertical_thrust_min,),
+            upper=(params.vertical_thrust_max,),
+        ),
+    )
+
+
+def vertical_axis_control_law(
+    params: DroneParams = DroneParams(),
+) -> dict[sp.Symbol, sp.Expr]:
+    """The axis-3 guard-band feedback law ``u3 = g3(q3, v3)``."""
+
+    return {_AXIS3_CONTROL: _vertical_law(_AXIS3_POSITION, _AXIS3_VELOCITY, params)}
+
+
+def vertical_axis_closed_loop(params: DroneParams = DroneParams()) -> DiscreteSystem:
+    """The autonomous ``(q3, v3)`` closed loop under the guard-band law."""
+
+    return vertical_axis_system(params).closed_loop(vertical_axis_control_law(params))
+
+
+def vertical_axis_controller(
+    params: DroneParams = DroneParams(),
+) -> Callable[[int, Sequence[float]], tuple[float, ...]]:
+    """A numeric ``(step, (q3, v3)) -> (u3,)`` law for axis-3 rollouts."""
+
+    law = vertical_axis_control_law(params)[_AXIS3_CONTROL]
+    compiled = sp.lambdify((_AXIS3_POSITION, _AXIS3_VELOCITY), law, "numpy")
+
+    def controller(step: int, state: Sequence[float]) -> tuple[float, ...]:
+        return (float(compiled(state[0], state[1])),)
+
+    return controller
+
+
+# A safe axis-3 start inside the inner interval: hovering altitude, coasting
+# upward at the vertical velocity bound so it reaches the ceiling guard band.
+DEFAULT_VERTICAL_AXIS_INITIAL_STATE: tuple[float, ...] = (1.0, 0.25)
+
+
+def vertical_axis_rollout(
+    params: DroneParams = DroneParams(),
+    *,
+    initial_state: Sequence[float] = DEFAULT_VERTICAL_AXIS_INITIAL_STATE,
+    step_count: int = DEFAULT_STEP_COUNT,
+) -> DiscreteRolloutResult:
+    """Deterministically iterate the axis-3 guard-band closed loop."""
+
+    return discrete_rollout(
+        vertical_axis_system(params),
+        vertical_axis_controller(params),
         initial_state=initial_state,
         step_count=step_count,
     )

@@ -28,6 +28,11 @@ from engine.verification import SCHEMA_VERSION, VerificationProblem
 # its flow derivative; any other kind would have no defined lane.
 _CERTIFICATE_SERIES_KINDS = frozenset({"candidate-value", "flow-derivative"})
 
+# The viewer-served path of the BE-045 package discovery index, published beside
+# the per-problem package manifests. The index catalog itself is optional in the
+# viewer verification index; when present it must point here.
+_PACKAGE_INDEX_PATH = "/data/verification/packages/packages.index.json"
+
 
 def validate_viewer_verification_problems(
     problems: Sequence[VerificationProblem],
@@ -55,6 +60,14 @@ def validate_viewer_verification_index(
     problems = payload.get("problems")
     if not isinstance(problems, list):
         raise ValueError("viewer verification index problems must be a list")
+
+    # The BE-045 package discovery index, published so the Verification view can
+    # fetch the package catalog directly. Optional for older data; when present it
+    # must point at the index written beside the package manifests. Pure
+    # cataloging — it claims nothing beyond the rigor of the packages it lists.
+    package_index_path = payload.get("packageIndexPath")
+    if package_index_path is not None and package_index_path != _PACKAGE_INDEX_PATH:
+        raise ValueError("viewer verification index packageIndexPath is invalid")
 
     seen_ids: set[str] = set()
     for index, entry in enumerate(problems):

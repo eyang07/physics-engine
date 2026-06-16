@@ -151,32 +151,59 @@ re-reads the index, validates its shape, and checks every referenced manifest
 exists on disk with a matching `problemId`. Pure cataloging; it claims nothing
 beyond the rigor of the packages it lists.
 
-1. **BE-046: Vertical altitude-axis (q3, v3) Tier-1 geofence package**
-   - Goal: Add the decoupled vertical altitude axis as a second flagship package,
-     reusing the BE-043 structure but exercising the asymmetric vertical regime —
-     gravity, hover thrust, floor/ceiling guard bands, and the `[u3Min, u3Max]`
-     thrust box — with the P1 floor/ceiling invariance and P2 vertical velocity
-     bound (spec E `B3`) obligations under the corresponding spec-G assumptions.
-   - Scope: `systems/drone_point_mass.py` (a `vertical_axis_*` sub-dynamics
-     mirror of the horizontal axis), `scripts/export_verification_problems.py`,
-     and `tests/`.
-   - Acceptance: generation publishes a complete, contract-valid vertical-axis
-     package with measured `proofStatuses`, rendering on the `(q3, v3)` plane;
-     nothing claims proof/certification; generated data stays uncommitted; focused
-     tests pass.
+BE-046 is done: the decoupled vertical altitude axis is a second flagship
+package. `systems/drone_point_mass.py` gained `vertical_axis_*` sub-dynamics
+(the `(q3, v3)` open loop carrying the gravity offset, the extracted
+`_vertical_law` floor/ceiling guard band, closed loop, controller, and rollout)
+plus a `vertical_reach` param property. `scripts/export_verification_problems.py`
+factored the BE-043 assembly into a shared `_AxisGeofenceSpec` /
+`_drone_axis_geofence_problem` builder (the horizontal problem is byte-identical)
+and added `drone_vertical_geofence_problem` + its trajectory, registered as a
+fourth viewer example. The published `drone-vertical-axis` package carries the
+three Tier-1 barriers, the floor/ceiling P1 + vertical P2 (spec E `B3`)
+obligations under the spec-G assumptions, and measured `proofStatuses` that all
+hold within their assumption regions, rendering on the `(q3, v3)` plane. Nothing
+claims proof/certification.
 
-2. **BE-047: Publish the package discovery index to the viewer data tree**
-   - Goal: The BE-045 discovery index (`packages.index.json`) is written beside
-     the generated packages, but the viewer-served verification index
-     (`validate_viewer_verification_index`) still enumerates problems without a
-     pointer to it. Add an optional `packageIndexPath` to the viewer verification
-     index so the Verification view can fetch the package catalog directly,
-     mirroring how `packagePath` already points at each problem's manifest. Pure
-     wiring; it claims nothing beyond the rigor of the packages it lists.
-   - Scope: `engine/export/verification_contract.py` (validate the optional
-     `packageIndexPath`), `scripts/generate_verification_problems.py` (emit it and
-     copy the index into the viewer package tree), and `tests/`.
-   - Acceptance: the generated viewer index carries a contract-valid
-     `packageIndexPath` resolving to the published `packages.index.json`; the
-     export validator accepts indexes with and without it; generated data stays
-     uncommitted; focused tests pass.
+BE-047 is done: the BE-045 package discovery index is now wired into the
+viewer-served verification catalog. `validate_viewer_verification_index` accepts
+an optional top-level `packageIndexPath` (validated against the published
+`/data/verification/packages/packages.index.json`, rejected otherwise), and
+`generate_verification_problems` emits it on the viewer `index.json` while the
+package writer already publishes `packages.index.json` into the viewer package
+tree. Pure wiring; it claims nothing beyond the rigor of the packages it lists.
+
+1. **BE-048: Tier-2 horizontal obstacle keep-out (P4) candidate package**
+   - Goal: With both Tier-1 axes published, add the first Tier-2 problem: a
+     keep-out barrier around a circular obstacle in the coupled `(q1, q2)`
+     horizontal plane (spec P4), with the one-step avoidance obligation under the
+     guard-band law and the spec-G assumptions. This is the first problem that is
+     not a single decoupled axis, so it exercises the 2-D coupled regime end to
+     end. Keep candidates candidate and obligations external-required.
+   - Scope: `systems/drone_point_mass.py` (a `horizontal_plane_*` coupled
+     `(q1, q2, v1, v2)` sub-dynamics and obstacle geometry),
+     `scripts/export_verification_problems.py` (the obstacle keep-out problem and
+     trajectory), and `tests/`.
+   - Acceptance: generation publishes a complete, contract-valid obstacle keep-out
+     package with a measured avoidance `proofStatus`, rendering on the `(q1, q2)`
+     plane; nothing claims proof/certification; generated data stays uncommitted;
+     focused tests pass.
+
+2. **BE-049: Tier-3 disturbance-robust horizontal geofence package**
+   - Goal: The Tier-1 geofence holds the guard-band law against a *nominal* plant.
+     Add the first Tier-3 problem: a bounded additive disturbance `w` (within the
+     spec-G `driftBound`) on the horizontal `(q1, v1)` zero-order-hold step, with a
+     *robust* one-step forward-invariance obligation that must hold for every
+     admissible `w`, not just the nominal trajectory. This is the first problem
+     whose obligation quantifies over a disturbance set, so it exercises the
+     worst-case regime end to end. Keep candidates candidate and obligations
+     external-required.
+   - Scope: `systems/drone_point_mass.py` (a disturbed `(q1, v1)` sub-dynamics
+     carrying `w` and the admissible disturbance set),
+     `scripts/export_verification_problems.py` (the disturbance-robust problem,
+     its assumption citing `driftBound`, and a nominal trajectory), and `tests/`.
+   - Acceptance: generation publishes a complete, contract-valid
+     disturbance-robust geofence package whose forward-invariance obligation cites
+     the disturbance bound and measures worst-case margin across the disturbance
+     set; nothing claims proof/certification; generated data stays uncommitted;
+     focused tests pass.

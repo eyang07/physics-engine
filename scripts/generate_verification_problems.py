@@ -28,7 +28,7 @@ from engine.export import (
     validate_viewer_verification_problems,
     validate_viewer_verification_trajectory,
 )
-from engine.export import PackageManifest
+from engine.export import PACKAGE_INDEX_FILENAME, PackageManifest
 from engine.verification import VerificationProblem
 from scripts.export_verification_problems import (
     controlled_trajectory_payload,
@@ -41,6 +41,10 @@ DEFAULT_VIEWER_DIR = Path("viewer/public/data/verification")
 DEFAULT_PACKAGE_DIR = Path("data/generated/verification/packages")
 DEFAULT_VIEWER_PACKAGE_DIR = Path("viewer/public/data/verification/packages")
 INDEX_VERSION = 1
+
+# The viewer-served path of the published BE-045 package discovery index, written
+# beside the per-problem package manifests under the viewer package tree.
+PACKAGE_INDEX_PATH = f"/data/verification/packages/{PACKAGE_INDEX_FILENAME}"
 
 
 def _package_path(problem_id: str) -> str:
@@ -113,7 +117,13 @@ def write_verification_problems(
         records.append((ir_filename, ir_payload))
         summaries.append(_problem_summary(payload, data_path, ir_path))
 
-    index_payload = {"version": INDEX_VERSION, "problems": summaries}
+    index_payload = {
+        "version": INDEX_VERSION,
+        "problems": summaries,
+        # Point the Verification view at the package discovery index published
+        # alongside the per-problem manifests (written by the package writer).
+        "packageIndexPath": PACKAGE_INDEX_PATH,
+    }
     validate_viewer_verification_export(
         index_payload,
         payloads_by_data_path,
