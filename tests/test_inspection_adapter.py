@@ -69,6 +69,7 @@ from scripts.generate_verification_problems import (
     DEFAULT_GENERATED_DIR as VIEWER_VERIFICATION_GENERATED_DIR,
     DEFAULT_PACKAGE_DIR as VIEWER_VERIFICATION_PACKAGE_DIR,
     DEFAULT_VIEWER_DIR as VIEWER_VERIFICATION_VIEWER_DIR,
+    DEFAULT_VIEWER_PACKAGE_DIR as VIEWER_VERIFICATION_VIEWER_PACKAGE_DIR,
     INDEX_VERSION,
     parse_args as parse_generate_verification_args,
     write_verification_problems,
@@ -1394,18 +1395,24 @@ def test_generate_verification_problems_default_dirs_are_ignored_paths() -> None
     assert args.generated_dir == VIEWER_VERIFICATION_GENERATED_DIR
     assert args.viewer_dir == VIEWER_VERIFICATION_VIEWER_DIR
     assert args.package_dir == VIEWER_VERIFICATION_PACKAGE_DIR
+    assert args.viewer_package_dir == VIEWER_VERIFICATION_VIEWER_PACKAGE_DIR
 
     gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
     assert "data/generated/" in gitignore
     assert "viewer/public/data/verification/" in gitignore
-    # The default package dir lives under the ignored generated tree.
+    # The default package dir lives under the ignored generated tree, and the
+    # viewer-served bundles live under the ignored viewer verification tree.
     assert str(VIEWER_VERIFICATION_PACKAGE_DIR).startswith("data/generated/")
+    assert str(VIEWER_VERIFICATION_VIEWER_PACKAGE_DIR).startswith(
+        "viewer/public/data/verification/"
+    )
 
 
 def test_generate_verification_problems_cli_writes_custom_output_dirs(tmp_path) -> None:
     generated_dir = tmp_path / "generated-verification"
     viewer_dir = tmp_path / "viewer-verification"
     package_dir = tmp_path / "packages"
+    viewer_package_dir = tmp_path / "viewer-packages"
 
     result = subprocess.run(
         [
@@ -1418,6 +1425,8 @@ def test_generate_verification_problems_cli_writes_custom_output_dirs(tmp_path) 
             str(viewer_dir),
             "--package-dir",
             str(package_dir),
+            "--viewer-package-dir",
+            str(viewer_package_dir),
         ],
         cwd=REPO_ROOT,
         check=True,
@@ -1431,12 +1440,15 @@ def test_generate_verification_problems_cli_writes_custom_output_dirs(tmp_path) 
         f"generated dir: {generated_dir}",
         f"viewer dir: {viewer_dir}",
         f"wrote {len(expected_ids)} verification package(s): {package_dir}",
+        f"viewer package dir: {viewer_package_dir}",
     ]
     assert result.stderr == ""
 
-    # Every example is bundled as a re-readable package.
+    # Every example is bundled as a re-readable package in both the ignored
+    # generated tree and the viewer-served tree.
     for problem_id in expected_ids:
         assert (package_dir / problem_id / "package.json").is_file()
+        assert (viewer_package_dir / problem_id / "package.json").is_file()
 
     expected_names = _viewer_verification_expected_filenames()
     assert _directory_filenames(generated_dir) == expected_names
@@ -1461,6 +1473,11 @@ def test_generate_verification_problems_cli_writes_custom_output_dirs(tmp_path) 
             (generated_dir / filename).read_text(encoding="utf-8")
         )
         assert generated_payload == viewer_payload
+        # Each catalog entry points the viewer at its self-contained bundle.
+        assert (
+            entry["packagePath"]
+            == f"/data/verification/packages/{entry['id']}/package.json"
+        )
 
 
 def test_validate_viewer_verification_index_accepts_export_shape() -> None:
@@ -1468,6 +1485,14 @@ def test_validate_viewer_verification_index_accepts_export_shape() -> None:
         _valid_viewer_verification_index(),
         version=INDEX_VERSION,
     )
+
+
+def test_validate_viewer_verification_index_accepts_package_path() -> None:
+    payload = _valid_viewer_verification_index()
+    payload["problems"][0]["packagePath"] = (
+        "/data/verification/packages/example-problem/package.json"
+    )
+    validate_viewer_verification_index(payload, version=INDEX_VERSION)
 
 
 def test_validate_viewer_verification_trajectory_accepts_export_shape() -> None:
@@ -1857,6 +1882,30 @@ def test_validate_viewer_verification_export_rejects_status_mismatches(
                 ],
             },
             "irPath is invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    {
+                        **_valid_viewer_verification_index()["problems"][0],
+                        "packagePath": "/data/verification/example-problem.json",
+                    }
+                ],
+            },
+            "packagePath is invalid",
+        ),
+        (
+            {
+                **_valid_viewer_verification_index(),
+                "problems": [
+                    {
+                        **_valid_viewer_verification_index()["problems"][0],
+                        "packagePath": "/data/verification/packages/other-problem/package.json",
+                    }
+                ],
+            },
+            "packagePath is invalid",
         ),
     ],
 )

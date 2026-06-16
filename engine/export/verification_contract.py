@@ -96,6 +96,19 @@ def validate_viewer_verification_index(
                 f"viewer verification index problem {problem_id} irPath is invalid"
             )
 
+        # The self-contained BE-039 package bundle: a ``package.json`` manifest
+        # indexing the IR, the viewer trajectory, and any inspection report, so
+        # the viewer can present and export a problem as one bundle. Optional for
+        # older data; when present it must point at this problem's package
+        # manifest under the packages tree.
+        package_path = entry.get("packagePath")
+        if package_path is not None:
+            expected_package_path = f"/data/verification/packages/{problem_id}/package.json"
+            if not isinstance(package_path, str) or package_path != expected_package_path:
+                raise ValueError(
+                    f"viewer verification index problem {problem_id} packagePath is invalid"
+                )
+
         counts = entry.get("counts")
         if not isinstance(counts, Mapping):
             raise ValueError(

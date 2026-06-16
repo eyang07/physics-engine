@@ -1130,6 +1130,72 @@ for (const viewport of [
     await expect(page.locator(".verif-download-ir")).toHaveCount(0);
   });
 
+  test(`Verification problem exports a self-contained package bundle at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // The package export is visibly distinct from the IR download and lists the
+    // components the bundle indexes, claiming no discharge.
+    await expect(page.locator(".verif-download-ir")).toBeVisible();
+    const packageDownload = page.locator(".verif-download-package");
+    await expect(packageDownload).toBeVisible();
+    await expect(page.locator(".verif-package__inspect")).toContainText("problem-ir");
+    await expect(page.locator(".verif-package__inspect")).toContainText("viewer-trajectory");
+    await expect(page.locator(".verif-package__note")).toContainText(/discharges nothing/i);
+
+    // Downloading assembles one file whose embedded manifest re-reads to the same
+    // components the backend wrote, each component's payload embedded by kind.
+    const [downloaded] = await Promise.all([
+      page.waitForEvent("download"),
+      packageDownload.click(),
+    ]);
+    expect(downloaded.suggestedFilename()).toBe(
+      "upright-pendulum-safety.verification-package.json",
+    );
+    const bundle = JSON.parse(readFileSync(await downloaded.path(), "utf-8"));
+    expect(bundle.schemaVersion).toBe("verification-package/v1");
+    const kinds = bundle.manifest.components.map((component: { kind: string }) => component.kind);
+    expect(kinds).toContain("problem-ir");
+    expect(kinds).toContain("viewer-trajectory");
+    expect(Object.keys(bundle.components).sort()).toEqual([...kinds].sort());
+    // The embedded IR is the backend-agnostic problem (no viewer trajectory); the
+    // viewer-trajectory component carries the animated series.
+    expect(bundle.components["problem-ir"].id).toBe("upright-pendulum-safety");
+    expect(bundle.components["problem-ir"]).not.toHaveProperty("trajectory");
+    expect(bundle.components["viewer-trajectory"]).toHaveProperty("series");
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-download-package.png`),
+    });
+  });
+
+  test(`Verification problem shows no package export when none is published at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Strip packagePath from the index (older export with no published bundle);
+    // the package affordance must be absent while the IR download remains.
+    await page.route("**/data/verification/index.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.problems.forEach((problem: { packagePath?: string }) => delete problem.packagePath);
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    await expect(page.locator(".verif-download-package")).toHaveCount(0);
+    await expect(page.locator(".verif-download-ir")).toBeVisible();
+  });
+
   test(`Verification certificate lane emphasizes the obligations it bears on at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

@@ -32,37 +32,22 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-_The backend package contract is stable (BE-043) and the flagship drone now
-renders correctly in the Verification view (FE-019 done): the catalog lists it,
-its `(q1, v1)` phase plane animates, all three barrier lanes draw (the inner-set
-value coasting positive as the rollout leaves `S_in`, shown honestly), and the
+_The backend package contract is stable (BE-043) and the flagship drone renders
+correctly in the Verification view (FE-019 done): the catalog lists it, its
+`(q1, v1)` phase plane animates, all three barrier lanes draw (the inner-set value
+coasting positive as the rollout leaves `S_in`, shown honestly), and the
 four-obligation ledger surfaces each obligation's signed `margin` (BE-036) and the
-assumption region its evidence was sampled within (BE-042/BE-043), with the
-measured-status cards carrying the same margin and verbatim sampling note. The
-view renders the rigor ladder, obligation/assumption cards, the verdict ledger,
-certificate lanes, and an IR download generically. The tasks below add the package
-bundle path and make the measured margin geometrically legible on the stage. Keep
-rendering honest — measured stays measured, candidates stay candidates, nothing
-reads as proved._
+assumption region its evidence was sampled within (BE-042/BE-043). The viewer now
+also publishes and renders the BE-039 package bundle (FE-020 done): each problem's
+`package.json` manifest is fetched and the header offers a self-contained bundle
+download — manifest + components — distinct from the IR download and claiming no
+discharge. The view renders the rigor ladder, obligation/assumption cards, the
+verdict ledger, certificate lanes, and both export paths generically. The tasks
+below make the measured margin geometrically legible and surface the package
+inventory in the inspector. Keep rendering honest — measured stays measured,
+candidates stay candidates, nothing reads as proved._
 
-1. **FE-020: Render the verification package bundle with a download/inspect path**
-   - Goal: Teach the viewer the BE-039 package (`package.json` manifest indexing
-     the IR, viewer trajectory, and optional inspection report) so a problem can
-     be presented and exported as one self-contained bundle, not just the IR file
-     the header currently downloads. Publish the package bundles to the viewer's
-     public data, add a package loader/types, and surface a clear package
-     download/inspection path in the Verification header alongside the existing IR
-     download, respecting the rigor ladder.
-   - Scope: `scripts/generate_verification_problems.py` (publish package bundles
-     under `viewer/public/data`), `viewer/src/data/verification.ts` (package
-     manifest types + loader), `viewer/src/verificationPanel.ts`, and the viewer
-     visual test.
-   - Acceptance: the viewer lists/downloads the drone package as one bundle whose
-     manifest re-reads to the same components the backend wrote; the path is
-     visibly distinct from the IR download and claims no discharge; `npm run
-     build` and the visual test pass.
-
-2. **FE-021: Mark the tightest measured-holds margin on the phase-plane stage**
+1. **FE-021: Mark the tightest measured-holds margin on the phase-plane stage**
    - Goal: The stage marks measured **violations** on the `(q1, v1)` plane, but a
      measured-holds status also exports its worst sampled point, projection, and
      signed `margin` (BE-036) — the closest the evidence came to the obligation
@@ -79,6 +64,21 @@ reads as proved._
      holding obligations, visually distinct from violation markers and labeled
      measured, with the violation path unchanged; the rigor labeling stays honest;
      `npm run build` and the visual test pass.
+
+2. **FE-022: Surface the package component inventory in the IR inspector**
+   - Goal: The header now downloads the BE-039 bundle, but a reader can only see
+     its components as a one-line tooltip. Add a read-only package section to the
+     collapsible IR details that lists the manifest's model, status, and counts
+     and each indexed component (kind, filename, description), so the bundle's
+     contents are inspectable without downloading. Render only what the manifest
+     exports and keep the rigor honest — the bundle gathers measured/candidate
+     parts and discharges nothing.
+   - Scope: `viewer/src/verificationPanel.ts` (a package detail section fed the
+     loaded manifest), `viewer/src/styles.css`, and the viewer visual test.
+   - Acceptance: selecting a problem with a published package shows its component
+     inventory in the IR details (each component's kind and filename, plus the
+     manifest model/status/counts); a problem without a package shows no package
+     section; nothing reads as proved; `npm run build` and the visual test pass.
 
 ## Backend Queue
 

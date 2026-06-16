@@ -636,6 +636,64 @@ select {
   border-color: var(--accent);
 }
 
+/* Export affordances: the IR download and, distinct from it, the self-contained
+   package bundle block. */
+.verif-exports {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.verif-package {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost);
+}
+
+.verif-package__inspect {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.verif-package__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.verif-download-package {
+  justify-self: start;
+  padding: 5px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.verif-download-package:hover {
+  background: rgba(240, 180, 106, 0.12);
+}
+
+.verif-download-package:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.verif-download-package:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
 .verif-evidence-toggle {
   justify-self: start;
   margin: 0;

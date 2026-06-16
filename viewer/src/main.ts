@@ -25,6 +25,7 @@ import { VerificationPanel } from "./verificationPanel";
 import { VerificationStage } from "./verificationStage";
 import {
   loadVerificationIndex,
+  loadVerificationPackageManifest,
   loadVerificationProblem,
   type VerificationProblemSummary,
 } from "./data/verification";
@@ -289,11 +290,22 @@ async function selectVerificationProblem(problemId: string) {
   selectedProblemId = summary.id;
   updateVerificationCatalogActive();
   try {
-    const problem = await loadVerificationProblem(summary.dataPath);
+    // The package manifest is an optional, self-contained bundle index; a
+    // missing one resolves to null so the view simply omits the package export.
+    const [problem, manifest] = await Promise.all([
+      loadVerificationProblem(summary.dataPath),
+      summary.packagePath
+        ? loadVerificationPackageManifest(summary.packagePath)
+        : Promise.resolve(null),
+    ]);
     // A stale click (the user moved on) should not overwrite the newer problem.
     if (selectedProblemId === summary.id) {
       verificationStage.show(problem);
-      verificationPanel.render(problem, summary.irPath);
+      const pkg =
+        manifest && summary.packagePath
+          ? { manifest, path: summary.packagePath }
+          : null;
+      verificationPanel.render(problem, summary.irPath, pkg);
     }
   } catch (error) {
     console.warn("Verification problem unavailable:", error);

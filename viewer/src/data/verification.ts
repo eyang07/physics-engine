@@ -222,6 +222,12 @@ export interface VerificationProblemSummary {
   dataPath: string;
   /** The backend-agnostic IR artifact path, when the export published one. */
   irPath: string | null;
+  /**
+   * The self-contained BE-039 package manifest path, when the export published
+   * one: a `package.json` indexing the IR, viewer trajectory, and any inspection
+   * report so the problem can be presented and exported as a single bundle.
+   */
+  packagePath: string | null;
   counts: { regions: number; obligations: number; candidates: number };
 }
 
@@ -545,6 +551,7 @@ function parseSummary(value: unknown): VerificationProblemSummary | null {
     schemaVersion: asOptionalString(record.schemaVersion),
     dataPath: record.dataPath,
     irPath: asOptionalString(record.irPath),
+    packagePath: asOptionalString(record.packagePath),
     counts: {
       regions: asOptionalNumber(counts.regions) ?? 0,
       obligations: asOptionalNumber(counts.obligations) ?? 0,
@@ -583,4 +590,136 @@ export async function loadVerificationProblem(dataPath: string): Promise<Verific
     throw new Error(`Unable to load verification problem: ${response.status}`);
   }
   return parseVerificationProblem((await response.json()) as unknown);
+}
+
+/**
+ * The BE-039 verification package, mirroring `engine/export/verification_package.py`.
+ * A `package.json` manifest indexes the bundle's component files (the IR, the
+ * viewer trajectory, and any inspection report). Like the rest of the verification
+ * layer it claims nothing: `status` stays `candidate`, and the components carry
+ * the same honest rigor as the standalone problem.
+ */
+export interface PackageComponent {
+  /** e.g. `problem-ir`, `viewer-trajectory`, `inspection-report`. */
+  kind: string;
+  /** The component filename, relative to the package directory. */
+  path: string;
+  description: string;
+}
+
+export interface PackageManifest {
+  schemaVersion: string;
+  problemId: string;
+  name: string;
+  model: string;
+  status: string;
+  counts: { regions: number; obligations: number; candidates: number };
+  components: PackageComponent[];
+}
+
+/** A single self-contained bundle assembled for download: the manifest plus each
+ * component's payload, keyed by component kind. Re-reading it recovers the same
+ * components the backend wrote. */
+export interface VerificationPackageBundle {
+  schemaVersion: string;
+  manifest: Record<string, unknown>;
+  components: Record<string, unknown>;
+}
+
+function parsePackageComponent(value: unknown): PackageComponent | null {
+  const record = asRecord(value);
+  if (!record || typeof record.kind !== "string" || typeof record.path !== "string") {
+    return null;
+  }
+  return {
+    kind: record.kind,
+    path: record.path,
+    description: asString(record.description),
+  };
+}
+
+function parsePackageManifest(raw: unknown): PackageManifest | null {
+  const record = asRecord(raw);
+  if (!record || typeof record.problemId !== "string") {
+    return null;
+  }
+  const components = parseArray(record.components, parsePackageComponent);
+  if (components.length === 0) {
+    return null;
+  }
+  const counts = asRecord(record.counts) ?? {};
+  return {
+    schemaVersion: asString(record.schemaVersion, "unknown"),
+    problemId: record.problemId,
+    name: asString(record.name, record.problemId),
+    model: asString(record.model),
+    status: asString(record.status, "candidate"),
+    counts: {
+      regions: asOptionalNumber(counts.regions) ?? 0,
+      obligations: asOptionalNumber(counts.obligations) ?? 0,
+      candidates: asOptionalNumber(counts.candidates) ?? 0,
+    },
+    components,
+  };
+}
+
+// The directory a package manifest lives in, so component paths (relative
+// filenames) can be resolved against it.
+function packageBasePath(packagePath: string): string {
+  return packagePath.slice(0, packagePath.lastIndexOf("/"));
+}
+
+/**
+ * Load a problem's package manifest. A missing or malformed manifest (data not
+ * yet generated, older export) resolves to null rather than throwing, so the
+ * Verification view can simply omit the package affordance.
+ */
+export async function loadVerificationPackageManifest(
+  packagePath: string,
+): Promise<PackageManifest | null> {
+  try {
+    const response = await fetch(packagePath);
+    if (!response.ok) {
+      return null;
+    }
+    return parsePackageManifest((await response.json()) as unknown);
+  } catch (error) {
+    console.warn("Verification package manifest unavailable:", error);
+    return null;
+  }
+}
+
+/**
+ * Assemble a problem's package into one self-contained bundle for download:
+ * fetch the manifest and every component it indexes, embedding each component's
+ * payload keyed by its kind. The embedded manifest is the backend's own, so the
+ * bundle re-reads to exactly the components the backend wrote. Throws if any
+ * indexed file is missing, so a download never silently drops a component.
+ */
+export async function assembleVerificationPackageBundle(
+  packagePath: string,
+): Promise<VerificationPackageBundle> {
+  const manifestResponse = await fetch(packagePath);
+  if (!manifestResponse.ok) {
+    throw new Error(`Unable to load verification package: ${manifestResponse.status}`);
+  }
+  const manifestRaw = (await manifestResponse.json()) as Record<string, unknown>;
+  const manifest = parsePackageManifest(manifestRaw);
+  if (!manifest) {
+    throw new Error("Verification package manifest is malformed.");
+  }
+  const base = packageBasePath(packagePath);
+  const components: Record<string, unknown> = {};
+  for (const component of manifest.components) {
+    const response = await fetch(`${base}/${component.path}`);
+    if (!response.ok) {
+      throw new Error(`Missing package component ${component.kind} (${component.path}).`);
+    }
+    components[component.kind] = (await response.json()) as unknown;
+  }
+  return {
+    schemaVersion: manifest.schemaVersion,
+    manifest: manifestRaw,
+    components,
+  };
 }

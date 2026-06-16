@@ -39,7 +39,14 @@ from scripts.export_verification_problems import (
 DEFAULT_GENERATED_DIR = Path("data/generated/verification")
 DEFAULT_VIEWER_DIR = Path("viewer/public/data/verification")
 DEFAULT_PACKAGE_DIR = Path("data/generated/verification/packages")
+DEFAULT_VIEWER_PACKAGE_DIR = Path("viewer/public/data/verification/packages")
 INDEX_VERSION = 1
+
+
+def _package_path(problem_id: str) -> str:
+    """The viewer-served path to a problem's BE-039 package manifest."""
+
+    return f"/data/verification/packages/{problem_id}/package.json"
 
 
 def _problem_summary(payload: dict, data_path: str, ir_path: str) -> dict:
@@ -54,6 +61,9 @@ def _problem_summary(payload: dict, data_path: str, ir_path: str) -> dict:
         "schemaVersion": payload.get("schemaVersion"),
         "dataPath": data_path,
         "irPath": ir_path,
+        # The self-contained bundle the viewer can present and export as one unit;
+        # the components live under this package directory.
+        "packagePath": _package_path(payload["id"]),
         "counts": {
             "regions": len(payload.get("regions", [])),
             "obligations": len(payload.get("obligations", [])),
@@ -153,6 +163,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_PACKAGE_DIR,
         help="directory for ignored self-contained verification packages",
     )
+    parser.add_argument(
+        "--viewer-package-dir",
+        type=Path,
+        default=DEFAULT_VIEWER_PACKAGE_DIR,
+        help="directory for ignored viewer-served verification packages",
+    )
     return parser.parse_args(argv)
 
 
@@ -169,6 +185,12 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     manifests = write_verification_packages_for_examples(args.package_dir)
     print(f"wrote {len(manifests)} verification package(s): {args.package_dir}")
+
+    # Publish the same bundles under the viewer's public data so the Verification
+    # view can fetch a problem's package manifest and components directly. Like
+    # the rest of the generated verification data, these stay uncommitted.
+    write_verification_packages_for_examples(args.viewer_package_dir)
+    print(f"viewer package dir: {args.viewer_package_dir}")
 
 
 if __name__ == "__main__":

@@ -11,11 +11,20 @@ import katex from "katex";
 import type {
   IrObligation,
   IrRegion,
+  PackageManifest,
   ProofStatus,
   RegionRole,
   VerificationProblem,
 } from "./data/verification";
+import { assembleVerificationPackageBundle } from "./data/verification";
 import { formatMeasured, formatSignedMeasured } from "./util";
+
+/** The self-contained package bundle offered for download/inspection, when the
+ * backend published one for this problem. */
+export interface VerificationPackageRef {
+  manifest: PackageManifest;
+  path: string;
+}
 
 const COMPARISON_LATEX: Record<string, string> = {
   "<=": "\\le",
@@ -179,14 +188,18 @@ export class VerificationPanel {
 
   // Verdict-first: a concise summary (what's being proved + measured outcome +
   // rigor) is always visible; the full IR math lives in a collapsed details band.
-  render(problem: VerificationProblem, irPath: string | null = null): void {
+  render(
+    problem: VerificationProblem,
+    irPath: string | null = null,
+    pkg: VerificationPackageRef | null = null,
+  ): void {
     this.obligationCards.clear();
     this.assumptionCards.clear();
     this.selectedEvidenceObligation = null;
 
     // Summary rail.
     const summary = el("div", "verif-summary");
-    summary.append(this.renderSummaryHeader(problem, irPath));
+    summary.append(this.renderSummaryHeader(problem, irPath, pkg));
     if (problem.obligations.length > 0) {
       summary.append(this.renderObligationLedger(problem));
     }
@@ -220,6 +233,7 @@ export class VerificationPanel {
   private renderSummaryHeader(
     problem: VerificationProblem,
     irPath: string | null,
+    pkg: VerificationPackageRef | null,
   ): HTMLElement {
     const header = el("header", "verif-summary__header");
     header.append(el("p", "eyebrow", "Verification problem"));
@@ -233,16 +247,81 @@ export class VerificationPanel {
         : "Measured evidence only — every obligation awaits external sound discharge; nothing here is certified.";
     header.append(el("p", "verif-note", note));
 
-    // The backend-agnostic IR artifact, offered for routing to an external
-    // backend. Absent when the export published no IR (older data); the link
-    // downloads the IR JSON, not the viewer-shaped payload.
+    // Export affordances: the backend-agnostic IR on its own, and — distinct from
+    // it — the self-contained BE-039 package bundle. Either is absent when the
+    // export published none (older data).
+    const exports = el("div", "verif-exports");
     if (irPath) {
       const download = el("a", "verif-download-ir", "Download problem (IR)");
       download.href = irPath;
       download.download = `${problem.id}.verification-problem.json`;
-      header.append(download);
+      exports.append(download);
+    }
+    if (pkg) {
+      exports.append(this.renderPackageExport(pkg));
+    }
+    if (exports.childElementCount > 0) {
+      header.append(exports);
     }
     return header;
+  }
+
+  // The self-contained package: a one-line inspect of the indexed components plus
+  // a download that assembles the whole bundle into a single file. Visibly
+  // distinct from the IR download, and honest — the bundle gathers the same
+  // measured/candidate parts and discharges nothing.
+  private renderPackageExport(pkg: VerificationPackageRef): HTMLElement {
+    const node = el("div", "verif-package");
+    const kinds = pkg.manifest.components.map((component) => component.kind).join(", ");
+    const inspect = el(
+      "p",
+      "verif-package__inspect",
+      `Package bundle (${pkg.manifest.components.length}): ${kinds}`,
+    );
+    inspect.title = pkg.manifest.components
+      .map((component) => `${component.kind} — ${component.path}`)
+      .join("\n");
+    node.append(inspect);
+
+    const button = el("button", "verif-download-package", "Download package (bundle)");
+    button.type = "button";
+    button.addEventListener("click", () => void this.downloadPackageBundle(pkg, button));
+    node.append(button);
+
+    node.append(
+      el(
+        "p",
+        "verif-package__note",
+        "One self-contained bundle (manifest + components) — gathers measured evidence and candidates; discharges nothing.",
+      ),
+    );
+    return node;
+  }
+
+  // Assemble and download the package as one JSON file. Fetching the components
+  // is async, so the control is disabled while in flight and a failure leaves an
+  // honest console warning rather than a half-written file.
+  private async downloadPackageBundle(
+    pkg: VerificationPackageRef,
+    button: HTMLButtonElement,
+  ): Promise<void> {
+    button.disabled = true;
+    try {
+      const bundle = await assembleVerificationPackageBundle(pkg.path);
+      const blob = new Blob([`${JSON.stringify(bundle, null, 2)}\n`], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = el("a");
+      anchor.href = url;
+      anchor.download = `${pkg.manifest.problemId}.verification-package.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.warn("Verification package download failed:", error);
+    } finally {
+      button.disabled = false;
+    }
   }
 
   // A compact, always-visible rigor indicator; the full four-level ladder lives
