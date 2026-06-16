@@ -222,27 +222,29 @@ Tier-2 assumptions, cross-package tooling, and a robust intersection capstone.
 Keep generated data uncommitted. Never label anything proved/certified — the
 engine proposes; external backends dispose._
 
-1. **BE-056: Export the Tier-2 boundary-corner violation reference scenario**
-   - Goal: Every published package only *holds*, so the engine's measured-violation
-     surface is never exercised end-to-end. Export the DRONE_MODEL_SPEC §L.2 / Tier-2
-     "load-bearing diagonal corner" scenario as a second trajectory on the obstacle
-     keep-out problem that approaches and enters the unsafe set, and emit measured
-     `proofStatuses` carrying a **negative** signed `margin` for the avoidance
-     obligation, using the existing event-based unsafe-set entry detection
-     (integrator-located entry time). This makes a measured violation a concrete,
-     honest rigor-level-1 artifact — evidence the run left the set on this rollout,
-     never a disproof of the candidate.
-   - Scope: `scripts/export_verification_problems.py` (the violation-scenario
-     trajectory and its sampled statuses on `drone_obstacle_keepout_problem`),
-     `engine/verification/measured.py` if violation sampling needs a seam, and
-     `tests/`.
-   - Acceptance: the obstacle package exports a violation scenario whose avoidance
-     `proofStatus` reports a negative worst-case margin with an integrator-located
-     entry, distinct from the holding rollout; the holding scenario is unchanged;
-     the violation is labeled measured evidence only; nothing claims
-     proof/certification; generated data stays uncommitted; focused tests pass.
+BE-056 is done: the first measured-violation scenario is published. A new
+`engine/verification/measured.py` seam `trajectory_obligation_proof_status`
+evaluates one obligation's inequality along a measured trajectory and reports the
+measured verdict with the worst signed margin (and an optional integrator-located
+entry time as `worst_time`). `scripts/export_verification_problems.py` added the
+spec-L.2 "load-bearing diagonal corner" scenario: `drone_obstacle_keepout_violation_trajectory`
+(the drone starts at `q = (9/16, 9/16)` with inward velocity `v = (-Bh, -Bh)` and
+coasts straight into the centered obstacle under the keep-out problem's own
+interior dynamics) and `drone_obstacle_keepout_violation_problem`, registered as a
+tenth viewer example. The published `drone-obstacle-keepout-violation` package
+carries the base region-grid statuses (avoidance still measured-holds within the
+standoff annulus — the candidate's claim is conditional on the standoff assumption)
+plus a trajectory-sampled **measured-violated** avoidance status with a negative
+worst margin and the obstacle entry time located by the event root-finder
+(`SafetySpecification.event_entry_report`, sharp at `t ≈ 1.543`, not snapped to the
+`dt = 1/4` grid). This is the rigor-ladder lesson of spec L.2: the standoff/dilation
+margin is load-bearing, not vacuous. The holding `drone-obstacle-keepout` package
+is unchanged; candidates stay candidate and obligations external-required — a
+located violation is measured evidence that this rollout left the set, never a
+disproof of the candidate. Nothing claims proof/certification.
 
-2. **BE-057: Cross-package consistency validator for the drone flagship**
+1. **BE-057: Cross-package consistency validator for the drone flagship**
+   - Goal: The flagship now spans seven drone packages sharing one model
    - Goal: The flagship now spans seven drone packages sharing one model
      (DRONE_MODEL_SPEC §N cross-artifact consistency), but nothing checks that they
      agree. Add a helper that validates all drone packages against a single
@@ -257,7 +259,7 @@ engine proposes; external backends dispose._
      mismatch; nothing claims proof/certification; generated data stays uncommitted;
      focused tests pass.
 
-3. **BE-058: Encode the full `Obstacle.Valid` assumption triple on the keep-out
+2. **BE-058: Encode the full `Obstacle.Valid` assumption triple on the keep-out
    package**
    - Goal: The obstacle keep-out package (BE-048) cites only a standoff-sizing
      precondition, but DRONE_MODEL_SPEC §337/§711 requires the full `Obstacle.Valid`
@@ -277,7 +279,7 @@ engine proposes; external backends dispose._
      unchanged where it already held; nothing claims proof/certification; generated
      data stays uncommitted; focused tests pass.
 
-4. **BE-059: Boundary-approaching margin scenario for the Tier-1 geofence axis**
+3. **BE-059: Boundary-approaching margin scenario for the Tier-1 geofence axis**
    - Goal: The Tier-1 geofence rollout sits comfortably inside the safe set, so its
      measured holds-margin is large and uninformative (and gives FE-021 little to
      show). Export the DRONE_MODEL_SPEC §L.2 boundary-approaching scenario: a second
@@ -293,7 +295,7 @@ engine proposes; external backends dispose._
      existing scenario is unchanged; nothing claims proof/certification; generated
      data stays uncommitted; focused tests pass.
 
-5. **BE-060: Robustness-aware adapter stubs for quantified-over-disturbance
+4. **BE-060: Robustness-aware adapter stubs for quantified-over-disturbance
    obligations**
    - Goal: The adapter-stub catalog (BE-044) derives reachability/SOS/deductive
      stubs from each obligation's classified target, but a Tier-3 robust obligation
@@ -311,7 +313,7 @@ engine proposes; external backends dispose._
      obligations stay `external-required`; nothing claims proof/certification;
      generated data stays uncommitted; focused tests pass.
 
-6. **BE-061: Cross-package human-readable catalog summary report**
+5. **BE-061: Cross-package human-readable catalog summary report**
    - Goal: The discovery index (BE-045) is machine-readable, but there is no
      human-readable cross-package summary like the inspection adapter's per-problem
      report. Add a writer that emits one deterministic summary across all packages —
@@ -326,7 +328,7 @@ engine proposes; external backends dispose._
      manifests; it is deterministic and re-readable; nothing claims
      proof/certification; generated data stays uncommitted; focused tests pass.
 
-7. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
+6. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
     - Goal: BE-050 publishes the nominal geofence∩obstacle intersection and
       BE-049/052 publish Tier-3 robust geofence and obstacle packages, but there is
       no robust *intersection* package. Combine them: on the coupled `(q1, q2)`

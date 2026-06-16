@@ -37,6 +37,7 @@ from engine.verification import (
     expression_spec,
     scalar_field_region_geometries,
     sampled_region_proof_statuses,
+    trajectory_obligation_proof_status,
     verification_problem_from_barrier,
     verification_problem_from_controlled_discrete_lyapunov,
     verification_problem_from_obligations,
@@ -998,6 +999,109 @@ def drone_obstacle_keepout_trajectory(
     result = horizontal_plane_rollout(params)
     time = result.steps.astype(float) * params.timestep
     return time, result.states[:, :2]
+
+
+def drone_obstacle_keepout_violation_trajectory(
+    params: DroneParams = DroneParams(),
+    obstacle: ObstacleSpec = DEFAULT_OBSTACLE,
+) -> tuple[np.ndarray, np.ndarray]:
+    """The spec L.2 diagonal-corner VIOLATION rollout; columns ``(q1, q2)``.
+
+    The drone starts at the corner ``q = (9/16, 9/16)`` with inward velocity
+    ``v = (-Bh, -Bh)`` (spec scaled ``(-8, -8)``) and coasts straight at the
+    centered obstacle under the keep-out problem's own interior dynamics
+    ``q+ = q + dt v`` -- it never maintains the standoff, so it enters the keep-out
+    region. ``N = 8``, ``dt`` from ``params``. Discrete-time axis: step ``k`` maps
+    to ``k * dt``.
+    """
+
+    dt = params.timestep
+    vel = params.horizontal_velocity_bound
+    q0 = np.array([9.0 / 16.0, 9.0 / 16.0])
+    velocity = np.array([-vel, -vel])
+    steps = np.arange(9)
+    states = q0[None, :] + steps[:, None] * dt * velocity[None, :]
+    time = steps.astype(float) * dt
+    return time, states
+
+
+def drone_obstacle_keepout_violation_problem(
+    params: DroneParams = DroneParams(),
+    obstacle: ObstacleSpec = DEFAULT_OBSTACLE,
+) -> VerificationProblem:
+    """Tier-2 keep-out VIOLATION reference scenario (spec L.2 diagonal corner).
+
+    The same coupled ``(q1, q2)`` keep-out problem as
+    :func:`drone_obstacle_keepout_problem`, but carrying the measured *violation*
+    the spec's load-bearing diagonal-corner scenario produces. A drone that does
+    not maintain the standoff -- starting at ``q = (9/16, 9/16)`` with inward
+    velocity ``v = (-Bh, -Bh)`` -- coasts straight into the centered obstacle.
+
+    The avoidance obligation's region-grid status still measured-holds within the
+    standoff annulus (the candidate's claim is conditional on the standoff
+    assumption), and an added trajectory-sampled status reports the measured
+    violation along this rollout, with the obstacle entry time located by the event
+    root-finder (sharp, not snapped to the ``dt`` grid). This is the rigor-ladder
+    lesson of spec L.2: the standoff/dilation margin is load-bearing, not vacuous.
+    Measured evidence only -- a located violation witnesses that *this* rollout
+    left the set; it does not disprove the candidate. Renders on the ``(q1, q2)``
+    plane.
+    """
+
+    problem = drone_obstacle_keepout_problem(params, obstacle)
+    time, states = drone_obstacle_keepout_violation_trajectory(params, obstacle)
+
+    # Locate the obstacle entry by event root-finding on the interior coasting
+    # segment (constant velocity between samples), so the entry time is sharp to
+    # integration tolerance rather than snapped to the dt grid.
+    q1, q2 = DRONE_STATE[0], DRONE_STATE[1]
+    r = _drone_rational
+    cx, cy = obstacle.center
+    dist = sp.sqrt((q1 - r(cx)) ** 2 + (q2 - r(cy)) ** 2)
+    obstacle_interior = SublevelSet(
+        state=(q1, q2),
+        expression=dist - r(obstacle.radius),
+        level=0.0,
+        name="obstacle-interior",
+    )
+    keepout_safe = SublevelSet(
+        state=(q1, q2),
+        expression=r(obstacle.radius) - dist,
+        level=0.0,
+        name="obstacle-exterior",
+    )
+    spec = SafetySpecification(
+        state=(q1, q2), safe_set=keepout_safe, unsafe_sets=(obstacle_interior,)
+    )
+    vel = float(params.horizontal_velocity_bound)
+    velocity = np.array([-vel, -vel])
+
+    def coasting_rhs(_t: float, _y: Sequence[float]) -> np.ndarray:
+        return velocity
+
+    entry = spec.event_entry_report(
+        coasting_rhs,
+        [float(states[0, 0]), float(states[0, 1])],
+        (float(time[0]), float(time[-1])),
+    ).unsafe_sets[0]
+
+    violation_status = trajectory_obligation_proof_status(
+        problem,
+        "obstacle-keepout-one-step-avoidance",
+        time,
+        states,
+        state_names=("q1", "q2"),
+        variable_to_state_axis=_DRONE_PLANE_PHASE_AXES,
+        source="trajectory:diagonal-corner-violation",
+        entry_time=entry.first_entry_time,
+    )
+    return replace(
+        problem,
+        id="drone-obstacle-keepout-violation",
+        name="drone obstacle keepout violation",
+        proof_statuses=problem.proof_statuses + (violation_status,),
+        metadata={"verificationModel": "drone-obstacle-keepout-violation"},
+    )
 
 
 def drone_geofence_obstacle_problem(
@@ -2163,6 +2267,11 @@ def viewer_verification_examples() -> tuple[ViewerVerificationExample, ...]:
         ViewerVerificationExample(
             problem_factory=drone_obstacle_keepout_problem,
             trajectory_factory=drone_obstacle_keepout_trajectory,
+            variable_to_state_axis=_DRONE_PLANE_PHASE_AXES,
+        ),
+        ViewerVerificationExample(
+            problem_factory=drone_obstacle_keepout_violation_problem,
+            trajectory_factory=drone_obstacle_keepout_violation_trajectory,
             variable_to_state_axis=_DRONE_PLANE_PHASE_AXES,
         ),
         ViewerVerificationExample(

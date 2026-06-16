@@ -233,6 +233,81 @@ def sampled_region_proof_statuses(
     return tuple(statuses)
 
 
+def trajectory_obligation_proof_status(
+    problem: VerificationProblem,
+    obligation_id: str,
+    time: Sequence[float] | np.ndarray,
+    states: np.ndarray,
+    *,
+    state_names: tuple[str, ...],
+    variable_to_state_axis: Mapping[str, str],
+    source: str,
+    entry_time: float | None = None,
+) -> ProofStatusSpec:
+    """Evaluate one obligation's inequality along a measured trajectory.
+
+    Samples the obligation expression at each trajectory point and reports the
+    measured verdict (``measured-holds`` / ``measured-violated``) with the worst
+    signed margin to the obligation boundary -- nonnegative when the rollout never
+    breached it, negative (how far past) when it did. ``entry_time``, when given
+    (e.g. an integrator-located unsafe-set entry time), is recorded as
+    ``worst_time``; it is the sharp moment the rollout first breached the boundary,
+    which is generally earlier than the worst (deepest) sample. Rigor level 1: a
+    located violation is measured evidence that *this* rollout left the set, never
+    a disproof of the candidate (whose claim is conditional on its assumptions).
+    """
+
+    obligation = next(
+        (item for item in problem.obligations if item.id == obligation_id), None
+    )
+    if obligation is None:
+        raise ValueError(f"problem has no obligation {obligation_id!r}")
+
+    variables = tuple(variable.name for variable in problem.variables)
+    state_array = np.atleast_2d(np.asarray(states, dtype=float))
+    time_array = np.asarray(time, dtype=float)
+    if state_array.shape[0] != time_array.shape[0]:
+        raise ValueError("time and states must have matching sample counts")
+    points = _trajectory_problem_points(
+        state_array,
+        state_names=state_names,
+        variable_names=variables,
+        variable_to_state_axis=variable_to_state_axis,
+    )
+    expressions = _problem_expressions(problem)
+    symbols = _symbols_for_names(variables, expressions)
+    values = _evaluate_expression(_expression(obligation.expression), symbols, points)
+    status, worst_index, worst_margin = _measured_status(
+        values, obligation.comparison, float(obligation.rhs)
+    )
+    candidate_by_obligation = _candidate_by_obligation(problem)
+    return ProofStatusSpec(
+        id=f"{obligation.id}-trajectory",
+        obligation_id=obligation.id,
+        candidate_id=candidate_by_obligation.get(obligation.id),
+        region_id=obligation.region_id,
+        status=status,
+        evaluation_kind="trajectory",
+        sample_count=int(points.shape[0]),
+        comparison=obligation.comparison,
+        rhs=float(obligation.rhs),
+        system=problem.system,
+        variables=variables,
+        state_axes=tuple(variable_to_state_axis[name] for name in variables),
+        variable_to_state_axis=dict(variable_to_state_axis),
+        source=source,
+        worst_value=float(values[worst_index]),
+        worst_point=tuple(float(value) for value in points[worst_index]),
+        worst_time=(
+            float(entry_time)
+            if entry_time is not None
+            else float(time_array[worst_index])
+        ),
+        worst_margin=worst_margin,
+        note=_MEASURED_NOTE,
+    )
+
+
 def _assumption_region_mask(
     geometry: RegionGeometrySpec,
     obligation: ObligationSpec,

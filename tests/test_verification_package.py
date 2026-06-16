@@ -157,6 +157,7 @@ _EXPECTED_REGIMES = {
     "drone-geofence-axis": REGIME_NOMINAL,
     "drone-vertical-axis": REGIME_NOMINAL,
     "drone-obstacle-keepout": REGIME_NOMINAL,
+    "drone-obstacle-keepout-violation": REGIME_NOMINAL,
     "drone-geofence-obstacle": REGIME_NOMINAL,
     "drone-disturbed-geofence-axis": REGIME_DISTURBANCE_ROBUST,
     "drone-disturbed-vertical-geofence-axis": REGIME_DISTURBANCE_ROBUST,
@@ -587,6 +588,60 @@ def test_generation_publishes_complete_obstacle_package(tmp_path) -> None:
 
     index = read_package_index(tmp_path)
     assert "drone-obstacle-keepout" in {entry.problem_id for entry in index.entries}
+
+
+def test_generation_publishes_keepout_violation_scenario(tmp_path) -> None:
+    # The Tier-2 boundary-corner VIOLATION scenario (BE-056, spec L.2): a drone
+    # that does not maintain the standoff coasts straight into the obstacle, so the
+    # keep-out property is measured-violated on this rollout -- the first published
+    # package whose rollout leaves the safe set.
+    manifests = write_verification_packages_for_examples(tmp_path)
+    violation = next(
+        m for m in manifests if m.problem_id == "drone-obstacle-keepout-violation"
+    )
+    assert violation.model == "drone-obstacle-keepout-violation"
+    assert violation.status == "candidate"
+
+    package = read_package(tmp_path / "drone-obstacle-keepout-violation")
+    problem = package.problem
+
+    # The engine proposes; it never disposes -- a measured violation is evidence,
+    # not a disproof, so candidates stay candidate and obligations external-required.
+    assert {candidate.status for candidate in problem.candidates} == {"candidate"}
+    assert {obligation.rigor for obligation in problem.obligations} == {
+        "external-required"
+    }
+    assert {status.rigor for status in problem.proof_statuses} == {"measured"}
+
+    statuses = {
+        (status.obligation_id, status.evaluation_kind): status
+        for status in problem.proof_statuses
+    }
+    # The avoidance obligation still measured-holds on the region grid (the
+    # candidate's claim is conditional on the standoff assumption)...
+    region_status = statuses[("obstacle-keepout-one-step-avoidance", "region-grid")]
+    assert region_status.status == "measured-holds"
+    assert region_status.worst_margin is not None and region_status.worst_margin >= 0.0
+
+    # ...but the diagonal-corner rollout, which breaks the standoff, is
+    # measured-violated with a negative worst-case margin and an integrator-located
+    # entry time that is sharp (not snapped to the dt = 1/4 sample grid).
+    trajectory_status = statuses[("obstacle-keepout-one-step-avoidance", "trajectory")]
+    assert trajectory_status.status == "measured-violated"
+    assert (
+        trajectory_status.worst_margin is not None
+        and trajectory_status.worst_margin < 0.0
+    )
+    assert trajectory_status.sample_count > 0
+    entry_time = trajectory_status.worst_time
+    assert entry_time is not None and 1.5 < entry_time < 1.75
+    # An event-located entry is sharper than any dt = 1/4 grid multiple.
+    assert abs((entry_time / 0.25) - round(entry_time / 0.25)) > 1e-6
+
+    index = read_package_index(tmp_path)
+    assert "drone-obstacle-keepout-violation" in {
+        entry.problem_id for entry in index.entries
+    }
 
 
 def test_generation_publishes_complete_disturbance_robust_package(tmp_path) -> None:

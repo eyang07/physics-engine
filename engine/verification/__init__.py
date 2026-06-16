@@ -63,6 +63,7 @@ from engine.verification.measured import (
     CertificateTrajectoryDiagnostics,
     certificate_series_for_trajectory,
     sampled_region_proof_statuses,
+    trajectory_obligation_proof_status,
 )
 from engine.verification.region_geometry import (
     scalar_field_region_geometries,
@@ -150,6 +151,7 @@ __all__ = [
     "scalar_field_region_geometries",
     "scalar_field_region_geometry",
     "sampled_region_proof_statuses",
+    "trajectory_obligation_proof_status",
     "sos_polynomial_requirement_diagnostics",
     "verification_problem_from_barrier",
     "verification_problem_from_controlled_discrete_barrier",
