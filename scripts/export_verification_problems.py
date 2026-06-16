@@ -1687,6 +1687,43 @@ def drone_vertical_disturbed_geofence_problem(
         ),
     )
 
+    # Robust self-reproducing vertical velocity bound (Tier-3 P2), the vertical
+    # mirror of the horizontal BE-053. The nominal bound is B3 = reach*dt with
+    # reach = max(u3Max-g, g-u3Min) -- the *larger* asymmetric authority margin --
+    # because the interior binds: the hover branch cancels gravity, so a coasting
+    # interior step is velocity-preserving, and one disturbed step adds at most
+    # dt*w. The bound therefore enlarges to (reach + w)*dt, and the worst-case
+    # disturbed successor of the nominal-velocity-bounded set lands within it:
+    # max_w |v3+| = |v3_nom+| + dt*w <= (reach + w)*dt, i.e. |v3_nom+| <= reach*dt.
+    # (The *binding* margin a = min(u3Max-g, g-u3Min) governs the robust speed
+    # precondition above, not this bound; the brakes never overshoot reach*dt.)
+    nominal_velocity_bound = reach * dt
+    robust_velocity_bound = (reach + w_max) * dt
+    robust_velocity_drift = dt * w_max
+    robust_velocity_barrier = sp.Abs(v) - robust_velocity_bound
+    robust_velocity_bound_set = SublevelSet(
+        state=(q, v),
+        expression=robust_velocity_barrier,
+        level=0.0,
+        name="robust-velocity-bound",
+    )
+    robust_velocity_invariance = ProofObligation(
+        name="robust-velocity-bound:one-step-invariance",
+        state=(q, v),
+        expression=robust_velocity_barrier.subs(nominal_next, simultaneous=True)
+        + robust_velocity_drift,
+        comparison="<=",
+        region=robust_velocity_bound_set,
+        description=(
+            "max_w |v3+| = |v3_nom+| + dt*w <= (reach + w)*dt on {|v3| <= reach*dt}: "
+            "the vertical velocity bound B3 = reach*dt, reach = max(u3Max-g, g-u3Min), "
+            "enlarges to the robust (reach + w)*dt, and the worst-case disturbed "
+            "successor of the nominal velocity-bounded set stays within it for every "
+            "admissible w in W = [-w, w] (Tier-3 robust P2). The +dt*w gust is exactly "
+            "absorbed by the enlargement."
+        ),
+    )
+
     disturbance_bound = AssumptionSpec(
         id="disturbance-within-wind-bound",
         name="additive disturbance within the wind bound",
@@ -1748,10 +1785,28 @@ def drone_vertical_disturbed_geofence_problem(
             "the guard band (robust analogue of spec G dtSmall)."
         ),
     )
+    nominal_velocity_bound_assumption = AssumptionSpec(
+        id="velocity-within-nominal-self-reproducing-bound",
+        name="vertical speed within the nominal self-reproducing velocity bound",
+        role="domain",
+        expression=expression_spec(sp.Abs(v)),
+        comparison="<=",
+        rhs=float(nominal_velocity_bound),
+        variables=(v.name,),
+        description=(
+            "|v3| <= B3 = reach*dt, reach = max(u3Max-g, g-u3Min): the robust P2 "
+            "obligation is asserted from the nominal self-reproducing vertical velocity "
+            "bound (spec G velBound, asymmetric reach), the largest set one disturbed "
+            "step keeps within the enlarged (reach + w)*dt. A coasting interior step "
+            "(hover cancels gravity) under persistent wind grows the speed by dt*w, so "
+            "the enlarged bound is not self-reproducing from itself; the nominal bound "
+            "is the honest precondition (plane-expressible in (q3, v3))."
+        ),
+    )
 
     problem = verification_problem_from_obligations(
         "drone disturbed vertical geofence axis",
-        (robust_forward_invariance, initial_containment),
+        (robust_forward_invariance, initial_containment, robust_velocity_invariance),
         system=dynamics,
         specification=specification,
         assumptions=(
@@ -1759,6 +1814,7 @@ def drone_vertical_disturbed_geofence_problem(
             robust_speed_bound,
             drift_inner_interval,
             robust_braking,
+            nominal_velocity_bound_assumption,
         ),
         obligation_assumptions={
             "geofence-barrier:robust-forward-invariance": (
@@ -1768,6 +1824,10 @@ def drone_vertical_disturbed_geofence_problem(
                 "robust-braking-displacement-fits-guard-band",
             ),
             "geofence-barrier:initial-containment": (),
+            "robust-velocity-bound:one-step-invariance": (
+                "disturbance-within-wind-bound",
+                "velocity-within-nominal-self-reproducing-bound",
+            ),
         },
         metadata={"verificationModel": "drone-disturbed-vertical-geofence-axis"},
     )
@@ -1787,6 +1847,16 @@ def drone_vertical_disturbed_geofence_problem(
                 obligation_id_by_name["geofence-barrier:initial-containment"],
             ),
             region_id=region_id_by_name["geofence"],
+        ),
+        CandidateSpec(
+            id="robust-velocity-bound-barrier",
+            name="robust-velocity-bound-barrier",
+            kind="barrier",
+            expression=expression_spec(robust_velocity_barrier),
+            obligation_ids=(
+                obligation_id_by_name["robust-velocity-bound:one-step-invariance"],
+            ),
+            region_id=region_id_by_name["robust-velocity-bound"],
         ),
     )
     problem = replace(problem, candidates=candidates)

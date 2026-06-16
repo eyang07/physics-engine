@@ -759,12 +759,16 @@ def test_generation_publishes_complete_vertical_disturbance_robust_package(
     assert problem.dynamics is not None and problem.dynamics.kind == "discrete"
     assert {variable.name for variable in problem.variables} == {"q3", "v3"}
     assert {parameter.name for parameter in problem.parameters} == {"w3"}
-    assert {candidate.id for candidate in problem.candidates} == {"geofence-barrier"}
+    assert {candidate.id for candidate in problem.candidates} == {
+        "geofence-barrier",
+        "robust-velocity-bound-barrier",
+    }
     assert {assumption.id for assumption in problem.assumptions} == {
         "disturbance-within-wind-bound",
         "robust-speed-within-tightened-guard-reach",
         "operating-within-geofence-inner-interval",
         "robust-braking-displacement-fits-guard-band",
+        "velocity-within-nominal-self-reproducing-bound",
     }
     # It renders on the (q3, v3) altitude plane, covering every region.
     assert {geometry.region_id for geometry in problem.region_geometry} == {
@@ -798,6 +802,28 @@ def test_generation_publishes_complete_vertical_disturbance_robust_package(
     assert robust_status.status == "measured-holds"
     assert robust_status.worst_margin is not None and robust_status.worst_margin >= 0.0
     assert robust_status.sample_count > 0
+
+    # The robust vertical P2 (BE-055) enlarges the asymmetric velocity bound to
+    # (reach + w)*dt and cites the disturbance bound; it measure-holds with a
+    # nonnegative worst-case signed margin within the nominal bound it is asserted
+    # from.
+    robust_p2 = next(
+        obligation
+        for obligation in problem.obligations
+        if obligation.id == "robust-velocity-bound-one-step-invariance"
+    )
+    assert "disturbance-within-wind-bound" in robust_p2.assumption_ids
+    robust_p2_status = next(
+        status
+        for status in problem.proof_statuses
+        if status.obligation_id == "robust-velocity-bound-one-step-invariance"
+    )
+    assert robust_p2_status.status == "measured-holds"
+    assert (
+        robust_p2_status.worst_margin is not None
+        and robust_p2_status.worst_margin >= 0.0
+    )
+    assert robust_p2_status.sample_count > 0
 
     index = read_package_index(tmp_path)
     assert "drone-disturbed-vertical-geofence-axis" in {
