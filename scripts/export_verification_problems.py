@@ -56,6 +56,7 @@ from systems.drone_point_mass import (
     horizontal_axis_rollout,
     horizontal_axis_system,
     horizontal_disturbed_axis_closed_loop,
+    horizontal_plane_disturbed_coasting,
     horizontal_plane_rollout,
     vertical_axis_closed_loop,
     vertical_axis_rollout,
@@ -1758,6 +1759,245 @@ def drone_vertical_disturbed_geofence_trajectory(
     return time, result.states
 
 
+def drone_disturbed_obstacle_keepout_problem(
+    params: DroneParams = DroneParams(),
+    obstacle: ObstacleSpec = DEFAULT_OBSTACLE,
+    disturbance: DisturbanceSpec = DEFAULT_DISTURBANCE,
+) -> VerificationProblem:
+    """Tier-3 disturbance-robust obstacle keep-out on the ``(q1, q2)`` plane.
+
+    Combines the BE-048 obstacle keep-out with the BE-049 disturbance regime: in
+    the geofence interior the guard band commands zero thrust, so one coupled step
+    is the disturbed coasting drift ``q+ = q + dt v + dt^2/2 w`` with the planar
+    velocity ``(v1, v2)`` and disturbance ``(w1, w2)`` bounded parameters of the
+    set-valued map. The keep-out avoidance obligation is *robust*: it must hold for
+    every admissible velocity (``|v| <= Vmax = sqrt(2)*Bh``) and disturbance
+    (``|w| <= sqrt(2)*w``).
+
+    The worst-case displacement of one step is ``dt*Vmax + dt^2/2*sqrt(2)*w``, so
+    ``max_{v,w} B_obs(q+) = rho - |q - c| + dt*Vmax + dt^2/2*sqrt(2)*w`` — both
+    worst cases baked in analytically, leaving the obligation expression in
+    ``(q1, q2)`` alone. It samples that within the standoff annulus and the
+    geofence interior; the velocity and disturbance bounds are non-plane
+    assumptions left for external discharge. Every obligation is
+    ``external-required`` and the keep-out barrier is a candidate only. Renders on
+    the ``(q1, q2)`` plane.
+    """
+
+    disturbance.assert_authority(params)
+    q1, q2 = DRONE_STATE[0], DRONE_STATE[1]
+    dynamics = horizontal_plane_disturbed_coasting(params, disturbance)
+    v1, v2, w1, w2 = dynamics.parameters
+    r = _drone_rational
+    dt = r(params.timestep)
+    cx, cy = obstacle.center
+    rho = r(obstacle.radius)
+    standoff = r(obstacle.standoff_radius)
+    # Worst-case planar speed and disturbance, and the total displacement one
+    # disturbed coasting step of those can produce.
+    speed_max = sp.sqrt(2) * r(params.horizontal_velocity_bound)
+    disturbance_max = sp.sqrt(2) * r(disturbance.bound)
+    drift = dt * speed_max + dt**2 / 2 * disturbance_max
+
+    dist = sp.sqrt((q1 - r(cx)) ** 2 + (q2 - r(cy)) ** 2)
+    keepout_expression = rho - dist
+    standoff_expression = standoff - dist
+    keepout_set = SublevelSet(
+        state=(q1, q2), expression=keepout_expression, level=0.0, name="keep-out"
+    )
+    standoff_set = SublevelSet(
+        state=(q1, q2), expression=standoff_expression, level=0.0, name="standoff"
+    )
+    specification = SafetySpecification(
+        state=(q1, q2), safe_set=keepout_set, initial_set=standoff_set
+    )
+
+    avoidance = ProofObligation(
+        name="obstacle-keepout:robust-one-step-avoidance",
+        state=(q1, q2),
+        expression=keepout_expression + drift,
+        comparison="<=",
+        region=keepout_set,
+        description=(
+            "rho - |q - c| + dt*Vmax + dt^2/2*sqrt(2)*w <= 0 on {B_obs <= 0}: the "
+            "worst-case one-step disturbed coasting drift keeps the drone outside the "
+            "obstacle for every admissible velocity and disturbance (Tier-3 robust P4)."
+        ),
+    )
+    initial_containment = ProofObligation(
+        name="obstacle-keepout:initial-containment",
+        state=(q1, q2),
+        expression=keepout_expression,
+        comparison="<=",
+        region=standoff_set,
+        description=(
+            "B_obs <= 0 on the standoff annulus: the operating region lies outside "
+            "the obstacle."
+        ),
+    )
+
+    speed_bound = AssumptionSpec(
+        id="planar-speed-within-velocity-bound",
+        name="planar speed within the closed-loop velocity bound",
+        role="domain",
+        expression=expression_spec(sp.sqrt(v1**2 + v2**2)),
+        comparison="<=",
+        rhs=float(speed_max),
+        variables=("v1", "v2"),
+        description=(
+            "Planar speed stays within Vmax = sqrt(2)*Bh, the per-axis closed-loop "
+            "velocity bound, so one coasting step drifts at most dt*Vmax (spec G "
+            "velBound). Not plane-expressible in (q1, q2); left for external discharge."
+        ),
+    )
+    disturbance_bound = AssumptionSpec(
+        id="planar-disturbance-within-wind-bound",
+        name="planar disturbance within the wind bound",
+        role="domain",
+        expression=expression_spec(sp.sqrt(w1**2 + w2**2)),
+        comparison="<=",
+        rhs=float(disturbance_max),
+        variables=("w1", "w2"),
+        description=(
+            "|w| <= sqrt(2)*w: the matched additive disturbance stays within the "
+            "planar wind box W = [-w, w]^2; the robust avoidance claim is quantified "
+            "over every admissible (w1, w2) in W (spec Tier-3 disturbance set). Not "
+            "plane-expressible in (q1, q2); left for external discharge."
+        ),
+    )
+    maintains_standoff = AssumptionSpec(
+        id="drone-maintains-obstacle-standoff",
+        name="drone keeps the standoff distance from the obstacle",
+        role="domain",
+        expression=expression_spec(standoff_expression),
+        comparison="<=",
+        rhs=0.0,
+        variables=("q1", "q2"),
+        description=(
+            "|q - c| >= R: the drone operates outside the standoff annulus, the "
+            "region the one-step keep-out argument is asserted within (analogous to "
+            "the geofence speed bound)."
+        ),
+    )
+    q1_min, q1_max = params.q1_bounds
+    q2_min, q2_max = params.q2_bounds
+    band = r(params.horizontal_band)
+    interior = AssumptionSpec(
+        id="operating-region-within-guard-band-interior",
+        name="operating region lies in the guard-band interior",
+        role="domain",
+        expression=expression_spec(
+            sp.Max(
+                r(q1_min) + band - q1,
+                q1 - (r(q1_max) - band),
+                r(q2_min) + band - q2,
+                q2 - (r(q2_max) - band),
+            )
+        ),
+        comparison="<=",
+        rhs=0.0,
+        variables=("q1", "q2"),
+        description=(
+            "q in [qMin+dh, qMax-dh]^2: the obstacle and its standoff lie in the "
+            "geofence interior, where the guard band commands zero thrust so the "
+            "closed-loop step is the pure disturbed coasting drift."
+        ),
+    )
+    standoff_margin = AssumptionSpec(
+        id="standoff-exceeds-worst-case-drift",
+        name="standoff radius leaves room for one worst-case disturbed drift step",
+        role="parameter-domain",
+        expression=expression_spec(rho + drift),
+        comparison="<=",
+        rhs=float(standoff),
+        variables=(),
+        description=(
+            "rho + dt*Vmax + dt^2/2*sqrt(2)*w <= R: the standoff radius exceeds the "
+            "obstacle radius by more than one worst-case disturbed coasting step "
+            "(precondition of robust one-step avoidance)."
+        ),
+    )
+
+    problem = verification_problem_from_obligations(
+        "drone disturbed obstacle keepout",
+        (avoidance, initial_containment),
+        system=dynamics,
+        specification=specification,
+        assumptions=(
+            speed_bound,
+            disturbance_bound,
+            maintains_standoff,
+            interior,
+            standoff_margin,
+        ),
+        obligation_assumptions={
+            "obstacle-keepout:robust-one-step-avoidance": (
+                "planar-speed-within-velocity-bound",
+                "planar-disturbance-within-wind-bound",
+                "drone-maintains-obstacle-standoff",
+                "operating-region-within-guard-band-interior",
+                "standoff-exceeds-worst-case-drift",
+            ),
+            "obstacle-keepout:initial-containment": (),
+        },
+        metadata={"verificationModel": "drone-disturbed-obstacle-keepout"},
+    )
+
+    region_id_by_name = {region.name: region.id for region in problem.regions}
+    obligation_id_by_name = {
+        obligation.name: obligation.id for obligation in problem.obligations
+    }
+    candidates = (
+        CandidateSpec(
+            id="obstacle-keepout-barrier",
+            name="obstacle-keepout-barrier",
+            kind="barrier",
+            expression=expression_spec(keepout_expression),
+            obligation_ids=(
+                obligation_id_by_name["obstacle-keepout:robust-one-step-avoidance"],
+                obligation_id_by_name["obstacle-keepout:initial-containment"],
+            ),
+            region_id=region_id_by_name["keep-out"],
+        ),
+    )
+    problem = replace(problem, candidates=candidates)
+
+    geometry = scalar_field_region_geometries(
+        problem.regions,
+        projection="phase",
+        plane_variables=("q1", "q2"),
+        variable_to_state_axis=_DRONE_PLANE_PHASE_AXES,
+        x_range=(-1.1, 1.1),
+        y_range=(-1.1, 1.1),
+        samples=(81, 81),
+    )
+    problem = replace(problem, region_geometry=geometry)
+    # The robust avoidance claim holds only where the standoff and interior
+    # assumptions hold; sample within that region (the velocity and disturbance
+    # bounds are external-required).
+    return replace(
+        problem,
+        proof_statuses=sampled_region_proof_statuses(
+            problem, restrict_to_assumption_regions=True
+        ),
+    )
+
+
+def drone_disturbed_obstacle_keepout_trajectory(
+    params: DroneParams = DroneParams(),
+) -> tuple[np.ndarray, np.ndarray]:
+    """Integrate the nominal coupled-plane guard-band loop; columns ``(q1, q2)``.
+
+    The animated path is one admissible realization — the nominal undisturbed
+    rollout (the BE-048 pass above the obstacle) — that the robust keep-out claim
+    must hold around. Discrete-time axis: step ``k`` maps to ``k * dt``.
+    """
+
+    result = horizontal_plane_rollout(params)
+    time = result.steps.astype(float) * params.timestep
+    return time, result.states[:, :2]
+
+
 def viewer_verification_examples() -> tuple[ViewerVerificationExample, ...]:
     """Every self-contained verification problem exported to the viewer."""
 
@@ -1801,6 +2041,11 @@ def viewer_verification_examples() -> tuple[ViewerVerificationExample, ...]:
             problem_factory=drone_vertical_disturbed_geofence_problem,
             trajectory_factory=drone_vertical_disturbed_geofence_trajectory,
             variable_to_state_axis=_DRONE_VERTICAL_PHASE_AXES,
+        ),
+        ViewerVerificationExample(
+            problem_factory=drone_disturbed_obstacle_keepout_problem,
+            trajectory_factory=drone_disturbed_obstacle_keepout_trajectory,
+            variable_to_state_axis=_DRONE_PLANE_PHASE_AXES,
         ),
     )
 

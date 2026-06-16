@@ -772,4 +772,43 @@ def horizontal_plane_rollout(
     )
 
 
+# --- Tier-3 disturbance-robust coupled-plane coasting (obstacle keep-out) ---
+#
+# The Tier-3 analogue of the BE-048 interior coasting model: in the geofence
+# interior the guard band commands zero thrust, so the matched additive
+# disturbance `(w1, w2)` is the only acceleration on the `(q1, q2)` step. The
+# closed loop is set-valued — one successor per admissible disturbance — so a
+# robust keep-out must hold for every `(w1, w2) in W = [-w, w]^2`.
+
+_PLANE_DISTURBANCE = (_AXIS1_DISTURBANCE, sp.Symbol("w2", real=True))
+
+
+def horizontal_plane_disturbed_coasting(
+    params: DroneParams = DroneParams(),
+    disturbance: DisturbanceSpec = DEFAULT_DISTURBANCE,
+) -> DiscreteSystem:
+    """The disturbed interior coasting map on the ``(q1, q2)`` plane.
+
+    In the geofence interior the guard band commands zero thrust, so the matched
+    additive disturbance is the only acceleration: ``q+ = q + dt v + dt^2/2 w``,
+    with the planar velocity ``(v1, v2)`` and disturbance ``(w1, w2)`` bounded
+    parameters of the set-valued map.
+    """
+
+    disturbance.assert_authority(params)
+    q1, q2 = DRONE_STATE[0], DRONE_STATE[1]
+    v1, v2 = DRONE_STATE[3], DRONE_STATE[4]
+    w1, w2 = _PLANE_DISTURBANCE
+    dt = _rational(params.timestep)
+    update = (
+        q1 + dt * v1 + dt**2 / 2 * w1,
+        q2 + dt * v2 + dt**2 / 2 * w2,
+    )
+    return DiscreteSystem(
+        state=(q1, q2),
+        update=update,
+        parameters=(v1, v2, w1, w2),
+    )
+
+
 system = build_system()

@@ -236,27 +236,23 @@ braking margin) plus an initial-containment obligation, and measured
 `proofStatuses` that hold within their assumption region with a nonnegative
 worst-case signed margin. Nothing claims proof/certification.
 
-1. **BE-052: Tier-3 disturbance-robust obstacle keep-out on the coupled plane**
-   - Goal: BE-048 keeps the drone clear of the obstacle against a *nominal* coasting
-     plant; BE-049 made the geofence axis disturbance-robust. Combine them: add a
-     Tier-3 obstacle keep-out on the coupled `(q1, q2)` plane where the coasting
-     step gains the matched additive disturbance, so the keep-out avoidance
-     obligation is *robust* — the worst-case one-step displacement absorbs both the
-     bounded velocity and the disturbance (`rho - |q - c| + dt*Vmax + dt^2/2*sqrt(2)*w`).
-     This is the first coupled worst-case avoidance problem. Keep candidates
-     candidate and obligations external-required.
-   - Scope: `systems/drone_point_mass.py` (a disturbed coupled `(q1, q2)` coasting
-     sub-dynamics carrying the planar disturbance and its bound),
-     `scripts/export_verification_problems.py` (the robust keep-out problem reusing
-     the BE-048 standoff/interior assumptions plus the disturbance bound, and a
-     nominal trajectory), and `tests/`.
-   - Acceptance: generation publishes a complete, contract-valid robust keep-out
-     package whose avoidance obligation cites the disturbance bound and measures
-     worst-case margin across the disturbance set, holding within the standoff
-     annulus on the `(q1, q2)` plane; nothing claims proof/certification; generated
-     data stays uncommitted; focused tests pass.
+BE-052 is done: the first coupled worst-case avoidance problem is published.
+`systems/drone_point_mass.py` gained `horizontal_plane_disturbed_coasting` — the
+disturbed interior coasting map on the `(q1, q2)` plane carrying the planar
+velocity `(v1, v2)` and disturbance `(w1, w2)` as bounded parameters of the
+set-valued map. `scripts/export_verification_problems.py` added
+`drone_disturbed_obstacle_keepout_problem` + its nominal trajectory, registered as
+a ninth viewer example, reusing the BE-048 standoff/interior assumptions plus the
+disturbance bound. The published `drone-disturbed-obstacle-keepout` package carries
+the keep-out barrier candidate and a robust avoidance obligation baking in both
+worst cases `rho - |q - c| + dt*Vmax + dt^2/2*sqrt(2)*w` (cites the planar velocity
+bound and the planar disturbance bound, both non-plane/external-required, plus the
+standoff annulus, interior, and the disturbance-aware standoff margin) plus an
+initial-containment obligation, and measured `proofStatuses` that hold within the
+standoff annulus with a nonnegative worst-case signed margin. Nothing claims
+proof/certification.
 
-2. **BE-053: Robust self-reproducing velocity-bound (P2) obligation for the
+1. **BE-053: Robust self-reproducing velocity-bound (P2) obligation for the
    disturbed geofence axis**
    - Goal: BE-049's disturbed horizontal package proves robust *forward
      invariance* (P1) but drops the velocity-bound (P2) obligation the nominal
@@ -274,3 +270,22 @@ worst-case signed margin. Nothing claims proof/certification.
      worst-case signed margin and cites the disturbance bound; the existing P1 and
      initial-containment obligations are unchanged; nothing claims
      proof/certification; generated data stays uncommitted; focused tests pass.
+
+2. **BE-054: Discovery-index Tier/regime metadata for the package catalog**
+   - Goal: The package discovery index (`packages.index.json`, BE-045) lists every
+     package by model/status/counts, but a reader cannot tell a Tier-1 nominal
+     geofence package from a Tier-3 disturbance-robust one without opening each
+     manifest. The flagship now spans nominal (Tier-1/2) and robust (Tier-3)
+     regimes across five drone packages; surface that. Add an optional, honest
+     descriptor to each index entry — e.g. whether the package carries a
+     disturbance parameter / set-valued dynamics and a quantified-over-disturbance
+     obligation — derived only from data already in the IR. Pure cataloging; claim
+     nothing beyond the rigor of the packages it lists.
+   - Scope: `engine/export/verification_package.py` (extend `PackageIndexEntry`
+     and `build_package_index` with the derived descriptor, keeping it optional and
+     backward-compatible; `read_package_index` validates it), and `tests/`.
+   - Acceptance: the discovery index records the new descriptor for every package,
+     correctly distinguishing the disturbance-robust packages from the nominal ones
+     from IR data alone; `read_package_index` round-trips and validates it; nothing
+     claims proof/certification; generated data stays uncommitted; focused tests
+     pass.

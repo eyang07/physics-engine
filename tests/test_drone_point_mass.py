@@ -25,6 +25,7 @@ from systems.drone_point_mass import (
     horizontal_axis_system,
     horizontal_disturbed_axis_closed_loop,
     horizontal_disturbed_axis_system,
+    horizontal_plane_disturbed_coasting,
     horizontal_plane_closed_loop,
     horizontal_plane_rollout,
     horizontal_plane_system,
@@ -377,6 +378,22 @@ def test_disturbed_closed_loop_retains_w1_as_a_parameter() -> None:
     assert sp.simplify(
         closed.update[1].subs(interior) - (sp.Rational(1, 8) + dt * w1)
     ) == 0
+
+
+def test_disturbed_plane_coasting_carries_velocity_and_disturbance_parameters() -> None:
+    coasting = horizontal_plane_disturbed_coasting(disturbance=DisturbanceSpec(bound=0.5))
+    q1, q2 = DRONE_STATE[0], DRONE_STATE[1]
+    v1, v2 = DRONE_STATE[3], DRONE_STATE[4]
+    assert isinstance(coasting, DiscreteSystem)
+    assert coasting.state == (q1, q2)
+    # The planar velocity and disturbance are both bounded parameters of the
+    # set-valued interior coasting map.
+    assert {p.name for p in coasting.parameters} == {"v1", "v2", "w1", "w2"}
+    w1 = next(p for p in coasting.parameters if p.name == "w1")
+    w2 = next(p for p in coasting.parameters if p.name == "w2")
+    dt = sp.Rational(1, 4)
+    assert sp.simplify(coasting.update[0] - (q1 + dt * v1 + dt**2 / 2 * w1)) == 0
+    assert sp.simplify(coasting.update[1] - (q2 + dt * v2 + dt**2 / 2 * w2)) == 0
 
 
 def test_disturbance_spec_enforces_the_vertical_authority_condition() -> None:

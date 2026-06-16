@@ -661,3 +661,78 @@ def test_generation_publishes_complete_vertical_disturbance_robust_package(
     assert "drone-disturbed-vertical-geofence-axis" in {
         entry.problem_id for entry in index.entries
     }
+
+
+def test_generation_publishes_complete_disturbed_obstacle_package(tmp_path) -> None:
+    # The first coupled worst-case avoidance problem (BE-052): the BE-048 obstacle
+    # keep-out under the BE-049 disturbance regime on the coupled (q1, q2) plane.
+    manifests = write_verification_packages_for_examples(tmp_path)
+    disturbed = next(
+        m for m in manifests if m.problem_id == "drone-disturbed-obstacle-keepout"
+    )
+    assert disturbed.model == "drone-disturbed-obstacle-keepout"
+    assert disturbed.status == "candidate"
+
+    package = read_package(tmp_path / "drone-disturbed-obstacle-keepout")
+    problem = package.problem
+
+    # The disturbed coasting map is set-valued: both the planar velocity and the
+    # planar disturbance are bounded parameters of the (q1, q2) discrete dynamics.
+    assert problem.dynamics is not None and problem.dynamics.kind == "discrete"
+    assert {variable.name for variable in problem.variables} == {"q1", "q2"}
+    assert {parameter.name for parameter in problem.parameters} == {
+        "v1",
+        "v2",
+        "w1",
+        "w2",
+    }
+    assert {candidate.id for candidate in problem.candidates} == {
+        "obstacle-keepout-barrier"
+    }
+    assert {assumption.id for assumption in problem.assumptions} == {
+        "planar-speed-within-velocity-bound",
+        "planar-disturbance-within-wind-bound",
+        "drone-maintains-obstacle-standoff",
+        "operating-region-within-guard-band-interior",
+        "standoff-exceeds-worst-case-drift",
+    }
+    # It renders on the (q1, q2) plane, covering every region.
+    assert {geometry.region_id for geometry in problem.region_geometry} == {
+        region.id for region in problem.regions
+    }
+    assert all(
+        geometry.plane_variables == ("q1", "q2")
+        for geometry in problem.region_geometry
+    )
+
+    # The engine proposes; it never disposes.
+    assert {obligation.rigor for obligation in problem.obligations} == {
+        "external-required"
+    }
+    assert {candidate.status for candidate in problem.candidates} == {"candidate"}
+    assert {status.rigor for status in problem.proof_statuses} == {"measured"}
+
+    # The robust avoidance obligation cites the disturbance bound and measures a
+    # worst-case-over-(velocity, disturbance) signed margin that holds.
+    avoidance = next(
+        obligation
+        for obligation in problem.obligations
+        if obligation.id == "obstacle-keepout-robust-one-step-avoidance"
+    )
+    assert "planar-disturbance-within-wind-bound" in avoidance.assumption_ids
+    avoidance_status = next(
+        status
+        for status in problem.proof_statuses
+        if status.obligation_id == "obstacle-keepout-robust-one-step-avoidance"
+    )
+    assert avoidance_status.status == "measured-holds"
+    assert (
+        avoidance_status.worst_margin is not None
+        and avoidance_status.worst_margin >= 0.0
+    )
+    assert avoidance_status.sample_count > 0
+
+    index = read_package_index(tmp_path)
+    assert "drone-disturbed-obstacle-keepout" in {
+        entry.problem_id for entry in index.entries
+    }
