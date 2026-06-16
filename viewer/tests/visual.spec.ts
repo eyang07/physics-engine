@@ -276,9 +276,9 @@ for (const viewport of [
       page.getByRole("heading", { name: /upright pendulum safety/i }),
     ).toBeVisible();
 
-    // The summary leads with the safety properties and their measured outcomes,
+    // The dossier leads with the proof obligations and their measured outcomes,
     // honestly labeled (a clean sample is evidence, never a discharge).
-    await expect(page.getByRole("heading", { name: /safety properties/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /proof obligations/i })).toBeVisible();
     await expect(page.locator("#verifLedger .verif-status").first()).toBeVisible();
 
     // Switching back returns to the Systems workbench on the default pendulum.
@@ -1083,6 +1083,9 @@ for (const viewport of [
     await page.getByRole("button", { name: "Verification" }).click();
     await page.waitForSelector("#verificationSummary .verif-summary");
 
+    // Exports live in the collapsed appendix; open it first.
+    await openVerificationDetails(page);
+
     // The download targets the IR artifact (.ir.json), not the viewer payload.
     const download = page.locator(".verif-download-ir");
     await expect(download).toBeVisible();
@@ -1139,6 +1142,9 @@ for (const viewport of [
     await page.getByRole("button", { name: "Verification" }).click();
     await page.waitForSelector("#verificationSummary .verif-summary");
 
+    // Exports live in the collapsed appendix; open it first.
+    await openVerificationDetails(page);
+
     // The package export is visibly distinct from the IR download and lists the
     // components the bundle indexes, claiming no discharge.
     await expect(page.locator(".verif-download-ir")).toBeVisible();
@@ -1191,6 +1197,9 @@ for (const viewport of [
     await page.waitForSelector("#systemsDomain.domain--active");
     await page.getByRole("button", { name: "Verification" }).click();
     await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // Exports live in the collapsed appendix; open it first.
+    await openVerificationDetails(page);
 
     await expect(page.locator(".verif-download-package")).toHaveCount(0);
     await expect(page.locator(".verif-download-ir")).toBeVisible();

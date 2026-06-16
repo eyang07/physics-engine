@@ -93,3 +93,73 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
+
+/*
+ * Verification "dossier" — a light, typeset report register, scoped to the
+ * Verification domain ONLY. The Systems gallery keeps the dark :root chrome.
+ * We remap the shared chrome tokens to a cool-vellum / blue-graphite-ink palette
+ * so the shared catalog/stage/panel classes render light without rewriting every
+ * rule, then add dossier-specific styling in styles.css. Mirrors the canvas
+ * figure palette in design/dossier.ts — keep the two in step.
+ *
+ * Color is the taxonomy: the four status hues each encode one true thing about a
+ * claim's standing, and are the only saturated color in the view.
+ */
+#verificationDomain {
+  /* Light neutrals (paper field -> panel surface). */
+  --ink-900: #fafbfc;
+  --ink-850: #f3f5f7;
+  --ink-800: #ffffff;
+  --ink-750: #eef1f4;
+  --ink-700: #e9edf0;
+  --ink-650: #e2e7eb;
+
+  --paper-bg: #e7ebee;
+  --paper: #fafbfc;
+
+  /* Print-grade surfaces + hairlines (dark-on-light). */
+  --surface-frost: #ffffff;
+  --surface-frost-strong: #f3f6f8;
+  --hairline: #d2dae0;
+  --hairline-strong: #b9c4cd;
+
+  /* Blue-graphite ink. */
+  --text-primary: #16212b;
+  --text-muted: #586573;
+  --text-faint: rgba(22, 33, 43, 0.5);
+
+  /* Semantic status system — the only saturated color in the view. */
+  --measured: #15706b;
+  --candidate: #8a5a22;
+  --required: #50457e;
+  --violated: #9e382c;
+  --measured-tint: rgba(21, 112, 107, 0.1);
+  --candidate-tint: rgba(138, 90, 34, 0.1);
+  --required-tint: rgba(80, 69, 126, 0.1);
+  --violated-tint: rgba(158, 56, 44, 0.1);
+
+  /* "Accent" is mapped to measured-teal; structural cool -> required-indigo.
+     No glow on paper. */
+  --accent: #15706b;
+  --accent-strong: #0f5752;
+  --accent-dim: rgba(21, 112, 107, 0.12);
+  --glow-accent: none;
+  --cool: #50457e;
+  --cool-dim: rgba(80, 69, 126, 0.12);
+
+  /* Soft, light-theme elevation. */
+  --shadow-panel: 0 18px 48px rgba(22, 33, 43, 0.12);
+  --shadow-card: 0 8px 22px rgba(22, 33, 43, 0.08);
+
+  /* The dossier is set in Computer Modern (same face as the math via KaTeX):
+     prose and headings adopt the serif, identifiers/data stay mono. Remapping
+     the display/sans tokens flips every shared rule in this domain to the serif
+     voice without touching each selector; --font-mono is left untouched. */
+  --font-serif: "KaTeX_Main", Georgia, "Times New Roman", serif;
+  --font-display: "KaTeX_Main", Georgia, "Times New Roman", serif;
+  --font-sans: "KaTeX_Main", Georgia, "Times New Roman", serif;
+
+  color: var(--text-primary);
+  background: var(--paper-bg);
+  font-family: var(--font-serif);
+}

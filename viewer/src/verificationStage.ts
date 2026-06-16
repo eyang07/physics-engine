@@ -7,13 +7,38 @@
  * world from the Systems gallery: it renders only verification data and never
  * re-derives physics.
  */
-import { drawStageBackground } from "./pendulumCanvas";
 import { PlaybackClock, sampleTrajectory, trajectoryDuration } from "./playback";
 import { CertificateLanes } from "./certificateLanes";
-import { theme } from "./design/theme";
+import { dossier, dossierRole } from "./design/dossier";
 import type { ProofStatus, RegionGeometry, VerificationProblem } from "./data/verification";
 import type { Trajectory } from "./data/trajectory";
 import { clamp, formatMeasured } from "./util";
+
+// The light dossier figure ground: cool paper with a faint hairline grid, drawn
+// in place of the dark chrome stage background so the figure reads as a typeset
+// plate rather than an instrument screen.
+function drawDossierBackground(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): void {
+  ctx.fillStyle = dossier.paper;
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = dossier.grid;
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= width; x += 36) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= height; y += 36) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+}
 
 type Bounds = {
   minX: number;
@@ -24,7 +49,7 @@ type Bounds = {
 
 type ViolationMarker = { x: number; y: number; label: string; worstValue: number | null };
 
-const VIOLATION_RGBA = "rgba(232, 86, 70, 0.95)";
+const VIOLATION_RGBA = dossier.violated;
 
 // A measured violation sample only belongs on the stage if its worst sampled
 // point projects onto the two axes this stage actually plots (state[0] vs
@@ -100,7 +125,7 @@ function drawViolationMarkers(
       ctx.shadowBlur = 0;
     }
     ctx.lineWidth = 4;
-    ctx.strokeStyle = "rgba(12, 14, 20, 0.6)";
+    ctx.strokeStyle = "rgba(250, 251, 252, 0.9)";
     ctx.beginPath();
     ctx.arc(cx, cy, 7, 0, Math.PI * 2);
     ctx.stroke();
@@ -123,17 +148,15 @@ function drawViolationMarkers(
   });
 }
 
-const ROLE_RGB: Record<string, string> = {
-  domain: "138, 148, 166",
-  safe: "240, 180, 106",
-  initial: "111, 182, 201",
-  unsafe: "201, 92, 78",
-};
-
+// Region roles are drawn from the dossier semantic palette (see design/dossier).
 const ROLE_DRAW_ORDER = ["domain", "safe", "initial", "unsafe"];
 
-// The trajectory is drawn with the theme accent; mirror it in the legend.
-const TRAJECTORY_RGB = "240, 180, 106";
+function roleStyle(role: string): { stroke: string; fill: string } {
+  return dossierRole[role] ?? dossierRole.domain;
+}
+
+// The controlled rollout is drawn in ink; mirror it in the legend.
+const TRAJECTORY_COLOR = dossier.ink;
 
 // Frame the stage to the action: the trajectory plus the safe/initial sets it is
 // meant to stay within. The far unsafe/domain grids are deliberately excluded
@@ -191,12 +214,12 @@ function drawRegionGeometry(
     ...regions.filter((region) => !ROLE_DRAW_ORDER.includes(region.role)),
   ];
 
-  // Outlines only — the per-cell shading read as visual noise. Each region's
-  // boundary is drawn in its role color; the legend names what each color means.
-  ctx.lineWidth = 1.6;
+  // Each region is a filled set under a firmer outline, so the safe/initial
+  // corridors read as areas (a journal figure), not bare contours. Color is the
+  // role's semantic dossier hue; the legend names what each means.
   ctx.lineJoin = "round";
   ordered.forEach((region) => {
-    ctx.strokeStyle = `rgba(${ROLE_RGB[region.role] ?? ROLE_RGB.domain}, 0.9)`;
+    const style = roleStyle(region.role);
     region.boundaryPolylines.forEach((polyline) => {
       ctx.beginPath();
       polyline.forEach(([x, y], index) => {
@@ -208,6 +231,11 @@ function drawRegionGeometry(
           ctx.lineTo(sx, sy);
         }
       });
+      ctx.closePath();
+      ctx.fillStyle = style.fill;
+      ctx.fill();
+      ctx.strokeStyle = style.stroke;
+      ctx.lineWidth = 1.4;
       ctx.stroke();
     });
   });
@@ -225,9 +253,9 @@ function drawVerificationPhaseScene(
   markers: ViolationMarker[],
   focusedIndex: number | null,
 ): void {
-  drawStageBackground(ctx, width, height);
+  drawDossierBackground(ctx, width, height);
   const plot = {
-    left: Math.max(34, width * 0.08),
+    left: Math.max(38, width * 0.09),
     right: width - Math.max(26, width * 0.06),
     top: Math.max(28, height * 0.09),
     bottom: height - Math.max(42, height * 0.12),
@@ -238,7 +266,7 @@ function drawVerificationPhaseScene(
   const mapY = (value: number) => plot.bottom - ((value - bounds.minY) / spanY) * (plot.bottom - plot.top);
 
   ctx.save();
-  ctx.strokeStyle = theme.hairlineStrong;
+  ctx.strokeStyle = dossier.ink;
   ctx.lineWidth = 1;
   ctx.strokeRect(plot.left, plot.top, plot.right - plot.left, plot.bottom - plot.top);
   ctx.restore();
@@ -249,6 +277,7 @@ function drawVerificationPhaseScene(
   const activeIndex = clamp(Math.round(phase * (count - 1)), 0, count - 1);
   const step = Math.max(1, Math.floor(count / 420));
 
+  // The controlled rollout — a clean ink line on paper, no glow.
   ctx.save();
   ctx.beginPath();
   for (let index = 0; index < count; index += step) {
@@ -261,25 +290,28 @@ function drawVerificationPhaseScene(
       ctx.lineTo(x, y);
     }
   }
-  ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 2;
-  ctx.shadowColor = theme.accent;
-  ctx.shadowBlur = 10;
+  ctx.strokeStyle = dossier.ink;
+  ctx.lineWidth = 1.75;
   ctx.stroke();
   ctx.restore();
 
+  // The playhead — a filled measured-teal dot ringed in paper so it stays
+  // legible over the rollout and the set washes.
   const active = trajectory.states[activeIndex] ?? trajectory.states[0];
-  ctx.fillStyle = theme.accentStrong;
-  ctx.shadowColor = theme.accent;
-  ctx.shadowBlur = 14;
+  const hx = mapX(active[0] ?? 0);
+  const hy = mapY(active[1] ?? 0);
   ctx.beginPath();
-  ctx.arc(mapX(active[0] ?? 0), mapY(active[1] ?? 0), 5, 0, Math.PI * 2);
+  ctx.arc(hx, hy, 5, 0, Math.PI * 2);
+  ctx.fillStyle = dossier.measured;
   ctx.fill();
-  ctx.shadowBlur = 0;
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = dossier.paper;
+  ctx.stroke();
 
   drawViolationMarkers(ctx, markers, mapX, mapY, focusedIndex);
 
-  ctx.fillStyle = theme.textMuted;
+  // Axis labels in the figure's own state names, set in mono.
+  ctx.fillStyle = dossier.graphite;
   ctx.font = '12px "IBM Plex Mono", monospace';
   ctx.fillText(trajectory.state_names[0] ?? "x", plot.right - 18, plot.bottom + 24);
   ctx.fillText(trajectory.state_names[1] ?? "y", plot.left - 24, plot.top + 10);
@@ -444,20 +476,20 @@ export class VerificationStage {
       this.rolesLegend.hidden = true;
       return;
     }
-    const entry = (rgb: string, label: string): HTMLElement => {
+    const entry = (color: string, label: string): HTMLElement => {
       const row = document.createElement("div");
       row.className = "verif-roles-legend__entry";
       const swatch = document.createElement("span");
       swatch.className = "verif-roles-legend__swatch";
-      swatch.style.background = `rgb(${rgb})`;
+      swatch.style.background = color;
       const name = document.createElement("span");
       name.className = "verif-roles-legend__name";
       name.textContent = label;
       row.append(swatch, name);
       return row;
     };
-    roles.forEach((role) => this.rolesLegend.append(entry(ROLE_RGB[role] ?? ROLE_RGB.domain, role)));
-    this.rolesLegend.append(entry(TRAJECTORY_RGB, "trajectory"));
+    roles.forEach((role) => this.rolesLegend.append(entry(roleStyle(role).stroke, role)));
+    this.rolesLegend.append(entry(TRAJECTORY_COLOR, "rollout"));
     this.rolesLegend.hidden = false;
   }
 
@@ -534,9 +566,9 @@ export class VerificationStage {
     const width = this.canvas.clientWidth;
     const height = this.canvas.clientHeight;
     if (!this.trajectory || !this.bounds) {
-      drawStageBackground(this.ctx, width, height);
-      this.ctx.fillStyle = theme.textMuted;
-      this.ctx.font = '16px "IBM Plex Sans", system-ui, sans-serif';
+      drawDossierBackground(this.ctx, width, height);
+      this.ctx.fillStyle = dossier.graphite;
+      this.ctx.font = '15px "KaTeX_Main", Georgia, serif';
       this.ctx.fillText("No trajectory for this problem.", 32, 48);
       return;
     }

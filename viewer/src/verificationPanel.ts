@@ -69,6 +69,15 @@ const RIGOR_LADDER: ReadonlyArray<{ level: number; title: string; note: string }
   },
 ];
 
+// Terse rung labels for the horizontal certification scale (the masthead
+// signature); the full titles ride along as tooltips.
+const CERTIFICATION_RUNG: Record<number, string> = {
+  1: "measured",
+  2: "certified numeric",
+  3: "certificate-accepted",
+  4: "deductively proved",
+};
+
 // The rigor ladder, rendered honestly. The engine never emits "proved" or
 // "certified"; these are the only labels it can produce, and we surface them
 // verbatim with a plain-language gloss.
@@ -165,6 +174,7 @@ export class VerificationPanel {
   onEvidenceSelect: (obligationId: string | null) => void = () => {};
 
   constructor(
+    private readonly mastheadEl: HTMLElement,
     private readonly summaryEl: HTMLElement,
     private readonly detailsEl: HTMLElement,
   ) {}
@@ -172,6 +182,7 @@ export class VerificationPanel {
   clear(): void {
     this.obligationCards.clear();
     this.assumptionCards.clear();
+    this.mastheadEl.replaceChildren();
     this.summaryEl.replaceChildren();
     this.detailsEl.replaceChildren();
   }
@@ -179,6 +190,7 @@ export class VerificationPanel {
   renderEmpty(message: string): void {
     this.obligationCards.clear();
     this.assumptionCards.clear();
+    this.mastheadEl.replaceChildren();
     this.detailsEl.replaceChildren();
     const empty = el("div", "verif-empty");
     empty.append(el("p", "verif-empty__title", "No verification problems"));
@@ -186,8 +198,9 @@ export class VerificationPanel {
     this.summaryEl.replaceChildren(empty);
   }
 
-  // Verdict-first: a concise summary (what's being proved + measured outcome +
-  // rigor) is always visible; the full IR math lives in a collapsed details band.
+  // The dossier: a masthead (claim + certification scale) spans the top, the
+  // proof-obligation table is the right column, and the full IR is a collapsed
+  // appendix below. Nothing here is proved; the masthead says so verbatim.
   render(
     problem: VerificationProblem,
     irPath: string | null = null,
@@ -197,18 +210,21 @@ export class VerificationPanel {
     this.assumptionCards.clear();
     this.selectedEvidenceObligation = null;
 
-    // Summary rail.
-    const summary = el("div", "verif-summary");
-    summary.append(this.renderSummaryHeader(problem, irPath, pkg));
-    if (problem.obligations.length > 0) {
-      summary.append(this.renderObligationLedger(problem));
-    }
-    this.summaryEl.replaceChildren(summary);
+    // Masthead band (full width above the figure + obligations).
+    this.mastheadEl.replaceChildren(this.renderMasthead(problem));
 
-    // Collapsible IR detail.
+    // Obligations column.
+    const obligations = el("div", "verif-summary");
+    if (problem.obligations.length > 0) {
+      obligations.append(this.renderObligationLedger(problem));
+    }
+    this.summaryEl.replaceChildren(obligations);
+
+    // Collapsed appendix: the full IR, plus the export affordances.
     const details = el("details", "verif-details");
-    details.append(el("summary", "verif-details__summary", "Problem details (IR)"));
+    details.append(el("summary", "verif-details__summary", "Appendix — problem record (IR)"));
     const body = el("div", "verif-details__body");
+    body.append(this.renderExports(problem, irPath, pkg));
     if (problem.dynamics) {
       body.append(this.renderDynamics(problem));
     }
@@ -230,26 +246,56 @@ export class VerificationPanel {
     this.detailsEl.replaceChildren(details);
   }
 
-  private renderSummaryHeader(
+  // The dossier masthead: the problem title and model, a one-line claim status,
+  // and the certification scale (the page's signature). It carries the honesty
+  // thesis up front — measured evidence, not a discharge.
+  private renderMasthead(problem: VerificationProblem): HTMLElement {
+    const masthead = el("div", "verif-masthead");
+
+    const head = el("div", "verif-masthead__head");
+    const heading = el("div", "verif-masthead__heading");
+    heading.append(el("p", "eyebrow", "Verification dossier"));
+    heading.append(el("h1", "verif-masthead__title", problem.name));
+    head.append(heading);
+    const model = this.metaString(problem, "verificationModel") ?? problem.system;
+    if (model) {
+      const tag = el("p", "verif-masthead__model");
+      tag.append(el("span", "verif-masthead__model-label", "model"));
+      tag.append(el("code", "verif-masthead__model-id", model));
+      head.append(tag);
+    }
+    masthead.append(head);
+
+    // Claim status — a single formal line. The engine emits only measured
+    // evidence, so unless a status reports external discharge the claim is
+    // measured-but-undischarged.
+    const discharged = this.currentRigorLevel(problem) === 0;
+    const claim = el("p", "verif-claim");
+    claim.append(el("span", "verif-claim__label", "Claim status"));
+    claim.append(
+      el(
+        "span",
+        "verif-claim__text",
+        discharged
+          ? "externally discharged"
+          : "measured evidence · not discharged",
+      ),
+    );
+    masthead.append(claim);
+
+    masthead.append(this.renderCertificationScale(problem));
+    return masthead;
+  }
+
+  // The export appendix: the backend-agnostic IR on its own, and — distinct from
+  // it — the self-contained BE-039 package bundle. Lives in the record/appendix,
+  // not the masthead, so the claim stays the focus.
+  private renderExports(
     problem: VerificationProblem,
     irPath: string | null,
     pkg: VerificationPackageRef | null,
   ): HTMLElement {
-    const header = el("header", "verif-summary__header");
-    header.append(el("p", "eyebrow", "Verification problem"));
-    header.append(el("h1", "verif-summary__title", problem.name));
-    header.append(this.renderRigorChip(problem));
-
-    // The honesty banner: nothing here is proved; external discharge is required.
-    const note =
-      typeof problem.metadata.note === "string"
-        ? problem.metadata.note
-        : "Measured evidence only — every obligation awaits external sound discharge; nothing here is certified.";
-    header.append(el("p", "verif-note", note));
-
-    // Export affordances: the backend-agnostic IR on its own, and — distinct from
-    // it — the self-contained BE-039 package bundle. Either is absent when the
-    // export published none (older data).
+    const node = section("Export");
     const exports = el("div", "verif-exports");
     if (irPath) {
       const download = el("a", "verif-download-ir", "Download problem (IR)");
@@ -260,10 +306,18 @@ export class VerificationPanel {
     if (pkg) {
       exports.append(this.renderPackageExport(pkg));
     }
-    if (exports.childElementCount > 0) {
-      header.append(exports);
+    if (exports.childElementCount === 0) {
+      node.append(el("p", "verif-meta", "No export artifact published for this problem."));
+    } else {
+      node.append(exports);
     }
-    return header;
+    return node;
+  }
+
+  // A metadata string accessor that never trusts the shape of the IR metadata.
+  private metaString(problem: VerificationProblem, key: string): string | null {
+    const value = problem.metadata[key];
+    return typeof value === "string" && value ? value : null;
   }
 
   // The self-contained package: a one-line inspect of the indexed components plus
@@ -324,19 +378,45 @@ export class VerificationPanel {
     }
   }
 
-  // A compact, always-visible rigor indicator; the full four-level ladder lives
-  // in the details. Keeps "measured" from being mistaken for "proved".
-  private renderRigorChip(problem: VerificationProblem): HTMLElement {
-    const level = this.currentRigorLevel(problem);
-    const step = RIGOR_LADDER.find((entry) => entry.level === level) ?? RIGOR_LADDER[0];
-    const chip = el(
-      "span",
-      "verif-rigor-chip",
-      `Rigor: level ${step.level} — ${step.title.toLowerCase()}`,
+  // The certification scale — the dossier's signature. The four rigor rungs as a
+  // horizontal gauge: rungs up to the established level are filled, the rest are
+  // open on a dashed "not yet established" track, so the gap to a real
+  // certificate is the most prominent, true-to-subject thing on the page.
+  private renderCertificationScale(problem: VerificationProblem): HTMLElement {
+    const current = this.currentRigorLevel(problem);
+    const node = el("div", "verif-scale");
+    const currentStep = RIGOR_LADDER.find((entry) => entry.level === current);
+    node.setAttribute("role", "img");
+    node.setAttribute(
+      "aria-label",
+      `Established to rung ${current} of ${RIGOR_LADDER.length}` +
+        (currentStep ? ` — ${currentStep.title}` : "") +
+        "; higher rungs require external discharge.",
     );
-    chip.title = step.note;
-    chip.dataset.level = String(step.level);
-    return chip;
+
+    const track = el("ol", "verif-scale__track");
+    RIGOR_LADDER.forEach((step) => {
+      const rung = el("li", "verif-scale__rung");
+      rung.dataset.level = String(step.level);
+      const established = step.level <= current;
+      rung.classList.toggle("verif-scale__rung--established", established);
+      rung.classList.toggle("verif-scale__rung--current", step.level === current);
+      rung.classList.toggle("verif-scale__rung--open", !established);
+      rung.append(el("span", "verif-scale__rank", `${step.level}`));
+      rung.append(el("span", "verif-scale__dot"));
+      rung.append(el("span", "verif-scale__label", CERTIFICATION_RUNG[step.level] ?? step.title));
+      rung.title = `${step.title} — ${step.note}`;
+      track.append(rung);
+    });
+    node.append(track);
+
+    const open = RIGOR_LADDER.filter((step) => step.level > current).map((step) => step.level);
+    const caption =
+      open.length > 0
+        ? `Established to rung ${current} (measured evidence). Rungs ${open[0]}–${open[open.length - 1]} require external discharge.`
+        : "Externally discharged.";
+    node.append(el("p", "verif-scale__caption", caption));
+    return node;
   }
 
   // The rigor level this problem currently sits at. The engine emits only
@@ -391,12 +471,12 @@ export class VerificationPanel {
   // discharge. Each row jumps to the obligation's full card. The measured
   // outcome is evidence only — never a proof.
   private renderObligationLedger(problem: VerificationProblem): HTMLElement {
-    const node = section("Safety properties (measured)", "verifLedger");
+    const node = section("Proof obligations", "verifLedger");
     node.append(
       el(
         "p",
         "verif-meta",
-        "What we're checking and how it measured — a clean sample is evidence, not a proof; every obligation still awaits external discharge.",
+        "Each obligation with its measured margin and the assumption region it was sampled within. A clean sample is evidence, not a proof — every obligation still awaits external discharge.",
       ),
     );
 

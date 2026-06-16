@@ -9,8 +9,7 @@
  */
 import katex from "katex";
 
-import { theme } from "./design/theme";
-import { magma } from "./design/colormaps";
+import { dossier } from "./design/dossier";
 import type { CertificateSeries } from "./data/trajectory";
 import { clamp } from "./util";
 
@@ -245,9 +244,10 @@ function drawLane(lane: Lane, phase: number): void {
   const xOf = (index: number) => (count <= 1 ? 0 : (index / (count - 1)) * width);
   const step = Math.max(1, Math.floor(count / 320));
 
+  // The obligation threshold (the `≤ 0` baseline), a dashed ink-graphite rule.
   ctx.save();
   ctx.setLineDash([3, 4]);
-  ctx.strokeStyle = theme.hairlineStrong;
+  ctx.strokeStyle = dossier.hairline;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, mid);
@@ -255,6 +255,7 @@ function drawLane(lane: Lane, phase: number): void {
   ctx.stroke();
   ctx.restore();
 
+  // The measured signal: a soft teal area under a teal trace — no glow.
   ctx.beginPath();
   ctx.moveTo(0, mid);
   for (let index = 0; index < count; index += step) {
@@ -262,10 +263,10 @@ function drawLane(lane: Lane, phase: number): void {
   }
   ctx.lineTo(xOf(count - 1), mid);
   ctx.closePath();
-  ctx.fillStyle = magma.css(0.72, 0.14);
+  ctx.fillStyle = "rgba(21, 112, 107, 0.12)";
   ctx.fill();
 
-  ctx.strokeStyle = theme.accent;
+  ctx.strokeStyle = dossier.measured;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   for (let index = 0; index < count; index += step) {
@@ -280,11 +281,8 @@ function drawLane(lane: Lane, phase: number): void {
   ctx.stroke();
 
   const playIndex = clamp(Math.round(phase * (count - 1)), 0, count - 1);
-  ctx.fillStyle = theme.accentStrong;
-  ctx.shadowColor = theme.accent;
-  ctx.shadowBlur = 8;
+  ctx.fillStyle = dossier.ink;
   ctx.beginPath();
-  ctx.arc(clamp(phase, 0, 1) * width, yOf(values[playIndex]), 3.5, 0, Math.PI * 2);
+  ctx.arc(clamp(phase, 0, 1) * width, yOf(values[playIndex]), 3, 0, Math.PI * 2);
   ctx.fill();
-  ctx.shadowBlur = 0;
 }

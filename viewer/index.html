@@ -82,12 +82,16 @@
 
       <section id="verificationDomain" class="domain" aria-label="Verification workbench" hidden>
         <aside class="catalog" aria-label="Verification problems">
-          <p class="control-label">problems</p>
+          <p class="control-label">docket</p>
           <div id="verificationCatalog" class="system-catalog"></div>
         </aside>
         <section class="verif-stage" aria-label="Verification problem">
+          <div id="verificationMasthead" class="verif-stage__masthead"></div>
           <div class="verif-stage__workspace">
-            <canvas id="verificationCanvas" class="verif-stage__canvas"></canvas>
+            <figure class="verif-figure">
+              <canvas id="verificationCanvas" class="verif-stage__canvas"></canvas>
+              <figcaption id="verificationFigureCaption" class="verif-figure__caption"></figcaption>
+            </figure>
             <div class="verif-stage__controls">
               <button id="verificationPlayButton" type="button">Pause</button>
               <label>
@@ -95,13 +99,13 @@
                 <input id="verificationSpeedControl" type="range" min="0.2" max="3" step="0.1" value="1" />
               </label>
             </div>
-          </div>
-          <aside class="verif-stage__summary" aria-label="Safety summary">
-            <div id="verificationSummary"></div>
-            <div class="verif-stage__signals" aria-label="Candidate certificate signals">
-              <p class="control-label">certificate lanes</p>
+            <div class="verif-stage__signals" aria-label="Certificate traces">
+              <p class="control-label">certificate traces</p>
               <div id="verificationCertificateLanes" class="diagnostics"></div>
             </div>
+          </div>
+          <aside class="verif-stage__summary" aria-label="Proof obligations">
+            <div id="verificationSummary"></div>
           </aside>
           <div id="verificationDetails" class="verif-details-band"></div>
         </section>

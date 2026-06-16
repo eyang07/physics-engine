@@ -27,6 +27,7 @@ import {
   loadVerificationIndex,
   loadVerificationPackageManifest,
   loadVerificationProblem,
+  type VerificationProblem,
   type VerificationProblemSummary,
 } from "./data/verification";
 import "./styles.css";
@@ -81,8 +82,10 @@ const aboutDialog = requireElement<HTMLDialogElement>("#aboutDialog");
 const aboutClose = requireElement<HTMLButtonElement>("#aboutClose");
 const systemCatalog = requireElement<HTMLElement>("#systemCatalog");
 const verificationCatalog = requireElement<HTMLElement>("#verificationCatalog");
+const verificationMasthead = requireElement<HTMLElement>("#verificationMasthead");
 const verificationSummary = requireElement<HTMLElement>("#verificationSummary");
 const verificationDetails = requireElement<HTMLElement>("#verificationDetails");
+const verificationFigureCaption = requireElement<HTMLElement>("#verificationFigureCaption");
 const verificationCanvas = requireElement<HTMLCanvasElement>("#verificationCanvas");
 const verificationPlayButton = requireElement<HTMLButtonElement>("#verificationPlayButton");
 const verificationSpeedControl = requireElement<HTMLInputElement>("#verificationSpeedControl");
@@ -114,7 +117,11 @@ const threeScene = new ThreeScene(threeCanvas);
 const trajectorySource = new StaticSource();
 const structurePanel = new StructurePanel(principlesPanel, invariantsPanel, parametersPanel, loopPhaseArc);
 const diagnosticsPanel = new DiagnosticsPanel(diagnosticsSection, diagnosticsPanel_);
-const verificationPanel = new VerificationPanel(verificationSummary, verificationDetails);
+const verificationPanel = new VerificationPanel(
+  verificationMasthead,
+  verificationSummary,
+  verificationDetails,
+);
 const verificationStage = new VerificationStage(
   verificationCanvas,
   verificationPlayButton,
@@ -306,14 +313,28 @@ async function selectVerificationProblem(problemId: string) {
           ? { manifest, path: summary.packagePath }
           : null;
       verificationPanel.render(problem, summary.irPath, pkg);
+      setFigureCaption(problem);
     }
   } catch (error) {
     console.warn("Verification problem unavailable:", error);
     verificationStage.clear();
+    verificationFigureCaption.textContent = "";
     verificationPanel.renderEmpty(
       `Could not load ${summary.name}. Regenerate with "python -m scripts.generate_verification_problems".`,
     );
   }
+}
+
+// The figure caption: a typeset plate label naming the state-space axes and the
+// safe set the rollout must stay within. Derived from the problem's own axes and
+// region roles — the figure renders the same data, this only names it.
+function setFigureCaption(problem: VerificationProblem) {
+  const axes = problem.trajectory?.stateNames ?? [];
+  const plane = axes.length >= 2 ? `(${axes[0]}, ${axes[1]})` : "state";
+  const hasSafe = problem.regions.some((region) => region.role === "safe");
+  verificationFigureCaption.textContent = hasSafe
+    ? `Figure — state space ${plane}; safe set 𝒮 shaded, controlled rollout in ink.`
+    : `Figure — state space ${plane}; controlled rollout in ink.`;
 }
 
 function renderVisualizationButtons() {
