@@ -80,6 +80,127 @@ candidates stay candidates, nothing reads as proved._
      manifest model/status/counts); a problem without a package shows no package
      section; nothing reads as proved; `npm run build` and the visual test pass.
 
+3. **FE-023: Distinguish disturbance-robust obligations in the obligation ledger**
+   - Goal: Five drone packages are now Tier-3 disturbance-robust (BE-049/051/052),
+     but the obligation ledger renders a robust forward-invariance obligation
+     (quantified over the wind box `W`, with the worst-case `dt^2/2*w` term baked
+     in) identically to a nominal one. Add an honest "robust (∀ disturbance ∈ W)"
+     badge to obligations whose IR carries a disturbance bound / set-valued
+     successor, and surface the disturbance bound the obligation cites. Read it
+     only from data already in the IR; a robust obligation is still
+     external-required, never discharged.
+   - Scope: `viewer/src/verificationPanel.ts` (ledger obligation card), the IR
+     reader in `viewer/src/data/verification.ts` if the disturbance descriptor
+     needs exposure, `viewer/src/styles.css`, and the viewer visual test.
+   - Acceptance: selecting a Tier-3 package shows the robust badge and cited
+     disturbance bound on its robust obligations; nominal (Tier-1/2) packages show
+     no such badge; obligations stay `external-required`; nothing reads as proved;
+     `npm run build` and the visual test pass.
+
+4. **FE-024: Annotate the disturbance set on Tier-3 stages**
+   - Goal: A Tier-3 stage renders the rollout and regions, but the wind box `W =
+     [-w, w]` the robust obligation is quantified over is invisible. Add an honest,
+     read-only annotation of the disturbance bound `w` (and, where plane-expressible,
+     its effect on the tightened safe margin) to the stage for packages that carry
+     a disturbance spec, so a reader can see what the robustness is *against*. Draw
+     nothing for nominal packages.
+   - Scope: `viewer/src/verificationStage.ts` (disturbance annotation), the IR
+     reader in `viewer/src/data/verification.ts` if needed, `viewer/src/styles.css`,
+     and the viewer visual test.
+   - Acceptance: selecting a Tier-3 package shows the disturbance-bound annotation;
+     a nominal package shows none; the rollout/region rendering is unchanged;
+     nothing reads as proved; `npm run build` and the visual test pass.
+
+5. **FE-025: Surface adapter-stub descriptors in the IR inspector**
+   - Goal: Each package now carries optional non-discharging adapter stubs (BE-044)
+     naming external backend categories (reachability, SOS/certificate synthesis,
+     deductive prover) that could consume each obligation, but the viewer never
+     shows them. Add a read-only adapter-stub section to the IR details listing,
+     per obligation, the applicable categories and the obligation shape each would
+     have to handle — every entry labeled `discharges: false`. Render only what the
+     stubs component exports.
+   - Scope: `viewer/src/verificationPanel.ts` (adapter-stub detail section),
+     `viewer/src/data/verification.ts` if the stubs need exposure,
+     `viewer/src/styles.css`, and the viewer visual test.
+   - Acceptance: a package with adapter stubs shows them in the IR details, each
+     marked non-discharging with its category and target; a package without stubs
+     shows no section; obligations stay `external-required`; `npm run build` and the
+     visual test pass.
+
+6. **FE-026: Per-obligation worst-margin readout aligned to the rollout**
+   - Goal: Certificate lanes plot candidate values over the rollout, but the
+     measured signed worst `margin` (BE-036) per obligation is shown only as a
+     static ledger number. Add a small, honest worst-margin readout for the
+     selected obligation, aligned to the rollout timeline, so the closest approach
+     to the boundary is legible in time as well as value. Measured stays measured.
+   - Scope: `viewer/src/certificateLanes.ts` (margin readout), `viewer/src/data/
+     verification.ts` if the per-obligation worst record needs exposure,
+     `viewer/src/styles.css`, and the viewer visual test.
+   - Acceptance: selecting an obligation shows its worst sampled margin aligned to
+     the rollout, consistent with the ledger value; nothing recomputes physics in
+     TypeScript; nothing reads as proved; `npm run build` and the visual test pass.
+
+7. **FE-027: Label each barrier lane for intersection-safe-set packages**
+   - Goal: The geofence∩obstacle package (BE-050) carries two candidate barriers
+     together — the geofence box barrier and the signed-distance keep-out barrier
+     `B_obs = rho - |q - c|` — but the certificate lanes do not name which lane is
+     which or that safety is their intersection `{max(B_geo, B_obs) <= 0}`. Label
+     each lane by its barrier and surface the intersection semantics honestly, so a
+     reader can tell the box barrier from the keep-out barrier. Both stay
+     candidates.
+   - Scope: `viewer/src/certificateLanes.ts` (lane labeling), the IR reader if
+     barrier identity needs exposure, `viewer/src/styles.css`, and the viewer
+     visual test.
+   - Acceptance: the intersection package shows each barrier lane named and the
+     intersection semantics stated; single-barrier packages are unchanged; both
+     barriers stay labeled candidate; `npm run build` and the visual test pass.
+
+8. **FE-028: Verification catalog overview from the package discovery index**
+   - Goal: The Verification view wires examples one by one, but the published
+     discovery index (`packages.index.json`, surfaced on the viewer index by
+     BE-047) already lists every package by model, status, and counts. Add a
+     read-only catalog overview that lists all packages from the index — model,
+     status, region/obligation/candidate counts — as a grounded package picker,
+     rather than re-deriving the list per example. Render only what the index
+     exports.
+   - Scope: `viewer/src/verificationPanel.ts` or `viewer/src/home.ts` (catalog
+     overview), `viewer/src/data/verification.ts` (read the published index),
+     `viewer/src/styles.css`, and the viewer visual test.
+   - Acceptance: the catalog lists every indexed package with its model/status/
+     counts and selecting one opens its problem; a missing index degrades to the
+     existing per-example list; nothing reads as proved; `npm run build` and the
+     visual test pass.
+
+9. **FE-029: Show the package Tier/regime badge in the catalog (after BE-054)**
+   - Goal: Once the discovery index carries the Tier/regime descriptor (BE-054 —
+     nominal Tier-1/2 vs disturbance-robust Tier-3), surface it as an honest badge
+     on each catalog entry so a reader can tell a nominal geofence package from a
+     disturbance-robust one without opening it. Read only the index descriptor;
+     claim nothing beyond the rigor of the listed package.
+   - Scope: `viewer/src/verificationPanel.ts` or `viewer/src/home.ts` (catalog
+     badge, builds on FE-028), `viewer/src/data/verification.ts`,
+     `viewer/src/styles.css`, and the viewer visual test.
+   - Acceptance: each catalog entry shows its Tier/regime badge matching the index
+     descriptor; entries without the descriptor show no badge; nothing reads as
+     proved; `npm run build` and the visual test pass.
+
+10. **FE-030: Render the measured violation reference scenario (after BE-056)**
+    - Goal: Every published package currently *holds*, so the viewer's measured
+      violation surface (red worst-violation markers and legend) is never
+      exercised. Once the Tier-2 boundary-corner violation scenario exports
+      (BE-056) — a second trajectory with measured `proofStatuses` carrying a
+      negative signed margin — render it: emphasize the negative-margin violation
+      markers and name the obligation that the run left, making the honest "this
+      simulated run entered the unsafe set" state concrete on the rigor ladder.
+    - Scope: `viewer/src/verificationStage.ts` (violation emphasis for the new
+      scenario), `viewer/src/data/verification.ts` if scenario selection needs
+      exposure, `viewer/src/styles.css`, and the viewer visual test.
+    - Acceptance: the violation scenario shows its measured violation markers and
+      named obligation with a negative margin, visually distinct from a holding
+      run; holding packages are unchanged; the violation is labeled measured
+      evidence, never a disproof of safety; `npm run build` and the visual test
+      pass.
+
 ## Backend Queue
 
 _Direction (VISION §11): stop expanding the IR in the abstract. The whole queue
@@ -289,3 +410,148 @@ proof/certification.
      from IR data alone; `read_package_index` round-trips and validates it; nothing
      claims proof/certification; generated data stays uncommitted; focused tests
      pass.
+
+3. **BE-055: Robust self-reproducing velocity-bound (P2) for the disturbed
+   vertical axis**
+   - Goal: Mirror BE-053 to the vertical disturbed package
+     (`drone_vertical_disturbed_geofence_problem`, BE-051), which proves robust
+     floor/ceiling forward invariance but drops the velocity-bound (P2) the nominal
+     vertical package carries. Add the robust P2 using the asymmetric authority
+     margin `a = min(u3Max - g, g - u3Min)`: under one disturbed step the vertical
+     velocity bound enlarges by the worst-case `+dt*w`, and `|v3+| <= Bv_robust`
+     must hold for every admissible `w`. Bake the worst case in analytically and
+     sample within the enlarged bound. Keep candidates candidate and obligations
+     external-required.
+   - Scope: `scripts/export_verification_problems.py` (add the robust vertical
+     velocity barrier candidate and its P2 obligation, citing the disturbance bound,
+     the asymmetric authority margin, and the enlarged bound), and `tests/`.
+   - Acceptance: the disturbed vertical package gains a measured robust P2
+     `proofStatus` holding within the enlarged bound with a nonnegative worst-case
+     signed margin and citing the disturbance bound and asymmetric authority margin;
+     the existing robust floor/ceiling and initial-containment obligations are
+     unchanged; nothing claims proof/certification; generated data stays
+     uncommitted; focused tests pass.
+
+4. **BE-056: Export the Tier-2 boundary-corner violation reference scenario**
+   - Goal: Every published package only *holds*, so the engine's measured-violation
+     surface is never exercised end-to-end. Export the DRONE_MODEL_SPEC §L.2 / Tier-2
+     "load-bearing diagonal corner" scenario as a second trajectory on the obstacle
+     keep-out problem that approaches and enters the unsafe set, and emit measured
+     `proofStatuses` carrying a **negative** signed `margin` for the avoidance
+     obligation, using the existing event-based unsafe-set entry detection
+     (integrator-located entry time). This makes a measured violation a concrete,
+     honest rigor-level-1 artifact — evidence the run left the set on this rollout,
+     never a disproof of the candidate.
+   - Scope: `scripts/export_verification_problems.py` (the violation-scenario
+     trajectory and its sampled statuses on `drone_obstacle_keepout_problem`),
+     `engine/verification/measured.py` if violation sampling needs a seam, and
+     `tests/`.
+   - Acceptance: the obstacle package exports a violation scenario whose avoidance
+     `proofStatus` reports a negative worst-case margin with an integrator-located
+     entry, distinct from the holding rollout; the holding scenario is unchanged;
+     the violation is labeled measured evidence only; nothing claims
+     proof/certification; generated data stays uncommitted; focused tests pass.
+
+5. **BE-057: Cross-package consistency validator for the drone flagship**
+   - Goal: The flagship now spans seven drone packages sharing one model
+     (DRONE_MODEL_SPEC §N cross-artifact consistency), but nothing checks that they
+     agree. Add a helper that validates all drone packages against a single
+     `DroneParams` and shared assumption/geometry conventions — same parameter
+     values, consistent geofence/inner-set/obstacle geometry, consistent assumption
+     bounds — so the packages cannot silently drift apart. Pure validation; it
+     asserts consistency, it does not certify safety.
+   - Scope: `engine/export/verification_package.py` or a small
+     `engine/verification/` helper (cross-package consistency check), and `tests/`.
+   - Acceptance: a test asserts the published drone packages share consistent
+     params, geometry, and assumption bounds, and fails loudly on an injected
+     mismatch; nothing claims proof/certification; generated data stays uncommitted;
+     focused tests pass.
+
+6. **BE-058: Encode the full `Obstacle.Valid` assumption triple on the keep-out
+   package**
+   - Goal: The obstacle keep-out package (BE-048) cites only a standoff-sizing
+     precondition, but DRONE_MODEL_SPEC §337/§711 requires the full `Obstacle.Valid`
+     triple: (1) dilated obstacle inside the inner safe set, (2) separation (band
+     narrower than half the obstacle, single-valued controller), (3) braking
+     adequacy (band dominates one-step drift at the velocity cap). Add all three as
+     explicit assumptions the avoidance obligation cites, marking the non-plane ones
+     external-required. This makes the avoidance claim's preconditions complete and
+     honest.
+   - Scope: `scripts/export_verification_problems.py` (add the three assumptions to
+     `drone_obstacle_keepout_problem` and have the avoidance obligation cite them),
+     `systems/drone_point_mass.py` if the `ObstacleSpec` needs the derived margins,
+     and `tests/`.
+   - Acceptance: the keep-out package carries the three `Obstacle.Valid` assumptions
+     with the avoidance obligation citing them; plane-expressible ones are sampled,
+     non-plane ones are external-required; the measured avoidance `proofStatus` is
+     unchanged where it already held; nothing claims proof/certification; generated
+     data stays uncommitted; focused tests pass.
+
+7. **BE-059: Boundary-approaching margin scenario for the Tier-1 geofence axis**
+   - Goal: The Tier-1 geofence rollout sits comfortably inside the safe set, so its
+     measured holds-margin is large and uninformative (and gives FE-021 little to
+     show). Export the DRONE_MODEL_SPEC §L.2 boundary-approaching scenario: a second
+     trajectory that drives the horizontal axis near the geofence boundary so the
+     measured forward-invariance margin is small but nonnegative, exercising the
+     closest-approach surface with a tight, honest margin. Still measured evidence,
+     never a discharge.
+   - Scope: `scripts/export_verification_problems.py` (the margin-scenario
+     trajectory and sampled statuses on `drone_geofence_problem`), and `tests/`.
+   - Acceptance: the geofence package exports a boundary-approaching scenario whose
+     forward-invariance `proofStatus` reports a small nonnegative worst-case margin
+     with its closest-approach point, distinct from the comfortable rollout; the
+     existing scenario is unchanged; nothing claims proof/certification; generated
+     data stays uncommitted; focused tests pass.
+
+8. **BE-060: Robustness-aware adapter stubs for quantified-over-disturbance
+   obligations**
+   - Goal: The adapter-stub catalog (BE-044) derives reachability/SOS/deductive
+     stubs from each obligation's classified target, but a Tier-3 robust obligation
+     (set-valued successor, quantified over the wind box `W`, worst-case term baked
+     in) is a distinct obligation *shape* that an external backend must handle
+     differently. Extend the stub descriptors so robust obligations carry an honest
+     robustness flag and the disturbance set they quantify over, derived only from
+     IR data. Every stub stays non-discharging.
+   - Scope: `engine/verification/adapter_stubs.py` (robustness-aware stub shape),
+     `engine/export/verification_package.py` if the descriptor validation needs
+     extending, and `tests/`.
+   - Acceptance: robust obligations' stubs record the robustness flag and
+     disturbance set; nominal obligations' stubs are unchanged; `read_package`
+     validates the extended descriptors; every stub stays `discharges: false` and
+     obligations stay `external-required`; nothing claims proof/certification;
+     generated data stays uncommitted; focused tests pass.
+
+9. **BE-061: Cross-package human-readable catalog summary report**
+   - Goal: The discovery index (BE-045) is machine-readable, but there is no
+     human-readable cross-package summary like the inspection adapter's per-problem
+     report. Add a writer that emits one deterministic summary across all packages —
+     per package: model, Tier/regime (BE-054), obligation count and how many hold
+     vs. are violated under measured sampling, and the worst signed margin — so a
+     reader can survey the flagship at a glance. Pure cataloging; it reports
+     measured status, it certifies nothing.
+   - Scope: `engine/export/verification_package.py` or a thin `scripts/` entry
+     point reading the published packages/index, and `tests/`.
+   - Acceptance: the summary report lists every package with its model, regime,
+     hold/violation counts, and worst margin, consistent with the per-package
+     manifests; it is deterministic and re-readable; nothing claims
+     proof/certification; generated data stays uncommitted; focused tests pass.
+
+10. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
+    - Goal: BE-050 publishes the nominal geofence∩obstacle intersection and
+      BE-049/052 publish Tier-3 robust geofence and obstacle packages, but there is
+      no robust *intersection* package. Combine them: on the coupled `(q1, q2)`
+      plane carry both the geofence box barrier and the keep-out barrier with their
+      robust worst-case one-step obligations (each baking in the disturbance term as
+      in BE-049/052), safe set `{max(B_geo, B_obs) <= 0}`, under the spec-G plus
+      disturbance assumptions. This is the natural capstone of the nominal/robust ×
+      single/intersection matrix.
+    - Scope: `scripts/export_verification_problems.py` (add
+      `drone_disturbed_geofence_obstacle_problem` + its nominal trajectory, register
+      it as a viewer example), `systems/drone_point_mass.py` if a combined disturbed
+      coasting map is needed, and `tests/`.
+    - Acceptance: the published robust intersection package carries both barriers as
+      candidates, each with a robust worst-case avoidance/forward-invariance
+      obligation citing the disturbance bound, and measured `proofStatuses` holding
+      within their assumption regions with nonnegative worst-case margins; both
+      barriers stay candidate and obligations external-required; nothing claims
+      proof/certification; generated data stays uncommitted; focused tests pass.
