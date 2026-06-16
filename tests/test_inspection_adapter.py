@@ -87,6 +87,10 @@ def _viewer_verification_expected_ids() -> list[str]:
         "drone-geofence-axis",
         "drone-vertical-axis",
         "drone-obstacle-keepout",
+        "drone-disturbed-geofence-axis",
+        "drone-geofence-obstacle",
+        "drone-disturbed-vertical-geofence-axis",
+        "drone-disturbed-obstacle-keepout",
     ]
 
 
@@ -1322,11 +1326,8 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
     # The published backend-agnostic IR is the problem serialization without the
     # viewer-only trajectory; reading it back yields exactly that.
     assert [problem["irPath"] for problem in index["problems"]] == [
-        "/data/verification/upright-pendulum-safety.ir.json",
-        "/data/verification/controlled-spring-regulator-safety.ir.json",
-        "/data/verification/drone-geofence-axis.ir.json",
-        "/data/verification/drone-vertical-axis.ir.json",
-        "/data/verification/drone-obstacle-keepout.ir.json",
+        f"/data/verification/{problem_id}.ir.json"
+        for problem_id in _viewer_verification_expected_ids()
     ]
     pendulum_ir = ir_payloads["/data/verification/upright-pendulum-safety.ir.json"]
     assert "trajectory" not in pendulum_ir
@@ -1387,6 +1388,10 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         "drone-geofence-axis",
         "drone-vertical-axis",
         "drone-obstacle-keepout",
+        "drone-disturbed-geofence-axis",
+        "drone-geofence-obstacle",
+        "drone-disturbed-vertical-geofence-axis",
+        "drone-disturbed-obstacle-keepout",
     ]
     assert [problem["dataPath"] for problem in index["problems"]] == [
         f"/data/verification/{problem_id}.json" for problem_id in expected_ids
