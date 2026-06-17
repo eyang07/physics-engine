@@ -222,43 +222,22 @@ Tier-2 assumptions, cross-package tooling, and a robust intersection capstone.
 Keep generated data uncommitted. Never label anything proved/certified — the
 engine proposes; external backends dispose._
 
-BE-059 is done: the Tier-1 geofence flagship now publishes a boundary-approaching
-**margin** scenario alongside the comfortable rollout, reusing the BE-056
-`engine/verification/measured.py` seam `trajectory_obligation_proof_status` (which
-evaluates one obligation's inequality along a measured trajectory and reports the
-worst signed margin). `scripts/export_verification_problems.py` added
-`drone_geofence_margin_trajectory` (the drone starts deep in the upper guard band
-at `q1 = 0.95` coasting outward at the velocity bound `v1 = Bh`, so one braking
-step nearly reaches the wall) and `drone_geofence_margin_problem`, registered as a
-fourth-position viewer example `drone-geofence-margin`. The published package
-carries the base region-grid statuses unchanged plus a trajectory-sampled
-**measured-holds** forward-invariance status with a tight nonnegative worst margin
-(`0.01875`) and its closest-approach point — distinct from the comfortable
-rollout's loose `0.21875`, giving FE-021 a tight margin to render. (The earlier
-BE-056 `drone-obstacle-keepout-violation` measured-violation scenario remains the
-negative-margin counterpart.) Candidates stay candidate and obligations
-external-required — a tight hold is measured evidence of how close this rollout
-came to the boundary, never a discharge. Nothing claims proof/certification.
+BE-060 is done: the adapter-stub catalog now distinguishes the Tier-3 robust
+obligation *shape*. `engine/verification/adapter_stubs.py` gained the IR-derived
+helper `robust_obligation_disturbances` (an obligation is robust when it cites a
+disturbance-bound assumption — id carrying the `disturbance` marker — whose
+variables range over declared problem parameters, the same convention the package
+regime descriptor uses), and `ObligationAdapterStub` carries an honest `robust`
+flag plus the `disturbanceParameters` / `disturbanceAssumptionIds` it quantifies
+over. Robust stubs (e.g. `drone-disturbed-geofence-axis` over `w1`, the planar
+keep-out over `w1, w2`) record the disturbance set; nominal stubs serialize exactly
+as before (no robustness keys). `engine/export/verification_package.py` `read_package`
+re-derives the robust set from the IR and rejects any stub whose robustness flag or
+disturbance set drifts from it. Every stub stays `discharges: false` and every
+obligation stays external-required — the flag describes the obligation shape an
+external backend must handle, never a discharge. Nothing claims proof/certification.
 
-1. **BE-060: Robustness-aware adapter stubs for quantified-over-disturbance
-   obligations**
-   - Goal: The adapter-stub catalog (BE-044) derives reachability/SOS/deductive
-     stubs from each obligation's classified target, but a Tier-3 robust obligation
-     (set-valued successor, quantified over the wind box `W`, worst-case term baked
-     in) is a distinct obligation *shape* that an external backend must handle
-     differently. Extend the stub descriptors so robust obligations carry an honest
-     robustness flag and the disturbance set they quantify over, derived only from
-     IR data. Every stub stays non-discharging.
-   - Scope: `engine/verification/adapter_stubs.py` (robustness-aware stub shape),
-     `engine/export/verification_package.py` if the descriptor validation needs
-     extending, and `tests/`.
-   - Acceptance: robust obligations' stubs record the robustness flag and
-     disturbance set; nominal obligations' stubs are unchanged; `read_package`
-     validates the extended descriptors; every stub stays `discharges: false` and
-     obligations stay `external-required`; nothing claims proof/certification;
-     generated data stays uncommitted; focused tests pass.
-
-2. **BE-061: Cross-package human-readable catalog summary report**
+1. **BE-061: Cross-package human-readable catalog summary report**
    - Goal: The discovery index (BE-045) is machine-readable, but there is no
      human-readable cross-package summary like the inspection adapter's per-problem
      report. Add a writer that emits one deterministic summary across all packages —
@@ -273,7 +252,7 @@ came to the boundary, never a discharge. Nothing claims proof/certification.
      manifests; it is deterministic and re-readable; nothing claims
      proof/certification; generated data stays uncommitted; focused tests pass.
 
-3. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
+2. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
     - Goal: BE-050 publishes the nominal geofence∩obstacle intersection and
       BE-049/052 publish Tier-3 robust geofence and obstacle packages, but there is
       no robust *intersection* package. Combine them: on the coupled `(q1, q2)`

@@ -337,6 +337,51 @@ def test_read_package_rejects_adapter_stub_id_mismatch(tmp_path) -> None:
         read_package(tmp_path / "pkg")
 
 
+def test_robust_package_adapter_stubs_carry_disturbance_set(tmp_path) -> None:
+    # BE-060: a Tier-3 robust package's stubs flag the obligations quantified over
+    # the wind box and record the disturbance set, surviving the write/read round
+    # trip; every stub still discharges nothing.
+    problem, trajectory = _inputs_by_id()["drone-disturbed-geofence-axis"]
+    write_package(problem, trajectory, tmp_path / "pkg", include_adapter_stubs=True)
+
+    package = read_package(tmp_path / "pkg")
+    assert package.adapter_stubs is not None
+    robust_stubs = [
+        stub for stub in package.adapter_stubs["stubs"] if stub.get("robust")
+    ]
+    assert robust_stubs  # the robust obligations produce robust stubs
+    for stub in robust_stubs:
+        assert stub["robust"] is True
+        assert stub["disturbanceParameters"] == ["w1"]
+        assert stub["disturbanceAssumptionIds"] == ["disturbance-within-wind-bound"]
+        assert stub["discharges"] is False
+    # The static initial-containment obligation does not cite the disturbance, so
+    # its stubs stay nominal (no robustness keys).
+    nominal_stubs = [
+        stub
+        for stub in package.adapter_stubs["stubs"]
+        if stub["obligationId"] == "geofence-barrier-initial-containment"
+    ]
+    assert nominal_stubs
+    assert all("robust" not in stub for stub in nominal_stubs)
+
+
+def test_read_package_rejects_robustness_descriptor_drift(tmp_path) -> None:
+    # Fabricating a robustness flag the IR does not derive is rejected on read.
+    problem, trajectory = _inputs_by_id()["drone-disturbed-geofence-axis"]
+    write_package(problem, trajectory, tmp_path / "pkg", include_adapter_stubs=True)
+    stub_path = tmp_path / "pkg" / "adapter-stubs.json"
+    payload = json.loads(stub_path.read_text())
+    for stub in payload["stubs"]:
+        if stub["obligationId"] == "geofence-barrier-initial-containment":
+            stub["robust"] = True
+            stub["disturbanceParameters"] = ["w1"]
+            stub["disturbanceAssumptionIds"] = ["disturbance-within-wind-bound"]
+    stub_path.write_text(json.dumps(payload, indent=2) + "\n")
+    with pytest.raises(ValueError, match="robustness flag does not match the IR"):
+        read_package(tmp_path / "pkg")
+
+
 def test_write_package_requires_verification_model(tmp_path) -> None:
     problem, trajectory = verification_package_inputs()[0]
     without_model = replace(problem, metadata=None)

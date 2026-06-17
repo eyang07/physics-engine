@@ -34,6 +34,7 @@ from engine.verification import VerificationProblem
 from engine.verification.adapter_stubs import (
     AdapterStubReport,
     obligation_adapter_stubs,
+    robust_obligation_disturbances,
 )
 
 PACKAGE_SCHEMA_VERSION = "verification-package/v1"
@@ -736,6 +737,28 @@ def read_package(directory: str | Path) -> VerificationPackage:
                 f"verification package adapter stubs reference unknown obligations: "
                 f"{sorted(unknown)}"
             )
+        # The robustness descriptors must agree with the IR: a stub may flag an
+        # obligation robust only where the IR derives it robust (a disturbance set
+        # it quantifies over), and must record that exact disturbance set.
+        robust_disturbances = robust_obligation_disturbances(problem)
+        for stub in report.stubs:
+            parameters, assumption_ids = robust_disturbances.get(
+                stub.obligation_id, ((), ())
+            )
+            expected_robust = bool(parameters)
+            if stub.robust != expected_robust:
+                raise ValueError(
+                    f"verification package adapter stub for {stub.obligation_id!r} "
+                    f"robustness flag does not match the IR"
+                )
+            if stub.robust and (
+                stub.disturbance_parameters != parameters
+                or stub.disturbance_assumption_ids != assumption_ids
+            ):
+                raise ValueError(
+                    f"verification package adapter stub for {stub.obligation_id!r} "
+                    "disturbance set does not match the IR"
+                )
 
     return VerificationPackage(
         manifest=manifest,

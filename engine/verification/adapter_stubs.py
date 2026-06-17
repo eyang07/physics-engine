@@ -29,6 +29,19 @@ from engine.verification.ir import VerificationProblem
 
 ADAPTER_STUB_SCHEMA_VERSION = "verification-adapter-stubs/v1"
 
+# A Tier-3 robust obligation is quantified over a bounded disturbance set: its
+# closed loop is set-valued (one successor per admissible disturbance) and the
+# worst-case term is baked into the obligation. An external backend must handle
+# that obligation *shape* differently (a robust/set-valued query, not a single
+# deterministic successor), so robust stubs carry an honest robustness flag and
+# the disturbance set they quantify over. The robustness is derived purely from
+# IR data: an obligation is robust when it cites a disturbance-bound assumption
+# (id carrying this marker, the same convention the package regime descriptor
+# uses) whose variables range over declared problem parameters. A robust stub is
+# still non-discharging -- the flag describes the obligation shape, never a
+# discharge.
+_DISTURBANCE_ASSUMPTION_MARKER = "disturbance"
+
 CATEGORY_REACHABILITY = "reachability"
 CATEGORY_SOS_SYNTHESIS = "sos-certificate-synthesis"
 CATEGORY_DEDUCTIVE_PROVER = "deductive-prover"
@@ -162,7 +175,15 @@ BACKEND_CATEGORY_STUBS: tuple[BackendCategoryStub, ...] = (
 
 @dataclass(frozen=True)
 class ObligationAdapterStub:
-    """How one backend category would consume one obligation. Never a discharge."""
+    """How one backend category would consume one obligation. Never a discharge.
+
+    For a Tier-3 robust obligation (quantified over a bounded disturbance set),
+    ``robust`` is set and ``disturbance_parameters`` / ``disturbance_assumption_ids``
+    record the disturbance set the obligation ranges over -- the shape an external
+    backend must handle as a set-valued/robust query. A nominal obligation leaves
+    these empty and serializes exactly as before. The flag is descriptive only; a
+    robust stub still discharges nothing.
+    """
 
     obligation_id: str
     category: str
@@ -171,6 +192,9 @@ class ObligationAdapterStub:
     required_shape_features: tuple[str, ...]
     note: str = _STUB_NOTE
     discharges: bool = False
+    robust: bool = False
+    disturbance_parameters: tuple[str, ...] = ()
+    disturbance_assumption_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.obligation_id:
@@ -186,9 +210,31 @@ class ObligationAdapterStub:
             raise ValueError("adapter stubs never discharge an obligation")
         if not self.note:
             raise ValueError("adapter stub note must be non-empty")
+        for label, names in (
+            ("disturbance_parameters", self.disturbance_parameters),
+            ("disturbance_assumption_ids", self.disturbance_assumption_ids),
+        ):
+            if any(not isinstance(name, str) or not name for name in names):
+                raise ValueError(f"adapter stub {label} must be non-empty strings")
+            if len(names) != len(set(names)):
+                raise ValueError(f"adapter stub {label} must be unique")
+        if self.robust:
+            if not self.disturbance_parameters:
+                raise ValueError(
+                    "a robust adapter stub must name the disturbance parameter(s) it "
+                    "quantifies over"
+                )
+            if not self.disturbance_assumption_ids:
+                raise ValueError(
+                    "a robust adapter stub must cite the disturbance-bound assumption(s)"
+                )
+        elif self.disturbance_parameters or self.disturbance_assumption_ids:
+            raise ValueError(
+                "a nominal adapter stub must not name a disturbance set"
+            )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "obligationId": self.obligation_id,
             "category": self.category,
             "target": self.target,
@@ -197,6 +243,11 @@ class ObligationAdapterStub:
             "discharges": self.discharges,
             "note": self.note,
         }
+        if self.robust:
+            payload["robust"] = True
+            payload["disturbanceParameters"] = list(self.disturbance_parameters)
+            payload["disturbanceAssumptionIds"] = list(self.disturbance_assumption_ids)
+        return payload
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "ObligationAdapterStub":
@@ -208,6 +259,12 @@ class ObligationAdapterStub:
         applicable = data.get("applicable")
         if not isinstance(applicable, bool):
             raise ValueError("obligation adapter stub applicable must be a bool")
+        parameters = data.get("disturbanceParameters", [])
+        assumption_ids = data.get("disturbanceAssumptionIds", [])
+        if not isinstance(parameters, list) or not isinstance(assumption_ids, list):
+            raise ValueError(
+                "obligation adapter stub disturbance descriptors must be lists"
+            )
         return cls(
             obligation_id=_require_string(data, "obligationId", "obligation adapter stub"),
             category=_require_string(data, "category", "obligation adapter stub"),
@@ -216,6 +273,9 @@ class ObligationAdapterStub:
             required_shape_features=tuple(features),
             note=data.get("note", _STUB_NOTE),
             discharges=bool(data.get("discharges", False)),
+            robust=bool(data.get("robust", False)),
+            disturbance_parameters=tuple(parameters),
+            disturbance_assumption_ids=tuple(assumption_ids),
         )
 
 
@@ -277,22 +337,74 @@ class AdapterStubReport:
         )
 
 
+def robust_obligation_disturbances(
+    problem: VerificationProblem,
+) -> dict[str, tuple[tuple[str, ...], tuple[str, ...]]]:
+    """Map each robust obligation id to its IR-derived disturbance set.
+
+    An obligation is robust when it cites a disturbance-bound assumption (id
+    carrying the disturbance marker) whose variables range over declared problem
+    parameters -- the same IR-only convention the package regime descriptor uses.
+    Returns ``{obligation_id: (disturbance_parameters, disturbance_assumption_ids)}``
+    for the robust obligations only; nominal obligations are absent. Pure
+    classification; it records the obligation shape, it discharges nothing.
+    """
+
+    disturbance_assumptions = {
+        assumption.id: assumption
+        for assumption in problem.assumptions
+        if _DISTURBANCE_ASSUMPTION_MARKER in assumption.id
+    }
+    if not disturbance_assumptions:
+        return {}
+    parameter_names = {parameter.name for parameter in problem.parameters}
+
+    robust: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {}
+    for obligation in problem.obligations:
+        cited = tuple(
+            assumption_id
+            for assumption_id in obligation.assumption_ids
+            if assumption_id in disturbance_assumptions
+        )
+        if not cited:
+            continue
+        parameters = tuple(
+            dict.fromkeys(
+                name
+                for assumption_id in cited
+                for name in disturbance_assumptions[assumption_id].variables
+                if name in parameter_names
+            )
+        )
+        # A cited disturbance bound that ranges no declared parameter is not a
+        # robust quantification in any honest sense; treat the obligation as nominal.
+        if not parameters:
+            continue
+        robust[obligation.id] = (parameters, cited)
+    return robust
+
+
 def obligation_adapter_stubs(problem: VerificationProblem) -> AdapterStubReport:
     """Derive non-discharging adapter stubs for every obligation in ``problem``.
 
     For each obligation, emits one stub per backend category that could consume
     its target, naming the category, the obligation's classified target, and the
     obligation shape (region-scoping, assumptions, strict comparison, ...) the
-    category would have to handle. Malformed targets yield no applicable stub —
-    no backend category can consume an ill-posed obligation. Nothing here is a
-    discharge.
+    category would have to handle. A Tier-3 robust obligation (quantified over a
+    bounded disturbance set) additionally carries a robustness flag and the
+    disturbance set it ranges over, derived only from IR data. Malformed targets
+    yield no applicable stub — no backend category can consume an ill-posed
+    obligation. Nothing here is a discharge.
     """
 
     classifications = classifications_by_obligation(problem)
+    robust_disturbances = robust_obligation_disturbances(problem)
     stubs: list[ObligationAdapterStub] = []
     for obligation in problem.obligations:
         classification = classifications[obligation.id]
         well_formed = classification.malformed_reason is None
+        parameters, assumption_ids = robust_disturbances.get(obligation.id, ((), ()))
+        is_robust = bool(parameters)
         for category in BACKEND_CATEGORY_STUBS:
             applicable = well_formed and category.consumes_target(classification.target)
             if not applicable:
@@ -304,6 +416,9 @@ def obligation_adapter_stubs(problem: VerificationProblem) -> AdapterStubReport:
                     target=classification.target,
                     applicable=True,
                     required_shape_features=classification.shape_features,
+                    robust=is_robust,
+                    disturbance_parameters=parameters,
+                    disturbance_assumption_ids=assumption_ids,
                 )
             )
     return AdapterStubReport(

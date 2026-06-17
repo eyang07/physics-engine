@@ -11,6 +11,7 @@ from engine.verification.adapter_stubs import (
     BackendCategoryStub,
     ObligationAdapterStub,
     obligation_adapter_stubs,
+    robust_obligation_disturbances,
 )
 from engine.verification.capabilities import (
     CANDIDATE_KINDS,
@@ -146,6 +147,7 @@ __all__ = [
     "expression_spec",
     "inspection_diagnostics",
     "obligation_adapter_stubs",
+    "robust_obligation_disturbances",
     "obligation_classifications",
     "render_inspection_markdown",
     "scalar_field_region_geometries",
