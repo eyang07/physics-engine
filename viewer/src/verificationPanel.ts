@@ -9,6 +9,7 @@
 import katex from "katex";
 
 import type {
+  IrAssumption,
   IrObligation,
   IrRegion,
   PackageManifest,
@@ -552,6 +553,10 @@ export class VerificationPanel {
       }
     }
 
+    // The assumptions, by id, so a robust obligation can surface the disturbance
+    // bound it is quantified over (FE-023).
+    const assumptionById = new Map(problem.assumptions.map((assumption) => [assumption.id, assumption]));
+
     const list = el("ul", "verif-ledger");
     problem.obligations.forEach((obligation) => {
       const row = el("li", "verif-ledger__row");
@@ -567,6 +572,13 @@ export class VerificationPanel {
       const outcome = outcomeByObligation.get(obligation.id) ?? "external-required";
       const badges = el("div", "verif-ledger__badges");
       badges.append(this.proofStatusBadge(outcome), rigorBadge(obligation.rigor));
+      // Tier-3: a disturbance-robust obligation is quantified over the wind box
+      // W. Mark it honestly — robust, but still external-required, never
+      // discharged.
+      const disturbance = this.disturbanceBound(obligation, assumptionById);
+      if (disturbance) {
+        badges.append(this.robustBadge());
+      }
       head.append(name, badges);
       row.append(head);
 
@@ -592,6 +604,12 @@ export class VerificationPanel {
         );
         meta.append(within);
       }
+      // The cited disturbance box the robust claim is quantified over, rendered
+      // verbatim from the assumption's bound (e.g. |w_1| <= 0.5). Read-only — it
+      // says what the robustness is against, not that it is discharged.
+      if (disturbance) {
+        meta.append(this.disturbanceBoundChip(disturbance));
+      }
       if (meta.childElementCount > 0) {
         row.append(meta);
       }
@@ -599,6 +617,54 @@ export class VerificationPanel {
     });
     node.append(list);
     return node;
+  }
+
+  // The disturbance-box assumption a robust (Tier-3) obligation is quantified
+  // over, if any. A robust obligation cites a wind/disturbance-box assumption
+  // (its id names the disturbance/wind bound); nominal obligations — including
+  // the nominal velocity bound — cite none. Read only from the IR.
+  private disturbanceBound(
+    obligation: IrObligation,
+    assumptionById: Map<string, IrAssumption>,
+  ): IrAssumption | null {
+    for (const id of obligation.assumptionIds) {
+      if (!/disturbance|wind/i.test(id)) {
+        continue;
+      }
+      const assumption = assumptionById.get(id);
+      if (assumption) {
+        return assumption;
+      }
+    }
+    return null;
+  }
+
+  // The honest robust marker: the obligation holds for every admissible
+  // disturbance in the wind box W — but it is still external-required, never
+  // discharged by the engine.
+  private robustBadge(): HTMLElement {
+    const badge = el("span", "verif-badge verif-badge--robust", "robust ∀ d ∈ W");
+    badge.title =
+      "disturbance-robust: quantified over every admissible disturbance in the wind box W — still external-required, not discharged";
+    return badge;
+  }
+
+  // The cited disturbance bound, rendered verbatim from the assumption (e.g.
+  // |w_1| <= 0.5), so a reader can see what the robustness is quantified against.
+  private disturbanceBoundChip(assumption: IrAssumption): HTMLElement {
+    const chip = el("span", "verif-ledger__disturbance");
+    chip.append(el("span", "verif-ledger__disturbance-label", "robust within "));
+    if (assumption.expression && assumption.rhs !== null) {
+      chip.append(
+        mathSpan(
+          `${assumption.expression.latex} ${comparisonLatex(assumption.comparison)} ${formatNumber(assumption.rhs)}`,
+        ),
+      );
+    } else {
+      chip.append(el("span", "verif-ledger__disturbance-id", assumption.id));
+    }
+    chip.title = "the disturbance box W the robust claim is quantified over — measured/assumed, not a proof";
+    return chip;
   }
 
   private renderDynamics(problem: VerificationProblem): HTMLElement {

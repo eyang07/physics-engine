@@ -1253,6 +1253,22 @@ select {
   color: var(--text-muted);
 }
 
+/* The cited disturbance box a robust obligation is quantified over. */
+.verif-ledger__disturbance {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--cool);
+}
+
+.verif-ledger__disturbance-label {
+  color: var(--text-muted);
+}
+
+.verif-ledger__disturbance .verif-math {
+  color: var(--cool);
+}
+
 .verif-ledger__name {
   align-self: stretch;
   min-width: 0;
@@ -1516,6 +1532,14 @@ select {
   color: var(--text-muted);
 }
 
+/* Tier-3 disturbance-robust marker: distinct from the rigor badges, sitting
+   right after them rather than pushed to the far edge. */
+.verif-badge--robust {
+  margin-left: 0;
+  color: var(--cool);
+  border-color: var(--cool-dim);
+}
+
 /* ---- Dossier scoped overrides (Verification domain only) ----------------- */
 
 /* The docket: a typeset index, not buttons-as-tiles. Model id in mono, title in
@@ -1607,6 +1631,12 @@ select {
 #verificationDomain .verif-badge--candidate {
   color: var(--candidate);
   border-color: var(--candidate-tint);
+}
+
+#verificationDomain .verif-badge--robust {
+  color: var(--cool);
+  border-color: var(--cool-dim);
+  background: var(--cool-dim);
 }
 
 #verificationDomain .verif-role--safe {

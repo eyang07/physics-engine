@@ -971,6 +971,44 @@ for (const viewport of [
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-drone.png`) });
   });
 
+  test(`Verification obligation ledger marks disturbance-robust obligations at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const catalogItems = page.locator("#verificationCatalog .catalog-item");
+
+    // Nominal Tier-1 geofence package (3rd entry): no robust badge anywhere.
+    await catalogItems.nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+    await expect(page.locator("#verifLedger .verif-badge--robust")).toHaveCount(0);
+
+    // Tier-3 disturbance-robust geofence package: its robust obligations carry the
+    // honest "robust ∀ d ∈ W" badge and surface the cited wind box, while still
+    // reading external-required (never discharged).
+    await catalogItems.nth(6).click();
+    await expect(
+      page.getByRole("heading", { name: /drone disturbed geofence axis/i }),
+    ).toBeVisible();
+    const robustBadges = page.locator("#verifLedger .verif-badge--robust");
+    expect(await robustBadges.count()).toBeGreaterThan(0);
+    await expect(robustBadges.first()).toContainText("robust");
+    // The cited disturbance box appears alongside the robust obligation rows.
+    await expect(page.locator("#verifLedger .verif-ledger__disturbance").first()).toBeVisible();
+    // The robustness changes nothing about the obligation's rigor: still external.
+    await expect(
+      page.locator("#verifLedger .verif-badge--external-required").first(),
+    ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-robust-ledger.png`),
+    });
+  });
+
   test(`Verification obligation ledger reads unsampled obligations as not sampled at ${viewport.name}`, async ({
     page,
   }) => {

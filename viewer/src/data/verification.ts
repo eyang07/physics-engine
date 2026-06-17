@@ -175,6 +175,10 @@ export interface IrAssumption {
   id: string;
   description: string | null;
   expression: IrExpression | null;
+  /** The bound comparison and right-hand side, when the assumption is an
+   * inequality (e.g. a disturbance/wind box `|w| <= w_max`). */
+  comparison: string;
+  rhs: number | null;
 }
 
 export interface IrDynamics {
@@ -442,6 +446,8 @@ function parseAssumption(value: unknown): IrAssumption | null {
     id: record.id,
     description: asOptionalString(record.description),
     expression: parseExpression(record.expression),
+    comparison: asString(record.comparison, "<="),
+    rhs: asOptionalNumber(record.rhs),
   };
 }
 
