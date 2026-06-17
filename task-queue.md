@@ -234,17 +234,7 @@ enclosure under stated assumptions), strictly distinct from `measured` (level 1)
 from any external `proved` / `certified` result. The engine proposes; external
 backends dispose._
 
-1. **BE-069: Certified velocity-bound and inner-set obligations**
-   - Goal: Extend certified-numeric enclosures to the Tier-1 P2 velocity-bound and
-     inner-set one-step obligations (still polynomial / exact), so the full Tier-1
-     axis carries level-2 status where the box closes it.
-   - Scope: `scripts/export_verification_problems.py`, and `tests/`.
-   - Acceptance: the horizontal and vertical geofence packages carry certified-numeric
-     statuses for the velocity-bound and inner-set obligations where the enclosure
-     closes them, and stay measured-only where it does not (an honest "not
-     certified"); generated data stays uncommitted; focused tests pass.
-
-2. **BE-070: Branch-partitioned enclosure for guard-band Piecewise maps**
+1. **BE-070: Branch-partitioned enclosure for guard-band Piecewise maps**
    - Goal: Tighten enclosures by partitioning the assumption box along the guard-band
      `Piecewise` switching surfaces (where the closed-loop map is affine on each
      piece), closing obligations the monolithic-box enclosure over-inflates — tightness
@@ -259,7 +249,7 @@ backends dispose._
      preserved); the geofence forward-invariance obligation (previously measured-only)
      now certifies via the branch partition; nothing claims proof; focused tests pass.
 
-3. **BE-071: Robust set-valued enclosure over the disturbance box (Tier-3)**
+2. **BE-071: Robust set-valued enclosure over the disturbance box (Tier-3)**
    - Goal: Certify the Tier-3 robust obligations by enclosing the worst case over the
      disturbance box `W` (carrying `w` as an interval parameter), so the robust
      forward-invariance / avoidance claims gain level-2 status quantified over every
@@ -271,7 +261,7 @@ backends dispose._
      measured-only where the enclosure does not close; generated data stays
      uncommitted; focused tests pass.
 
-4. **BE-072: Certified keep-out avoidance via the mpmath sqrt path**
+3. **BE-072: Certified keep-out avoidance via the mpmath sqrt path**
     - Goal: Certify the obstacle keep-out / intersection avoidance obligations — the
       `sqrt`-bearing distance barrier — exercising the mpmath enclosure layer, so the
       Tier-2 and intersection packages reach level 2.
@@ -282,7 +272,7 @@ backends dispose._
       the obligation over the standoff / interior box; measured statuses unchanged;
       nothing claims proof; generated data stays uncommitted; focused tests pass.
 
-5. **BE-073: Affine-form refinement for the distance barrier**
+4. **BE-073: Affine-form refinement for the distance barrier**
     - Goal: Add an affine / Taylor-model enclosure form to tighten the `sqrt` distance
       barrier where pure intervals over-inflate (tightness only; soundness from the
       same trusted base), closing avoidance obligations the box form cannot.
@@ -293,7 +283,7 @@ backends dispose._
       previously-too-loose avoidance obligation certifies; soundness tests pass;
       nothing claims proof.
 
-6. **BE-074: Surface the certified level-2 status across the summary and rigor ladder**
+5. **BE-074: Surface the certified level-2 status across the summary and rigor ladder**
     - Goal: Make the certified-numeric tier legible — extend the BE-061 cross-package
       summary and the package rigor ladder to report, per obligation, certified-numeric
       vs measured-only vs external-required, keeping the three rigor levels strictly
@@ -306,7 +296,7 @@ backends dispose._
       the report stays deterministic; generated data stays uncommitted; focused tests
       pass.
 
-7. **BE-075: Cross-package certified-status validator**
+6. **BE-075: Cross-package certified-status validator**
     - Goal: Validate, across the whole drone family, which obligations close at level 2
       and that every certified status is internally consistent (its enclosure satisfies
       the recorded verdict over the recorded box and its assumptions are recorded),
@@ -318,7 +308,7 @@ backends dispose._
       tampered one; it reports the family-wide certified coverage; nothing claims
       proof; focused tests pass.
 
-8. **BE-076: Real `reachability` export adapter (non-discharging handoff)**
+7. **BE-076: Real `reachability` export adapter (non-discharging handoff)**
     - Goal: Replace the reachability adapter *stub* with a concrete artifact — write
       each one-step obligation as an enclosure / reachability problem an external
       validated-numerics tool could consume, closing the IR's "optional backend

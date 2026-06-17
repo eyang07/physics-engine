@@ -627,26 +627,30 @@ def _geofence_certified_statuses(
     ``B = max(qMin - q, q - qMax)`` is polynomial and Piecewise-free, so the
     enclosure holds with no rounding and certifies ``B <= 0`` on ``S_in``.
 
-    The one-step forward-invariance / velocity / inner-set obligations are
-    guard-band *closed-loop* (Piecewise) claims: a single monolithic enclosure
-    over free control cannot close them (coasting from a wall already exits the
-    geofence — the guard band is essential), so they honestly stay measured-only
-    here and are taken up by the branch-partitioned enclosure.
+    BE-069 adds conservative branch-free boxes for the Tier-1 P2 velocity bound
+    and the inner-set one-step obligation. These boxes sit inside the guard-band
+    interior, so the recorded box itself fixes the closed-loop map to the coast
+    branch. The certified expressions are exact-rational polynomials/Abs/Max on
+    that stated box; the guard-band portions of the larger assumption regions
+    remain measured-only until the branch-partitioned enclosure handles them.
     """
 
     r = _drone_rational
     q_min, q_max = spec.pos_bounds
+    dt = r(spec.timestep)
+    q = spec.position
+    v = spec.velocity
+    velocity_bound = r(spec.velocity_bound)
+    inner_low = r(q_min) + r(spec.lower_band)
+    inner_high = r(q_max) - r(spec.upper_band)
+    drift_margin = dt * velocity_bound
     obligation_by_name = {ob.name: ob for ob in problem.obligations}
 
     statuses: list[EnclosureStatusSpec] = []
     containment = obligation_by_name["geofence-barrier:initial-containment"]
     inner_box = {
-        spec.position.name: Interval(
-            r(q_min) + r(spec.lower_band), r(q_max) - r(spec.upper_band)
-        ),
-        spec.velocity.name: Interval(
-            -r(spec.velocity_bound), r(spec.velocity_bound)
-        ),
+        q.name: Interval(inner_low, inner_high),
+        v.name: Interval(-velocity_bound, velocity_bound),
     }
     status = certified_enclosure_status(
         id="enclosure:geofence-barrier:initial-containment",
@@ -658,6 +662,62 @@ def _geofence_certified_statuses(
             "Box is the inner-start set S_in: "
             f"{spec.position.name} in [qMin + dLow, qMax - dHigh], "
             f"|{spec.velocity.name}| <= Bh.",
+        ),
+    )
+    if status is not None:
+        statuses.append(status)
+
+    coast_box = {
+        q.name: Interval(inner_low + drift_margin, inner_high - drift_margin),
+        v.name: Interval(-velocity_bound, velocity_bound),
+    }
+    velocity_obligation = replace(
+        obligation_by_name["velocity-bound:one-step-invariance"],
+        expression=expression_spec(sp.Abs(v) - velocity_bound),
+    )
+    status = certified_enclosure_status(
+        id="enclosure:velocity-bound:one-step-invariance:coast-core",
+        obligation=velocity_obligation,
+        box=coast_box,
+        soundness_assumptions=(
+            "Exact zero-order-hold sampled-data map with rational DroneParams; "
+            "the enclosure is exact-rational with no rounding.",
+            "Box lies in the guard-band interior, so the closed-loop guard law "
+            "selects the coast branch throughout the stated box.",
+            f"Box records the certified P2 core: {q.name} in "
+            "[qMin + guard + dt*B, qMax - guard - dt*B], "
+            f"|{v.name}| <= B.",
+        ),
+        note=(
+            "Certified-numeric only on the recorded coast-core box; guard-band "
+            "branches remain measured/external-required until partitioned."
+        ),
+    )
+    if status is not None:
+        statuses.append(status)
+
+    drift = q + dt * v
+    inner_obligation = replace(
+        obligation_by_name["inner-set:one-step-invariance"],
+        expression=expression_spec(
+            sp.Max(inner_low - drift, drift - inner_high, sp.Abs(v) - velocity_bound)
+        ),
+    )
+    status = certified_enclosure_status(
+        id="enclosure:inner-set:one-step-invariance:coast-core",
+        obligation=inner_obligation,
+        box=coast_box,
+        soundness_assumptions=(
+            "Exact zero-order-hold sampled-data map with rational DroneParams; "
+            "the enclosure is exact-rational with no rounding.",
+            "Box lies in the guard-band interior, so the closed-loop guard law "
+            "selects the coast branch throughout the stated box.",
+            "Box is tightened by dt*B on each side, so q + dt*v remains inside "
+            "the inner interval for every point in the box.",
+        ),
+        note=(
+            "Certified-numeric only on the recorded drift-valid coast-core box; "
+            "the larger S_in region remains measured/external-required."
         ),
     )
     if status is not None:

@@ -68,6 +68,12 @@ artifacts.
     `rigor="external-required"`. Viewer-facing verification exports are
     self-contained and include measured `regionGeometry` scalar-field grids plus
     boundary polylines for safe/unsafe/initial/domain regions.
+  - Certified-numeric enclosure statuses for selected Tier-1 drone geofence
+    obligations, all still `externalStatus="external-required"`: exact-rational
+    interval enclosures close initial containment and conservative coast-core
+    boxes for the velocity-bound and inner-set one-step obligations. Guard-band
+    branches and any box whose enclosure does not close remain measured-only /
+    external-required, never promoted to a false safety verdict.
   - Viewer-renderable verification examples now include
     `upright-pendulum-safety` and `controlled-spring-regulator-safety`, each
     with its own controlled trajectory, region geometry, candidate-certificate
