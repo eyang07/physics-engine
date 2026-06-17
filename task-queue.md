@@ -203,40 +203,205 @@ candidates stay candidates, nothing reads as proved._
 
 ## Backend Queue
 
-_Direction (VISION §11): stop expanding the IR in the abstract. The whole queue
-now drives **one flagship controlled system end-to-end** — backend model →
-verification package → (later) frontend. The package contract exists (BE-039) and
-the case studies carry per-obligation assumptions (BE-034). The flagship model has
-arrived (`DRONE_MODEL_SPEC.md`): a **guard-band feedback-controlled, geofenced
-point-mass drone**, whose canonical model is a **discrete** exact zero-order-hold
-map with a per-axis piecewise (Piecewise) controller and a **box / forward-
-invariance barrier** certificate — not Lyapunov (there is no equilibrium). The
-flagship is now routed broadly: nine verification packages span Tier-1 geofence
-(horizontal + vertical, P1 + P2), Tier-2 obstacle keep-out and the
-geofence∩obstacle intersection, and Tier-3 disturbance-robust variants of the
-horizontal, vertical, and obstacle problems (each with robust P1 + P2), all
-carried by the BE-039 package contract, the BE-045 discovery index (now with
-BE-054 Tier/regime metadata), and BE-044 adapter stubs. The remaining work
-deepens that flagship — measured-violation and boundary-margin scenarios, complete
-Tier-2 assumptions, cross-package tooling, and a robust intersection capstone.
-Keep generated data uncommitted. Never label anything proved/certified — the
-engine proposes; external backends dispose._
+_Direction (VISION §7, §11): the flagship drone is now routed end-to-end at **rigor
+level 1 (measured)**, and the nominal/robust × single/intersection matrix is
+complete — twelve verification packages (Tier-1 geofence horizontal + vertical,
+P1 + P2; Tier-2 obstacle keep-out; the geofence∩obstacle intersection; the
+measured-violation and boundary-margin scenarios; and the Tier-3 disturbance-robust
+variants through the robust-intersection capstone), all carried by the BE-039
+package contract, the BE-045 discovery index with BE-054 regime metadata, BE-060
+robustness-aware adapter stubs, the BE-057 consistency validator, and the BE-061
+cross-package summary. Depth on this one flagship still outranks breadth; the engine
+must not become drone-specific elsewhere either._
 
-BE-062 is done: the robust intersection capstone is published, completing the
-nominal/robust x single/intersection matrix.
-`scripts/export_verification_problems.py` added
-`drone_disturbed_geofence_obstacle_problem` + `drone_disturbed_geofence_obstacle_trajectory`,
-registered as the final viewer example `drone-disturbed-geofence-obstacle`. On the
-coupled `(q1, q2)` plane it carries both the geofence box barrier and the keep-out
-barrier as candidates, each with a robust worst-case one-step obligation that bakes
-the disturbance term `dt^2/2*sqrt(2)*w` into the BE-050 intersection drift and cites
-the planar disturbance bound `planar-disturbance-within-wind-bound` (so BE-054
-classifies the package disturbance-robust over `(w1, w2)` and the BE-060 robust
-adapter stubs flag both obligations). The safe set is the intersection
-`{max(B_geo, B_obs) <= 0}`; all four measured `proofStatuses` hold within their
-assumption regions with nonnegative worst-case margins (geofence `+0.147`, keep-out
-`+0.141`). Both barriers stay candidate and obligations external-required; nothing
-claims proof/certification.
+_**The next direction — climb the rigor ladder (level 1 → level 2).** Every
+obligation today is checked by *sampling* (a clean grid is evidence between samples,
+never a bound). This pathway makes **rigor level 2 (certified numerical bounds)**
+real for the flagship: sound *enclosures* of each one-step obligation over its
+stated assumption box, making the IR's `reachability` adapter category concrete
+instead of a stub. The engine still proposes; it does not prove — a certified
+enclosure is "sound over this box under this model," never "safe."_
 
-_Backend queue intentionally left empty for now (per request); do not auto-refill
-until the next batch of flagship work is scoped._
+_**Soundness plan (how level-2 claims stay honest):**_
+_- **Exact-rational interval arithmetic (sound by exactness)** for the polynomial
+  obligations. The drone's exact zero-order-hold map and `DroneParams` are rational,
+  so the geofence / velocity / inner-set / intersection / Tier-3 worst-case forms are
+  polynomials over `sympy.Rational`; interval arithmetic on rationals has **no
+  rounding at all**, so the enclosure property holds by construction. This covers
+  most of the family._
+_- **mpmath outward-rounded intervals only where irrationals appear** — the keep-out
+  distance `sqrt(...)` and the planar `sqrt(2)` factor. mpmath (already a SymPy
+  dependency) gives sound `sqrt` enclosures; the trusted-irrational surface is two
+  nodes. No hand-rolled directed-rounding floats — the credibility-critical failure
+  mode is avoided._
+_- **Fail-closed lowering.** A whitelist of IR expression nodes
+  (Add / Mul / Pow[int] / Rational / Abs / Max / Min / sqrt) with proven-enclosing
+  handlers (including the even-power-straddling-zero case); anything else raises
+  rather than returning a possibly-unsound number._
+_- **Containment property-test suite — the backstop.** Sample points inside each
+  box, evaluate in exact reference arithmetic, assert every value lies inside the
+  computed enclosure. The lane lives or dies on this suite._
+_- **Tag gated on the trusted path; soundness ≠ tightness.** A `certified-numeric`
+  status is emitted only by the sound evaluator; a too-loose enclosure stays
+  `measured` / `external-required` (an honest "not certified"), never a false
+  verdict. Tightening (branch partitioning, affine forms) improves tightness only and
+  can never affect soundness._
+
+_Keep generated data uncommitted. `certified-numeric` is rigor level 2 (a sound
+enclosure under stated assumptions), strictly distinct from `measured` (level 1) and
+from any external `proved` / `certified` result. The engine proposes; external
+backends dispose._
+
+1. **BE-064: mpmath outward-rounded interval layer for irrational nodes**
+   - Goal: Extend the interval layer with sound outward-rounded enclosures for the
+     only irrational operations the flagship needs — `sqrt` and irrational constants
+     (`sqrt(2)`) — delegating to mpmath so the rational core stays exact and only
+     `sqrt` nodes touch floating point.
+   - Scope: `engine/numerics/intervals.py` (mpmath-backed `sqrt` / constant
+     enclosure), and `tests/`.
+   - Acceptance: `sqrt` of a nonnegative rational interval returns an enclosing
+     interval (verified by sampling against a high-precision reference); an irrational
+     constant encloses outward (never inward); the rational operations stay exact;
+     containment property tests pass; nothing claims proof.
+
+2. **BE-065: Fail-closed symbolic-to-interval lowering of IR expressions**
+   - Goal: Evaluate an IR `ExpressionSpec` over a box of variable/parameter intervals
+     via a whitelist of node types, each with a proven-enclosing handler, raising on
+     any unsupported node so an unsound result is never produced.
+   - Scope: `engine/verification/` (an enclosure evaluator over `ExpressionSpec`),
+     and `tests/`.
+   - Acceptance: the evaluator lowers Add / Mul / Pow[int] / Rational / Integer /
+     Abs / Max / Min / sqrt and raises on anything else; a containment property test
+     samples each obligation expression's box and asserts every concrete value lies
+     inside the enclosure; the polynomial path stays exact-rational and the `sqrt`
+     path uses mpmath; nothing claims proof; focused tests pass.
+
+4. **BE-066: One-step image enclosure of a discrete map**
+   - Goal: Over-approximate the one-step reachable image of a `DiscreteSystem` /
+     closed-loop map over a box of states and bounded parameters — the set-propagation
+     primitive the certified obligations build on.
+   - Scope: `engine/verification/` (one-step enclosure built on the lowering), and
+     `tests/`.
+   - Acceptance: given a state box, the enclosure contains the true image of every
+     sampled state (verified by sampling); bounded parameters (velocity, disturbance)
+     are carried as interval parameters; the drone closed-loop map is exercised;
+     nothing claims proof; focused tests pass.
+
+5. **BE-067: certified-numeric rigor tier + EnclosureStatusSpec**
+   - Goal: Add a level-2 `certified-numeric` status to the IR — an enclosure-backed
+     obligation record distinct from `measured` and `external-required` — carrying the
+     obligation box, the computed enclosure, the verdict, and the explicit soundness
+     assumptions, producible only by the trusted enclosure path.
+   - Scope: `engine/verification/ir.py` (new status spec + rigor tier, round-trip,
+     validation), the enclosure producer module, and `tests/`.
+   - Acceptance: an `EnclosureStatusSpec` round-trips through `to_dict` /
+     `from_dict`, is locked to `rigor="certified-numeric"`, records the box /
+     enclosure / soundness-assumption note, and is rejected if it claims `proved`; the
+     status is only emitted by the enclosure evaluator; nothing reads as proof;
+     focused tests pass.
+
+6. **BE-068: Certified Tier-1 geofence one-step invariance (exact-rational path)**
+   - Goal: Produce the first level-2 claim — a certified-numeric enclosure status for
+     the Tier-1 geofence forward-invariance obligation over its stated assumption box,
+     using the exact-rational path (no `sqrt`), upgrading that obligation from
+     measured-holds to enclosure-certified under stated assumptions.
+   - Scope: `scripts/export_verification_problems.py` (attach the enclosure status to
+     `drone_geofence_problem`), and `tests/`.
+   - Acceptance: the geofence package carries a certified-numeric forward-invariance
+     status whose enclosure satisfies the obligation over the assumption box, computed
+     in exact rational arithmetic; the measured status is unchanged; the soundness
+     assumptions are recorded; nothing claims proof beyond the stated enclosure;
+     generated data stays uncommitted; focused tests pass.
+
+7. **BE-069: Certified velocity-bound and inner-set obligations**
+   - Goal: Extend certified-numeric enclosures to the Tier-1 P2 velocity-bound and
+     inner-set one-step obligations (still polynomial / exact), so the full Tier-1
+     axis carries level-2 status where the box closes it.
+   - Scope: `scripts/export_verification_problems.py`, and `tests/`.
+   - Acceptance: the horizontal and vertical geofence packages carry certified-numeric
+     statuses for the velocity-bound and inner-set obligations where the enclosure
+     closes them, and stay measured-only where it does not (an honest "not
+     certified"); generated data stays uncommitted; focused tests pass.
+
+8. **BE-070: Branch-partitioned enclosure for guard-band Piecewise maps**
+   - Goal: Tighten enclosures by partitioning the assumption box along the guard-band
+     `Piecewise` switching surfaces (where the closed-loop map is affine on each
+     piece), closing obligations the monolithic-box enclosure over-inflates — tightness
+     only, soundness invariant.
+   - Scope: `engine/verification/` (region-partitioned enclosure), and `tests/`.
+   - Acceptance: partitioning yields a tighter enclosure than the monolithic box on a
+     chosen obligation while still containing every sampled value (soundness
+     preserved); a previously-too-loose obligation now certifies; nothing claims
+     proof; focused tests pass.
+
+9. **BE-071: Robust set-valued enclosure over the disturbance box (Tier-3)**
+   - Goal: Certify the Tier-3 robust obligations by enclosing the worst case over the
+     disturbance box `W` (carrying `w` as an interval parameter), so the robust
+     forward-invariance / avoidance claims gain level-2 status quantified over every
+     admissible disturbance.
+   - Scope: `scripts/export_verification_problems.py` (attach to the disturbed
+     packages), and `tests/`.
+   - Acceptance: the Tier-3 packages carry certified-numeric robust statuses whose
+     enclosures cover every disturbance in `W` (verified by sampling `w`); they stay
+     measured-only where the enclosure does not close; generated data stays
+     uncommitted; focused tests pass.
+
+10. **BE-072: Certified keep-out avoidance via the mpmath sqrt path**
+    - Goal: Certify the obstacle keep-out / intersection avoidance obligations — the
+      `sqrt`-bearing distance barrier — exercising the mpmath enclosure layer, so the
+      Tier-2 and intersection packages reach level 2.
+    - Scope: `scripts/export_verification_problems.py` (attach to keep-out +
+      intersection packages), and `tests/`.
+    - Acceptance: the keep-out and geofence∩obstacle packages carry certified-numeric
+      avoidance statuses whose enclosures (`sqrt` via mpmath, argument exact) satisfy
+      the obligation over the standoff / interior box; measured statuses unchanged;
+      nothing claims proof; generated data stays uncommitted; focused tests pass.
+
+11. **BE-073: Affine-form refinement for the distance barrier**
+    - Goal: Add an affine / Taylor-model enclosure form to tighten the `sqrt` distance
+      barrier where pure intervals over-inflate (tightness only; soundness from the
+      same trusted base), closing avoidance obligations the box form cannot.
+    - Scope: `engine/numerics/intervals.py` or `engine/verification/` (affine form),
+      and `tests/`.
+    - Acceptance: the affine enclosure is tighter than the interval-box enclosure on
+      the keep-out obligation while still containing every sampled value; a
+      previously-too-loose avoidance obligation certifies; soundness tests pass;
+      nothing claims proof.
+
+12. **BE-074: Surface the certified level-2 status across the summary and rigor ladder**
+    - Goal: Make the certified-numeric tier legible — extend the BE-061 cross-package
+      summary and the package rigor ladder to report, per obligation, certified-numeric
+      vs measured-only vs external-required, keeping the three rigor levels strictly
+      distinct and nothing reading as proof.
+    - Scope: `engine/export/verification_package.py` (summary + per-package certified
+      counts), and `tests/`.
+    - Acceptance: the summary reports each package's certified-numeric / measured-only
+      / external counts (and worst certified margin alongside the measured one);
+      certified is visually and structurally distinct from measured and from proved;
+      the report stays deterministic; generated data stays uncommitted; focused tests
+      pass.
+
+13. **BE-075: Cross-package certified-status validator**
+    - Goal: Validate, across the whole drone family, which obligations close at level 2
+      and that every certified status is internally consistent (its enclosure satisfies
+      the recorded verdict over the recorded box and its assumptions are recorded),
+      failing loudly on a fabricated or inconsistent certified status.
+    - Scope: `engine/verification/` or `engine/export/verification_package.py`, and
+      `tests/`.
+    - Acceptance: a validator re-checks that every published certified-numeric status'
+      enclosure actually satisfies its obligation over the recorded box and rejects a
+      tampered one; it reports the family-wide certified coverage; nothing claims
+      proof; focused tests pass.
+
+14. **BE-076: Real `reachability` export adapter (non-discharging handoff)**
+    - Goal: Replace the reachability adapter *stub* with a concrete artifact — write
+      each one-step obligation as an enclosure / reachability problem an external
+      validated-numerics tool could consume, closing the IR's "optional backend
+      adapter" loop without the engine discharging anything.
+    - Scope: `engine/verification/` (reachability export adapter),
+      `engine/export/verification_package.py` (optional package component), and
+      `tests/`.
+    - Acceptance: the adapter writes a deterministic, re-readable reachability problem
+      file per obligation (dynamics, box, obligation), labeled non-discharging; no
+      external result is fabricated; obligations stay external-required until a backend
+      actually returns one; generated data stays uncommitted; focused tests pass.
