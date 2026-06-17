@@ -15,6 +15,7 @@ from engine.export import (
     PACKAGE_INDEX_SCHEMA_VERSION,
     PACKAGE_MANIFEST_FILENAME,
     PACKAGE_SCHEMA_VERSION,
+    PACKAGE_SUMMARY_FILENAME,
     REGIME_DISTURBANCE_ROBUST,
     REGIME_NOMINAL,
     PackageComponent,
@@ -24,6 +25,8 @@ from engine.export import (
     build_package_index,
     read_package,
     read_package_index,
+    read_package_summaries,
+    render_package_summary_markdown,
     validate_drone_flagship_package_consistency,
     write_package,
 )
@@ -197,6 +200,68 @@ def test_package_index_records_regime_for_every_entry(tmp_path) -> None:
     assert coupled.regime.kind == REGIME_NOMINAL
     assert coupled.regime.disturbance_parameters == ()
     assert coupled.regime.robust_obligation_ids == ()
+
+
+def test_package_summary_surveys_measured_status_consistent_with_manifests(
+    tmp_path,
+) -> None:
+    # BE-061: the human-readable summary lists every package with its model,
+    # regime, obligation count, measured hold/violation counts, and worst margin,
+    # consistent with the per-package manifests. It reports measured evidence and
+    # certifies nothing.
+    manifests = write_verification_packages(tmp_path)
+    summaries = read_package_summaries(tmp_path)
+
+    by_id = {manifest.problem_id: manifest for manifest in manifests}
+    # Every published package appears exactly once, in index order.
+    assert [summary.problem_id for summary in summaries] == [
+        manifest.problem_id for manifest in manifests
+    ]
+    for summary in summaries:
+        manifest = by_id[summary.problem_id]
+        assert summary.model == manifest.model
+        assert summary.regime == (
+            REGIME_NOMINAL if manifest.regime is None else manifest.regime.kind
+        )
+        # The obligation count matches the manifest's counts.
+        assert summary.obligation_count == manifest.counts["obligations"]
+        # The measured tallies cover every proof status (none lost or double-counted).
+        package = read_package(tmp_path / summary.problem_id)
+        assert (
+            summary.measured_holds
+            + summary.measured_violated
+            + summary.external_required
+        ) == len(package.problem.proof_statuses)
+
+    summary_by_id = {summary.problem_id: summary for summary in summaries}
+    # The measured-violation reference scenario reports its violation and a
+    # negative worst margin; a holding package keeps a nonnegative worst margin.
+    violation = summary_by_id["drone-obstacle-keepout-violation"]
+    assert violation.measured_violated >= 1
+    assert violation.worst_margin is not None and violation.worst_margin < 0.0
+
+    holding = summary_by_id["drone-geofence-axis"]
+    assert holding.measured_violated == 0
+    assert holding.worst_margin is not None and holding.worst_margin >= 0.0
+
+    # A disturbance-robust package is labeled as such.
+    assert summary_by_id["drone-disturbed-geofence-axis"].regime == REGIME_DISTURBANCE_ROBUST
+
+
+def test_package_summary_is_deterministic_and_re_readable(tmp_path) -> None:
+    write_verification_packages(tmp_path)
+    summary_path = tmp_path / PACKAGE_SUMMARY_FILENAME
+    assert summary_path.is_file()
+
+    written = summary_path.read_text(encoding="utf-8")
+    # Re-deriving the summary from the published packages yields identical text.
+    rerendered = render_package_summary_markdown(read_package_summaries(tmp_path))
+    assert written == rerendered
+    # It is an honest measured survey -- never a proof or certificate.
+    assert "never a proof or certificate" in written
+    assert "proved" not in written and "certified" not in written
+    # The header counts every package.
+    assert "- packages: " in written
 
 
 def test_package_regime_round_trips() -> None:

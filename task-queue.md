@@ -222,37 +222,21 @@ Tier-2 assumptions, cross-package tooling, and a robust intersection capstone.
 Keep generated data uncommitted. Never label anything proved/certified — the
 engine proposes; external backends dispose._
 
-BE-060 is done: the adapter-stub catalog now distinguishes the Tier-3 robust
-obligation *shape*. `engine/verification/adapter_stubs.py` gained the IR-derived
-helper `robust_obligation_disturbances` (an obligation is robust when it cites a
-disturbance-bound assumption — id carrying the `disturbance` marker — whose
-variables range over declared problem parameters, the same convention the package
-regime descriptor uses), and `ObligationAdapterStub` carries an honest `robust`
-flag plus the `disturbanceParameters` / `disturbanceAssumptionIds` it quantifies
-over. Robust stubs (e.g. `drone-disturbed-geofence-axis` over `w1`, the planar
-keep-out over `w1, w2`) record the disturbance set; nominal stubs serialize exactly
-as before (no robustness keys). `engine/export/verification_package.py` `read_package`
-re-derives the robust set from the IR and rejects any stub whose robustness flag or
-disturbance set drifts from it. Every stub stays `discharges: false` and every
-obligation stays external-required — the flag describes the obligation shape an
-external backend must handle, never a discharge. Nothing claims proof/certification.
+BE-061 is done: the machine-readable discovery index now has a human-readable
+companion. `engine/export/verification_package.py` gained `PackageSummary`,
+`summarize_packages` / `read_package_summaries` (read the index and survey each
+package's IR + manifest), and `render_package_summary_markdown` /
+`write_package_summary`, which emit a deterministic `packages.summary.md` beside
+the packages (wired into `write_verification_packages`). The table lists every
+package with its model, regime (BE-054), obligation count, measured hold/violation
+counts under sampling, and the worst (most negative) signed margin — e.g. the
+`drone-obstacle-keepout-violation` row shows one measured-violated surface with a
+`-0.250000` margin while the holding rows stay nonnegative. It is consistent with
+the per-package manifests by construction and reports measured evidence only — a
+measured-holds count is clean samples, never a proof or certificate. Nothing claims
+proof/certification.
 
-1. **BE-061: Cross-package human-readable catalog summary report**
-   - Goal: The discovery index (BE-045) is machine-readable, but there is no
-     human-readable cross-package summary like the inspection adapter's per-problem
-     report. Add a writer that emits one deterministic summary across all packages —
-     per package: model, Tier/regime (BE-054), obligation count and how many hold
-     vs. are violated under measured sampling, and the worst signed margin — so a
-     reader can survey the flagship at a glance. Pure cataloging; it reports
-     measured status, it certifies nothing.
-   - Scope: `engine/export/verification_package.py` or a thin `scripts/` entry
-     point reading the published packages/index, and `tests/`.
-   - Acceptance: the summary report lists every package with its model, regime,
-     hold/violation counts, and worst margin, consistent with the per-package
-     manifests; it is deterministic and re-readable; nothing claims
-     proof/certification; generated data stays uncommitted; focused tests pass.
-
-2. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
+1. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
     - Goal: BE-050 publishes the nominal geofence∩obstacle intersection and
       BE-049/052 publish Tier-3 robust geofence and obstacle packages, but there is
       no robust *intersection* package. Combine them: on the coupled `(q1, q2)`

@@ -17,7 +17,7 @@ packages raise clear ``ValueError``s.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 import json
 from pathlib import Path
@@ -46,6 +46,11 @@ PACKAGE_MANIFEST_FILENAME = "package.json"
 # packages it lists.
 PACKAGE_INDEX_SCHEMA_VERSION = "verification-packages/v1"
 PACKAGE_INDEX_FILENAME = "packages.index.json"
+
+# A deterministic human-readable cross-package survey written beside the packages,
+# the catalog-level analogue of the inspection adapter's per-problem report. It
+# reports measured (sampled) status only; it certifies nothing.
+PACKAGE_SUMMARY_FILENAME = "packages.summary.md"
 
 # Component kinds the manifest may index, with their on-disk filenames. The IR
 # and the viewer trajectory are required; the inspection report and the
@@ -1133,3 +1138,164 @@ def _read_component(
             f"verification package {manifest.problem_id!r} {kind} file must be an object"
         )
     return payload
+
+
+# --- BE-061: cross-package human-readable summary report --------------------
+#
+# The discovery index is machine-readable; this is its human-readable companion.
+# It surveys every generated package's measured status at a glance -- model,
+# regime, obligation count, how many obligation surfaces measured-hold vs are
+# measured-violated under sampling, and the worst (most negative) signed margin.
+# Pure cataloging: it reports sampled evidence, it certifies nothing.
+
+_SUMMARY_STATUS_HOLDS = "measured-holds"
+_SUMMARY_STATUS_VIOLATED = "measured-violated"
+_SUMMARY_STATUS_EXTERNAL = "external-required"
+
+
+@dataclass(frozen=True)
+class PackageSummary:
+    """One package's measured-status survey row, derived from its IR and manifest."""
+
+    problem_id: str
+    name: str
+    model: str
+    regime: str
+    obligation_count: int
+    measured_holds: int
+    measured_violated: int
+    external_required: int
+    worst_margin: float | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "problemId": self.problem_id,
+            "name": self.name,
+            "model": self.model,
+            "regime": self.regime,
+            "obligationCount": self.obligation_count,
+            "measuredHolds": self.measured_holds,
+            "measuredViolated": self.measured_violated,
+            "externalRequired": self.external_required,
+            "worstMargin": self.worst_margin,
+        }
+
+
+def _summarize_problem(
+    manifest: PackageManifest,
+    problem: VerificationProblem,
+) -> PackageSummary:
+    holds = violated = external = 0
+    margins: list[float] = []
+    for status in problem.proof_statuses:
+        if status.status == _SUMMARY_STATUS_HOLDS:
+            holds += 1
+        elif status.status == _SUMMARY_STATUS_VIOLATED:
+            violated += 1
+        elif status.status == _SUMMARY_STATUS_EXTERNAL:
+            external += 1
+        if status.worst_margin is not None:
+            margins.append(float(status.worst_margin))
+    regime = REGIME_NOMINAL if manifest.regime is None else manifest.regime.kind
+    return PackageSummary(
+        problem_id=manifest.problem_id,
+        name=manifest.name,
+        model=manifest.model,
+        regime=regime,
+        obligation_count=len(problem.obligations),
+        measured_holds=holds,
+        measured_violated=violated,
+        external_required=external,
+        worst_margin=min(margins) if margins else None,
+    )
+
+
+def summarize_packages(
+    packages: Iterable[VerificationPackage],
+) -> tuple[PackageSummary, ...]:
+    """Survey the measured status of each package, in the given order.
+
+    Reads each package's manifest (model, regime) and IR (obligation count,
+    sampled proof statuses) only; it reports measured evidence and certifies
+    nothing.
+    """
+
+    return tuple(
+        _summarize_problem(package.manifest, package.problem) for package in packages
+    )
+
+
+def read_package_summaries(directory: str | Path) -> tuple[PackageSummary, ...]:
+    """Read the discovery index and summarize every package it lists, in order.
+
+    The summary is derived from the published packages on disk, so it stays
+    consistent with the per-package manifests by construction.
+    """
+
+    package_dir = Path(directory)
+    index = read_package_index(package_dir)
+    return tuple(
+        _summarize_problem(
+            package.manifest,
+            package.problem,
+        )
+        for entry in index.entries
+        for package in (read_package(package_dir / entry.problem_id),)
+    )
+
+
+def _format_margin(margin: float | None) -> str:
+    return "n/a" if margin is None else f"{margin:+.6f}"
+
+
+def render_package_summary_markdown(
+    summaries: Sequence[PackageSummary],
+) -> str:
+    """Render a deterministic human-readable cross-package summary report.
+
+    The report is sampled evidence only: a measured-holds count is clean samples,
+    never a proof or certificate, and every obligation still requires external
+    discharge.
+    """
+
+    lines = [
+        "# Verification package summary",
+        "",
+        f"- packages: {len(summaries)}",
+        "",
+        "A cross-package measured-status survey of every generated verification",
+        "package. It reports sampled (measured) evidence only: a measured-holds",
+        "count is clean samples, never a proof or certificate, and every obligation",
+        "still requires external discharge. The worst margin is the most negative",
+        "(or, if none are violated, the smallest nonnegative) signed distance any",
+        "sample reached toward an obligation boundary.",
+        "",
+        "| package | model | regime | obligations | measured-holds | "
+        "measured-violated | external-required | worst margin |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for summary in summaries:
+        lines.append(
+            f"| `{summary.problem_id}` | `{summary.model}` | {summary.regime} | "
+            f"{summary.obligation_count} | {summary.measured_holds} | "
+            f"{summary.measured_violated} | {summary.external_required} | "
+            f"{_format_margin(summary.worst_margin)} |"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_package_summary(directory: str | Path) -> str:
+    """Write the human-readable cross-package summary beside the packages.
+
+    Reads the published discovery index and packages from ``directory`` and writes
+    ``packages.summary.md``. Output is deterministic and regenerable; keep it
+    uncommitted with the rest of the generated verification data. Returns the
+    rendered text.
+    """
+
+    output_dir = Path(directory)
+    summaries = read_package_summaries(output_dir)
+    text = render_package_summary_markdown(summaries)
+    (output_dir / PACKAGE_SUMMARY_FILENAME).write_text(text, encoding="utf-8")
+    return text
