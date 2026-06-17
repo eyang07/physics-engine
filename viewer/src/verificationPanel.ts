@@ -225,6 +225,9 @@ export class VerificationPanel {
     details.append(el("summary", "verif-details__summary", "Appendix — problem record (IR)"));
     const body = el("div", "verif-details__body");
     body.append(this.renderExports(problem, irPath, pkg));
+    if (pkg) {
+      body.append(this.renderPackageInventory(pkg));
+    }
     if (problem.dynamics) {
       body.append(this.renderDynamics(problem));
     }
@@ -347,6 +350,53 @@ export class VerificationPanel {
         "p",
         "verif-package__note",
         "One self-contained bundle (manifest + components) — gathers measured evidence and candidates; discharges nothing.",
+      ),
+    );
+    return node;
+  }
+
+  // A read-only inventory of the published BE-039 package: the manifest's model,
+  // status, and counts, and every indexed component (kind, filename,
+  // description), so the bundle's contents are inspectable without downloading
+  // it. Renders only what the manifest exports; the bundle gathers measured
+  // evidence and candidates and discharges nothing.
+  private renderPackageInventory(pkg: VerificationPackageRef): HTMLElement {
+    const node = section("Package", "verifPackage");
+    const manifest = pkg.manifest;
+
+    const meta = el("dl", "verif-package-meta");
+    const addMeta = (label: string, value: string): void => {
+      meta.append(el("dt", "verif-package-meta__term", label));
+      meta.append(el("dd", "verif-package-meta__value", value));
+    };
+    addMeta("model", manifest.model || "—");
+    addMeta("status", manifest.status);
+    addMeta(
+      "counts",
+      `${manifest.counts.regions} regions · ${manifest.counts.obligations} obligations · ` +
+        `${manifest.counts.candidates} candidates`,
+    );
+    node.append(meta);
+
+    const list = el("ul", "verif-package-components");
+    manifest.components.forEach((component) => {
+      const item = el("li", "verif-package-component");
+      const head = el("div", "verif-package-component__head");
+      head.append(el("span", "verif-package-component__kind", component.kind));
+      head.append(el("code", "verif-package-component__file", component.path));
+      item.append(head);
+      if (component.description) {
+        item.append(el("p", "verif-package-component__desc", component.description));
+      }
+      list.append(item);
+    });
+    node.append(list);
+
+    node.append(
+      el(
+        "p",
+        "verif-meta",
+        "Inventory of the bundle's indexed components — the same measured evidence and candidates as the IR; it discharges nothing.",
       ),
     );
     return node;

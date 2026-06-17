@@ -970,6 +970,69 @@ select {
   cursor: progress;
 }
 
+/* Read-only package inventory (FE-022): the manifest's model/status/counts and
+   the indexed components, inspectable without downloading the bundle. */
+.verif-package-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+
+.verif-package-meta__term {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.verif-package-meta__value {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.verif-package-components {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.verif-package-component {
+  padding: 8px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost);
+}
+
+.verif-package-component__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.verif-package-component__kind {
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.verif-package-component__file {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.verif-package-component__desc {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
 .verif-evidence-toggle {
   justify-self: start;
   margin: 0;

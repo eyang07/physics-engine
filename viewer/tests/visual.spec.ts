@@ -1197,6 +1197,16 @@ for (const viewport of [
     await expect(page.locator(".verif-package__inspect")).toContainText("viewer-trajectory");
     await expect(page.locator(".verif-package__note")).toContainText(/discharges nothing/i);
 
+    // The read-only inventory (FE-022) lists the manifest's model/status/counts
+    // and each indexed component, inspectable without downloading the bundle.
+    const inventory = page.locator("#verifPackage");
+    await expect(inventory).toBeVisible();
+    await expect(inventory.locator(".verif-package-meta")).toContainText("candidate");
+    const components = inventory.locator(".verif-package-component");
+    expect(await components.count()).toBeGreaterThan(0);
+    await expect(inventory.locator(".verif-package-component__kind").first()).toBeVisible();
+    await expect(inventory.locator(".verif-package-component__file").first()).toBeVisible();
+
     // Downloading assembles one file whose embedded manifest re-reads to the same
     // components the backend wrote, each component's payload embedded by kind.
     const [downloaded] = await Promise.all([
@@ -1246,6 +1256,9 @@ for (const viewport of [
 
     await expect(page.locator(".verif-download-package")).toHaveCount(0);
     await expect(page.locator(".verif-download-ir")).toBeVisible();
+
+    // With no published package the inventory section is absent entirely.
+    await expect(page.locator("#verifPackage")).toHaveCount(0);
   });
 
   test(`Verification certificate lane emphasizes the obligations it bears on at ${viewport.name}`, async ({
