@@ -12,7 +12,7 @@ import { CertificateLanes } from "./certificateLanes";
 import { dossier, dossierRole } from "./design/dossier";
 import type { ProofStatus, RegionGeometry, VerificationProblem } from "./data/verification";
 import type { Trajectory } from "./data/trajectory";
-import { clamp, formatMeasured } from "./util";
+import { clamp, formatMeasured, formatSignedMeasured } from "./util";
 
 // The light dossier figure ground: cool paper with a faint hairline grid, drawn
 // in place of the dark chrome stage background so the figure reads as a typeset
@@ -48,15 +48,47 @@ type Bounds = {
 };
 
 type ViolationMarker = { x: number; y: number; label: string; worstValue: number | null };
+// A measured-holds closest-approach annotation: the worst (tightest) sampled
+// point and its signed margin to the obligation boundary. Measured slack, never
+// a discharge.
+type HoldsMarker = { x: number; y: number; label: string; margin: number | null };
 
 const VIOLATION_RGBA = dossier.violated;
+const HOLDS_RGBA = dossier.measured;
 
-// A measured violation sample only belongs on the stage if its worst sampled
-// point projects onto the two axes this stage actually plots (state[0] vs
-// state[1]). Samples taken on a different projection, or with no exported point,
-// are dropped rather than drawn somewhere misleading. The obligation name and
-// worst measured value ride along so each marker can be named and quantified in
-// the legend.
+// A worst sampled point only belongs on the stage if it projects onto the two
+// axes this stage actually plots (state[0] vs state[1]). Samples taken on a
+// different projection, or with no exported point, return null rather than being
+// drawn somewhere misleading.
+function projectWorstPoint(
+  status: ProofStatus,
+  axisX: string,
+  axisY: string,
+): { x: number; y: number } | null {
+  const point = status.worstPoint;
+  const projection = status.projection;
+  if (!point || !projection) {
+    return null;
+  }
+  const byStateAxis = new Map<string, number>();
+  projection.variables.forEach((variable, index) => {
+    const axis = projection.variableToStateAxis[variable] ?? variable;
+    const value = point[index];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      byStateAxis.set(axis, value);
+    }
+  });
+  const x = byStateAxis.get(axisX);
+  const y = byStateAxis.get(axisY);
+  if (x === undefined || y === undefined) {
+    return null;
+  }
+  return { x, y };
+}
+
+// The worst sampled violation per obligation, mappable onto the plotted axes.
+// The obligation name and worst measured value ride along so each marker can be
+// named and quantified in the legend.
 function violationMarkers(
   statuses: ProofStatus[],
   axisX: string,
@@ -71,26 +103,40 @@ function violationMarkers(
     if (status.status !== "measured-violated") {
       continue;
     }
-    const point = status.worstPoint;
-    const projection = status.projection;
-    if (!point || !projection) {
-      continue;
-    }
-    const byStateAxis = new Map<string, number>();
-    projection.variables.forEach((variable, index) => {
-      const axis = projection.variableToStateAxis[variable] ?? variable;
-      const value = point[index];
-      if (typeof value === "number" && Number.isFinite(value)) {
-        byStateAxis.set(axis, value);
-      }
-    });
-    const x = byStateAxis.get(axisX);
-    const y = byStateAxis.get(axisY);
-    if (x === undefined || y === undefined) {
+    const placed = projectWorstPoint(status, axisX, axisY);
+    if (!placed) {
       continue;
     }
     const label = obligationName.get(status.obligationId) ?? status.obligationId;
-    markers.push({ x, y, label, worstValue: status.worstValue });
+    markers.push({ x: placed.x, y: placed.y, label, worstValue: status.worstValue });
+  }
+  return markers;
+}
+
+// The closest-approach point per holding obligation: its worst (tightest) sample
+// and signed margin (BE-036). A measured-holds status whose worst point maps onto
+// the plotted axes gets a marker so the ledger's nonnegative margin is also
+// legible geometrically. A tight hold is still measured evidence, never a proof.
+function holdsMarkers(
+  statuses: ProofStatus[],
+  axisX: string,
+  axisY: string,
+  obligationName: Map<string, string>,
+): HoldsMarker[] {
+  if (!axisX || !axisY) {
+    return [];
+  }
+  const markers: HoldsMarker[] = [];
+  for (const status of statuses) {
+    if (status.status !== "measured-holds") {
+      continue;
+    }
+    const placed = projectWorstPoint(status, axisX, axisY);
+    if (!placed) {
+      continue;
+    }
+    const label = obligationName.get(status.obligationId) ?? status.obligationId;
+    markers.push({ x: placed.x, y: placed.y, label, margin: status.worstMargin });
   }
   return markers;
 }
@@ -142,6 +188,44 @@ function drawViolationMarkers(
     ctx.lineTo(cx + r, cy - r);
     ctx.stroke();
     ctx.fillStyle = VIOLATION_RGBA;
+    ctx.font = 'bold 11px "IBM Plex Mono", monospace';
+    ctx.fillText(String(index + 1), cx + 9, cy - 8);
+    ctx.restore();
+  });
+}
+
+// A closest-approach sample, drawn as a hollow measured-teal *diamond* with a
+// paper halo — deliberately distinct from the red ringed cross of a violation,
+// so a holding obligation's tightest sample reads as measured slack rather than
+// a breach. A small index tag ties each marker to its legend entry.
+function drawHoldsMarkers(
+  ctx: CanvasRenderingContext2D,
+  markers: HoldsMarker[],
+  mapX: (value: number) => number,
+  mapY: (value: number) => number,
+): void {
+  const diamond = (cx: number, cy: number, radius: number): void => {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - radius);
+    ctx.lineTo(cx + radius, cy);
+    ctx.lineTo(cx, cy + radius);
+    ctx.lineTo(cx - radius, cy);
+    ctx.closePath();
+  };
+  markers.forEach((marker, index) => {
+    const cx = mapX(marker.x);
+    const cy = mapY(marker.y);
+    ctx.save();
+    // Paper halo so the diamond stays legible over the set washes and rollout.
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(250, 251, 252, 0.9)";
+    diamond(cx, cy, 7);
+    ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = HOLDS_RGBA;
+    diamond(cx, cy, 7);
+    ctx.stroke();
+    ctx.fillStyle = HOLDS_RGBA;
     ctx.font = 'bold 11px "IBM Plex Mono", monospace';
     ctx.fillText(String(index + 1), cx + 9, cy - 8);
     ctx.restore();
@@ -251,6 +335,7 @@ function drawVerificationPhaseScene(
   width: number,
   height: number,
   markers: ViolationMarker[],
+  holds: HoldsMarker[],
   focusedIndex: number | null,
 ): void {
   drawDossierBackground(ctx, width, height);
@@ -308,6 +393,9 @@ function drawVerificationPhaseScene(
   ctx.strokeStyle = dossier.paper;
   ctx.stroke();
 
+  // Holding closest-approach markers under the violation markers, so a breach
+  // (if any) always reads on top of measured slack.
+  drawHoldsMarkers(ctx, holds, mapX, mapY);
   drawViolationMarkers(ctx, markers, mapX, mapY, focusedIndex);
 
   // Axis labels in the figure's own state names, set in mono.
@@ -322,11 +410,13 @@ export class VerificationStage {
   private readonly clock = new PlaybackClock();
   private readonly certificateLanes: CertificateLanes;
   private readonly legend: HTMLElement;
+  private readonly holdsLegend: HTMLElement;
   private readonly rolesLegend: HTMLElement;
   private trajectory: Trajectory | null = null;
   private bounds: Bounds | null = null;
   private regions: RegionGeometry[] = [];
   private violations: ViolationMarker[] = [];
+  private holds: HoldsMarker[] = [];
   private focusedViolation: number | null = null;
   private active = false;
   private running = false;
@@ -349,6 +439,12 @@ export class VerificationStage {
     this.legend.className = "verif-violation-legend";
     this.legend.hidden = true;
     canvas.parentElement?.append(this.legend);
+    // The closest-approach legend names each holding obligation's tightest sample
+    // and its signed margin; hidden until at least one holds marker is drawn.
+    this.holdsLegend = document.createElement("div");
+    this.holdsLegend.className = "verif-holds-legend";
+    this.holdsLegend.hidden = true;
+    canvas.parentElement?.append(this.holdsLegend);
     // A small key for the phase-plane colors (region roles + trajectory), shown
     // whenever a problem is on the stage.
     this.rolesLegend = document.createElement("div");
@@ -369,6 +465,7 @@ export class VerificationStage {
       this.regions = [];
       this.renderRolesLegend([]);
       this.setViolations([]);
+      this.setHolds([]);
       this.syncPlayButton();
       return;
     }
@@ -385,14 +482,12 @@ export class VerificationStage {
     const obligationName = new Map(
       problem.obligations.map((obligation) => [obligation.id, obligation.name]),
     );
+    const axisX = vt.stateNames[0] ?? "";
+    const axisY = vt.stateNames[1] ?? "";
     this.setViolations(
-      violationMarkers(
-        problem.proofStatuses,
-        vt.stateNames[0] ?? "",
-        vt.stateNames[1] ?? "",
-        obligationName,
-      ),
+      violationMarkers(problem.proofStatuses, axisX, axisY, obligationName),
     );
+    this.setHolds(holdsMarkers(problem.proofStatuses, axisX, axisY, obligationName));
     this.certificateLanes.show(vt.series, vt.certificateSeries);
     this.syncPlayButton();
     this.resize();
@@ -407,6 +502,15 @@ export class VerificationStage {
     this.canvas.dataset.violationMarkers = String(markers.length);
     this.setFocusedViolation(null);
     this.renderLegend(markers);
+  }
+
+  // Mirror the closest-approach markers onto the canvas dataset (so visual
+  // coverage can assert the marker / no-marker paths without pixel diffing) and
+  // into the legend.
+  private setHolds(markers: HoldsMarker[]): void {
+    this.holds = markers;
+    this.canvas.dataset.holdsMarkers = String(markers.length);
+    this.renderHoldsLegend(markers);
   }
 
   // Focus (or clear focus on) a single drawn violation so the stage emphasizes
@@ -467,6 +571,44 @@ export class VerificationStage {
     this.legend.hidden = false;
   }
 
+  // The closest-approach legend names each holding obligation by its tightest
+  // sample and shows the signed measured margin (BE-036) — read-only, since a
+  // holding sample is measured slack, not a breach to focus on. Hidden when no
+  // holds marker is on the stage.
+  private renderHoldsLegend(markers: HoldsMarker[]): void {
+    this.holdsLegend.replaceChildren();
+    if (markers.length === 0) {
+      this.holdsLegend.hidden = true;
+      return;
+    }
+    const title = document.createElement("p");
+    title.className = "verif-holds-legend__title";
+    title.textContent = "measured closest approach";
+    this.holdsLegend.append(title);
+    markers.forEach((marker, index) => {
+      const entry = document.createElement("div");
+      entry.className = "verif-holds-legend__entry";
+      const tag = document.createElement("span");
+      tag.className = "verif-holds-legend__tag";
+      tag.textContent = String(index + 1);
+      const name = document.createElement("span");
+      name.className = "verif-holds-legend__name";
+      name.textContent = marker.label;
+      entry.append(tag, name);
+      // Show the signed margin (the closest the evidence came to the boundary)
+      // when the backend exported one. A missing margin simply omits the chip.
+      if (marker.margin !== null) {
+        const value = document.createElement("span");
+        value.className = "verif-holds-legend__value";
+        value.textContent = formatSignedMeasured(marker.margin);
+        value.title = "worst measured margin (signed slack to the boundary)";
+        entry.append(value);
+      }
+      this.holdsLegend.append(entry);
+    });
+    this.holdsLegend.hidden = false;
+  }
+
   // A small key for the phase-plane colors: each region role present plus the
   // trajectory, so a reader can tell the safe corridor from the unsafe set.
   private renderRolesLegend(regions: RegionGeometry[]): void {
@@ -513,6 +655,7 @@ export class VerificationStage {
     this.regions = [];
     this.renderRolesLegend([]);
     this.setViolations([]);
+    this.setHolds([]);
     this.syncPlayButton();
     this.resize();
   }
@@ -586,6 +729,7 @@ export class VerificationStage {
       width,
       height,
       this.violations,
+      this.holds,
       this.focusedViolation,
     );
     this.certificateLanes.update(sample.phase);

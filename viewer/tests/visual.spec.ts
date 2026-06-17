@@ -301,7 +301,7 @@ for (const viewport of [
 
     // The catalog lists every exported problem; the first is active by default.
     const catalogItems = page.locator("#verificationCatalog .catalog-item");
-    await expect(catalogItems).toHaveCount(3);
+    await expect(catalogItems).toHaveCount(10);
     await expect(page.locator("#verificationCatalog .catalog-item--active")).toHaveCount(1);
 
     // The default problem animates its controlled trajectory on the exported
@@ -424,7 +424,7 @@ for (const viewport of [
     await page.waitForSelector("#verificationSummary .verif-summary");
 
     const items = page.locator("#verificationCatalog .catalog-item");
-    await expect(items).toHaveCount(3);
+    await expect(items).toHaveCount(10);
 
     // Every item carries its obligation/candidate counts from the index summary.
     for (let index = 0; index < 3; index += 1) {
@@ -574,6 +574,49 @@ for (const viewport of [
     await page.locator("#verificationCatalog .catalog-item").nth(1).click();
     await page.waitForSelector("#verificationSummary .verif-summary");
     await expect(canvas).toHaveAttribute("data-focused-violation", "");
+  });
+
+  test(`Verification stage marks measured closest-approach for holding obligations at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // Select the drone (third catalog entry): all four obligations hold within
+    // their stated assumption regions, so the stage marks each one's closest
+    // approach and draws no violation marker.
+    await page.locator("#verificationCatalog .catalog-item").nth(2).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+    await page.waitForTimeout(400);
+
+    const canvas = page.locator("#verificationCanvas");
+    // A closest-approach marker per holding obligation whose worst point maps onto
+    // the (q1, v1) axes; the violation path is unchanged (no breach on this run).
+    await expect(canvas).toHaveAttribute("data-holds-markers", /^[1-9][0-9]*$/);
+    await expect(canvas).toHaveAttribute("data-violation-markers", "0");
+    await expectCanvasNonBlank(page, "#verificationCanvas");
+
+    // The closest-approach legend names each holding obligation and shows its
+    // signed measured margin (BE-036) — distinct from the measured-violations
+    // legend, which stays hidden because nothing was breached.
+    const holdsLegend = page.locator(".verif-holds-legend");
+    await expect(holdsLegend).toBeVisible();
+    await expect(holdsLegend.locator(".verif-holds-legend__title")).toHaveText(
+      "measured closest approach",
+    );
+    const entries = holdsLegend.locator(".verif-holds-legend__entry");
+    expect(await entries.count()).toBeGreaterThan(0);
+    // The name resolves the obligation (colon-delimited), and the chip carries an
+    // explicitly signed margin (measured slack to the boundary).
+    await expect(holdsLegend.locator(".verif-holds-legend__name").first()).toContainText(":");
+    await expect(holdsLegend.locator(".verif-holds-legend__value").first()).toHaveText(/[+-]/);
+    await expect(page.locator(".verif-violation-legend")).toBeHidden();
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-holds.png`) });
   });
 
   test(`Verification stage shows worst measured values in the legend at ${viewport.name}`, async ({
