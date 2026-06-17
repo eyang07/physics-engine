@@ -32,13 +32,15 @@ from engine.export import (
     write_package_index,
     write_package_summary,
 )
-from engine.numerics import integrate_fixed_step
+from engine.numerics import Interval, integrate_fixed_step
 from engine.verification import (
     AssumptionSpec,
     CandidateSpec,
+    EnclosureStatusSpec,
     InspectionAdapterReport,
     VerificationProblem,
     certificate_series_for_trajectory,
+    certified_enclosure_status,
     expression_spec,
     scalar_field_region_geometries,
     sampled_region_proof_statuses,
@@ -606,12 +608,61 @@ def _drone_axis_geofence_problem(spec: _AxisGeofenceSpec) -> VerificationProblem
     # Each one-step invariance claim is asserted only under its stated assumption
     # (speedBound, velBound, driftBound); sample within that region rather than
     # over all velocities, where a single guard-band step can overshoot.
-    return replace(
+    problem = replace(
         problem,
         proof_statuses=sampled_region_proof_statuses(
             problem, restrict_to_assumption_regions=True
         ),
     )
+    return replace(problem, enclosure_statuses=_geofence_certified_statuses(problem, spec))
+
+
+def _geofence_certified_statuses(
+    problem: VerificationProblem, spec: _AxisGeofenceSpec
+) -> tuple[EnclosureStatusSpec, ...]:
+    """Level-2 certified-numeric statuses for a Tier-1 geofence package.
+
+    The exact-rational interval enclosure closes the geofence barrier's
+    initial-containment obligation over the inner-start set ``S_in``: the barrier
+    ``B = max(qMin - q, q - qMax)`` is polynomial and Piecewise-free, so the
+    enclosure holds with no rounding and certifies ``B <= 0`` on ``S_in``.
+
+    The one-step forward-invariance / velocity / inner-set obligations are
+    guard-band *closed-loop* (Piecewise) claims: a single monolithic enclosure
+    over free control cannot close them (coasting from a wall already exits the
+    geofence — the guard band is essential), so they honestly stay measured-only
+    here and are taken up by the branch-partitioned enclosure.
+    """
+
+    r = _drone_rational
+    q_min, q_max = spec.pos_bounds
+    obligation_by_name = {ob.name: ob for ob in problem.obligations}
+
+    statuses: list[EnclosureStatusSpec] = []
+    containment = obligation_by_name["geofence-barrier:initial-containment"]
+    inner_box = {
+        spec.position.name: Interval(
+            r(q_min) + r(spec.lower_band), r(q_max) - r(spec.upper_band)
+        ),
+        spec.velocity.name: Interval(
+            -r(spec.velocity_bound), r(spec.velocity_bound)
+        ),
+    }
+    status = certified_enclosure_status(
+        id="enclosure:geofence-barrier:initial-containment",
+        obligation=containment,
+        box=inner_box,
+        soundness_assumptions=(
+            "Exact zero-order-hold sampled-data map with rational DroneParams; "
+            "the enclosure is exact-rational with no rounding.",
+            "Box is the inner-start set S_in: "
+            f"{spec.position.name} in [qMin + dLow, qMax - dHigh], "
+            f"|{spec.velocity.name}| <= Bh.",
+        ),
+    )
+    if status is not None:
+        statuses.append(status)
+    return tuple(statuses)
 
 
 def drone_geofence_problem(params: DroneParams = DroneParams()) -> VerificationProblem:

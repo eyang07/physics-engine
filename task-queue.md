@@ -252,20 +252,7 @@ enclosure under stated assumptions), strictly distinct from `measured` (level 1)
 from any external `proved` / `certified` result. The engine proposes; external
 backends dispose._
 
-1. **BE-068: Certified Tier-1 geofence one-step invariance (exact-rational path)**
-   - Goal: Produce the first level-2 claim — a certified-numeric enclosure status for
-     the Tier-1 geofence forward-invariance obligation over its stated assumption box,
-     using the exact-rational path (no `sqrt`), upgrading that obligation from
-     measured-holds to enclosure-certified under stated assumptions.
-   - Scope: `scripts/export_verification_problems.py` (attach the enclosure status to
-     `drone_geofence_problem`), and `tests/`.
-   - Acceptance: the geofence package carries a certified-numeric forward-invariance
-     status whose enclosure satisfies the obligation over the assumption box, computed
-     in exact rational arithmetic; the measured status is unchanged; the soundness
-     assumptions are recorded; nothing claims proof beyond the stated enclosure;
-     generated data stays uncommitted; focused tests pass.
-
-2. **BE-069: Certified velocity-bound and inner-set obligations**
+1. **BE-069: Certified velocity-bound and inner-set obligations**
    - Goal: Extend certified-numeric enclosures to the Tier-1 P2 velocity-bound and
      inner-set one-step obligations (still polynomial / exact), so the full Tier-1
      axis carries level-2 status where the box closes it.
@@ -275,18 +262,22 @@ backends dispose._
      closes them, and stay measured-only where it does not (an honest "not
      certified"); generated data stays uncommitted; focused tests pass.
 
-8. **BE-070: Branch-partitioned enclosure for guard-band Piecewise maps**
+2. **BE-070: Branch-partitioned enclosure for guard-band Piecewise maps**
    - Goal: Tighten enclosures by partitioning the assumption box along the guard-band
      `Piecewise` switching surfaces (where the closed-loop map is affine on each
      piece), closing obligations the monolithic-box enclosure over-inflates — tightness
-     only, soundness invariant.
-   - Scope: `engine/verification/` (region-partitioned enclosure), and `tests/`.
+     only, soundness invariant. The prime target is the geofence **forward-invariance**
+     obligation (and the P2 velocity bound): coasting from a wall already exits the
+     geofence, so the guard band is essential and the monolithic free-control enclosure
+     cannot close it — only the per-branch (fixed-control) partition can.
+   - Scope: `engine/verification/` (region-partitioned enclosure, consumed by
+     `scripts/export_verification_problems.py`), and `tests/`.
    - Acceptance: partitioning yields a tighter enclosure than the monolithic box on a
      chosen obligation while still containing every sampled value (soundness
-     preserved); a previously-too-loose obligation now certifies; nothing claims
-     proof; focused tests pass.
+     preserved); the geofence forward-invariance obligation (previously measured-only)
+     now certifies via the branch partition; nothing claims proof; focused tests pass.
 
-9. **BE-071: Robust set-valued enclosure over the disturbance box (Tier-3)**
+3. **BE-071: Robust set-valued enclosure over the disturbance box (Tier-3)**
    - Goal: Certify the Tier-3 robust obligations by enclosing the worst case over the
      disturbance box `W` (carrying `w` as an interval parameter), so the robust
      forward-invariance / avoidance claims gain level-2 status quantified over every
@@ -298,7 +289,7 @@ backends dispose._
      measured-only where the enclosure does not close; generated data stays
      uncommitted; focused tests pass.
 
-10. **BE-072: Certified keep-out avoidance via the mpmath sqrt path**
+4. **BE-072: Certified keep-out avoidance via the mpmath sqrt path**
     - Goal: Certify the obstacle keep-out / intersection avoidance obligations — the
       `sqrt`-bearing distance barrier — exercising the mpmath enclosure layer, so the
       Tier-2 and intersection packages reach level 2.
@@ -309,7 +300,7 @@ backends dispose._
       the obligation over the standoff / interior box; measured statuses unchanged;
       nothing claims proof; generated data stays uncommitted; focused tests pass.
 
-11. **BE-073: Affine-form refinement for the distance barrier**
+5. **BE-073: Affine-form refinement for the distance barrier**
     - Goal: Add an affine / Taylor-model enclosure form to tighten the `sqrt` distance
       barrier where pure intervals over-inflate (tightness only; soundness from the
       same trusted base), closing avoidance obligations the box form cannot.
@@ -320,7 +311,7 @@ backends dispose._
       previously-too-loose avoidance obligation certifies; soundness tests pass;
       nothing claims proof.
 
-12. **BE-074: Surface the certified level-2 status across the summary and rigor ladder**
+6. **BE-074: Surface the certified level-2 status across the summary and rigor ladder**
     - Goal: Make the certified-numeric tier legible — extend the BE-061 cross-package
       summary and the package rigor ladder to report, per obligation, certified-numeric
       vs measured-only vs external-required, keeping the three rigor levels strictly
@@ -333,7 +324,7 @@ backends dispose._
       the report stays deterministic; generated data stays uncommitted; focused tests
       pass.
 
-13. **BE-075: Cross-package certified-status validator**
+7. **BE-075: Cross-package certified-status validator**
     - Goal: Validate, across the whole drone family, which obligations close at level 2
       and that every certified status is internally consistent (its enclosure satisfies
       the recorded verdict over the recorded box and its assumptions are recorded),
@@ -345,7 +336,7 @@ backends dispose._
       tampered one; it reports the family-wide certified coverage; nothing claims
       proof; focused tests pass.
 
-14. **BE-076: Real `reachability` export adapter (non-discharging handoff)**
+8. **BE-076: Real `reachability` export adapter (non-discharging handoff)**
     - Goal: Replace the reachability adapter *stub* with a concrete artifact — write
       each one-step obligation as an enclosure / reachability problem an external
       validated-numerics tool could consume, closing the IR's "optional backend
