@@ -252,20 +252,7 @@ enclosure under stated assumptions), strictly distinct from `measured` (level 1)
 from any external `proved` / `certified` result. The engine proposes; external
 backends dispose._
 
-1. **BE-067: certified-numeric rigor tier + EnclosureStatusSpec**
-   - Goal: Add a level-2 `certified-numeric` status to the IR — an enclosure-backed
-     obligation record distinct from `measured` and `external-required` — carrying the
-     obligation box, the computed enclosure, the verdict, and the explicit soundness
-     assumptions, producible only by the trusted enclosure path.
-   - Scope: `engine/verification/ir.py` (new status spec + rigor tier, round-trip,
-     validation), the enclosure producer module, and `tests/`.
-   - Acceptance: an `EnclosureStatusSpec` round-trips through `to_dict` /
-     `from_dict`, is locked to `rigor="certified-numeric"`, records the box /
-     enclosure / soundness-assumption note, and is rejected if it claims `proved`; the
-     status is only emitted by the enclosure evaluator; nothing reads as proof;
-     focused tests pass.
-
-2. **BE-068: Certified Tier-1 geofence one-step invariance (exact-rational path)**
+1. **BE-068: Certified Tier-1 geofence one-step invariance (exact-rational path)**
    - Goal: Produce the first level-2 claim — a certified-numeric enclosure status for
      the Tier-1 geofence forward-invariance obligation over its stated assumption box,
      using the exact-rational path (no `sqrt`), upgrading that obligation from
@@ -278,7 +265,7 @@ backends dispose._
      assumptions are recorded; nothing claims proof beyond the stated enclosure;
      generated data stays uncommitted; focused tests pass.
 
-7. **BE-069: Certified velocity-bound and inner-set obligations**
+2. **BE-069: Certified velocity-bound and inner-set obligations**
    - Goal: Extend certified-numeric enclosures to the Tier-1 P2 velocity-bound and
      inner-set one-step obligations (still polynomial / exact), so the full Tier-1
      axis carries level-2 status where the box closes it.

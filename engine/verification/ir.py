@@ -8,6 +8,7 @@ certified.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fractions import Fraction
 import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -17,6 +18,17 @@ SCHEMA_VERSION = "verification-problem/v3"
 _ORDER_COMPARISONS = ("<=", "<", ">=", ">")
 _ASSUMPTION_COMPARISONS = (*_ORDER_COMPARISONS, "=", "!=")
 _PROOF_STATUSES = ("external-required", "measured-holds", "measured-violated")
+
+# Rigor level 2: a sound interval enclosure over a stated box under recorded
+# soundness assumptions. Strictly distinct from "measured" (level 1, sampling)
+# and from any external "proved" / "certified" result (level 3).
+RIGOR_CERTIFIED_NUMERIC = "certified-numeric"
+_ENCLOSURE_VERDICTS = ("certified-holds", "certified-violated")
+_DEFAULT_ENCLOSURE_NOTE = (
+    "Sound interval enclosure over the stated box under the recorded soundness "
+    "assumptions (rigor level 2). Not a proof and not an external certificate; "
+    "the obligation still requires external discharge to be proved."
+)
 
 
 def _require(data: Mapping[str, Any], key: str, owner: str) -> Any:
@@ -669,6 +681,168 @@ class ProofStatusSpec:
         )
 
 
+def _rational(text: str) -> Fraction:
+    """Parse an exact-rational endpoint string (e.g. ``"-3/2"``, ``"0"``)."""
+
+    return Fraction(text)
+
+
+@dataclass(frozen=True)
+class EnclosureStatusSpec:
+    """A level-2 certified-numeric status for one obligation.
+
+    Records a *sound interval enclosure* of the obligation expression over a
+    stated box of exact-rational variable/parameter intervals, the verdict that
+    enclosure supports, and the explicit soundness assumptions under which the
+    enclosure holds. Endpoints are stored as exact-rational strings so the claim
+    round-trips without rounding.
+
+    This is rigor level 2: strictly stronger than ``measured`` sampling and
+    strictly weaker than an external ``proved`` result. The status is locked to
+    ``rigor="certified-numeric"`` and ``external_status="external-required"`` — a
+    certified enclosure never reads as a proof or certificate, and the verdict
+    must be supported by the recorded enclosure or construction fails. It is
+    produced only by the trusted enclosure evaluator
+    (:mod:`engine.verification.certified`).
+    """
+
+    id: str
+    obligation_id: str
+    comparison: str
+    verdict: str
+    # (name, lower, upper) exact-rational endpoint strings, sorted by name.
+    box: tuple[tuple[str, str, str], ...]
+    enclosure_lower: str
+    enclosure_upper: str
+    rhs: float = 0.0
+    region_id: str | None = None
+    soundness_assumptions: tuple[str, ...] = ()
+    rigor: str = RIGOR_CERTIFIED_NUMERIC
+    external_status: str = "external-required"
+    note: str = _DEFAULT_ENCLOSURE_NOTE
+
+    def __post_init__(self) -> None:
+        if self.rigor != RIGOR_CERTIFIED_NUMERIC:
+            raise ValueError(
+                f"enclosure status rigor must be {RIGOR_CERTIFIED_NUMERIC!r}; a "
+                "sound enclosure is not a proof or external certificate"
+            )
+        if self.external_status != "external-required":
+            raise ValueError(
+                "enclosure status external_status must stay external-required"
+            )
+        if self.comparison not in _ORDER_COMPARISONS:
+            raise ValueError("enclosure status comparison must be one of <=, <, >=, >")
+        if self.verdict not in _ENCLOSURE_VERDICTS:
+            raise ValueError(
+                "enclosure status verdict must be certified-holds or certified-violated"
+            )
+        try:
+            lower = _rational(self.enclosure_lower)
+            upper = _rational(self.enclosure_upper)
+        except (ValueError, ZeroDivisionError) as error:
+            raise ValueError("enclosure endpoints must be exact rationals") from error
+        if lower > upper:
+            raise ValueError("enclosure lower endpoint exceeds the upper endpoint")
+        for name, box_lower, box_upper in self.box:
+            try:
+                box_lo = _rational(box_lower)
+                box_hi = _rational(box_upper)
+            except (ValueError, ZeroDivisionError) as error:
+                raise ValueError(
+                    f"box endpoints for {name!r} must be exact rationals"
+                ) from error
+            if box_lo > box_hi:
+                raise ValueError(f"box interval for {name!r} is inverted")
+
+        # The recorded enclosure must actually support the recorded verdict; a
+        # fabricated verdict whose enclosure does not close the obligation is
+        # rejected. (BE-075 additionally re-derives the enclosure from scratch.)
+        rhs = Fraction(str(self.rhs))
+        if self.verdict == "certified-holds":
+            if not _enclosure_holds(self.comparison, lower, upper, rhs):
+                raise ValueError(
+                    "certified-holds verdict not supported by the recorded enclosure"
+                )
+        else:  # certified-violated
+            if not _enclosure_violated(self.comparison, lower, upper, rhs):
+                raise ValueError(
+                    "certified-violated verdict not supported by the recorded enclosure"
+                )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "id": self.id,
+            "obligationId": self.obligation_id,
+            "comparison": self.comparison,
+            "rhs": self.rhs,
+            "verdict": self.verdict,
+            "rigor": self.rigor,
+            "externalStatus": self.external_status,
+            "box": {name: [lower, upper] for name, lower, upper in self.box},
+            "enclosure": {"lower": self.enclosure_lower, "upper": self.enclosure_upper},
+            "soundnessAssumptions": list(self.soundness_assumptions),
+            "note": self.note,
+        }
+        if self.region_id is not None:
+            payload["regionId"] = self.region_id
+        return payload
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "EnclosureStatusSpec":
+        box_data = data.get("box", {})
+        box = tuple(
+            sorted(
+                (name, str(bounds[0]), str(bounds[1]))
+                for name, bounds in box_data.items()
+            )
+        )
+        enclosure = _require(data, "enclosure", "enclosure status")
+        return cls(
+            id=_require(data, "id", "enclosure status"),
+            obligation_id=_require(data, "obligationId", "enclosure status"),
+            comparison=_require(data, "comparison", "enclosure status"),
+            verdict=_require(data, "verdict", "enclosure status"),
+            box=box,
+            enclosure_lower=str(_require(enclosure, "lower", "enclosure status enclosure")),
+            enclosure_upper=str(_require(enclosure, "upper", "enclosure status enclosure")),
+            rhs=float(data.get("rhs", 0.0)),
+            region_id=data.get("regionId"),
+            soundness_assumptions=tuple(data.get("soundnessAssumptions", ())),
+            rigor=data.get("rigor", RIGOR_CERTIFIED_NUMERIC),
+            external_status=data.get("externalStatus", "external-required"),
+            note=data.get("note", _DEFAULT_ENCLOSURE_NOTE),
+        )
+
+
+def _enclosure_holds(
+    comparison: str, lower: Fraction, upper: Fraction, rhs: Fraction
+) -> bool:
+    """Whether the whole enclosure satisfies ``value comparison rhs``."""
+
+    if comparison == "<=":
+        return upper <= rhs
+    if comparison == "<":
+        return upper < rhs
+    if comparison == ">=":
+        return lower >= rhs
+    return lower > rhs  # ">"
+
+
+def _enclosure_violated(
+    comparison: str, lower: Fraction, upper: Fraction, rhs: Fraction
+) -> bool:
+    """Whether no point in the enclosure satisfies ``value comparison rhs``."""
+
+    if comparison == "<=":
+        return lower > rhs
+    if comparison == "<":
+        return lower >= rhs
+    if comparison == ">=":
+        return upper < rhs
+    return upper <= rhs  # ">"
+
+
 @dataclass(frozen=True)
 class VerificationProblem:
     """A portable verification problem for inspection or external adapters."""
@@ -687,6 +861,7 @@ class VerificationProblem:
     system: str | None = None
     region_geometry: tuple[RegionGeometrySpec, ...] = ()
     proof_statuses: tuple[ProofStatusSpec, ...] = ()
+    enclosure_statuses: tuple[EnclosureStatusSpec, ...] = ()
     metadata: Mapping[str, Any] | None = None
     schema_version: str = SCHEMA_VERSION
 
@@ -816,6 +991,27 @@ class VerificationProblem:
                 raise ValueError(
                     f"unknown proof status variables: {sorted(unknown_variables)}"
                 )
+        enclosure_status_ids = [status.id for status in self.enclosure_statuses]
+        if len(set(enclosure_status_ids)) != len(enclosure_status_ids):
+            raise ValueError("enclosure status ids must be unique")
+        for status in self.enclosure_statuses:
+            if status.obligation_id not in known_obligations:
+                raise ValueError(
+                    f"unknown enclosure status obligation id: {status.obligation_id}"
+                )
+            if status.region_id is not None and status.region_id not in known_regions:
+                raise ValueError(
+                    f"unknown enclosure status region id: {status.region_id}"
+                )
+            unknown_box_variables = {name for name, _, _ in status.box} - {
+                *known_variables,
+                *parameter_names,
+            }
+            if unknown_box_variables:
+                raise ValueError(
+                    "unknown enclosure status box symbols: "
+                    f"{sorted(unknown_box_variables)}"
+                )
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -832,6 +1028,7 @@ class VerificationProblem:
             "candidates": [candidate.to_dict() for candidate in self.candidates],
             "regionGeometry": [geometry.to_dict() for geometry in self.region_geometry],
             "proofStatuses": [status.to_dict() for status in self.proof_statuses],
+            "enclosureStatuses": [status.to_dict() for status in self.enclosure_statuses],
         }
         if self.dynamics is not None:
             payload["dynamics"] = self.dynamics.to_dict()
@@ -879,6 +1076,10 @@ class VerificationProblem:
             proof_statuses=tuple(
                 ProofStatusSpec.from_dict(item) for item in data.get("proofStatuses", ())
             ),
+            enclosure_statuses=tuple(
+                EnclosureStatusSpec.from_dict(item)
+                for item in data.get("enclosureStatuses", ())
+            ),
             metadata=None if metadata is None else dict(metadata),
             schema_version=data.get("schemaVersion", SCHEMA_VERSION),
         )
@@ -900,6 +1101,7 @@ def problem_from_parts(
     candidates: Sequence[CandidateSpec] = (),
     region_geometry: Sequence[RegionGeometrySpec] = (),
     proof_statuses: Sequence[ProofStatusSpec] = (),
+    enclosure_statuses: Sequence[EnclosureStatusSpec] = (),
     metadata: Mapping[str, Any] | None = None,
 ) -> VerificationProblem:
     return VerificationProblem(
@@ -917,5 +1119,6 @@ def problem_from_parts(
         candidates=tuple(candidates),
         region_geometry=tuple(region_geometry),
         proof_statuses=tuple(proof_statuses),
+        enclosure_statuses=tuple(enclosure_statuses),
         metadata=metadata,
     )

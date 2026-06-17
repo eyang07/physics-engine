@@ -51,15 +51,18 @@ from engine.verification.enclosure import (
     enclose_expression,
 )
 from engine.verification.reachability import one_step_image
+from engine.verification.certified import certified_enclosure_status
 from engine.verification.ir import (
     AssumptionSpec,
     CandidateSpec,
     DynamicsSpec,
+    EnclosureStatusSpec,
     ExpressionSpec,
     InputSpec,
     ObligationSpec,
     ParameterSpec,
     ProofStatusSpec,
+    RIGOR_CERTIFIED_NUMERIC,
     RegionSpec,
     RegionGeometrySpec,
     SCHEMA_VERSION,
@@ -121,6 +124,7 @@ __all__ = [
     "DIAGNOSTIC_STATUSES",
     "DYNAMICS_KINDS",
     "DynamicsSpec",
+    "EnclosureStatusSpec",
     "ExpressionSpec",
     "InputSpec",
     "InspectionAdapterReport",
@@ -135,6 +139,7 @@ __all__ = [
     "ParameterSpec",
     "ProofStatusSpec",
     "REPORT_STATUS",
+    "RIGOR_CERTIFIED_NUMERIC",
     "RegionGeometrySpec",
     "RegionSpec",
     "SCHEMA_VERSION",
@@ -146,6 +151,7 @@ __all__ = [
     "UnsupportedExpressionError",
     "CertificateTrajectoryDiagnostics",
     "certificate_series_for_trajectory",
+    "certified_enclosure_status",
     "classifications_by_obligation",
     "decode_expression",
     "enclose_expression",
