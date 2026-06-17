@@ -17,6 +17,8 @@ obligation still requires external discharge to be proved.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
 from fractions import Fraction
 from typing import Mapping
 
@@ -24,6 +26,7 @@ from engine.numerics.intervals import Interval
 from engine.verification.enclosure import enclose_expression
 from engine.verification.ir import (
     EnclosureStatusSpec,
+    ExpressionSpec,
     ObligationSpec,
     _enclosure_holds,
     _enclosure_violated,
@@ -42,6 +45,42 @@ def _verdict(comparison: str, enclosure: Interval, rhs: Fraction) -> str | None:
     if _enclosure_violated(comparison, lower, upper, rhs):
         return "certified-violated"
     return None
+
+
+@dataclass(frozen=True)
+class EnclosurePartition:
+    """One branch box for a sound partitioned enclosure.
+
+    The expression must be exact for, or a sound upper/lower enclosing expression
+    of, the original obligation on this box. Coverage of the whole recorded box
+    is a caller-supplied construction invariant and should be recorded in the
+    status soundness assumptions.
+    """
+
+    label: str
+    expression: ExpressionSpec
+    box: Mapping[str, Interval]
+
+    def __post_init__(self) -> None:
+        if not self.label:
+            raise ValueError("enclosure partition label must be non-empty")
+        if not self.box:
+            raise ValueError("enclosure partition box must be non-empty")
+
+
+def partitioned_enclosure(partitions: Sequence[EnclosurePartition]) -> Interval:
+    """Union exact interval enclosures over a finite branch partition."""
+
+    if not partitions:
+        raise ValueError("partitioned enclosure requires at least one partition")
+    intervals = tuple(
+        enclose_expression(partition.expression, partition.box)
+        for partition in partitions
+    )
+    return Interval(
+        min(interval.lower for interval in intervals),
+        max(interval.upper for interval in intervals),
+    )
 
 
 def certified_enclosure_status(
@@ -88,4 +127,62 @@ def certified_enclosure_status(
     )
 
 
-__all__ = ["certified_enclosure_status"]
+def certified_partitioned_enclosure_status(
+    *,
+    id: str,
+    obligation: ObligationSpec,
+    box: Mapping[str, Interval],
+    partitions: Sequence[EnclosurePartition],
+    soundness_assumptions: tuple[str, ...] = (),
+    region_id: str | None = None,
+    note: str | None = None,
+) -> EnclosureStatusSpec | None:
+    """Emit a certified-numeric status from a finite branch partition.
+
+    Returns ``None`` when the unioned enclosure does not close the obligation.
+    This is still level 2 only: a sound enclosure over the stated box under the
+    recorded branch-coverage assumptions, not a proof or safety certificate.
+    """
+
+    enclosure = partitioned_enclosure(partitions)
+    rhs = Fraction(str(obligation.rhs))
+    verdict = _verdict(obligation.comparison, enclosure, rhs)
+    if verdict is None:
+        return None
+
+    serialized_box = tuple(
+        sorted(
+            (name, str(interval.lower), str(interval.upper))
+            for name, interval in box.items()
+        )
+    )
+    partition_assumptions = tuple(
+        f"Partition {partition.label!r} enclosed over "
+        + ", ".join(
+            f"{name} in [{interval.lower}, {interval.upper}]"
+            for name, interval in sorted(partition.box.items())
+        )
+        for partition in partitions
+    )
+    extra = {} if note is None else {"note": note}
+    return EnclosureStatusSpec(
+        id=id,
+        obligation_id=obligation.id,
+        comparison=obligation.comparison,
+        verdict=verdict,
+        box=serialized_box,
+        enclosure_lower=str(enclosure.lower),
+        enclosure_upper=str(enclosure.upper),
+        rhs=obligation.rhs,
+        region_id=region_id if region_id is not None else obligation.region_id,
+        soundness_assumptions=tuple(soundness_assumptions) + partition_assumptions,
+        **extra,
+    )
+
+
+__all__ = [
+    "EnclosurePartition",
+    "certified_enclosure_status",
+    "certified_partitioned_enclosure_status",
+    "partitioned_enclosure",
+]

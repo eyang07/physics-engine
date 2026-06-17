@@ -36,11 +36,13 @@ from engine.numerics import Interval, integrate_fixed_step
 from engine.verification import (
     AssumptionSpec,
     CandidateSpec,
+    EnclosurePartition,
     EnclosureStatusSpec,
     InspectionAdapterReport,
     VerificationProblem,
     certificate_series_for_trajectory,
     certified_enclosure_status,
+    certified_partitioned_enclosure_status,
     expression_spec,
     scalar_field_region_geometries,
     sampled_region_proof_statuses,
@@ -627,12 +629,11 @@ def _geofence_certified_statuses(
     ``B = max(qMin - q, q - qMax)`` is polynomial and Piecewise-free, so the
     enclosure holds with no rounding and certifies ``B <= 0`` on ``S_in``.
 
-    BE-069 adds conservative branch-free boxes for the Tier-1 P2 velocity bound
-    and the inner-set one-step obligation. These boxes sit inside the guard-band
-    interior, so the recorded box itself fixes the closed-loop map to the coast
-    branch. The certified expressions are exact-rational polynomials/Abs/Max on
-    that stated box; the guard-band portions of the larger assumption regions
-    remain measured-only until the branch-partitioned enclosure handles them.
+    BE-069 added a conservative branch-free box for the inner-set one-step
+    obligation. BE-070 partitions the guard-band switching surfaces and closes
+    the forward-invariance and P2 velocity-bound obligations over their full
+    stated rectangular assumption boxes. Each partition is exact-rational; the
+    union affects tightness only, not soundness.
     """
 
     r = _drone_rational
@@ -644,9 +645,98 @@ def _geofence_certified_statuses(
     inner_low = r(q_min) + r(spec.lower_band)
     inner_high = r(q_max) - r(spec.upper_band)
     drift_margin = dt * velocity_bound
+    speed_bound = r(spec.reach) * dt / 2
+    half_dt2_reach = r(spec.reach) * dt**2 / 2
     obligation_by_name = {ob.name: ob for ob in problem.obligations}
 
     statuses: list[EnclosureStatusSpec] = []
+    forward_obligation = obligation_by_name["geofence-barrier:forward-invariance"]
+    forward_box = {
+        q.name: Interval(r(q_min), r(q_max)),
+        v.name: Interval(-speed_bound, speed_bound),
+    }
+
+    def geofence_margin(q_next: sp.Expr) -> sp.Expr:
+        return sp.Max(r(q_min) - q_next, q_next - r(q_max))
+
+    def guard_partitions(
+        *,
+        velocity_limit: sp.Expr,
+        expression_for: Callable[[sp.Expr, sp.Expr], sp.Expr],
+    ) -> tuple[EnclosurePartition, ...]:
+        coast_q = q + dt * v
+        lower_brake_q = coast_q + half_dt2_reach
+        upper_brake_q = coast_q - half_dt2_reach
+        lower_brake_v = v + dt * r(spec.reach)
+        upper_brake_v = v - dt * r(spec.reach)
+        return (
+            EnclosurePartition(
+                label="lower-guard-outward-brake",
+                expression=expression_spec(expression_for(lower_brake_q, lower_brake_v)),
+                box={
+                    q.name: Interval(r(q_min), inner_low),
+                    v.name: Interval(-velocity_limit, 0),
+                },
+            ),
+            EnclosurePartition(
+                label="lower-guard-inward-coast",
+                expression=expression_spec(expression_for(coast_q, v)),
+                box={
+                    q.name: Interval(r(q_min), inner_low),
+                    v.name: Interval(0, velocity_limit),
+                },
+            ),
+            EnclosurePartition(
+                label="guard-interior-coast",
+                expression=expression_spec(expression_for(coast_q, v)),
+                box={
+                    q.name: Interval(inner_low, inner_high),
+                    v.name: Interval(-velocity_limit, velocity_limit),
+                },
+            ),
+            EnclosurePartition(
+                label="upper-guard-inward-coast",
+                expression=expression_spec(expression_for(coast_q, v)),
+                box={
+                    q.name: Interval(inner_high, r(q_max)),
+                    v.name: Interval(-velocity_limit, 0),
+                },
+            ),
+            EnclosurePartition(
+                label="upper-guard-outward-brake",
+                expression=expression_spec(expression_for(upper_brake_q, upper_brake_v)),
+                box={
+                    q.name: Interval(inner_high, r(q_max)),
+                    v.name: Interval(0, velocity_limit),
+                },
+            ),
+        )
+
+    status = certified_partitioned_enclosure_status(
+        id="enclosure:geofence-barrier:forward-invariance:guard-partition",
+        obligation=forward_obligation,
+        box=forward_box,
+        partitions=guard_partitions(
+            velocity_limit=speed_bound,
+            expression_for=lambda q_next, _v_next: geofence_margin(q_next),
+        ),
+        soundness_assumptions=(
+            "Exact zero-order-hold sampled-data map with rational DroneParams; "
+            "each branch enclosure is exact-rational with no rounding.",
+            "The five closed boxes cover the geofence position interval together "
+            "with the speedBound velocity interval; overlaps occur only on "
+            "switching surfaces and are enclosed by at least one adjacent branch.",
+            "On lower/upper outward guard boxes the corrective guard-band branch "
+            "is used; on inward and interior boxes the coast branch is used.",
+        ),
+        note=(
+            "Certified-numeric over the recorded guard-partitioned box; this is "
+            "a sound enclosure, not proof or safety certification."
+        ),
+    )
+    if status is not None:
+        statuses.append(status)
+
     containment = obligation_by_name["geofence-barrier:initial-containment"]
     inner_box = {
         q.name: Interval(inner_low, inner_high),
@@ -667,35 +757,39 @@ def _geofence_certified_statuses(
     if status is not None:
         statuses.append(status)
 
-    coast_box = {
-        q.name: Interval(inner_low + drift_margin, inner_high - drift_margin),
+    velocity_obligation = obligation_by_name["velocity-bound:one-step-invariance"]
+    velocity_box = {
+        q.name: Interval(r(q_min), r(q_max)),
         v.name: Interval(-velocity_bound, velocity_bound),
     }
-    velocity_obligation = replace(
-        obligation_by_name["velocity-bound:one-step-invariance"],
-        expression=expression_spec(sp.Abs(v) - velocity_bound),
-    )
-    status = certified_enclosure_status(
-        id="enclosure:velocity-bound:one-step-invariance:coast-core",
+    status = certified_partitioned_enclosure_status(
+        id="enclosure:velocity-bound:one-step-invariance:guard-partition",
         obligation=velocity_obligation,
-        box=coast_box,
+        box=velocity_box,
+        partitions=guard_partitions(
+            velocity_limit=velocity_bound,
+            expression_for=lambda _q_next, v_next: sp.Abs(v_next) - velocity_bound,
+        ),
         soundness_assumptions=(
             "Exact zero-order-hold sampled-data map with rational DroneParams; "
-            "the enclosure is exact-rational with no rounding.",
-            "Box lies in the guard-band interior, so the closed-loop guard law "
-            "selects the coast branch throughout the stated box.",
-            f"Box records the certified P2 core: {q.name} in "
-            "[qMin + guard + dt*B, qMax - guard - dt*B], "
-            f"|{v.name}| <= B.",
+            "each branch enclosure is exact-rational with no rounding.",
+            "The five closed boxes cover the geofence position interval together "
+            "with the full self-reproducing velocity-bound interval.",
+            "On outward guard boxes the corrective branch maps velocity back into "
+            "the bound; on inward and interior boxes the coast branch is used.",
         ),
         note=(
-            "Certified-numeric only on the recorded coast-core box; guard-band "
-            "branches remain measured/external-required until partitioned."
+            "Certified-numeric over the recorded guard-partitioned P2 box; this "
+            "is a sound enclosure, not proof or safety certification."
         ),
     )
     if status is not None:
         statuses.append(status)
 
+    coast_box = {
+        q.name: Interval(inner_low + drift_margin, inner_high - drift_margin),
+        v.name: Interval(-velocity_bound, velocity_bound),
+    }
     drift = q + dt * v
     inner_obligation = replace(
         obligation_by_name["inner-set:one-step-invariance"],

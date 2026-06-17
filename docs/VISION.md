@@ -145,10 +145,12 @@ these must never be conflated:
 4. **Deductively proved.** A theorem established in a theorem prover or proof
    calculus for hybrid/continuous dynamics.
 
-The engine today operates at **level 1** for behavior and diagnostics. Levels
-2–4 are reached only by routing exported artifacts to appropriate backends; the
-engine's own contribution at those levels is to *generate the problem*, not to
-discharge it.
+The engine today operates at **level 1** for behavior and diagnostics, and has a
+narrow **level 2** lane for selected certified-numeric interval enclosures over
+recorded assumption boxes. Those enclosures are sound numerical bounds under the
+stated model assumptions, not safety proofs. Levels 3–4 are reached only by
+routing exported artifacts to appropriate external backends; the engine's own
+contribution at those levels is to *generate the problem*, not to discharge it.
 
 ## 8. Core Abstractions
 
@@ -178,11 +180,13 @@ dynamics `dx/dt = f(t, x, u, d; θ)` with box-shaped admissible control and
 disturbance sets, closed-loop reduction, and deterministic rollouts
 (backend-only). It also implements backend-only safe/unsafe sublevel sets,
 candidate Lyapunov/barrier functions, proof obligations, measured sampled
-checks, and verification-problem IR v3 (continuous and discrete dynamics,
-control/disturbance channels, explicit assumptions, candidate certificates,
-plus self-contained viewer-facing verification exports: measured
-`regionGeometry` grids and boundary polylines, controlled trajectories,
-time-aligned candidate-certificate series, and sampled `proofStatuses`). The
+checks, selected exact-rational certified-numeric interval enclosures for the
+Tier-1 drone geofence family, and verification-problem IR v3 (continuous and
+discrete dynamics, control/disturbance channels, explicit assumptions,
+candidate certificates, plus self-contained viewer-facing verification exports:
+measured `regionGeometry` grids and boundary polylines, controlled
+trajectories, time-aligned candidate-certificate series, and sampled
+`proofStatuses`). The
 discrete-time analogue
 `x_{k+1} = F(k, x_k, u_k, d_k; θ)` now exists backend-only
 (`engine/dynamics/discrete.py`, spec in `docs/discrete-dynamics.md`) with
@@ -190,8 +194,8 @@ closed-loop reduction, deterministic rollouts, and Euler discretization of
 autonomous continuous systems. The backend exports self-contained controlled
 pendulum and controlled spring verification case studies; frontend safety
 surfaces still need to generalize fully across those exported problems. It does
-**not** yet implement real certificate synthesis, proof discharge, or validated
-numerics.
+**not** yet implement real certificate synthesis, proof discharge, broad
+validated numerics, or any safety certification.
 
 A specific distinction to preserve: the existing **finite-time Lyapunov exponent**
 diagnostic (`engine/dynamics/diagnostics.py`) measures sensitive dependence /

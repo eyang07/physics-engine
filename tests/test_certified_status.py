@@ -15,12 +15,14 @@ import sympy as sp
 from engine.numerics import Interval
 from engine.verification import (
     EnclosureStatusSpec,
+    EnclosurePartition,
     ExpressionSpec,
     ObligationSpec,
     RIGOR_CERTIFIED_NUMERIC,
     VariableSpec,
     VerificationProblem,
     certified_enclosure_status,
+    certified_partitioned_enclosure_status,
     expression_spec,
 )
 
@@ -99,6 +101,34 @@ def test_producer_preserves_exact_rational_endpoints() -> None:
     assert status.enclosure_lower == "-5/12"
     assert status.enclosure_upper == "-1/12"
     assert ("dt", "1/4", "1/4") in status.box
+
+
+def test_partitioned_producer_unions_branch_enclosures() -> None:
+    x = sp.Symbol("x", real=True)
+    obligation = _obligation(sp.Abs(x) - 1, "<=")
+    status = certified_partitioned_enclosure_status(
+        id="enc-partitioned",
+        obligation=obligation,
+        box={"x": Interval(-1, 1)},
+        partitions=(
+            EnclosurePartition(
+                label="left",
+                expression=expression_spec(-x - 1),
+                box={"x": Interval(-1, 0)},
+            ),
+            EnclosurePartition(
+                label="right",
+                expression=expression_spec(x - 1),
+                box={"x": Interval(0, 1)},
+            ),
+        ),
+        soundness_assumptions=("two branch boxes cover x in [-1, 1]",),
+    )
+    assert status is not None
+    assert status.verdict == "certified-holds"
+    assert status.enclosure_lower == "-1"
+    assert status.enclosure_upper == "0"
+    assert any("Partition 'left'" in item for item in status.soundness_assumptions)
 
 
 # -- round-trip ----------------------------------------------------------

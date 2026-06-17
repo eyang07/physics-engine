@@ -51,7 +51,12 @@ from engine.verification.enclosure import (
     enclose_expression,
 )
 from engine.verification.reachability import one_step_image
-from engine.verification.certified import certified_enclosure_status
+from engine.verification.certified import (
+    EnclosurePartition,
+    certified_enclosure_status,
+    certified_partitioned_enclosure_status,
+    partitioned_enclosure,
+)
 from engine.verification.ir import (
     AssumptionSpec,
     CandidateSpec,
@@ -124,6 +129,7 @@ __all__ = [
     "DIAGNOSTIC_STATUSES",
     "DYNAMICS_KINDS",
     "DynamicsSpec",
+    "EnclosurePartition",
     "EnclosureStatusSpec",
     "ExpressionSpec",
     "InputSpec",
@@ -152,6 +158,7 @@ __all__ = [
     "CertificateTrajectoryDiagnostics",
     "certificate_series_for_trajectory",
     "certified_enclosure_status",
+    "certified_partitioned_enclosure_status",
     "classifications_by_obligation",
     "decode_expression",
     "enclose_expression",
@@ -165,6 +172,7 @@ __all__ = [
     "robust_obligation_disturbances",
     "obligation_classifications",
     "one_step_image",
+    "partitioned_enclosure",
     "render_inspection_markdown",
     "scalar_field_region_geometries",
     "scalar_field_region_geometry",
