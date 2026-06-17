@@ -15,6 +15,8 @@ from engine.numerics.intervals import (
     interval_abs,
     interval_max,
     interval_min,
+    interval_sqrt,
+    rational_sqrt_interval,
 )
 
 __all__ = [
@@ -27,6 +29,8 @@ __all__ = [
     "interval_abs",
     "interval_max",
     "interval_min",
+    "interval_sqrt",
+    "rational_sqrt_interval",
     "rk4_step",
     "stormer_verlet_step",
     "symplectic_euler_step",

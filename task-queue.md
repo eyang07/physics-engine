@@ -252,19 +252,7 @@ enclosure under stated assumptions), strictly distinct from `measured` (level 1)
 from any external `proved` / `certified` result. The engine proposes; external
 backends dispose._
 
-1. **BE-064: mpmath outward-rounded interval layer for irrational nodes**
-   - Goal: Extend the interval layer with sound outward-rounded enclosures for the
-     only irrational operations the flagship needs — `sqrt` and irrational constants
-     (`sqrt(2)`) — delegating to mpmath so the rational core stays exact and only
-     `sqrt` nodes touch floating point.
-   - Scope: `engine/numerics/intervals.py` (mpmath-backed `sqrt` / constant
-     enclosure), and `tests/`.
-   - Acceptance: `sqrt` of a nonnegative rational interval returns an enclosing
-     interval (verified by sampling against a high-precision reference); an irrational
-     constant encloses outward (never inward); the rational operations stay exact;
-     containment property tests pass; nothing claims proof.
-
-2. **BE-065: Fail-closed symbolic-to-interval lowering of IR expressions**
+1. **BE-065: Fail-closed symbolic-to-interval lowering of IR expressions**
    - Goal: Evaluate an IR `ExpressionSpec` over a box of variable/parameter intervals
      via a whitelist of node types, each with a proven-enclosing handler, raising on
      any unsupported node so an unsound result is never produced.
@@ -276,7 +264,7 @@ backends dispose._
      inside the enclosure; the polynomial path stays exact-rational and the `sqrt`
      path uses mpmath; nothing claims proof; focused tests pass.
 
-4. **BE-066: One-step image enclosure of a discrete map**
+3. **BE-066: One-step image enclosure of a discrete map**
    - Goal: Over-approximate the one-step reachable image of a `DiscreteSystem` /
      closed-loop map over a box of states and bounded parameters — the set-propagation
      primitive the certified obligations build on.

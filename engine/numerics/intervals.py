@@ -13,9 +13,15 @@ interval that *contains* the true image; some operations (notably even powers
 straddling zero) are not the tightest possible enclosure but are always
 enclosing. Floating-point inputs are rejected rather than silently rounded:
 the credibility-critical failure mode of this lane is an unsound endpoint, so
-only exact rational inputs are admitted. Irrational operations (``sqrt`` and
-irrational constants) are deliberately *not* handled here; they require
-outward-rounded mpmath enclosures and live in a separate layer.
+only exact rational inputs are admitted.
+
+Irrational operations — ``sqrt`` and irrational constants such as ``sqrt(2)``
+— are the only places the flagship needs floating point. They live in a thin
+outward-rounded layer (:func:`rational_sqrt_interval` / :func:`interval_sqrt`)
+that uses mpmath only to *propose* a candidate enclosure and then verifies and
+widens it with exact rational arithmetic, so the enclosing endpoints are exact
+rationals and soundness never depends on trusting mpmath's rounding. The
+rational core above stays exact; only the ``sqrt`` candidate touches mpmath.
 
 Nothing in this module claims proof or certification. It computes sound
 enclosures under stated assumptions; external backends dispose.
@@ -26,9 +32,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fractions import Fraction
 
+import mpmath
 import sympy as sp
 
 Rational = sp.Rational
+
+# Default mpmath working precision (bits) for proposing sqrt candidates. The
+# candidate is exactly verified and widened afterwards, so this controls only
+# enclosure tightness, never soundness.
+_DEFAULT_SQRT_BITS = 200
 
 
 def _as_rational(value: object) -> sp.Rational:
@@ -211,9 +223,95 @@ def interval_min(*values: Interval | object) -> Interval:
     return Interval(lower, upper)
 
 
+# -- irrational layer: outward-rounded sqrt ------------------------------
+
+
+def _mpf_to_rational(value: mpmath.mpf) -> sp.Rational:
+    """Exactly convert a finite mpmath float to a ``sympy.Rational``.
+
+    An ``mpf`` is a dyadic rational ``(-1)**sign * man * 2**exp``, so this
+    conversion is exact — no rounding is introduced.
+    """
+
+    sign, man, exp, _bc = value._mpf_
+    if exp >= 0:
+        rational = sp.Rational(int(man) * (1 << exp))
+    else:
+        rational = sp.Rational(int(man), 1 << (-exp))
+    return -rational if sign else rational
+
+
+def rational_sqrt_interval(
+    value: object, *, bits: int = _DEFAULT_SQRT_BITS
+) -> "Interval":
+    """Enclose ``sqrt(value)`` for an exact nonnegative rational ``value``.
+
+    mpmath proposes a candidate square root at ``bits`` of precision; the
+    candidate is then verified and, if necessary, widened using exact rational
+    arithmetic so the returned endpoints satisfy ``lower**2 <= value`` and
+    ``upper**2 >= value`` exactly. Soundness therefore holds independently of
+    mpmath's internal rounding. Perfect rational squares return a degenerate
+    (exact) interval.
+    """
+
+    x = _as_rational(value)
+    if x < 0:
+        raise ValueError(f"sqrt of a negative quantity {x} is out of domain")
+    if x == 0:
+        return Interval(sp.Integer(0), sp.Integer(0))
+
+    exact = sp.sqrt(x)
+    if exact.is_Rational:
+        return Interval(exact, exact)
+
+    with mpmath.workprec(bits):
+        candidate_mpf = mpmath.sqrt(mpmath.mpf(int(x.p)) / mpmath.mpf(int(x.q)))
+    candidate = _mpf_to_rational(candidate_mpf)
+
+    # Widen outward with exact rational checks until both squared bounds hold.
+    step = (abs(candidate) + 1) * sp.Rational(1, 1 << max(bits - 8, 1))
+    lower = candidate
+    delta = step
+    while lower * lower > x:
+        lower -= delta
+        delta *= 2
+    if lower < 0:
+        lower = sp.Integer(0)
+    upper = candidate
+    delta = step
+    while upper * upper < x:
+        upper += delta
+        delta *= 2
+
+    # Exact soundness assertions: the lane lives or dies on these holding.
+    assert lower * lower <= x <= upper * upper
+    return Interval(lower, upper)
+
+
+def interval_sqrt(value: object, *, bits: int = _DEFAULT_SQRT_BITS) -> "Interval":
+    """Enclose ``sqrt`` over an interval (or rational point).
+
+    ``sqrt`` is monotonically increasing on ``[0, inf)``, so the enclosure is
+    ``[sqrt_lower(a), sqrt_upper(b)]`` for ``[a, b]``. A negative lower bound is
+    rejected as out of domain rather than silently clamped.
+    """
+
+    iv = Interval._coerce(value)
+    if iv.lower < 0:
+        raise ValueError(
+            f"sqrt of an interval with negative lower bound {iv.lower} is out "
+            "of domain"
+        )
+    lower = rational_sqrt_interval(iv.lower, bits=bits).lower
+    upper = rational_sqrt_interval(iv.upper, bits=bits).upper
+    return Interval(lower, upper)
+
+
 __all__ = [
     "Interval",
     "interval_abs",
     "interval_max",
     "interval_min",
+    "interval_sqrt",
+    "rational_sqrt_interval",
 ]
