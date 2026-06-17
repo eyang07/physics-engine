@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 
+import numpy as np
 import pytest
 import sympy as sp
 
@@ -44,6 +45,7 @@ from engine.verification import (
     ParameterSpec,
     VariableSpec,
     certificate_series_for_trajectory,
+    trajectory_obligation_proof_status,
     dynamics_spec_from_controlled_discrete,
     dynamics_spec_from_discrete,
     expression_spec,
@@ -59,6 +61,8 @@ from scripts.export_verification_problems import (
     INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION,
     controlled_discrete_decay_problem,
     controlled_spring_problem,
+    drone_geofence_margin_problem,
+    drone_geofence_margin_trajectory,
     drone_geofence_problem,
     drone_geofence_trajectory,
     export_inspection_artifacts,
@@ -85,6 +89,7 @@ def _viewer_verification_expected_ids() -> list[str]:
         "upright-pendulum-safety",
         "controlled-spring-regulator-safety",
         "drone-geofence-axis",
+        "drone-geofence-margin",
         "drone-vertical-axis",
         "drone-obstacle-keepout",
         "drone-obstacle-keepout-violation",
@@ -1185,6 +1190,57 @@ def test_drone_geofence_problem_exports_viewer_contract() -> None:
     validate_viewer_verification_problems([problem])
 
 
+def test_drone_geofence_margin_scenario_reports_tight_holding_margin() -> None:
+    # The BE-059 boundary-approaching scenario reuses the geofence problem but
+    # drives the horizontal axis near the wall, so the forward-invariance margin is
+    # small but nonnegative -- a tight, load-bearing measured hold (never a
+    # discharge), distinct from the comfortable centered rollout.
+    problem = drone_geofence_margin_problem()
+    assert problem.id == "drone-geofence-margin"
+    assert problem.metadata["verificationModel"] == "drone-geofence-margin"
+
+    # The base region-grid ledger is unchanged: one status per obligation plus the
+    # added trajectory-sampled forward-invariance status.
+    base = drone_geofence_problem()
+    margin_statuses = [
+        status
+        for status in problem.proof_statuses
+        if status.evaluation_kind == "trajectory"
+    ]
+    assert len(problem.proof_statuses) == len(base.proof_statuses) + 1
+    assert len(margin_statuses) == 1
+    margin = margin_statuses[0]
+
+    # A measured hold along the rollout, with a small nonnegative worst margin and
+    # its closest-approach point -- and tighter than the comfortable rollout.
+    assert margin.obligation_id == "geofence-barrier-forward-invariance"
+    assert margin.status == "measured-holds"
+    assert margin.rigor == "measured"
+    assert margin.external_status == "external-required"
+    assert margin.source == "trajectory:boundary-approaching-margin"
+    assert margin.worst_margin is not None
+    assert 0.0 <= margin.worst_margin < 0.05
+    assert margin.worst_point is not None
+
+    comfortable_time, comfortable_states = drone_geofence_trajectory()
+    comfortable = trajectory_obligation_proof_status(
+        base,
+        "geofence-barrier-forward-invariance",
+        comfortable_time,
+        comfortable_states,
+        state_names=("q1", "v1"),
+        variable_to_state_axis={"q1": "q1", "v1": "v1"},
+        source="trajectory:comfortable",
+    )
+    assert margin.worst_margin < comfortable.worst_margin
+
+    # The viewer contract accepts the scenario, and its trajectory stays strictly
+    # inside the geofence (the hold is never breached).
+    validate_viewer_verification_problems([problem])
+    _, states = drone_geofence_margin_trajectory()
+    assert np.all(np.abs(states[:, 0]) < 1.0)
+
+
 def test_certificate_series_supports_discrete_dynamics() -> None:
     problem = drone_geofence_problem()
     time, states = drone_geofence_trajectory()
@@ -1387,6 +1443,7 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         "controlled-pendulum-closed-loop",
         "controlled-spring-regulator",
         "drone-geofence-axis",
+        "drone-geofence-margin",
         "drone-vertical-axis",
         "drone-obstacle-keepout",
         "drone-obstacle-keepout-violation",

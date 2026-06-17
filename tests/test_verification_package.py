@@ -156,6 +156,7 @@ _EXPECTED_REGIMES = {
     "upright-pendulum-safety": REGIME_NOMINAL,
     "controlled-spring-regulator-safety": REGIME_NOMINAL,
     "drone-geofence-axis": REGIME_NOMINAL,
+    "drone-geofence-margin": REGIME_NOMINAL,
     "drone-vertical-axis": REGIME_NOMINAL,
     "drone-obstacle-keepout": REGIME_NOMINAL,
     "drone-obstacle-keepout-violation": REGIME_NOMINAL,

@@ -783,6 +783,72 @@ def drone_vertical_geofence_trajectory(
     return time, result.states
 
 
+# A boundary-approaching axis-1 start (spec L.2 margin scenario): the drone begins
+# deep in the upper guard band, coasting outward at the velocity bound, so one
+# braking step nearly reaches the geofence wall before stopping -- the tight,
+# load-bearing forward-invariance margin.
+DRONE_GEOFENCE_MARGIN_INITIAL_STATE: tuple[float, ...] = (0.95, 0.25)
+
+
+def drone_geofence_margin_trajectory(
+    params: DroneParams = DroneParams(),
+) -> tuple[np.ndarray, np.ndarray]:
+    """The spec L.2 boundary-approaching MARGIN rollout; columns ``(q1, v1)``.
+
+    The drone starts deep in the upper guard band (``q1 = 0.95``) moving outward at
+    the velocity bound (``v1 = Bh``); the guard band fires ``-uh`` and one braking
+    step nearly reaches the wall ``q1 = q1Max`` before stopping -- staying strictly
+    inside the geofence with a small, load-bearing margin, unlike the comfortable
+    centered rollout. Discrete-time axis: step ``k`` maps to ``k * dt``.
+    """
+
+    result = horizontal_axis_rollout(
+        params, initial_state=DRONE_GEOFENCE_MARGIN_INITIAL_STATE
+    )
+    time = result.steps.astype(float) * params.timestep
+    return time, result.states
+
+
+def drone_geofence_margin_problem(
+    params: DroneParams = DroneParams(),
+) -> VerificationProblem:
+    """Tier-1 geofence boundary-approaching MARGIN reference scenario (spec L.2).
+
+    The same decoupled ``(q1, v1)`` geofence problem as
+    :func:`drone_geofence_problem`, but carrying the measured *tight margin* the
+    spec's boundary-approaching scenario produces. A drone that begins deep in the
+    upper guard band moving outward at the velocity bound brakes to a near-wall
+    stop, so the forward-invariance barrier's measured slack is small but
+    nonnegative -- the closest the rollout's successor comes to the geofence wall.
+
+    The base region-grid statuses are unchanged (each one-step claim still
+    measured-holds within its assumption region); an added trajectory-sampled
+    status reports the tight forward-invariance margin along this rollout, with its
+    closest-approach point. Measured evidence only -- a tight hold witnesses how
+    close *this* rollout came to the boundary; it is never a discharge. Renders on
+    the ``(q1, v1)`` phase plane.
+    """
+
+    problem = drone_geofence_problem(params)
+    time, states = drone_geofence_margin_trajectory(params)
+    margin_status = trajectory_obligation_proof_status(
+        problem,
+        "geofence-barrier-forward-invariance",
+        time,
+        states,
+        state_names=("q1", "v1"),
+        variable_to_state_axis=_DRONE_PHASE_AXES,
+        source="trajectory:boundary-approaching-margin",
+    )
+    return replace(
+        problem,
+        id="drone-geofence-margin",
+        name="drone geofence margin",
+        proof_statuses=problem.proof_statuses + (margin_status,),
+        metadata={"verificationModel": "drone-geofence-margin"},
+    )
+
+
 def drone_obstacle_keepout_problem(
     params: DroneParams = DroneParams(),
     obstacle: ObstacleSpec = DEFAULT_OBSTACLE,
@@ -2321,6 +2387,11 @@ def viewer_verification_examples() -> tuple[ViewerVerificationExample, ...]:
         ViewerVerificationExample(
             problem_factory=drone_geofence_problem,
             trajectory_factory=drone_geofence_trajectory,
+            variable_to_state_axis=_DRONE_PHASE_AXES,
+        ),
+        ViewerVerificationExample(
+            problem_factory=drone_geofence_margin_problem,
+            trajectory_factory=drone_geofence_margin_trajectory,
             variable_to_state_axis=_DRONE_PHASE_AXES,
         ),
         ViewerVerificationExample(

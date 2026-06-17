@@ -222,44 +222,25 @@ Tier-2 assumptions, cross-package tooling, and a robust intersection capstone.
 Keep generated data uncommitted. Never label anything proved/certified — the
 engine proposes; external backends dispose._
 
-BE-056 is done: the first measured-violation scenario is published. A new
-`engine/verification/measured.py` seam `trajectory_obligation_proof_status`
+BE-059 is done: the Tier-1 geofence flagship now publishes a boundary-approaching
+**margin** scenario alongside the comfortable rollout, reusing the BE-056
+`engine/verification/measured.py` seam `trajectory_obligation_proof_status` (which
 evaluates one obligation's inequality along a measured trajectory and reports the
-measured verdict with the worst signed margin (and an optional integrator-located
-entry time as `worst_time`). `scripts/export_verification_problems.py` added the
-spec-L.2 "load-bearing diagonal corner" scenario: `drone_obstacle_keepout_violation_trajectory`
-(the drone starts at `q = (9/16, 9/16)` with inward velocity `v = (-Bh, -Bh)` and
-coasts straight into the centered obstacle under the keep-out problem's own
-interior dynamics) and `drone_obstacle_keepout_violation_problem`, registered as a
-tenth viewer example. The published `drone-obstacle-keepout-violation` package
-carries the base region-grid statuses (avoidance still measured-holds within the
-standoff annulus — the candidate's claim is conditional on the standoff assumption)
-plus a trajectory-sampled **measured-violated** avoidance status with a negative
-worst margin and the obstacle entry time located by the event root-finder
-(`SafetySpecification.event_entry_report`, sharp at `t ≈ 1.543`, not snapped to the
-`dt = 1/4` grid). This is the rigor-ladder lesson of spec L.2: the standoff/dilation
-margin is load-bearing, not vacuous. The holding `drone-obstacle-keepout` package
-is unchanged; candidates stay candidate and obligations external-required — a
-located violation is measured evidence that this rollout left the set, never a
-disproof of the candidate. Nothing claims proof/certification.
+worst signed margin). `scripts/export_verification_problems.py` added
+`drone_geofence_margin_trajectory` (the drone starts deep in the upper guard band
+at `q1 = 0.95` coasting outward at the velocity bound `v1 = Bh`, so one braking
+step nearly reaches the wall) and `drone_geofence_margin_problem`, registered as a
+fourth-position viewer example `drone-geofence-margin`. The published package
+carries the base region-grid statuses unchanged plus a trajectory-sampled
+**measured-holds** forward-invariance status with a tight nonnegative worst margin
+(`0.01875`) and its closest-approach point — distinct from the comfortable
+rollout's loose `0.21875`, giving FE-021 a tight margin to render. (The earlier
+BE-056 `drone-obstacle-keepout-violation` measured-violation scenario remains the
+negative-margin counterpart.) Candidates stay candidate and obligations
+external-required — a tight hold is measured evidence of how close this rollout
+came to the boundary, never a discharge. Nothing claims proof/certification.
 
-1. **BE-059: Boundary-approaching margin scenario for the Tier-1 geofence axis**
-   - Goal: The Tier-1 geofence rollout sits comfortably inside the safe set, so its
-     measured holds-margin is large and uninformative (and gives FE-021 little to
-     show). Export the DRONE_MODEL_SPEC §L.2 boundary-approaching scenario: a second
-     trajectory that drives the horizontal axis near the geofence boundary so the
-     measured forward-invariance margin is small but nonnegative, exercising the
-     closest-approach surface with a tight, honest margin. Still measured evidence,
-     never a discharge.
-   - Scope: `scripts/export_verification_problems.py` (the margin-scenario
-     trajectory and sampled statuses on `drone_geofence_problem`), and `tests/`.
-   - Acceptance: the geofence package exports a boundary-approaching scenario whose
-     forward-invariance `proofStatus` reports a small nonnegative worst-case margin
-     with its closest-approach point, distinct from the comfortable rollout; the
-     existing scenario is unchanged; nothing claims proof/certification; generated
-     data stays uncommitted; focused tests pass.
-
-2. **BE-060: Robustness-aware adapter stubs for quantified-over-disturbance
+1. **BE-060: Robustness-aware adapter stubs for quantified-over-disturbance
    obligations**
    - Goal: The adapter-stub catalog (BE-044) derives reachability/SOS/deductive
      stubs from each obligation's classified target, but a Tier-3 robust obligation
@@ -277,7 +258,7 @@ disproof of the candidate. Nothing claims proof/certification.
      obligations stay `external-required`; nothing claims proof/certification;
      generated data stays uncommitted; focused tests pass.
 
-3. **BE-061: Cross-package human-readable catalog summary report**
+2. **BE-061: Cross-package human-readable catalog summary report**
    - Goal: The discovery index (BE-045) is machine-readable, but there is no
      human-readable cross-package summary like the inspection adapter's per-problem
      report. Add a writer that emits one deterministic summary across all packages —
@@ -292,7 +273,7 @@ disproof of the candidate. Nothing claims proof/certification.
      manifests; it is deterministic and re-readable; nothing claims
      proof/certification; generated data stays uncommitted; focused tests pass.
 
-4. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
+3. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
     - Goal: BE-050 publishes the nominal geofence∩obstacle intersection and
       BE-049/052 publish Tier-3 robust geofence and obstacle packages, but there is
       no robust *intersection* package. Combine them: on the coupled `(q1, q2)`
