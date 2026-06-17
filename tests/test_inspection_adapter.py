@@ -13,6 +13,8 @@ import sympy as sp
 from metadata_assertions import assert_embedded_certificate_trajectory
 from engine.export import (
     PACKAGE_INDEX_FILENAME,
+    REGIME_DISTURBANCE_ROBUST,
+    build_package_manifest,
     read_package_index,
     validate_viewer_verification_export,
     validate_viewer_verification_index,
@@ -45,6 +47,7 @@ from engine.verification import (
     ParameterSpec,
     VariableSpec,
     certificate_series_for_trajectory,
+    robust_obligation_disturbances,
     trajectory_obligation_proof_status,
     dynamics_spec_from_controlled_discrete,
     dynamics_spec_from_discrete,
@@ -61,6 +64,7 @@ from scripts.export_verification_problems import (
     INSPECTION_ARTIFACT_INDEX_SCHEMA_VERSION,
     controlled_discrete_decay_problem,
     controlled_spring_problem,
+    drone_disturbed_geofence_obstacle_problem,
     drone_geofence_margin_problem,
     drone_geofence_margin_trajectory,
     drone_geofence_problem,
@@ -97,6 +101,7 @@ def _viewer_verification_expected_ids() -> list[str]:
         "drone-geofence-obstacle",
         "drone-disturbed-vertical-geofence-axis",
         "drone-disturbed-obstacle-keepout",
+        "drone-disturbed-geofence-obstacle",
     ]
 
 
@@ -1241,6 +1246,62 @@ def test_drone_geofence_margin_scenario_reports_tight_holding_margin() -> None:
     assert np.all(np.abs(states[:, 0]) < 1.0)
 
 
+def test_drone_disturbed_geofence_obstacle_is_robust_intersection() -> None:
+    # BE-062: the capstone robust intersection carries both barriers as candidates,
+    # each with a robust worst-case obligation quantified over the wind box, and
+    # measured proof statuses holding within their assumption regions with
+    # nonnegative margins. Both barriers stay candidate; every obligation stays
+    # external-required; nothing is proved.
+    problem = drone_disturbed_geofence_obstacle_problem()
+    assert problem.id == "drone-disturbed-geofence-obstacle"
+    assert problem.metadata["verificationModel"] == "drone-disturbed-geofence-obstacle"
+
+    payload = problem.to_dict()
+    # Two barrier candidates together (the geofence box and the keep-out barrier),
+    # both candidate-only -- the intersection safe set {max(B_geo, B_obs) <= 0}.
+    candidates = {candidate["id"]: candidate for candidate in payload["candidates"]}
+    assert set(candidates) == {"geofence-box-barrier", "obstacle-keepout-barrier"}
+    assert {candidate["status"] for candidate in candidates.values()} == {"candidate"}
+
+    # Both worst-case obligations are robust: they cite the planar disturbance bound
+    # and stay external-required.
+    obligations = {obligation["id"]: obligation for obligation in payload["obligations"]}
+    assert {obligation["rigor"] for obligation in obligations.values()} == {
+        "external-required"
+    }
+    for obligation_id in (
+        "geofence-box-robust-one-step-forward-invariance",
+        "obstacle-keepout-robust-one-step-avoidance",
+    ):
+        assert "planar-disturbance-within-wind-bound" in obligations[obligation_id][
+            "assumptionIds"
+        ]
+
+    # The package is classified disturbance-robust over the planar wind (w1, w2),
+    # and its robust adapter stubs carry that disturbance set.
+    manifest = build_package_manifest(problem)
+    assert manifest.regime.kind == REGIME_DISTURBANCE_ROBUST
+    assert manifest.regime.disturbance_parameters == ("w1", "w2")
+    robust = robust_obligation_disturbances(problem)
+    assert set(robust) == {
+        "geofence-box-robust-one-step-forward-invariance",
+        "obstacle-keepout-robust-one-step-avoidance",
+    }
+    assert all(params == ("w1", "w2") for params, _ in robust.values())
+
+    # Every measured proof status holds within its assumption region with a
+    # nonnegative worst-case margin.
+    statuses = {status["obligationId"]: status for status in payload["proofStatuses"]}
+    assert set(statuses) == set(obligations)
+    for status in statuses.values():
+        assert status["rigor"] == "measured"
+        assert status["externalStatus"] == "external-required"
+        assert status["status"] == "measured-holds"
+        assert status["worst"]["margin"] >= 0.0
+
+    validate_viewer_verification_problems([problem])
+
+
 def test_certificate_series_supports_discrete_dynamics() -> None:
     problem = drone_geofence_problem()
     time, states = drone_geofence_trajectory()
@@ -1451,6 +1512,7 @@ def test_generate_verification_problems_writes_self_contained_index(tmp_path) ->
         "drone-geofence-obstacle",
         "drone-disturbed-vertical-geofence-axis",
         "drone-disturbed-obstacle-keepout",
+        "drone-disturbed-geofence-obstacle",
     ]
     assert [problem["dataPath"] for problem in index["problems"]] == [
         f"/data/verification/{problem_id}.json" for problem_id in expected_ids

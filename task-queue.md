@@ -222,36 +222,21 @@ Tier-2 assumptions, cross-package tooling, and a robust intersection capstone.
 Keep generated data uncommitted. Never label anything proved/certified — the
 engine proposes; external backends dispose._
 
-BE-061 is done: the machine-readable discovery index now has a human-readable
-companion. `engine/export/verification_package.py` gained `PackageSummary`,
-`summarize_packages` / `read_package_summaries` (read the index and survey each
-package's IR + manifest), and `render_package_summary_markdown` /
-`write_package_summary`, which emit a deterministic `packages.summary.md` beside
-the packages (wired into `write_verification_packages`). The table lists every
-package with its model, regime (BE-054), obligation count, measured hold/violation
-counts under sampling, and the worst (most negative) signed margin — e.g. the
-`drone-obstacle-keepout-violation` row shows one measured-violated surface with a
-`-0.250000` margin while the holding rows stay nonnegative. It is consistent with
-the per-package manifests by construction and reports measured evidence only — a
-measured-holds count is clean samples, never a proof or certificate. Nothing claims
-proof/certification.
+BE-062 is done: the robust intersection capstone is published, completing the
+nominal/robust x single/intersection matrix.
+`scripts/export_verification_problems.py` added
+`drone_disturbed_geofence_obstacle_problem` + `drone_disturbed_geofence_obstacle_trajectory`,
+registered as the final viewer example `drone-disturbed-geofence-obstacle`. On the
+coupled `(q1, q2)` plane it carries both the geofence box barrier and the keep-out
+barrier as candidates, each with a robust worst-case one-step obligation that bakes
+the disturbance term `dt^2/2*sqrt(2)*w` into the BE-050 intersection drift and cites
+the planar disturbance bound `planar-disturbance-within-wind-bound` (so BE-054
+classifies the package disturbance-robust over `(w1, w2)` and the BE-060 robust
+adapter stubs flag both obligations). The safe set is the intersection
+`{max(B_geo, B_obs) <= 0}`; all four measured `proofStatuses` hold within their
+assumption regions with nonnegative worst-case margins (geofence `+0.147`, keep-out
+`+0.141`). Both barriers stay candidate and obligations external-required; nothing
+claims proof/certification.
 
-1. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
-    - Goal: BE-050 publishes the nominal geofence∩obstacle intersection and
-      BE-049/052 publish Tier-3 robust geofence and obstacle packages, but there is
-      no robust *intersection* package. Combine them: on the coupled `(q1, q2)`
-      plane carry both the geofence box barrier and the keep-out barrier with their
-      robust worst-case one-step obligations (each baking in the disturbance term as
-      in BE-049/052), safe set `{max(B_geo, B_obs) <= 0}`, under the spec-G plus
-      disturbance assumptions. This is the natural capstone of the nominal/robust ×
-      single/intersection matrix.
-    - Scope: `scripts/export_verification_problems.py` (add
-      `drone_disturbed_geofence_obstacle_problem` + its nominal trajectory, register
-      it as a viewer example), `systems/drone_point_mass.py` if a combined disturbed
-      coasting map is needed, and `tests/`.
-    - Acceptance: the published robust intersection package carries both barriers as
-      candidates, each with a robust worst-case avoidance/forward-invariance
-      obligation citing the disturbance bound, and measured `proofStatuses` holding
-      within their assumption regions with nonnegative worst-case margins; both
-      barriers stay candidate and obligations external-required; nothing claims
-      proof/certification; generated data stays uncommitted; focused tests pass.
+_Backend queue intentionally left empty for now (per request); do not auto-refill
+until the next batch of flagship work is scoped._

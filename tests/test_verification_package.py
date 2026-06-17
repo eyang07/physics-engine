@@ -167,6 +167,7 @@ _EXPECTED_REGIMES = {
     "drone-disturbed-geofence-axis": REGIME_DISTURBANCE_ROBUST,
     "drone-disturbed-vertical-geofence-axis": REGIME_DISTURBANCE_ROBUST,
     "drone-disturbed-obstacle-keepout": REGIME_DISTURBANCE_ROBUST,
+    "drone-disturbed-geofence-obstacle": REGIME_DISTURBANCE_ROBUST,
 }
 
 
