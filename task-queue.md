@@ -243,43 +243,7 @@ is unchanged; candidates stay candidate and obligations external-required — a
 located violation is measured evidence that this rollout left the set, never a
 disproof of the candidate. Nothing claims proof/certification.
 
-1. **BE-057: Cross-package consistency validator for the drone flagship**
-   - Goal: The flagship now spans seven drone packages sharing one model
-   - Goal: The flagship now spans seven drone packages sharing one model
-     (DRONE_MODEL_SPEC §N cross-artifact consistency), but nothing checks that they
-     agree. Add a helper that validates all drone packages against a single
-     `DroneParams` and shared assumption/geometry conventions — same parameter
-     values, consistent geofence/inner-set/obstacle geometry, consistent assumption
-     bounds — so the packages cannot silently drift apart. Pure validation; it
-     asserts consistency, it does not certify safety.
-   - Scope: `engine/export/verification_package.py` or a small
-     `engine/verification/` helper (cross-package consistency check), and `tests/`.
-   - Acceptance: a test asserts the published drone packages share consistent
-     params, geometry, and assumption bounds, and fails loudly on an injected
-     mismatch; nothing claims proof/certification; generated data stays uncommitted;
-     focused tests pass.
-
-2. **BE-058: Encode the full `Obstacle.Valid` assumption triple on the keep-out
-   package**
-   - Goal: The obstacle keep-out package (BE-048) cites only a standoff-sizing
-     precondition, but DRONE_MODEL_SPEC §337/§711 requires the full `Obstacle.Valid`
-     triple: (1) dilated obstacle inside the inner safe set, (2) separation (band
-     narrower than half the obstacle, single-valued controller), (3) braking
-     adequacy (band dominates one-step drift at the velocity cap). Add all three as
-     explicit assumptions the avoidance obligation cites, marking the non-plane ones
-     external-required. This makes the avoidance claim's preconditions complete and
-     honest.
-   - Scope: `scripts/export_verification_problems.py` (add the three assumptions to
-     `drone_obstacle_keepout_problem` and have the avoidance obligation cite them),
-     `systems/drone_point_mass.py` if the `ObstacleSpec` needs the derived margins,
-     and `tests/`.
-   - Acceptance: the keep-out package carries the three `Obstacle.Valid` assumptions
-     with the avoidance obligation citing them; plane-expressible ones are sampled,
-     non-plane ones are external-required; the measured avoidance `proofStatus` is
-     unchanged where it already held; nothing claims proof/certification; generated
-     data stays uncommitted; focused tests pass.
-
-3. **BE-059: Boundary-approaching margin scenario for the Tier-1 geofence axis**
+1. **BE-059: Boundary-approaching margin scenario for the Tier-1 geofence axis**
    - Goal: The Tier-1 geofence rollout sits comfortably inside the safe set, so its
      measured holds-margin is large and uninformative (and gives FE-021 little to
      show). Export the DRONE_MODEL_SPEC §L.2 boundary-approaching scenario: a second
@@ -295,7 +259,7 @@ disproof of the candidate. Nothing claims proof/certification.
      existing scenario is unchanged; nothing claims proof/certification; generated
      data stays uncommitted; focused tests pass.
 
-4. **BE-060: Robustness-aware adapter stubs for quantified-over-disturbance
+2. **BE-060: Robustness-aware adapter stubs for quantified-over-disturbance
    obligations**
    - Goal: The adapter-stub catalog (BE-044) derives reachability/SOS/deductive
      stubs from each obligation's classified target, but a Tier-3 robust obligation
@@ -313,7 +277,7 @@ disproof of the candidate. Nothing claims proof/certification.
      obligations stay `external-required`; nothing claims proof/certification;
      generated data stays uncommitted; focused tests pass.
 
-5. **BE-061: Cross-package human-readable catalog summary report**
+3. **BE-061: Cross-package human-readable catalog summary report**
    - Goal: The discovery index (BE-045) is machine-readable, but there is no
      human-readable cross-package summary like the inspection adapter's per-problem
      report. Add a writer that emits one deterministic summary across all packages —
@@ -328,7 +292,7 @@ disproof of the candidate. Nothing claims proof/certification.
      manifests; it is deterministic and re-readable; nothing claims
      proof/certification; generated data stays uncommitted; focused tests pass.
 
-6. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
+4. **BE-062: Disturbance-robust geofence∩obstacle intersection package**
     - Goal: BE-050 publishes the nominal geofence∩obstacle intersection and
       BE-049/052 publish Tier-3 robust geofence and obstacle packages, but there is
       no robust *intersection* package. Combine them: on the coupled `(q1, q2)`

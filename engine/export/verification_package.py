@@ -17,11 +17,13 @@ packages raise clear ``ValueError``s.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import json
 from pathlib import Path
 from typing import Any
+
+import sympy as sp
 
 from engine.export.verification_contract import (
     validate_viewer_verification_problem_payload,
@@ -297,6 +299,19 @@ class VerificationPackage:
     trajectory: Mapping[str, Any]
     inspection: Mapping[str, Any] | None = None
     adapter_stubs: Mapping[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class DroneFlagshipConsistencyReport:
+    """Diagnostic summary for cross-package drone flagship validation.
+
+    The report is cataloging only. It records which packages were compared and
+    which IR-derived consistency groups were checked; it does not certify any
+    obligation or candidate.
+    """
+
+    problem_ids: tuple[str, ...]
+    signature_groups: Mapping[str, tuple[str, ...]]
 
 
 @dataclass(frozen=True)
@@ -729,6 +744,343 @@ def read_package(directory: str | Path) -> VerificationPackage:
         inspection=inspection,
         adapter_stubs=adapter_stubs,
     )
+
+
+def validate_drone_flagship_package_consistency(
+    packages: Sequence[VerificationPackage | VerificationProblem],
+) -> DroneFlagshipConsistencyReport:
+    """Validate shared conventions across the generated drone packages.
+
+    The flagship spans multiple verification packages, but they should all be
+    projections of one drone parameterization: the same guard-band/geofence
+    geometry, obstacle keep-out geometry, disturbance/velocity bounds, and
+    assumption conventions where those facts are shared. This routine compares
+    those facts from the IR itself and raises ``ValueError`` on drift. It is pure
+    validation and claims no proof or certification.
+    """
+
+    if not packages:
+        raise ValueError("drone flagship consistency validation needs packages")
+
+    problems: list[VerificationProblem] = []
+    manifests: list[PackageManifest | None] = []
+    for item in packages:
+        if isinstance(item, VerificationPackage):
+            problems.append(item.problem)
+            manifests.append(item.manifest)
+        elif isinstance(item, VerificationProblem):
+            problems.append(item)
+            manifests.append(None)
+        else:
+            raise ValueError(
+                "drone flagship consistency validation expects VerificationPackage "
+                "or VerificationProblem entries"
+            )
+
+    problem_ids = tuple(problem.id for problem in problems)
+    if len(problem_ids) != len(set(problem_ids)):
+        raise ValueError("drone flagship consistency validation got duplicate packages")
+
+    groups: dict[str, list[tuple[str, tuple[Any, ...]]]] = {}
+
+    def add(group: str, problem: VerificationProblem, signature: tuple[Any, ...]) -> None:
+        groups.setdefault(group, []).append((problem.id, signature))
+
+    for problem, manifest in zip(problems, manifests, strict=True):
+        model, status = _problem_model_and_status(problem)
+        if not model.startswith("drone-"):
+            raise ValueError(
+                f"drone flagship consistency validation got non-drone package "
+                f"{problem.id!r} with model {model!r}"
+            )
+        if manifest is not None:
+            if manifest.problem_id != problem.id:
+                raise ValueError(
+                    f"drone package {problem.id!r} manifest problemId "
+                    f"{manifest.problem_id!r} does not match the IR"
+                )
+            if manifest.model != model:
+                raise ValueError(
+                    f"drone package {problem.id!r} manifest model {manifest.model!r} "
+                    f"does not match metadata.verificationModel {model!r}"
+                )
+            if manifest.status != status:
+                raise ValueError(
+                    f"drone package {problem.id!r} manifest status {manifest.status!r} "
+                    f"does not match metadata.status {status!r}"
+                )
+        if status != "candidate":
+            raise ValueError(
+                f"drone package {problem.id!r} must keep candidate status, got {status!r}"
+            )
+        if {candidate.status for candidate in problem.candidates} - {"candidate"}:
+            raise ValueError(
+                f"drone package {problem.id!r} has a non-candidate certificate"
+            )
+        if {obligation.rigor for obligation in problem.obligations} - {
+            "external-required"
+        }:
+            raise ValueError(
+                f"drone package {problem.id!r} has a non-external-required obligation"
+            )
+
+        assumptions = {assumption.id: assumption for assumption in problem.assumptions}
+        candidates = {candidate.id: candidate for candidate in problem.candidates}
+        parameters = tuple(parameter.name for parameter in problem.parameters)
+        variables = tuple(variable.name for variable in problem.variables)
+        has_disturbance = any(
+            "disturbance" in assumption.id for assumption in problem.assumptions
+        )
+        if variables == ("q1", "q2") and parameters == ("v1", "v2"):
+            add(
+                "nominal planar bounded-parameter declarations",
+                problem,
+                _parameter_signature(problem),
+            )
+        if len(parameters) == 1 and parameters[0] in {"w1", "w3"}:
+            add(
+                "disturbed axis wind-parameter declarations",
+                problem,
+                _parameter_signature(problem, canonical_names=True),
+            )
+
+        geofence = candidates.get("geofence-barrier")
+        if geofence is not None and variables == ("q1", "v1"):
+            add(
+                "horizontal geofence barrier geometry",
+                problem,
+                _candidate_signature(geofence, variables),
+            )
+        if geofence is not None and variables == ("q3", "v3"):
+            add(
+                "vertical geofence barrier geometry",
+                problem,
+                _candidate_signature(geofence, variables),
+            )
+        obstacle = candidates.get("obstacle-keepout-barrier")
+        if obstacle is not None:
+            add(
+                "planar obstacle keep-out geometry",
+                problem,
+                _candidate_signature(obstacle, variables),
+            )
+            for assumption_id, group in (
+                (
+                    "planar-speed-within-velocity-bound",
+                    "planar velocity-bound assumption",
+                ),
+                (
+                    "drone-maintains-obstacle-standoff",
+                    "planar obstacle standoff geometry",
+                ),
+                (
+                    "operating-region-within-guard-band-interior",
+                    "planar guard-band interior geometry",
+                ),
+            ):
+                add(
+                    group,
+                    problem,
+                    _required_assumption_signature(problem, assumptions, assumption_id),
+                )
+            standoff = _required_assumption_signature(
+                problem, assumptions, "standoff-exceeds-worst-case-drift"
+            )
+            add(
+                (
+                    "disturbed obstacle standoff drift bound"
+                    if has_disturbance
+                    else "nominal obstacle standoff drift bound"
+                ),
+                problem,
+                standoff,
+            )
+
+        if assumptions.get("speed-within-half-guard-reach") is not None:
+            add(
+                "axis nominal half-guard speed bound",
+                problem,
+                _assumption_signature(assumptions["speed-within-half-guard-reach"]),
+            )
+        if assumptions.get("velocity-within-self-reproducing-bound") is not None:
+            add(
+                "axis nominal velocity bound",
+                problem,
+                _assumption_signature(
+                    assumptions["velocity-within-self-reproducing-bound"]
+                ),
+            )
+        if assumptions.get("timestep-small-vs-guard-band") is not None:
+            timestep_small = assumptions["timestep-small-vs-guard-band"]
+            add(
+                "axis nominal guard-band braking bound",
+                problem,
+                _assumption_signature(timestep_small),
+            )
+            add(
+                "shared guard-band scalar",
+                problem,
+                _assumption_rhs_signature(timestep_small),
+            )
+
+        if assumptions.get("guard-band-exceeds-worst-case-drift") is not None:
+            guard_band = assumptions["guard-band-exceeds-worst-case-drift"]
+            add(
+                "shared guard-band scalar",
+                problem,
+                _assumption_rhs_signature(guard_band),
+            )
+        if assumptions.get("robust-braking-displacement-fits-guard-band") is not None:
+            robust_braking = assumptions["robust-braking-displacement-fits-guard-band"]
+            add(
+                "disturbed axis robust braking bound",
+                problem,
+                _assumption_signature(robust_braking),
+            )
+            add(
+                "shared guard-band scalar",
+                problem,
+                _assumption_rhs_signature(robust_braking),
+            )
+
+        if assumptions.get("disturbance-within-wind-bound") is not None:
+            add(
+                "disturbed axis wind-bound assumption",
+                problem,
+                _assumption_signature(assumptions["disturbance-within-wind-bound"]),
+            )
+        if assumptions.get("robust-speed-within-tightened-guard-reach") is not None:
+            add(
+                "disturbed axis tightened speed bound",
+                problem,
+                _assumption_signature(
+                    assumptions["robust-speed-within-tightened-guard-reach"]
+                ),
+            )
+        if assumptions.get("velocity-within-nominal-self-reproducing-bound") is not None:
+            add(
+                "disturbed axis nominal velocity precondition",
+                problem,
+                _assumption_signature(
+                    assumptions["velocity-within-nominal-self-reproducing-bound"]
+                ),
+            )
+
+        if (
+            problem.dynamics is not None
+            and variables == ("q1", "q2")
+            and parameters == ("v1", "v2")
+        ):
+            add(
+                "nominal planar coasting dynamics",
+                problem,
+                _dynamics_signature(problem.dynamics),
+            )
+
+    checked_groups: dict[str, tuple[str, ...]] = {}
+    for group, entries in groups.items():
+        if len(entries) < 2:
+            continue
+        first_problem_id, first_signature = entries[0]
+        for problem_id, signature in entries[1:]:
+            if signature != first_signature:
+                raise ValueError(
+                    "drone flagship consistency mismatch in "
+                    f"{group!r}: package {problem_id!r} has signature "
+                    f"{signature!r}, expected {first_signature!r} from "
+                    f"{first_problem_id!r}"
+                )
+        checked_groups[group] = tuple(problem_id for problem_id, _ in entries)
+
+    required = (
+        "horizontal geofence barrier geometry",
+        "vertical geofence barrier geometry",
+        "planar obstacle keep-out geometry",
+        "planar obstacle standoff geometry",
+        "planar guard-band interior geometry",
+        "planar velocity-bound assumption",
+        "shared guard-band scalar",
+    )
+    missing = [group for group in required if group not in checked_groups]
+    if missing:
+        raise ValueError(
+            "drone flagship consistency validation did not see enough packages "
+            f"to compare required groups: {missing}"
+        )
+
+    return DroneFlagshipConsistencyReport(
+        problem_ids=problem_ids,
+        signature_groups=checked_groups,
+    )
+
+
+def _required_assumption_signature(
+    problem: VerificationProblem,
+    assumptions: Mapping[str, Any],
+    assumption_id: str,
+) -> tuple[Any, ...]:
+    assumption = assumptions.get(assumption_id)
+    if assumption is None:
+        raise ValueError(
+            f"drone package {problem.id!r} missing required assumption {assumption_id!r}"
+        )
+    return _assumption_signature(assumption)
+
+
+def _assumption_signature(assumption: Any) -> tuple[Any, ...]:
+    return (
+        assumption.role,
+        assumption.comparison,
+        float(assumption.rhs),
+        _canonical_expression(assumption.expression.source, assumption.variables),
+    )
+
+
+def _assumption_rhs_signature(assumption: Any) -> tuple[Any, ...]:
+    return (assumption.comparison, float(assumption.rhs))
+
+
+def _candidate_signature(candidate: Any, variables: Sequence[str]) -> tuple[Any, ...]:
+    return (
+        candidate.kind,
+        candidate.status,
+        _canonical_expression(candidate.expression.source, variables),
+    )
+
+
+def _dynamics_signature(dynamics: Any) -> tuple[Any, ...]:
+    variables = (*dynamics.state, *(input_spec.name for input_spec in dynamics.inputs))
+    return (
+        dynamics.kind,
+        tuple(dynamics.state),
+        tuple(
+            _canonical_expression(expression.source, variables)
+            for expression in dynamics.rhs
+        ),
+    )
+
+
+def _parameter_signature(
+    problem: VerificationProblem,
+    *,
+    canonical_names: bool = False,
+) -> tuple[Any, ...]:
+    return tuple(
+        (
+            f"_p{index}" if canonical_names else parameter.name,
+            parameter.value,
+        )
+        for index, parameter in enumerate(problem.parameters)
+    )
+
+
+def _canonical_expression(source: str, variables: Sequence[str]) -> str:
+    expression = sp.sympify(source)
+    replacements = {
+        sp.Symbol(name, real=True): sp.Symbol(f"_x{index}", real=True)
+        for index, name in enumerate(variables)
+    }
+    return sp.srepr(expression.xreplace(replacements))
 
 
 def _read_json(path: Path) -> Any:

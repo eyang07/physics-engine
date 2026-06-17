@@ -817,6 +817,10 @@ def drone_obstacle_keepout_problem(
     # coasting step of that speed can produce.
     speed_max = sp.sqrt(2) * r(params.horizontal_velocity_bound)
     drift = dt * speed_max
+    # Circular analogue of the Tier-2 obstacle braking band `b`: one per-axis
+    # velocity-cap drift step. This is separate from the larger standoff radius
+    # used as the measured operating annulus.
+    obstacle_band = dt * r(params.horizontal_velocity_bound)
 
     dist = sp.sqrt((q1 - r(cx)) ** 2 + (q2 - r(cy)) ** 2)
     keepout_expression = rho - dist
@@ -893,6 +897,12 @@ def drone_obstacle_keepout_problem(
     q1_min, q1_max = params.q1_bounds
     q2_min, q2_max = params.q2_bounds
     band = r(params.horizontal_band)
+    inner_clearance = min(
+        float(r(cx) - (r(q1_min) + band)),
+        float((r(q1_max) - band) - r(cx)),
+        float(r(cy) - (r(q2_min) + band)),
+        float((r(q2_max) - band) - r(cy)),
+    )
     interior = AssumptionSpec(
         id="operating-region-within-guard-band-interior",
         name="operating region lies in the guard-band interior",
@@ -912,6 +922,49 @@ def drone_obstacle_keepout_problem(
             "q in [qMin+dh, qMax-dh]^2: the obstacle and its standoff lie in the "
             "geofence interior, where the guard band commands zero thrust so the "
             "closed-loop step is the pure coasting drift."
+        ),
+    )
+    obstacle_valid_dilation = AssumptionSpec(
+        id="obstacle-valid-dilated-obstacle-inside-inner-set",
+        name="Obstacle.Valid: dilated obstacle lies inside the inner set",
+        role="parameter-domain",
+        expression=expression_spec(rho + obstacle_band),
+        comparison="<=",
+        rhs=inner_clearance,
+        variables=(),
+        description=(
+            "rho + b <= dist(c, boundary(S_in)): the circular obstacle dilated by "
+            "the obstacle braking band b lies inside the horizontal geofence inner "
+            "set, so obstacle avoidance does not interfere with the geofence guard "
+            "bands (Obstacle.Valid clause 1)."
+        ),
+    )
+    obstacle_valid_separation = AssumptionSpec(
+        id="obstacle-valid-band-separates-opposite-faces",
+        name="Obstacle.Valid: obstacle band separates opposite faces",
+        role="parameter-domain",
+        expression=expression_spec(2 * obstacle_band),
+        comparison="<",
+        rhs=float(2 * rho),
+        variables=(),
+        description=(
+            "2*b < 2*rho: the circular analogue of the strict obstacle-band "
+            "separation condition, keeping the avoidance controller single-valued "
+            "(Obstacle.Valid clause 2)."
+        ),
+    )
+    obstacle_valid_braking = AssumptionSpec(
+        id="obstacle-valid-braking-band-dominates-one-step-drift",
+        name="Obstacle.Valid: obstacle band dominates one-step drift",
+        role="parameter-domain",
+        expression=expression_spec(dt * r(params.horizontal_velocity_bound)),
+        comparison="<=",
+        rhs=float(obstacle_band),
+        variables=(),
+        description=(
+            "dt*Bh <= b: the obstacle braking band dominates one per-axis drift step "
+            "at the velocity cap, the braking-margin precondition used by P4 "
+            "(Obstacle.Valid clause 3)."
         ),
     )
     standoff_margin = AssumptionSpec(
@@ -934,12 +987,23 @@ def drone_obstacle_keepout_problem(
         (avoidance, initial_containment),
         system=dynamics,
         specification=specification,
-        assumptions=(speed_bound, maintains_standoff, interior, standoff_margin),
+        assumptions=(
+            speed_bound,
+            maintains_standoff,
+            interior,
+            obstacle_valid_dilation,
+            obstacle_valid_separation,
+            obstacle_valid_braking,
+            standoff_margin,
+        ),
         obligation_assumptions={
             "obstacle-keepout:one-step-avoidance": (
                 "planar-speed-within-velocity-bound",
                 "drone-maintains-obstacle-standoff",
                 "operating-region-within-guard-band-interior",
+                "obstacle-valid-dilated-obstacle-inside-inner-set",
+                "obstacle-valid-band-separates-opposite-faces",
+                "obstacle-valid-braking-band-dominates-one-step-drift",
                 "standoff-exceeds-worst-case-drift",
             ),
             "obstacle-keepout:initial-containment": (),

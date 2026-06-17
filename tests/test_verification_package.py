@@ -24,6 +24,7 @@ from engine.export import (
     build_package_index,
     read_package,
     read_package_index,
+    validate_drone_flagship_package_consistency,
     write_package,
 )
 from engine.verification import obligation_adapter_stubs, write_inspection_artifacts
@@ -557,8 +558,38 @@ def test_generation_publishes_complete_obstacle_package(tmp_path) -> None:
         "planar-speed-within-velocity-bound",
         "drone-maintains-obstacle-standoff",
         "operating-region-within-guard-band-interior",
+        "obstacle-valid-dilated-obstacle-inside-inner-set",
+        "obstacle-valid-band-separates-opposite-faces",
+        "obstacle-valid-braking-band-dominates-one-step-drift",
         "standoff-exceeds-worst-case-drift",
     }
+    obstacle_valid = {
+        assumption.id: assumption
+        for assumption in problem.assumptions
+        if assumption.id.startswith("obstacle-valid-")
+    }
+    assert {assumption.role for assumption in obstacle_valid.values()} == {
+        "parameter-domain"
+    }
+    assert obstacle_valid[
+        "obstacle-valid-dilated-obstacle-inside-inner-set"
+    ].comparison == "<="
+    assert obstacle_valid[
+        "obstacle-valid-band-separates-opposite-faces"
+    ].comparison == "<"
+    assert obstacle_valid[
+        "obstacle-valid-braking-band-dominates-one-step-drift"
+    ].comparison == "<="
+    avoidance_obligation = next(
+        obligation
+        for obligation in problem.obligations
+        if obligation.id == "obstacle-keepout-one-step-avoidance"
+    )
+    assert {
+        "obstacle-valid-dilated-obstacle-inside-inner-set",
+        "obstacle-valid-band-separates-opposite-faces",
+        "obstacle-valid-braking-band-dominates-one-step-drift",
+    } <= set(avoidance_obligation.assumption_ids)
     # It renders on the (q1, q2) plane, covering every region.
     assert {geometry.region_id for geometry in problem.region_geometry} == {
         region.id for region in problem.regions
@@ -642,6 +673,56 @@ def test_generation_publishes_keepout_violation_scenario(tmp_path) -> None:
     assert "drone-obstacle-keepout-violation" in {
         entry.problem_id for entry in index.entries
     }
+
+
+def test_drone_flagship_packages_share_one_consistent_model(tmp_path) -> None:
+    write_verification_packages_for_examples(tmp_path)
+    index = read_package_index(tmp_path)
+    packages = tuple(
+        read_package(tmp_path / entry.problem_id)
+        for entry in index.entries
+        if entry.problem_id.startswith("drone-")
+    )
+
+    report = validate_drone_flagship_package_consistency(packages)
+
+    assert "drone-geofence-axis" in report.problem_ids
+    assert "drone-disturbed-obstacle-keepout" in report.problem_ids
+    assert "planar obstacle keep-out geometry" in report.signature_groups
+    assert "shared guard-band scalar" in report.signature_groups
+
+
+def test_drone_flagship_consistency_rejects_injected_geometry_drift(tmp_path) -> None:
+    write_verification_packages_for_examples(tmp_path)
+    index = read_package_index(tmp_path)
+    packages = [
+        read_package(tmp_path / entry.problem_id)
+        for entry in index.entries
+        if entry.problem_id.startswith("drone-")
+    ]
+    drift_index = next(
+        index
+        for index, package in enumerate(packages)
+        if package.problem.id == "drone-geofence-obstacle"
+    )
+    drifted_package = packages[drift_index]
+    drifted_problem = drifted_package.problem
+    drifted_assumptions = tuple(
+        replace(assumption, rhs=assumption.rhs + 0.125)
+        if assumption.id == "drone-maintains-obstacle-standoff"
+        else assumption
+        for assumption in drifted_problem.assumptions
+    )
+    packages[drift_index] = replace(
+        drifted_package,
+        problem=replace(drifted_problem, assumptions=drifted_assumptions),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="planar obstacle standoff geometry.*drone-geofence-obstacle",
+    ):
+        validate_drone_flagship_package_consistency(packages)
 
 
 def test_generation_publishes_complete_disturbance_robust_package(tmp_path) -> None:
