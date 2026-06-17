@@ -252,18 +252,7 @@ enclosure under stated assumptions), strictly distinct from `measured` (level 1)
 from any external `proved` / `certified` result. The engine proposes; external
 backends dispose._
 
-1. **BE-066: One-step image enclosure of a discrete map**
-   - Goal: Over-approximate the one-step reachable image of a `DiscreteSystem` /
-     closed-loop map over a box of states and bounded parameters — the set-propagation
-     primitive the certified obligations build on.
-   - Scope: `engine/verification/` (one-step enclosure built on the lowering), and
-     `tests/`.
-   - Acceptance: given a state box, the enclosure contains the true image of every
-     sampled state (verified by sampling); bounded parameters (velocity, disturbance)
-     are carried as interval parameters; the drone closed-loop map is exercised;
-     nothing claims proof; focused tests pass.
-
-2. **BE-067: certified-numeric rigor tier + EnclosureStatusSpec**
+1. **BE-067: certified-numeric rigor tier + EnclosureStatusSpec**
    - Goal: Add a level-2 `certified-numeric` status to the IR — an enclosure-backed
      obligation record distinct from `measured` and `external-required` — carrying the
      obligation box, the computed enclosure, the verdict, and the explicit soundness
@@ -276,7 +265,7 @@ backends dispose._
      status is only emitted by the enclosure evaluator; nothing reads as proof;
      focused tests pass.
 
-6. **BE-068: Certified Tier-1 geofence one-step invariance (exact-rational path)**
+2. **BE-068: Certified Tier-1 geofence one-step invariance (exact-rational path)**
    - Goal: Produce the first level-2 claim — a certified-numeric enclosure status for
      the Tier-1 geofence forward-invariance obligation over its stated assumption box,
      using the exact-rational path (no `sqrt`), upgrading that obligation from

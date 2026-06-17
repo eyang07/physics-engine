@@ -50,6 +50,7 @@ from engine.verification.enclosure import (
     decode_expression,
     enclose_expression,
 )
+from engine.verification.reachability import one_step_image
 from engine.verification.ir import (
     AssumptionSpec,
     CandidateSpec,
@@ -157,6 +158,7 @@ __all__ = [
     "obligation_adapter_stubs",
     "robust_obligation_disturbances",
     "obligation_classifications",
+    "one_step_image",
     "render_inspection_markdown",
     "scalar_field_region_geometries",
     "scalar_field_region_geometry",
