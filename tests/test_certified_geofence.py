@@ -1,11 +1,11 @@
-"""Certified Tier-1 geofence enclosure status (BE-068/BE-069).
+"""Certified Tier-1 geofence enclosure status (BE-068/BE-070).
 
 The first level-2 claim on a real package: the geofence barrier's
 initial-containment obligation (B <= 0 on the inner-start set S_in) is closed by
 an exact-rational interval enclosure. BE-069 adds exact-rational coast-core
-boxes for the velocity-bound and inner-set one-step obligations. The guard-band
-branches still stay measured/external-required until partitioning, so nothing
-reads as proof and the measured evidence is untouched.
+boxes for the inner-set one-step obligation. BE-070 partitions the guard-band
+branches for forward invariance and P2 velocity-bound, so those full rectangular
+assumption boxes close at level 2 without claiming proof.
 """
 
 from __future__ import annotations
@@ -16,7 +16,12 @@ from fractions import Fraction
 import pytest
 import sympy as sp
 
-from engine.verification import RIGOR_CERTIFIED_NUMERIC, VerificationProblem
+from engine.numerics import Interval
+from engine.verification import (
+    RIGOR_CERTIFIED_NUMERIC,
+    VerificationProblem,
+    enclose_expression,
+)
 from scripts.export_verification_problems import (
     drone_geofence_problem,
     drone_vertical_geofence_problem,
@@ -45,14 +50,18 @@ def test_geofence_carries_certified_initial_containment(geofence_problem) -> Non
     assert status.soundness_assumptions  # explicit assumptions recorded
 
 
-def test_geofence_carries_certified_velocity_and_inner_core(geofence_problem) -> None:
+def test_geofence_carries_certified_forward_velocity_and_inner_core(
+    geofence_problem,
+) -> None:
     names = _obligation_name_by_id(geofence_problem)
     certified = {
         names[s.obligation_id]: s for s in geofence_problem.enclosure_statuses
     }
+    assert "geofence-barrier:forward-invariance" in certified
     assert "velocity-bound:one-step-invariance" in certified
     assert "inner-set:one-step-invariance" in certified
     for name in (
+        "geofence-barrier:forward-invariance",
         "velocity-bound:one-step-invariance",
         "inner-set:one-step-invariance",
     ):
@@ -60,8 +69,10 @@ def test_geofence_carries_certified_velocity_and_inner_core(geofence_problem) ->
         assert status.rigor == RIGOR_CERTIFIED_NUMERIC
         assert status.verdict == "certified-holds"
         assert status.external_status == "external-required"
-        assert "coast" in status.note
         assert status.soundness_assumptions
+    assert "guard-partitioned" in certified["geofence-barrier:forward-invariance"].note
+    assert "guard-partitioned" in certified["velocity-bound:one-step-invariance"].note
+    assert "coast" in certified["inner-set:one-step-invariance"].note
 
 
 def test_certified_enclosures_satisfy_their_obligations(geofence_problem) -> None:
@@ -98,25 +109,45 @@ def test_certified_enclosure_is_sound_against_sampling(geofence_problem) -> None
             assert lower <= value <= upper, (names[status.obligation_id], value, status)
 
 
-def test_forward_invariance_stays_measured_only(geofence_problem) -> None:
+def test_partitioned_forward_enclosure_is_tighter_than_free_control_box(
+    geofence_problem,
+) -> None:
+    """The branch partition closes where a monolithic free-control box overinflates."""
+
     names = _obligation_name_by_id(geofence_problem)
-    certified_obligation_names = {
-        names[s.obligation_id] for s in geofence_problem.enclosure_statuses
-    }
-    # The guard-band forward-invariance claim is not certified by this coast-core
-    # slice; it remains measured-only until branch partitioning handles the guard
-    # surfaces (an honest "not certified" for that obligation here).
-    assert "geofence-barrier:forward-invariance" not in certified_obligation_names
-    # but they still carry their measured proof statuses, unchanged.
+    status = next(
+        s
+        for s in geofence_problem.enclosure_statuses
+        if names[s.obligation_id] == "geofence-barrier:forward-invariance"
+    )
+    q_name, v_name = (name for name, *_ in status.box)
+    q = sp.Symbol(q_name, real=True)
+    v = sp.Symbol(v_name, real=True)
+    a = sp.Symbol("a", real=True)
+    box = {name: Interval(Fraction(lo), Fraction(hi)) for name, lo, hi in status.box}
+    q_lo = box[q_name].lower
+    q_hi = box[q_name].upper
+    dt = sp.Rational(1, 4)
+    reach = sp.Integer(1)
+    free_control_margin = sp.Max(
+        q_lo - (q + dt * v + dt**2 * a / 2),
+        (q + dt * v + dt**2 * a / 2) - q_hi,
+    )
+    loose = enclose_expression(
+        free_control_margin,
+        {**box, "a": Interval(-reach, reach)},
+    )
+    assert Fraction(status.enclosure_upper) == 0
+    assert Fraction(str(loose.upper)) > 0
+
+
+def test_measured_statuses_remain_present(geofence_problem) -> None:
+    # Certified-numeric statuses do not replace the measured ledger; the sampled
+    # evidence remains available and still external-required.
     measured_obligations = {
         s.obligation_id for s in geofence_problem.proof_statuses
     }
-    forward = next(
-        ob.id
-        for ob in geofence_problem.obligations
-        if ob.name == "geofence-barrier:forward-invariance"
-    )
-    assert forward in measured_obligations
+    assert {ob.id for ob in geofence_problem.obligations} <= measured_obligations
 
 
 def test_problem_round_trips_with_enclosure_status(geofence_problem) -> None:
