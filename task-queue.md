@@ -252,19 +252,7 @@ enclosure under stated assumptions), strictly distinct from `measured` (level 1)
 from any external `proved` / `certified` result. The engine proposes; external
 backends dispose._
 
-1. **BE-065: Fail-closed symbolic-to-interval lowering of IR expressions**
-   - Goal: Evaluate an IR `ExpressionSpec` over a box of variable/parameter intervals
-     via a whitelist of node types, each with a proven-enclosing handler, raising on
-     any unsupported node so an unsound result is never produced.
-   - Scope: `engine/verification/` (an enclosure evaluator over `ExpressionSpec`),
-     and `tests/`.
-   - Acceptance: the evaluator lowers Add / Mul / Pow[int] / Rational / Integer /
-     Abs / Max / Min / sqrt and raises on anything else; a containment property test
-     samples each obligation expression's box and asserts every concrete value lies
-     inside the enclosure; the polynomial path stays exact-rational and the `sqrt`
-     path uses mpmath; nothing claims proof; focused tests pass.
-
-3. **BE-066: One-step image enclosure of a discrete map**
+1. **BE-066: One-step image enclosure of a discrete map**
    - Goal: Over-approximate the one-step reachable image of a `DiscreteSystem` /
      closed-loop map over a box of states and bounded parameters — the set-propagation
      primitive the certified obligations build on.
@@ -275,7 +263,7 @@ backends dispose._
      are carried as interval parameters; the drone closed-loop map is exercised;
      nothing claims proof; focused tests pass.
 
-5. **BE-067: certified-numeric rigor tier + EnclosureStatusSpec**
+2. **BE-067: certified-numeric rigor tier + EnclosureStatusSpec**
    - Goal: Add a level-2 `certified-numeric` status to the IR — an enclosure-backed
      obligation record distinct from `measured` and `external-required` — carrying the
      obligation box, the computed enclosure, the verdict, and the explicit soundness

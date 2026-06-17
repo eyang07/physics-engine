@@ -45,6 +45,11 @@ from engine.verification.diagnostics import (
     DIAGNOSTIC_STATUSES,
     VerificationDiagnostic,
 )
+from engine.verification.enclosure import (
+    UnsupportedExpressionError,
+    decode_expression,
+    enclose_expression,
+)
 from engine.verification.ir import (
     AssumptionSpec,
     CandidateSpec,
@@ -137,9 +142,12 @@ __all__ = [
     "VerificationDiagnostic",
     "VerificationProblem",
     "PolynomialRequirementReport",
+    "UnsupportedExpressionError",
     "CertificateTrajectoryDiagnostics",
     "certificate_series_for_trajectory",
     "classifications_by_obligation",
+    "decode_expression",
+    "enclose_expression",
     "dynamics_spec_from_controlled",
     "dynamics_spec_from_controlled_discrete",
     "dynamics_spec_from_discrete",
