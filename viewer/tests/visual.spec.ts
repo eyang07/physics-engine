@@ -467,6 +467,54 @@ for (const viewport of [
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-violation.png`) });
   });
 
+  test(`Verification renders the measured violation reference scenario at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const catalogItems = page.locator("#verificationCatalog .catalog-item");
+    const legend = page.locator(".verif-violation-legend");
+
+    // A holding keep-out package (5th entry) draws no violation markers and hides
+    // the violation legend.
+    await catalogItems.nth(4).click();
+    await expect(page.getByRole("heading", { name: /^drone obstacle keepout$/i })).toBeVisible();
+    await page.waitForTimeout(300);
+    await expect(page.locator("#verificationCanvas")).toHaveAttribute("data-violation-markers", "0");
+    await expect(legend).toBeHidden();
+
+    // The boundary-corner violation scenario (6th entry) exports a measured-
+    // violated run: the stage draws the violation marker, names the obligation
+    // the run left, and headlines its negative margin — labeled measured
+    // evidence, never a disproof.
+    await catalogItems.nth(5).click();
+    await expect(
+      page.getByRole("heading", { name: /drone obstacle keepout violation/i }),
+    ).toBeVisible();
+    await page.waitForTimeout(400);
+    await expect(page.locator("#verificationCanvas")).toHaveAttribute("data-violation-markers", "1");
+    await expect(legend).toBeVisible();
+    await expect(legend.locator(".verif-violation-legend__name")).toContainText(
+      /obstacle-keepout.*avoidance/,
+    );
+    await expect(legend.locator(".verif-violation-legend__margin")).toHaveText("-0.25");
+    await expect(legend.locator(".verif-violation-legend__note")).toContainText(
+      /entered the unsafe set/i,
+    );
+    await expect(legend.locator(".verif-violation-legend__note")).toContainText(
+      /not a disproof/i,
+    );
+    await expectCanvasNonBlank(page, "#verificationCanvas");
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-violation-scenario.png`),
+    });
+  });
+
   test(`Verification catalog shows counts and active selection at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

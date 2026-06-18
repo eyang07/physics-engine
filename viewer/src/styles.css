@@ -470,13 +470,27 @@ select {
   word-break: break-word;
 }
 
-.verif-violation-legend__value {
+.verif-violation-legend__value,
+.verif-violation-legend__margin {
   flex: none;
   color: rgba(232, 86, 70, 0.95);
   font-family: "IBM Plex Mono", monospace;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.verif-violation-legend__margin {
+  font-weight: 600;
+}
+
+/* The honest framing: a measured run reached the unsafe set — not a disproof of
+   safety. Sits under the named violations. */
+.verif-violation-legend__note {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.4;
 }
 
 /* Closest-approach (measured-holds) legend: bottom-right so it never collides

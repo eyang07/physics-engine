@@ -77,7 +77,15 @@ type Bounds = {
   maxY: number;
 };
 
-type ViolationMarker = { x: number; y: number; label: string; worstValue: number | null };
+type ViolationMarker = {
+  x: number;
+  y: number;
+  label: string;
+  worstValue: number | null;
+  // The signed worst margin (BE-036), negative for a violation: the depth the
+  // measured run entered the unsafe set. Measured evidence, never a disproof.
+  margin: number | null;
+};
 // A measured-holds closest-approach annotation: the worst (tightest) sampled
 // point and its signed margin to the obligation boundary. Measured slack, never
 // a discharge.
@@ -138,7 +146,13 @@ function violationMarkers(
       continue;
     }
     const label = obligationName.get(status.obligationId) ?? status.obligationId;
-    markers.push({ x: placed.x, y: placed.y, label, worstValue: status.worstValue });
+    markers.push({
+      x: placed.x,
+      y: placed.y,
+      label,
+      worstValue: status.worstValue,
+      margin: status.worstMargin,
+    });
   }
   return markers;
 }
@@ -615,9 +629,17 @@ export class VerificationStage {
       name.className = "verif-violation-legend__name";
       name.textContent = marker.label;
       entry.append(tag, name);
-      // Show how far the sample broke the obligation, when the backend exported
-      // a worst value. A missing value simply omits the chip — no broken chrome.
-      if (marker.worstValue !== null) {
+      // The signed negative margin (BE-036): how far the run crossed the
+      // obligation boundary into the unsafe set. This is the headline of the
+      // violation — measured evidence, never a disproof of safety.
+      if (marker.margin !== null) {
+        const margin = document.createElement("span");
+        margin.className = "verif-violation-legend__margin";
+        margin.textContent = formatSignedMeasured(marker.margin);
+        margin.title = "signed worst margin (negative = entered the unsafe set) — measured, not a proof";
+        entry.append(margin);
+      } else if (marker.worstValue !== null) {
+        // Fall back to the worst value when no signed margin was exported.
         const value = document.createElement("span");
         value.className = "verif-violation-legend__value";
         value.textContent = formatMeasured(marker.worstValue);
@@ -629,6 +651,14 @@ export class VerificationStage {
       });
       this.legend.append(entry);
     });
+    // The honest framing: a measured run reached the unsafe set on these
+    // samples. That is evidence the controller can be driven out — never a
+    // disproof of safety, and it leaves every obligation external-required.
+    const note = document.createElement("p");
+    note.className = "verif-violation-legend__note";
+    note.textContent =
+      "This simulated run entered the unsafe set — measured evidence, not a disproof of safety.";
+    this.legend.append(note);
     this.legend.hidden = false;
   }
 

@@ -63,22 +63,41 @@ candidates stay candidates, nothing reads as proved._
      existing per-example list; nothing reads as proved; `npm run build` and the
      visual test pass.
 
-2. **FE-030: Render the measured violation reference scenario (after BE-056)**
-    - Goal: Every published package currently *holds*, so the viewer's measured
-      violation surface (red worst-violation markers and legend) is never
-      exercised. Once the Tier-2 boundary-corner violation scenario exports
-      (BE-056) — a second trajectory with measured `proofStatuses` carrying a
-      negative signed margin — render it: emphasize the negative-margin violation
-      markers and name the obligation that the run left, making the honest "this
-      simulated run entered the unsafe set" state concrete on the rigor ladder.
-    - Scope: `viewer/src/verificationStage.ts` (violation emphasis for the new
-      scenario), `viewer/src/data/verification.ts` if scenario selection needs
-      exposure, `viewer/src/styles.css`, and the viewer visual test.
-    - Acceptance: the violation scenario shows its measured violation markers and
-      named obligation with a negative margin, visually distinct from a holding
-      run; holding packages are unchanged; the violation is labeled measured
-      evidence, never a disproof of safety; `npm run build` and the visual test
-      pass.
+2. **FE-031: Mark when the measured violation occurs on the rollout**
+   - Goal: The measured violation scenario (FE-030) draws the worst-violation
+     marker on the phase plane and names the obligation the run left, but the
+     run carries a `worst.time` (and the trajectory a time axis), so *when* in
+     the rollout the run entered the unsafe set is not yet legible. Surface that
+     time honestly — a read-only playhead/time annotation tied to the violation's
+     exported `worst.time`, so a reader can see the moment the simulated run
+     crossed the boundary. Measured evidence only; draw nothing for holding runs
+     or violations that export no time.
+   - Scope: `viewer/src/verificationStage.ts` (violation time annotation),
+     `viewer/src/data/verification.ts` if the worst time needs exposure,
+     `viewer/src/styles.css`, and the viewer visual test.
+   - Acceptance: the violation scenario shows the time its run entered the unsafe
+     set, consistent with the exported `worst.time`; holding runs and time-less
+     violations show none; the rollout/marker rendering is otherwise unchanged;
+     nothing reads as proved; `npm run build` and the visual test pass.
+
+3. **FE-032: Surface the certified-numeric (level-2) status on the rigor ladder (after BE-074)**
+   - Goal: The dossier rigor ladder currently pins every problem at level 1
+     (measured), because the viewer export carries no level-2 status. Once the
+     backend exports the `certified-numeric` per-obligation status into the
+     viewer data (BE-074), surface it honestly: mark each certified obligation at
+     rigor level 2 (a sound enclosure under stated assumptions) distinctly from
+     measured-only and external-required, and reflect the highest established
+     rung on the certification scale. A certified-numeric status is "sound over
+     this box under this model", never "safe" — keep the levels strictly
+     distinct and nothing reading as proved.
+   - Scope: `viewer/src/verificationPanel.ts` (rigor ladder + obligation ledger),
+     `viewer/src/data/verification.ts` (read the certified status), `viewer/src/
+     styles.css`, and the viewer visual test.
+   - Acceptance: an obligation exporting a certified-numeric status shows level-2
+     rigor distinct from measured and external; the certification scale reflects
+     the highest established rung; problems without any certified status are
+     unchanged at level 1; nothing reads as proved; `npm run build` and the
+     visual test pass.
 
 ## Backend Queue
 
