@@ -10,6 +10,7 @@ from engine.export import (
     COMPONENT_ADAPTER_STUBS,
     COMPONENT_INSPECTION,
     COMPONENT_IR,
+    COMPONENT_REACHABILITY,
     COMPONENT_TRAJECTORY,
     PACKAGE_INDEX_FILENAME,
     PACKAGE_INDEX_SCHEMA_VERSION,
@@ -31,7 +32,12 @@ from engine.export import (
     validate_drone_flagship_package_consistency,
     write_package,
 )
-from engine.verification import obligation_adapter_stubs, write_inspection_artifacts
+from engine.verification import (
+    REACHABILITY_HANDOFF_INDEX_FILENAME,
+    obligation_adapter_stubs,
+    read_reachability_handoff,
+    write_inspection_artifacts,
+)
 from scripts.export_verification_problems import (
     verification_package_inputs,
     write_verification_packages,
@@ -569,6 +575,7 @@ def test_generation_publishes_complete_drone_package(tmp_path) -> None:
         COMPONENT_IR,
         COMPONENT_TRAJECTORY,
         COMPONENT_ADAPTER_STUBS,
+        COMPONENT_REACHABILITY,
     }
     assert problem.dynamics is not None and problem.dynamics.kind == "discrete"
     assert {assumption.id for assumption in problem.assumptions} == {
@@ -621,6 +628,25 @@ def test_generation_publishes_complete_drone_package(tmp_path) -> None:
         assert "region-scoped" in stub["requiredShapeFeatures"]
         assert stub["applicable"] is True
         assert stub["discharges"] is False
+
+    # BE-076: concrete reachability handoff artifacts are present, but they are
+    # non-discharging inputs for an external backend, not proof results.
+    reachability = package.manifest.component(COMPONENT_REACHABILITY)
+    assert reachability is not None
+    reachability_dir = tmp_path / "drone-geofence-axis" / reachability.path
+    assert (reachability_dir / REACHABILITY_HANDOFF_INDEX_FILENAME).is_file()
+    artifacts = read_reachability_handoff(reachability_dir)
+    assert {artifact.obligation_id for artifact in artifacts} == {
+        "geofence-barrier-forward-invariance",
+        "velocity-bound-one-step-invariance",
+        "inner-set-one-step-invariance",
+    }
+    for artifact in artifacts:
+        assert artifact.dynamics.kind == "discrete"
+        assert artifact.box
+        assert artifact.obligation.rigor == "external-required"
+        assert artifact.discharges is False
+        assert artifact.external_status == "external-required"
 
 
 def test_generation_publishes_complete_vertical_axis_package(tmp_path) -> None:

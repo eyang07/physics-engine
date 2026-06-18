@@ -33,10 +33,12 @@ from engine.export.verification_contract import (
 )
 from engine.numerics import Interval
 from engine.verification import (
+    REACHABILITY_HANDOFF_INDEX_FILENAME,
     RIGOR_CERTIFIED_NUMERIC,
     UnsupportedExpressionError,
     VerificationProblem,
     enclose_expression,
+    write_reachability_handoff,
 )
 from engine.verification.adapter_stubs import (
     AdapterStubReport,
@@ -66,12 +68,14 @@ COMPONENT_IR = "problem-ir"
 COMPONENT_TRAJECTORY = "viewer-trajectory"
 COMPONENT_INSPECTION = "inspection-report"
 COMPONENT_ADAPTER_STUBS = "adapter-stubs"
+COMPONENT_REACHABILITY = "reachability-problems"
 
 PACKAGE_COMPONENT_KINDS = (
     COMPONENT_IR,
     COMPONENT_TRAJECTORY,
     COMPONENT_INSPECTION,
     COMPONENT_ADAPTER_STUBS,
+    COMPONENT_REACHABILITY,
 )
 _REQUIRED_COMPONENT_KINDS = (COMPONENT_IR, COMPONENT_TRAJECTORY)
 _COMPONENT_FILENAMES = {
@@ -79,6 +83,7 @@ _COMPONENT_FILENAMES = {
     COMPONENT_TRAJECTORY: "trajectory.json",
     COMPONENT_INSPECTION: "inspection.json",
     COMPONENT_ADAPTER_STUBS: "adapter-stubs.json",
+    COMPONENT_REACHABILITY: "reachability",
 }
 _COMPONENT_DESCRIPTIONS = {
     COMPONENT_IR: "Backend-agnostic verification-problem IR (no viewer trajectory).",
@@ -87,6 +92,10 @@ _COMPONENT_DESCRIPTIONS = {
     COMPONENT_ADAPTER_STUBS: (
         "Non-discharging adapter-stub descriptors: how external backend "
         "categories would consume each obligation."
+    ),
+    COMPONENT_REACHABILITY: (
+        "Non-discharging reachability handoff problems: one JSON file per "
+        "exported one-step obligation, plus an index."
     ),
 }
 _COUNT_KEYS = ("regions", "obligations", "candidates")
@@ -645,6 +654,7 @@ def build_package_manifest(
     *,
     include_inspection: bool = False,
     include_adapter_stubs: bool = False,
+    include_reachability: bool = False,
 ) -> PackageManifest:
     """Build the manifest indexing a problem's package components."""
 
@@ -654,6 +664,8 @@ def build_package_manifest(
         component_kinds.append(COMPONENT_INSPECTION)
     if include_adapter_stubs:
         component_kinds.append(COMPONENT_ADAPTER_STUBS)
+    if include_reachability:
+        component_kinds.append(COMPONENT_REACHABILITY)
     components = tuple(
         PackageComponent(
             kind=kind,
@@ -680,13 +692,16 @@ def write_package(
     *,
     inspection: Mapping[str, Any] | None = None,
     include_adapter_stubs: bool = False,
+    include_reachability: bool = False,
 ) -> PackageManifest:
     """Write a self-contained verification package to ``directory``.
 
     Validates the problem and trajectory against the export contract before
     writing, so a package never persists internally inconsistent data. When
     ``include_adapter_stubs`` is set, also writes the non-discharging
-    adapter-stub descriptors derived from the obligations. Returns the manifest.
+    adapter-stub descriptors derived from the obligations. When
+    ``include_reachability`` is set, writes non-discharging reachability handoff
+    problems for exported one-step enclosure obligations. Returns the manifest.
     Output is deterministic and regenerable.
     """
 
@@ -701,6 +716,7 @@ def write_package(
         problem,
         include_inspection=inspection is not None,
         include_adapter_stubs=include_adapter_stubs,
+        include_reachability=include_reachability,
     )
 
     output_dir = Path(directory)
@@ -720,6 +736,9 @@ def write_package(
         (output_dir / _COMPONENT_FILENAMES[COMPONENT_ADAPTER_STUBS]).write_text(
             _dump_json(adapter_stubs), encoding="utf-8"
         )
+    if include_reachability:
+        reachability_dir = output_dir / _COMPONENT_FILENAMES[COMPONENT_REACHABILITY]
+        write_reachability_handoff(problem, reachability_dir)
     (output_dir / PACKAGE_MANIFEST_FILENAME).write_text(
         _dump_json(manifest.to_dict()), encoding="utf-8"
     )

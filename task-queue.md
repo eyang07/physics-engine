@@ -234,20 +234,7 @@ enclosure under stated assumptions), strictly distinct from `measured` (level 1)
 from any external `proved` / `certified` result. The engine proposes; external
 backends dispose._
 
-1. **BE-076: Real `reachability` export adapter (non-discharging handoff)**
-    - Goal: Replace the reachability adapter *stub* with a concrete artifact — write
-      each one-step obligation as an enclosure / reachability problem an external
-      validated-numerics tool could consume, closing the IR's "optional backend
-      adapter" loop without the engine discharging anything.
-    - Scope: `engine/verification/` (reachability export adapter),
-      `engine/export/verification_package.py` (optional package component), and
-      `tests/`.
-    - Acceptance: the adapter writes a deterministic, re-readable reachability problem
-      file per obligation (dynamics, box, obligation), labeled non-discharging; no
-      external result is fabricated; obligations stay external-required until a backend
-      actually returns one; generated data stays uncommitted; focused tests pass.
-
-2. **BE-077: Validate reachability adapter artifacts in package reads**
+1. **BE-077: Validate reachability adapter artifacts in package reads**
     - Goal: Once BE-076 writes non-discharging reachability handoff files, make package
       reads validate that every reachability artifact references a real obligation,
       matches the problem dynamics/box contract, and is labeled non-discharging.
@@ -256,3 +243,13 @@ backends dispose._
     - Acceptance: package reads reject a tampered reachability artifact or one that
       claims discharge; valid generated packages round-trip; obligations remain
       `external-required`; focused tests pass.
+
+2. **BE-078: Summarize reachability handoff coverage in package reports**
+    - Goal: Surface how many non-discharging reachability handoff artifacts each
+      generated package exports, so the backend inventory shows which obligations
+      have concrete handoff files without implying discharge.
+    - Scope: `engine/export/verification_package.py` (package summary/index metadata
+      if needed), `engine/verification/reachability.py`, and `tests/`.
+    - Acceptance: the package summary or a deterministic companion report lists
+      reachability handoff counts per package; missing/empty handoff inventories are
+      represented honestly; no entry claims proof or certification; focused tests pass.

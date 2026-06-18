@@ -3307,6 +3307,7 @@ def write_verification_packages(directory: str | Path) -> list[PackageManifest]:
                 trajectory,
                 output_dir / problem.id,
                 include_adapter_stubs=True,
+                include_reachability=True,
             )
         )
     write_package_index(output_dir, manifests)

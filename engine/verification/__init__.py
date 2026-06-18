@@ -50,7 +50,18 @@ from engine.verification.enclosure import (
     decode_expression,
     enclose_expression,
 )
-from engine.verification.reachability import one_step_image
+from engine.verification.reachability import (
+    REACHABILITY_HANDOFF_INDEX_FILENAME,
+    REACHABILITY_HANDOFF_INDEX_SCHEMA_VERSION,
+    REACHABILITY_HANDOFF_KIND,
+    REACHABILITY_HANDOFF_SCHEMA_VERSION,
+    ReachabilityHandoffArtifact,
+    ReachabilityHandoffIndex,
+    one_step_image,
+    reachability_handoff_artifacts,
+    read_reachability_handoff,
+    write_reachability_handoff,
+)
 from engine.verification.certified import (
     EnclosurePartition,
     certified_constrained_upper_refinement_status,
@@ -148,6 +159,10 @@ __all__ = [
     "ParameterSpec",
     "ProofStatusSpec",
     "REPORT_STATUS",
+    "REACHABILITY_HANDOFF_INDEX_FILENAME",
+    "REACHABILITY_HANDOFF_INDEX_SCHEMA_VERSION",
+    "REACHABILITY_HANDOFF_KIND",
+    "REACHABILITY_HANDOFF_SCHEMA_VERSION",
     "RIGOR_CERTIFIED_NUMERIC",
     "RegionGeometrySpec",
     "RegionSpec",
@@ -157,6 +172,8 @@ __all__ = [
     "VerificationDiagnostic",
     "VerificationProblem",
     "PolynomialRequirementReport",
+    "ReachabilityHandoffArtifact",
+    "ReachabilityHandoffIndex",
     "UnsupportedExpressionError",
     "CertificateTrajectoryDiagnostics",
     "certificate_series_for_trajectory",
@@ -177,6 +194,8 @@ __all__ = [
     "obligation_classifications",
     "one_step_image",
     "partitioned_enclosure",
+    "reachability_handoff_artifacts",
+    "read_reachability_handoff",
     "render_inspection_markdown",
     "scalar_field_region_geometries",
     "scalar_field_region_geometry",
@@ -192,4 +211,5 @@ __all__ = [
     "verification_problem_from_obligations",
     "validate_inspection_artifact_index",
     "write_inspection_artifacts",
+    "write_reachability_handoff",
 ]

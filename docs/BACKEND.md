@@ -107,6 +107,12 @@ artifacts.
     partitioned, constrained-domain, and set-valued disturbance statuses must
     record the assumptions that justify their tighter enclosure. The report
     catalogs which obligations close at level 2; it does not discharge them.
+  - Verification packages can include a non-discharging reachability handoff
+    component. The component writes a deterministic `reachability/` directory
+    with one JSON artifact per exported one-step enclosure obligation plus an
+    index. Each artifact carries the discrete dynamics, recorded exact-rational
+    box/domain constraints, and obligation for an external validated-numerics
+    backend, with `discharges=false` and `externalStatus="external-required"`.
   - Viewer-renderable verification examples now include
     `upright-pendulum-safety` and `controlled-spring-regulator-safety`, each
     with its own controlled trajectory, region geometry, candidate-certificate
