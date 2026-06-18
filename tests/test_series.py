@@ -1,9 +1,9 @@
-"""Exported series should carry the invariants — and they should be flat.
+"""Exported series should carry the invariants, and they should be flat.
 
-A conserved quantity that visibly does not move is how the viewer proves a
-conservation law without a single decimal. These tests confirm the exporter
-actually samples those quantities and that they stay constant along the
-integrated motion (to the tolerance of fixed-step RK4).
+A conserved quantity that visibly does not move is measured evidence for the
+structure the symbolic backend derives, not a proof. These tests confirm the
+exporter samples those quantities, labels the residuals as measured, and keeps
+them constant along the integrated motion to the tolerance of fixed-step RK4.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import pytest
 from scripts import example_specs
 from scripts.generate_bead_on_hoop import generate_bead_on_hoop_trajectory
 from scripts.generate_charged_particle import generate_charged_particle_trajectory
+from scripts.generate_double_pendulum import generate_double_pendulum_trajectory
 from scripts.generate_henon_heiles import generate_henon_heiles_trajectory
 from scripts.generate_ideal_spring import generate_ideal_spring_trajectory
 from scripts.generate_kepler_problem import generate_kepler_trajectory
@@ -31,6 +32,10 @@ CASES = {
     "ideal-spring": (example_specs.IDEAL_SPRING, generate_ideal_spring_trajectory),
     "kepler": (example_specs.KEPLER, generate_kepler_trajectory),
     "bead-on-hoop": (example_specs.BEAD_ON_HOOP, generate_bead_on_hoop_trajectory),
+    "double-pendulum": (
+        example_specs.DOUBLE_PENDULUM,
+        generate_double_pendulum_trajectory,
+    ),
     "henon-heiles": (example_specs.HENON_HEILES, generate_henon_heiles_trajectory),
 }
 
@@ -66,6 +71,7 @@ def test_series_present_and_conserved(spec, generate) -> None:
             "series",
             "reference",
             "referenceKind",
+            "rigor",
             "maxAbs",
             "rms",
             "maxRelative",
@@ -74,6 +80,7 @@ def test_series_present_and_conserved(spec, generate) -> None:
         assert record["name"] in expected
         assert record["series"] in trajectory.series
         assert record["referenceKind"] == "initial"
+        assert record["rigor"] == "measured"
         assert isinstance(record["reference"], float)
         assert isinstance(record["maxAbs"], float)
         assert isinstance(record["rms"], float)

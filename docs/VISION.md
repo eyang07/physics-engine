@@ -369,11 +369,12 @@ integrations likewise come only after the flagship package exists.
 
 ## 13. Case Studies
 
-**Classical mechanics (existing foundation).** Pendulum, geodesic on a sphere,
-charged particle in a magnetic field, uniform gravity, ideal spring, Kepler
-problem, bead on a rotating hoop, Lorenz attractor, Hénon–Heiles, and a
-variable-speed wavefront. These exercise symbolic mechanics, conserved
-quantities, Poincaré sections, finite-time Lyapunov *exponents*, invariant
+**Classical mechanics (existing foundation).** Pendulum, double pendulum,
+geodesic on a sphere, charged particle in a magnetic field, uniform gravity,
+ideal spring, Kepler problem, bead on a rotating hoop, Lorenz attractor,
+Hénon–Heiles, and a variable-speed wavefront. These exercise symbolic
+mechanics, conserved quantities, Poincaré sections, finite-time Lyapunov
+*exponents*, invariant
 residuals, parameter-sweep manifest slices (Lorenz rho and ideal-spring
 stiffness families), ray-bundle / cotangent-Hamiltonian export with
 travel-time, caustic-proximity, and

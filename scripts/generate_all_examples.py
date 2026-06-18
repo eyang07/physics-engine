@@ -6,6 +6,10 @@ from engine.export.manifest import write_manifest
 from scripts.example_specs import LENSES, SPECS
 from scripts.generate_bead_on_hoop import write_bead_on_hoop_trajectory
 from scripts.generate_charged_particle import write_charged_particle_trajectory
+from scripts.generate_double_pendulum import (
+    write_double_pendulum_trajectory,
+    write_double_pendulum_variant_trajectories,
+)
 from scripts.generate_henon_heiles import write_henon_heiles_trajectory
 from scripts.generate_ideal_spring import (
     write_ideal_spring_trajectory,
@@ -51,6 +55,14 @@ def main() -> None:
     write_bead_on_hoop_trajectory(
         Path("data/generated/bead_on_hoop.json"),
         viewer_output=Path("viewer/public/data/bead_on_hoop.json"),
+    )
+    write_double_pendulum_trajectory(
+        Path("data/generated/double_pendulum.json"),
+        viewer_output=Path("viewer/public/data/double_pendulum.json"),
+    )
+    write_double_pendulum_variant_trajectories(
+        Path("data/generated"),
+        viewer_output_dir=Path("viewer/public/data"),
     )
     write_lorenz_trajectory(
         Path("data/generated/lorenz_attractor.json"),

@@ -17,8 +17,9 @@ from engine.export import Trajectory, validate_viewer_verification_problems
 from engine.export.manifest import SystemSpec, build_manifest, system_entry
 from engine.dynamics import CotangentHamiltonianSystem
 from engine.mechanics.lagrangian import LagrangianSystem
-from scripts.example_specs import IDEAL_SPRING, LENSES, LORENZ, SPECS
+from scripts.example_specs import DOUBLE_PENDULUM, IDEAL_SPRING, LENSES, LORENZ, SPECS
 from scripts.export_verification_problems import upright_pendulum_problem
+from scripts.generate_double_pendulum import write_double_pendulum_variant_trajectories
 from scripts.generate_ideal_spring import write_ideal_spring_variant_trajectories
 from scripts.generate_lorenz_attractor import write_lorenz_variant_trajectories
 
@@ -43,7 +44,18 @@ def _write_lorenz_variants(
     )
 
 
+def _write_double_pendulum_variants(
+    output_dir: Path,
+    viewer_output_dir: Path,
+) -> list[Trajectory]:
+    return write_double_pendulum_variant_trajectories(
+        output_dir,
+        viewer_output_dir=viewer_output_dir,
+    )
+
+
 VARIANT_TRAJECTORY_WRITERS: dict[str, Callable[[Path, Path], list[Trajectory]]] = {
+    DOUBLE_PENDULUM.id: _write_double_pendulum_variants,
     IDEAL_SPRING.id: _write_ideal_spring_variants,
     LORENZ.id: _write_lorenz_variants,
 }

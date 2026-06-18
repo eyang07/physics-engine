@@ -23,6 +23,7 @@ def _invariant_residual_record(residual: InvariantResidual) -> dict[str, Any]:
         "series": residual.name,
         "reference": residual.reference,
         "referenceKind": "initial",
+        "rigor": "measured",
         "maxAbs": residual.max_abs,
         "rms": residual.rms,
         "maxRelative": residual.max_relative,

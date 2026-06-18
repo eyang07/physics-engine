@@ -76,6 +76,7 @@ Registered viewer examples:
 - Ideal spring, including precomputed stiffness variants
 - Kepler problem
 - Bead on a rotating hoop
+- Double pendulum, including precomputed parameter variants
 - Lorenz attractor, including precomputed rho variants
 - Hénon-Heiles system
 - Variable-speed wavefront propagation

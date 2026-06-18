@@ -32,103 +32,569 @@ Each task should use this structure:
 
 ## Frontend Queue
 
-_The backend package contract is stable (BE-043) and the flagship drone renders
-correctly in the Verification view (FE-019 done): the catalog lists it, its
-`(q1, v1)` phase plane animates, all three barrier lanes draw (the inner-set value
-coasting positive as the rollout leaves `S_in`, shown honestly), and the
-four-obligation ledger surfaces each obligation's signed `margin` (BE-036) and the
-assumption region its evidence was sampled within (BE-042/BE-043). The viewer now
-also publishes and renders the BE-039 package bundle (FE-020 done): each problem's
-`package.json` manifest is fetched and the header offers a self-contained bundle
-download — manifest + components — distinct from the IR download and claiming no
-discharge. The view renders the rigor ladder, obligation/assumption cards, the
-verdict ledger, certificate lanes, and both export paths generically. The tasks
-below make the measured margin geometrically legible and surface the package
-inventory in the inspector. Keep rendering honest — measured stays measured,
-candidates stay candidates, nothing reads as proved._
+_**Direction change — render the new physics (mirrors the backend pivot).** The
+Verification view stays as built, but the frontend's active work now follows the
+physics-for-visualization backend directions (BE-082..BE-106). The viewer renders
+backend-generated manifest/trajectory data and **must not re-derive physics**; new
+capability arrives as documented renderer hints and export channels, drawn by the
+viewer, never recomputed in it._
 
-1. **FE-035: Draw the certified enclosure box on the phase-plane stage**
-   - Goal: An obligation's certified-numeric enclosure (FE-032) records the box it
-     is sound over in state-variable coordinates, but the stage never shows where
-     on the phase plane that box lies. Draw a read-only certified-box overlay on
-     the (q1, v1) stage for obligations whose enclosure box is plane-expressible,
-     so a reader can see the region the obligation was certified sound over. Draw
-     nothing for obligations with no certified enclosure or a non-plane box.
-     Honest — "sound over this box under this model", never "safe".
-   - Scope: `viewer/src/verificationStage.ts` (certified-box overlay),
-     `viewer/src/data/verification.ts` if the box needs exposure to the stage,
-     `viewer/src/styles.css`, and the viewer visual test.
-   - Acceptance: a package with a plane-expressible certified box shows the box
-     overlay on the stage; a package with no certified enclosure shows none; the
-     rollout/region rendering is otherwise unchanged; nothing reads as proved;
+_**Reuse, don't duplicate (VISION §9).** The three physics families below compose a
+small shared rendering vocabulary rather than three bespoke render stacks. Build the
+foundation block (FE-037..FE-039) first; the family lenses depend on it. Keep the
+existing honesty discipline: qualitative readouts with no raw decimals, consistent
+on-stage legends, and renderer-hint-driven framing._
+
+_**Strict dependency on backend exports.** Each family task names the `BE-0xx` task
+whose export it consumes; pick it up only after that backend export has landed and
+validated. The viewer renders the schema — it never invents UI against unstable or
+absent data. This direction stays decoupled from the Verification domain (no
+cross-links, no Systems-side safety overlay)._
+
+### Foundation — shared rendering vocabulary (do first)
+
+1. **FE-037: Route the new physics renderer hints to a shared primitive registry**
+   - Goal: Extend the renderer-hint routing so the new backend hints
+     (`rigid-body`, `scalar-field`, `vector-field`, `field-lines`,
+     `surface-geodesic`) resolve to reusable stage primitives instead of one-off
+     lenses, with a clear fallback when a hint is unknown.
+   - Scope: `viewer/src/main.ts` (hint routing), `viewer/src/threeScene.ts` and the
+     lens modules (primitive registry), `viewer/src/data/manifest.ts` if the hint
+     channels need typing, and the viewer visual test.
+   - Acceptance: each new hint maps to a registered primitive (or a graceful
+     fallback) with no duplicated render path; existing systems render unchanged;
+     `npm run build` and the visual test pass.
+   - Depends on: the renderer-hint vocabulary from BE-089/BE-091/BE-101.
+
+2. **FE-038: Add a shared scalar→color + on-stage legend layer**
+   - Goal: Build one scalar-to-color mapping and a reusable on-stage legend on top
+     of `viewer/src/design/colormaps.ts`, so every scalar readout (field magnitude,
+     curvature, intensity) shares a consistent, honest, decimal-free legend.
+   - Scope: `viewer/src/design/colormaps.ts`, a small legend component in
+     `viewer/src/`, `viewer/src/styles.css`, and the viewer visual test.
+   - Acceptance: a sample scalar field renders with a legend whose color ramp
+     matches the data range qualitatively; the legend is reused (not re-implemented)
+     by at least one consumer; `npm run build` and the visual test pass.
+
+3. **FE-039: Add a reusable animated field-surface / mesh primitive**
+   - Goal: Add one three.js primitive that renders a time-animated height/displacement
+     surface or a colored mesh from an exported grid, reused by the wave, membrane,
+     wavefront, and curved-surface lenses rather than re-built per family.
+   - Scope: `viewer/src/threeScene.ts` (or a new surface module), `viewer/src/
+     playback.ts` for time binding, and the viewer visual test.
+   - Acceptance: the primitive animates a sample displacement grid and colors a
+     sample static mesh; playback loops consistently with the existing controls;
      `npm run build` and the visual test pass.
 
-2. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
-   - Goal: The catalog lists every package's region/obligation/candidate counts
-     and Tier/regime, but not how many of its obligations reach level 2. Once the
-     discovery index carries a per-package certified-numeric count, surface it as
-     an honest catalog readout (e.g. "2/4 certified-numeric") so a reader can tell
-     which packages climb the rigor ladder without opening them. Read only the
-     index count; certified-numeric is a sound enclosure, never proved or safe.
-   - Scope: `viewer/src/data/verification.ts` (read the certified count from the
-     discovery index), `viewer/src/main.ts` (catalog readout), `viewer/src/
-     styles.css`, and the viewer visual test.
-   - Acceptance: each catalog entry shows its certified-numeric coverage from the
-     index; entries without the count show none; nothing reads as proved;
+### Direction A — Rigid-body & many-body rendering
+
+4. **FE-040: Attitude playback for rotating rigid bodies**
+   - Goal: Drive a rotating three.js body from the exported orientation (quaternion)
+     series and body-frame triad, so rigid-body systems show a body that spins, not
+     a point that moves.
+   - Scope: `viewer/src/threeScene.ts` (rigid-body scene), `viewer/src/data/
+     trajectory.ts` (orientation channel), `viewer/src/playback.ts`, and the viewer
+     visual test.
+   - Acceptance: a rigid-body system animates its orientation with a visible body
+     triad; the body returns to the same pose on loop; `npm run build` and the
+     visual test pass.
+   - Depends on: BE-089 (orientation/attitude export schema), BE-087/BE-088.
+
+5. **FE-041: Polhode / momentum-sphere ∩ energy-ellipsoid lens**
+   - Goal: Render the free asymmetric top's angular-momentum sphere, kinetic-energy
+     ellipsoid, and the polhode curve traced on the body, making the intermediate-axis
+     instability legible.
+   - Scope: `viewer/src/threeScene.ts` (polhode lens), `viewer/src/data/
+     trajectory.ts` / `manifest.ts` for the exported geometry, and the viewer visual
+     test.
+   - Acceptance: the sphere/ellipsoid/polhode draw from the exported geometry only;
+     intermediate-axis motion visibly differs from the stable axes; `npm run build`
+     and the visual test pass.
+   - Depends on: BE-087 (polhode / energy-ellipsoid export).
+
+6. **FE-042: N-body orbit trails with center-of-mass framing**
+   - Goal: Render N-body systems as per-body orbit trails in 3D, framed on the
+     center of mass, with per-body color and a legend.
+   - Scope: `viewer/src/threeScene.ts` (orbit-trail scene), renderer-hint framing in
+     `viewer/src/main.ts`, and the viewer visual test.
+   - Acceptance: each body draws a distinct colored trail; the figure-eight and
+     Sun–planets configurations frame sensibly on the COM; `npm run build` and the
+     visual test pass.
+   - Depends on: BE-082 (N-body system + export).
+
+7. **FE-043: Normal-mode lens with mode selector and superposition scrub**
+   - Goal: Add a lens that animates each exported normal-mode shape, with a mode
+     selector and a control to scrub a superposition, for the coupled-oscillator
+     (and small-oscillation) systems.
+   - Scope: `viewer/src/threeScene.ts` or a mode lens, `viewer/src/structurePanel.ts`
+     for the mode selector, `viewer/src/data/manifest.ts` for mode shapes/frequencies,
+     and the viewer visual test.
+   - Acceptance: selecting a mode animates its shape at its frequency; a superposition
+     scrub blends modes; frequencies display qualitatively (no raw decimals);
      `npm run build` and the visual test pass.
+   - Depends on: BE-083 (normal-mode analysis + coupled-oscillator export).
+
+### Direction B — Field & wave rendering
+
+8. **FE-044: Scalar-field lens (heatmap / contour)**
+   - Goal: Render an exported scalar-field grid as a heatmap/contour using the
+     FE-038 color+legend layer, for potentials and other scalar fields.
+   - Scope: a scalar-field lens in `viewer/src/`, `viewer/src/data/manifest.ts` for
+     the field channel, reuse of FE-038, and the viewer visual test.
+   - Acceptance: a scalar field renders with a correct legend and honest qualitative
+     scale; the grid is drawn as exported with no browser-side field evaluation;
+     `npm run build` and the visual test pass.
+   - Depends on: BE-091 (field grid export); consumes BE-093 potentials, reusable for
+     BE-105 curvature.
+
+9. **FE-045: Vector-field lens (glyphs + field lines)**
+   - Goal: Render an exported vector-field grid as glyphs/quiver with magnitude→color,
+     and draw the exported field-line / streamline polylines.
+   - Scope: a vector-field lens in `viewer/src/`, `viewer/src/data/manifest.ts` /
+     `trajectory.ts` for the glyph grid and polylines, reuse of FE-038, and the viewer
+     visual test.
+   - Acceptance: glyphs and field lines draw from exported data only; magnitude maps
+     to the shared color legend; `npm run build` and the visual test pass.
+   - Depends on: BE-091 (vector-field + field-line export), BE-092, BE-093.
+
+10. **FE-046: 1D wave displacement animation (string and wave packet)**
+    - Goal: Animate the exported 1D displacement/amplitude field for the vibrating
+      string and the dispersive wave packet, including a standing/traveling toggle
+      where the data supports it.
+    - Scope: a 1D wave lens (reusing the FE-039 surface/line primitive),
+      `viewer/src/playback.ts`, `viewer/src/data/trajectory.ts`, and the viewer visual
+      test.
+    - Acceptance: string modes and a traveling solution animate from exported series;
+      the wave packet shows envelope spreading; `npm run build` and the visual test
+      pass.
+    - Depends on: BE-094 (string), BE-096 (wave packet).
+
+11. **FE-047: 2D membrane mode surfaces with mode selector**
+    - Goal: Render rectangular and circular membrane modes as animated displacement
+      surfaces (reusing FE-039), with a mode selector and superposition.
+    - Scope: a membrane lens, `viewer/src/structurePanel.ts` for the mode selector,
+      `viewer/src/data/manifest.ts` for mode data, and the viewer visual test.
+    - Acceptance: rectangular and circular modes animate as exported surfaces; the
+      mode selector switches shapes; `npm run build` and the visual test pass.
+    - Depends on: BE-095 (membrane modes export).
+
+12. **FE-048: 2D wavefront / intensity surface lens**
+    - Goal: Render the exported 2D wavefront surfaces and intensity field from the
+      heterogeneous-media work, reusing the wavefront/ray bundle path and the FE-038
+      color layer for intensity.
+    - Scope: extend `viewer/src/wavefrontCanvas.ts` (or a three.js surface lens),
+      `viewer/src/data/manifest.ts`, reuse of FE-038/FE-039, and the viewer visual
+      test.
+    - Acceptance: wavefront surfaces and intensity render from exported grids;
+      intensity brightens near caustics consistent with the exported diagnostic;
+      `npm run build` and the visual test pass.
+    - Depends on: BE-097 (2D wavefront / intensity export).
+
+### Direction C — Curved-geometry rendering
+
+13. **FE-049: Surface-embedding mesh with geodesic drawn on the surface**
+    - Goal: Render an exported surface-of-revolution embedding mesh with the geodesic
+      polyline drawn on the surface in embedded coordinates.
+    - Scope: a surface-geodesic lens in `viewer/src/threeScene.ts`, `viewer/src/data/
+      manifest.ts` / `trajectory.ts` for the mesh and embedded curve, renderer-hint
+      framing, and the viewer visual test.
+    - Acceptance: the mesh and the geodesic-on-surface draw from exported data only;
+      great circles render correctly on the sphere; `npm run build` and the visual
+      test pass.
+    - Depends on: BE-100 (surface geodesics), BE-101 (embedding export schema).
+
+14. **FE-050: Curvature coloring on the surface mesh**
+    - Goal: Color the surface-embedding mesh by the exported curvature scalar field
+      using the FE-038 color+legend layer, making curvature visible.
+    - Scope: the surface-geodesic lens, `viewer/src/data/manifest.ts` for the
+      curvature field, reuse of FE-038, and the viewer visual test.
+    - Acceptance: the mesh colors by exported curvature with an honest legend; flat
+      regions and high-curvature regions read distinctly; `npm run build` and the
+      visual test pass.
+    - Depends on: BE-105 (curvature scalar-field export); reuses FE-049.
+
+15. **FE-051: Parallel-transport frame animation (holonomy)**
+    - Goal: Animate the exported transported frame along a curve / closed loop on a
+      curved surface, making the holonomy angle legible.
+    - Scope: the surface-geodesic lens, `viewer/src/playback.ts`, `viewer/src/data/
+      trajectory.ts` for the transported frame, and the viewer visual test.
+    - Acceptance: the transported vector animates along the curve and the holonomy
+      angle around a loop is visible; flat-space transport shows no rotation;
+      `npm run build` and the visual test pass.
+    - Depends on: BE-104 (parallel transport / holonomy export).
+
+16. **FE-052: Effective-potential and orbit lens for Kepler / Schwarzschild**
+    - Goal: Render the exported effective potential with turning points alongside the
+      orbit, surfacing bound/unbound/precessing classification for central-force and
+      GR orbits.
+    - Scope: extend `viewer/src/effectivePotentialCanvas.ts` and/or
+      `viewer/src/phasePotentialCanvas.ts`, `viewer/src/data/manifest.ts` for the
+      effective-potential / turning-point channel, and the viewer visual test.
+    - Acceptance: the effective potential, turning points, and orbit draw from
+      exported data; precession is visible for the GR case; the orbit class displays
+      qualitatively; `npm run build` and the visual test pass.
+    - Depends on: BE-102 (orbit classification), BE-103 (Schwarzschild geodesics).
+
+### Verification track (paused)
+
+_These two verification-view tasks predate the direction change and are kept for
+continuity. They are **deprioritized** while the frontend follows the physics
+directions; pick them up only on explicit request._
+
+17. **FE-035: Draw the certified enclosure box on the phase-plane stage**
+    - Goal: An obligation's certified-numeric enclosure (FE-032) records the box it
+      is sound over in state-variable coordinates, but the stage never shows where
+      on the phase plane that box lies. Draw a read-only certified-box overlay on
+      the (q1, v1) stage for obligations whose enclosure box is plane-expressible,
+      so a reader can see the region the obligation was certified sound over. Draw
+      nothing for obligations with no certified enclosure or a non-plane box.
+      Honest — "sound over this box under this model", never "safe".
+    - Scope: `viewer/src/verificationStage.ts` (certified-box overlay),
+      `viewer/src/data/verification.ts` if the box needs exposure to the stage,
+      `viewer/src/styles.css`, and the viewer visual test.
+    - Acceptance: a package with a plane-expressible certified box shows the box
+      overlay on the stage; a package with no certified enclosure shows none; the
+      rollout/region rendering is otherwise unchanged; nothing reads as proved;
+      `npm run build` and the visual test pass.
+
+18. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
+    - Goal: The catalog lists every package's region/obligation/candidate counts
+      and Tier/regime, but not how many of its obligations reach level 2. Once the
+      discovery index carries a per-package certified-numeric count, surface it as
+      an honest catalog readout (e.g. "2/4 certified-numeric") so a reader can tell
+      which packages climb the rigor ladder without opening them. Read only the
+      index count; certified-numeric is a sound enclosure, never proved or safe.
+    - Scope: `viewer/src/data/verification.ts` (read the certified count from the
+      discovery index), `viewer/src/main.ts` (catalog readout), `viewer/src/
+      styles.css`, and the viewer visual test.
+    - Acceptance: each catalog entry shows its certified-numeric coverage from the
+      index; entries without the count show none; nothing reads as proved;
+      `npm run build` and the visual test pass.
 
 ## Backend Queue
 
-_Direction (VISION §7, §11): the flagship drone is now routed end-to-end at **rigor
-level 1 (measured)**, and the nominal/robust × single/intersection matrix is
-complete — twelve verification packages (Tier-1 geofence horizontal + vertical,
-P1 + P2; Tier-2 obstacle keep-out; the geofence∩obstacle intersection; the
-measured-violation and boundary-margin scenarios; and the Tier-3 disturbance-robust
-variants through the robust-intersection capstone), all carried by the BE-039
-package contract, the BE-045 discovery index with BE-054 regime metadata, BE-060
-robustness-aware adapter stubs, the BE-057 consistency validator, and the BE-061
-cross-package summary. Depth on this one flagship still outranks breadth; the engine
-must not become drone-specific elsewhere either._
+_**Direction change — back to the physics engine for visualizations (VISION §3,
+§9, §13).** The verification/CPS line (BE-070s) is paused. The backend now returns
+to its theory-first mechanics core and grows the physics that the viewer can
+render. The thesis is unchanged: Python is the source of mathematical truth and
+computes + exports deterministic data; TypeScript renders. New capability crosses
+the boundary as documented manifest/export schema and renderer hints, never as
+physics re-derived in the viewer. Actual TypeScript rendering of these new
+primitives is tracked separately in the frontend queue; these backend tasks
+deliver the math, the deterministic export, and the schema contract._
 
-_**The next direction — climb the rigor ladder (level 1 → level 2).** Every
-obligation today is checked by *sampling* (a clean grid is evidence between samples,
-never a bound). This pathway makes **rigor level 2 (certified numerical bounds)**
-real for the flagship: sound *enclosures* of each one-step obligation over its
-stated assumption box, making the IR's `reachability` adapter category concrete
-instead of a stub. The engine still proposes; it does not prove — a certified
-enclosure is "sound over this box under this model," never "safe."_
+_Three coherent directions, each grounded in existing modules. Tasks are ordered
+by implementation readiness within each direction: foundations first, then systems
+that use them, then the export/schema that carries them to the viewer. Conserved
+quantities and structural identities are first-class; conservation/structure
+**diagnostics computed from rollouts stay labeled `measured`** (level 1 evidence),
+consistent with the rigor ladder — a clean energy trace is evidence, not a
+theorem. Keep `systems/` definitions thin and symbolic, reusable logic in
+`engine/`, and generated data uncommitted._
 
-_**Soundness plan (how level-2 claims stay honest):**_
-_- **Exact-rational interval arithmetic (sound by exactness)** for the polynomial
-  obligations. The drone's exact zero-order-hold map and `DroneParams` are rational,
-  so the geofence / velocity / inner-set / intersection / Tier-3 worst-case forms are
-  polynomials over `sympy.Rational`; interval arithmetic on rationals has **no
-  rounding at all**, so the enclosure property holds by construction. This covers
-  most of the family._
-_- **mpmath outward-rounded intervals only where irrationals appear** — the keep-out
-  distance `sqrt(...)` and the planar `sqrt(2)` factor. mpmath (already a SymPy
-  dependency) gives sound `sqrt` enclosures; the trusted-irrational surface is two
-  nodes. No hand-rolled directed-rounding floats — the credibility-critical failure
-  mode is avoided._
-_- **Fail-closed lowering.** A whitelist of IR expression nodes
-  (Add / Mul / Pow[int] / Rational / Abs / Max / Min / sqrt) with proven-enclosing
-  handlers (including the even-power-straddling-zero case); anything else raises
-  rather than returning a possibly-unsound number._
-_- **Containment property-test suite — the backstop.** Sample points inside each
-  box, evaluate in exact reference arithmetic, assert every value lies inside the
-  computed enclosure. The lane lives or dies on this suite._
-_- **Tag gated on the trusted path; soundness ≠ tightness.** A `certified-numeric`
-  status is emitted only by the sound evaluator; a too-loose enclosure stays
-  `measured` / `external-required` (an honest "not certified"), never a false
-  verdict. Tightening (branch partitioning, affine forms) improves tightness only and
-  can never affect soundness._
+_This direction stays cleanly separated from the verification/CPS track: no
+shared modules, no cross-links, no drone-specific coupling._
 
-_Keep generated data uncommitted. `certified-numeric` is rigor level 2 (a sound
-enclosure under stated assumptions), strictly distinct from `measured` (level 1) and
-from any external `proved` / `certified` result. The engine proposes; external
-backends dispose._
+### Direction A — Rigid-body & many-body classical mechanics
 
-1. **BE-079: Cross-check reachability handoff coverage against certified coverage**
+_From point masses to bodies with extent and to coupled systems: orientation,
+inertia, Euler's equations, chaotic and integrable many-body motion, and normal
+modes. Builds on `engine/mechanics/` (lagrangian, hamiltonian, symmetries) and the
+trajectory/manifest export._
+
+1. **BE-082: Add the N-body gravitational system**
+   - Goal: Add a general Newtonian N-body system in the center-of-mass frame with
+     conserved energy, total linear momentum, and total angular momentum, plus a
+     couple of canonical configurations (e.g. a Sun–planets set and the figure-eight
+     choreography).
+   - Scope: `systems/n_body_gravity.py`, `scripts/generate_n_body_gravity.py`,
+     `scripts/example_specs.py`, `engine/dynamics/first_order.py` if a reusable helper
+     is warranted, and `tests/`.
+   - Acceptance: the system builds a first-order field for arbitrary N; energy,
+     linear-momentum, and angular-momentum diagnostics stay within tolerance
+     (`measured`) on reference configurations; the manifest exposes per-body
+     projections and conserved quantities; focused tests pass and generation is clean.
+
+2. **BE-083: Small-oscillation normal-mode analysis and coupled-oscillator system**
+   - Goal: Add a reusable small-oscillation helper that, given a Lagrangian system
+     and an equilibrium, forms the mass and stiffness matrices and returns normal-mode
+     frequencies and mode shapes (generalized eigenproblem), and add a coupled-
+     oscillator chain that exports its mode shapes and frequencies for mode animation.
+   - Scope: `engine/mechanics/` (new small-oscillation helper, e.g.
+     `small_oscillations.py`), `systems/coupled_oscillators.py`,
+     `scripts/generate_coupled_oscillators.py`, `scripts/example_specs.py`, `tests/`.
+   - Acceptance: the helper recovers known frequencies/shapes for a simple coupled
+     pair and an N-mass chain; the manifest carries mode shapes and frequencies; a
+     mode superposition rollout conserves energy within tolerance (`measured`);
+     focused tests pass and generation is clean.
+
+3. **BE-084: Rigid-body orientation and angular-velocity kinematics**
+   - Goal: Add a rigid-body kinematics foundation: SO(3) rotation matrices,
+     conversions among rotation matrix / unit quaternion / Euler angles, and body-frame
+     vs. space-frame angular velocity, all symbolic where useful and numeric where
+     needed.
+   - Scope: `engine/mechanics/rigid_body.py` and `tests/`.
+   - Acceptance: round-trip conversions (matrix↔quaternion↔Euler) are identities to
+     tolerance; quaternion stays unit-norm under normalization; angular-velocity
+     relations match for sample motions; focused tests pass. No system or export
+     change yet.
+
+4. **BE-085: Inertia tensor value object and principal-axis decomposition**
+   - Goal: Add a frozen inertia-tensor value object (validated symmetric positive
+     definite) with principal-moment / principal-axis decomposition and constructors
+     for standard shapes (rod, disk, sphere, box).
+   - Scope: `engine/mechanics/rigid_body.py` (or a sibling module), and `tests/`.
+   - Acceptance: invariants validated in `__post_init__`; principal decomposition
+     reproduces known moments for standard shapes; eigen-axes are orthonormal;
+     focused tests pass.
+
+5. **BE-086: Euler's rigid-body equations (torque-free and torqued)**
+   - Goal: Implement Euler's equations for rigid-body rotation in the body frame from
+     an inertia tensor and an applied torque, integrable through the existing numerics,
+     with torque-free conservation of kinetic energy and angular-momentum magnitude.
+   - Scope: `engine/mechanics/rigid_body.py`, `engine/dynamics/first_order.py` if a
+     bridge to the integrator is needed, and `tests/`.
+   - Acceptance: torque-free rollouts conserve rotational energy and |L| within
+     tolerance (`measured`); a symmetric body reproduces steady precession; focused
+     tests pass.
+
+6. **BE-087: Free asymmetric top with polhode / energy-ellipsoid export**
+   - Goal: Add a torque-free asymmetric rigid-body system that demonstrates the
+     intermediate-axis (tennis-racket) instability and exports the angular-momentum
+     sphere, the kinetic-energy ellipsoid, and the polhode curve traced on the body.
+   - Scope: `systems/free_rigid_body.py`, `scripts/generate_free_rigid_body.py`,
+     `scripts/example_specs.py`, the export contract for the ellipsoid/sphere/polhode
+     geometry, and `tests/`.
+   - Acceptance: rotation about the intermediate axis shows the instability while the
+     extreme axes are stable; conserved energy and |L| stay within tolerance
+     (`measured`); the manifest carries the polhode/ellipsoid/sphere geometry with a
+     renderer hint; focused tests pass and generation is clean.
+
+7. **BE-088: Add the heavy symmetric top (gyroscope) system**
+   - Goal: Add the heavy symmetric top under gravity in Euler angles, with its two
+     conserved angular momenta and energy, exhibiting precession and nutation.
+   - Scope: `systems/symmetric_top.py`, `scripts/generate_symmetric_top.py`,
+     `scripts/example_specs.py`, and `tests/`.
+   - Acceptance: the Lagrangian derivation yields the precession/nutation motion;
+     `p_phi`, `p_psi`, and energy stay conserved within tolerance (`measured`); the
+     manifest exposes the conserved quantities and the effective potential in the
+     nutation angle; focused tests pass and generation is clean.
+
+8. **BE-089: Orientation/attitude trajectory export schema and renderer hints**
+   - Goal: Extend the trajectory/manifest contract to carry an orientation series
+     (unit quaternion) and a body-frame triad alongside the usual state, with a
+     `rigid-body` renderer hint, so a rotating body — not just a point — can be
+     rendered. Wire the rigid-body systems (BE-087, BE-088) to emit it.
+   - Scope: `engine/export/trajectory.py`, `engine/export/manifest.py`, the
+     rigid-body generators, and `tests/`.
+   - Acceptance: exported rigid-body trajectories include a unit-norm quaternion
+     series and body-axis vectors; the manifest declares the orientation channel and
+     renderer hint; the schema change is documented in `docs/BACKEND.md`; focused tests
+     pass and generation is clean.
+
+### Direction B — Fields, waves & continuum
+
+_Lift the engine from particle trajectories to fields over space and to wave
+phenomena. Builds on `engine/dynamics/media.py`, `ray_bundle.py`, `ray_diagnostics.py`,
+and `variable_speed_wavefront`, and gives the viewer genuinely new visual primitives
+(scalar fields, vector glyphs, field lines, mode shapes, wavefront surfaces)._
+
+9. **BE-090: Scalar and vector field abstraction with differential operators**
+    - Goal: Add a field abstraction — a value object wrapping a symbolic scalar or
+      vector field over spatial coordinates and parameters — with gradient, divergence,
+      curl, and Laplacian operators and deterministic sampling to grids.
+    - Scope: `engine/fields/` (new package) or `engine/dynamics/fields.py`, and
+      `tests/`.
+    - Acceptance: operators match known closed forms on sample fields (e.g. curl of a
+      gradient is zero, divergence of a curl is zero, Laplacian of a known harmonic
+      function); grid sampling is deterministic; focused tests pass.
+
+10. **BE-091: Field grid and field-line export schema with renderer hints**
+    - Goal: Define deterministic export for scalar-field grids (heatmap/contour),
+      vector-field grids (glyph/quiver), and field-line polylines, with manifest
+      renderer hints (`scalar-field`, `vector-field`, `field-lines`).
+    - Scope: `engine/export/manifest.py`, a field-export helper in `engine/export/` or
+      `engine/fields/`, `docs/BACKEND.md`, and `tests/`.
+    - Acceptance: a sample field exports a deterministic grid and field-line set; the
+      manifest declares the field channels and renderer hints; the schema is
+      documented; focused tests pass.
+
+11. **BE-092: Field-line and streamline integration**
+    - Goal: Integrate field lines of a vector field (and streamlines of a flow) using
+      the existing integrators, with a documented seeding strategy, producing the
+      polylines consumed by BE-091.
+    - Scope: `engine/fields/` (or `engine/dynamics/`), reusing `engine/numerics/
+      integrators.py`, and `tests/`.
+    - Acceptance: field lines of a known field (e.g. a dipole) match analytic
+      streamlines to tolerance; seeding is deterministic and documented; integration
+      terminates cleanly at domain edges/singularities; focused tests pass.
+
+12. **BE-093: Electrostatic and magnetostatic field system**
+    - Goal: Add a fields system for point-charge and dipole electric fields and
+      current-loop / magnetic-dipole fields, exporting equipotentials and field lines.
+    - Scope: `systems/electromagnetic_field.py`,
+      `scripts/generate_electromagnetic_field.py`, `scripts/example_specs.py`, building
+      on BE-090–BE-092, and `tests/`.
+    - Acceptance: field magnitudes/equipotentials match closed forms to tolerance;
+      field lines emanate/terminate correctly on charges; the manifest exports the
+      scalar potential grid and field lines with renderer hints; focused tests pass and
+      generation is clean.
+
+13. **BE-094: Add the vibrating-string wave system (normal modes and d'Alembert)**
+    - Goal: Add a 1D vibrating string with fixed/free boundary conditions, modal
+      decomposition, and standing/traveling-wave time evolution exported as an animated
+      displacement field.
+    - Scope: `systems/vibrating_string.py`, `scripts/generate_vibrating_string.py`,
+      `scripts/example_specs.py`, and `tests/`.
+    - Acceptance: mode frequencies match `n·c/2L` for fixed ends; a superposition
+      reproduces the d'Alembert traveling solution to tolerance; energy stays within
+      tolerance (`measured`); the manifest exports the displacement series and mode
+      data with renderer hints; focused tests pass and generation is clean.
+
+14. **BE-095: Add the 2D membrane wave system (rectangular and circular modes)**
+    - Goal: Add membrane normal modes — rectangular sine modes and circular (Bessel)
+      drum modes — exporting mode-shape surfaces and time-animated superpositions.
+    - Scope: `systems/membrane.py`, `scripts/generate_membrane.py`,
+      `scripts/example_specs.py`, reusing BE-091 grid export, and `tests/`.
+    - Acceptance: rectangular and circular eigenfrequencies match closed forms /
+      Bessel zeros to tolerance; mode-shape surfaces and a superposition animation
+      export deterministically as scalar-field grids with renderer hints; focused tests
+      pass and generation is clean.
+
+15. **BE-096: Dispersion and wave-packet propagation**
+    - Goal: Add 1D dispersive wave propagation distinguishing phase and group
+      velocity, with Gaussian wave-packet evolution, exporting amplitude/intensity over
+      space and time.
+    - Scope: `systems/wave_packet.py` (or extend the wave module),
+      `scripts/generate_wave_packet.py`, `scripts/example_specs.py`, and `tests/`.
+    - Acceptance: measured group/phase velocities match the dispersion relation to
+      tolerance; packet spreading matches the analytic envelope; the manifest exports
+      the amplitude field with renderer hints; focused tests pass and generation is
+      clean.
+
+16. **BE-097: 2D wavefronts and intensity from heterogeneous media**
+    - Goal: Extend the existing media / `variable_speed_wavefront` work to export full
+      2D wavefront surfaces and intensity from a heterogeneous scalar-speed field,
+      reusing the ray bundle and the BE-091 grid export.
+    - Scope: `engine/dynamics/media.py`, `engine/dynamics/ray_bundle.py`,
+      `engine/dynamics/ray_diagnostics.py`, `systems/variable_speed_wavefront.py`,
+      `scripts/generate_variable_speed_wavefront.py`, and `tests/`.
+    - Acceptance: wavefronts reconstructed from the ray bundle match the eikonal
+      travel-time field to tolerance; intensity rises near caustics consistent with the
+      existing caustic-proximity diagnostic; the manifest exports the wavefront/
+      intensity grids with renderer hints; focused tests pass and generation is clean.
+
+17. **BE-098: Vector-calculus flux diagnostics for fields**
+    - Goal: Add measured field diagnostics — divergence, curl, and surface/line flux —
+      that numerically check Gauss/Stokes relations on exported fields, labeled
+      honestly as measured evidence.
+    - Scope: `engine/fields/` diagnostics (or `engine/dynamics/`), and `tests/`.
+    - Acceptance: numerical flux of a point source matches enclosed charge (Gauss) and
+      circulation matches curl flux (Stokes) to tolerance; all results are labeled
+      `measured`; no result claims an exact identity from sampling; focused tests pass.
+
+### Direction C — Geometry & gravitation (geometric mechanics / relativity)
+
+_Deepen the differential-geometry strand: geodesics on curved surfaces and
+spacetimes, curvature, parallel transport, and orbital structure. Generalizes
+`engine/dynamics/metric.py` (today the 2-sphere and equatorial Schwarzschild) and
+`systems/sphere_geodesic.py`, and gives the viewer curved-space trajectories and
+embedding diagrams._
+
+18. **BE-099: General Riemannian metric module**
+    - Goal: Generalize the metric helper into a reusable module: a metric-tensor value
+      object over arbitrary coordinates, with Christoffel symbols, the geodesic
+      equation, and symbolic Riemann / Ricci / scalar curvature — replacing the two
+      hardcoded cases with a general path that reproduces them.
+    - Scope: `engine/dynamics/metric.py` (or new `engine/geometry/`), and `tests/`.
+    - Acceptance: the general path reproduces the existing 2-sphere and equatorial
+      Schwarzschild Christoffels/curvature; curvature of flat space is zero and of the
+      unit 2-sphere is the known constant; focused tests pass with no regression in
+      existing metric tests.
+
+19. **BE-100: Geodesics on surfaces of revolution**
+    - Goal: Add geodesics on general surfaces of revolution (torus, paraboloid, cone,
+      hyperboloid) via the BE-099 module, with the Clairaut conserved quantity.
+    - Scope: `systems/surface_geodesic.py` (parameterized family),
+      `scripts/generate_surface_geodesic.py`, `scripts/example_specs.py`, and `tests/`.
+    - Acceptance: geodesics satisfy the geodesic equation; the Clairaut invariant is
+      conserved within tolerance (`measured`); great circles are recovered on the
+      sphere; focused tests pass and generation is clean.
+
+20. **BE-101: Surface-embedding and geodesic export schema with renderer hints**
+    - Goal: Extend the export contract to carry a surface mesh in 3D embedding
+      coordinates, the geodesic polyline in embedded coordinates, and a curvature
+      scalar field over the surface, with a `surface-geodesic` renderer hint.
+    - Scope: `engine/export/manifest.py`, the geodesic generators,
+      `docs/BACKEND.md`, and `tests/`.
+    - Acceptance: a surface-of-revolution geodesic exports a deterministic mesh,
+      embedded curve, and curvature field; the manifest declares the channels and
+      renderer hint; the schema is documented; focused tests pass and generation is
+      clean.
+
+21. **BE-102: Effective-potential and orbit classification for central-force and GR orbits**
+    - Goal: Compute and export effective potentials, turning points, and bound/
+      unbound/critical orbit classification for Kepler and Schwarzschild orbits, reusing
+      the manifest effective-potential field.
+    - Scope: `engine/dynamics/` (orbit-classification helper), `systems/kepler_problem.py`,
+      the Schwarzschild system, generators, and `tests/`.
+    - Acceptance: turning points match roots of the effective potential; classification
+      matches energy/angular-momentum regimes for Kepler; the manifest exposes the
+      effective potential and turning points; focused tests pass and generation is
+      clean.
+
+22. **BE-103: Full Schwarzschild geodesics (timelike and null)**
+    - Goal: Generalize beyond the equatorial special case to timelike and null
+      Schwarzschild geodesics, exporting perihelion precession, the photon sphere, and
+      light bending, with the GR effective potential.
+    - Scope: `systems/schwarzschild.py`, `scripts/generate_schwarzschild.py`,
+      `scripts/example_specs.py`, building on BE-099/BE-102, and `tests/`.
+    - Acceptance: the precession rate matches the weak-field GR prediction to
+      tolerance; null geodesics bend by the expected angle; conserved energy and
+      angular momentum stay within tolerance (`measured`); the manifest exposes the
+      orbit and effective potential; focused tests pass and generation is clean.
+
+23. **BE-104: Parallel transport and holonomy on curved surfaces**
+    - Goal: Add parallel transport of a vector along a curve on a curved surface and
+      compute the holonomy angle around a closed loop, exporting the transported frame
+      for visualization.
+    - Scope: `engine/dynamics/metric.py` (or `engine/geometry/`),
+      `systems/sphere_geodesic.py` or the surface-geodesic system, generators, and
+      `tests/`.
+    - Acceptance: the holonomy angle around a spherical cap matches the enclosed solid
+      angle to tolerance; transport on flat space is trivial; the transported frame is
+      exported along the curve; focused tests pass and generation is clean.
+
+24. **BE-105: Curvature scalar fields and a Gauss–Bonnet diagnostic**
+    - Goal: Export Gaussian curvature over surfaces of revolution and curvature scalars
+      (Ricci / Kretschmann) for spacetimes as scalar fields, and add a measured
+      Gauss–Bonnet check relating integrated curvature to topology.
+    - Scope: `engine/dynamics/metric.py` (or `engine/geometry/`), the geodesic
+      generators, reusing BE-091/BE-101 scalar-field export, and `tests/`.
+    - Acceptance: Gaussian curvature matches closed forms for standard surfaces; the
+      integrated-curvature Gauss–Bonnet check matches `2πχ` to tolerance and is labeled
+      `measured`; curvature fields export deterministically; focused tests pass and
+      generation is clean.
+
+25. **BE-106: Add a second curved background (wormhole or FLRW)**
+    - Goal: Add one additional fixed-background spacetime — an Ellis-wormhole
+      embedding or an FLRW expansion slice — exercising the general BE-099 module and
+      kept honest as a fixed background (no dynamical gravity).
+    - Scope: `systems/` (new spacetime), generator, `scripts/example_specs.py`, and
+      `tests/`.
+    - Acceptance: geodesics satisfy the geodesic equation for the new metric; a
+      characteristic feature is reproduced (e.g. throat traversal for the wormhole, or
+      redshift along an FLRW null geodesic) to tolerance; the manifest exposes the
+      embedding/curve; focused tests pass and generation is clean.
+
+### Verification track (paused)
+
+_These two verification/CPS tasks predate the direction change above and are kept
+for continuity. They are **deprioritized** while the backend focuses on the physics
+directions; pick them up only if the physics queue is blocked or on explicit
+request._
+
+26. **BE-079: Cross-check reachability handoff coverage against certified coverage**
     - Goal: Ensure the reachability handoff inventory stays aligned with the
       certified-status coverage report: every handoff-backed obligation is a real
       certified-numeric obligation, and missing handoffs are reported rather than
@@ -139,7 +605,7 @@ backends dispose._
       reachability handoffs; it rejects a handoff for a non-certified obligation; no
       report claims proof or external discharge; focused tests pass.
 
-2. **BE-080: Add a reachability handoff dependency index**
+27. **BE-080: Add a reachability handoff dependency index**
     - Goal: Make each package's reachability handoff prerequisites inspectable
       without opening every artifact, by publishing a deterministic dependency
       index that maps handoffs to obligation ids, enclosure status ids, assumption

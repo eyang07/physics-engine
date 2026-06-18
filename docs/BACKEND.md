@@ -173,6 +173,7 @@ surfaces remain future work.
 - Ideal spring
 - Kepler problem
 - Bead on a rotating hoop
+- Double pendulum
 - Lorenz attractor
 - Hénon-Heiles system
 - Variable-speed wavefront propagation
@@ -196,7 +197,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `357 passed`.
+Latest known result: `607 passed`.
 
 Use focused tests while iterating:
 

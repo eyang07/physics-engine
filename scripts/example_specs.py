@@ -25,6 +25,7 @@ from engine.export.manifest import (
 from engine.mechanics.symmetries import InfinitesimalSymmetry
 from systems.bead_on_hoop import build_system as build_bead_on_hoop
 from systems.charged_particle import build_uniform_magnetic_field_system
+from systems.double_pendulum import build_system as build_double_pendulum
 from systems.henon_heiles import build_system as build_henon_heiles
 from systems.ideal_spring import build_system as build_ideal_spring
 from systems.kepler_problem import build_system as build_kepler
@@ -190,6 +191,22 @@ LENSES: tuple[Lens, ...] = (
         kind="potential-energy",
         description="Effective potential of the rotating hoop.",
         projections=("angle",),
+        conserved=("H",),
+    ),
+    Lens(
+        id="doublePendulumMotion",
+        title="Coupled Motion",
+        kind="configuration-space",
+        description="The two-link pendulum traced through the physical plane.",
+        projections=("bobPositions",),
+        conserved=("H",),
+    ),
+    Lens(
+        id="doublePendulumPhase",
+        title="Phase Portraits",
+        kind="configuration-phase",
+        description="Angular phase slices for the two coupled pendulum links.",
+        projections=("theta1Phase", "theta2Phase"),
         conserved=("H",),
     ),
     Lens(
@@ -503,6 +520,111 @@ BEAD_ON_HOOP = SystemSpec(
 )
 
 
+DOUBLE_PENDULUM = SystemSpec(
+    id="double-pendulum",
+    title="Double Pendulum",
+    category="Hamiltonian Chaos",
+    description=(
+        "A canonical two-link pendulum with full nonlinear coupling and "
+        "chaotic energy exchange."
+    ),
+    build=build_double_pendulum,
+    parameters=(
+        Parameter("m1", "m_1", 1.0, 0.2, 3.0),
+        Parameter("m2", "m_2", 1.0, 0.2, 3.0),
+        Parameter("ell1", r"\ell_1", 1.0, 0.4, 2.5),
+        Parameter("ell2", r"\ell_2", 1.0, 0.4, 2.5),
+        Parameter("g", "g", 9.81, 1.0, 20.0),
+        Parameter("theta1_0", r"\theta_{1,0}", 1.2, -3.0, 3.0, role="initial"),
+        Parameter("theta2_0", r"\theta_{2,0}", -0.2, -3.0, 3.0, role="initial"),
+        Parameter(
+            "theta1_dot0",
+            r"\dot{\theta}_{1,0}",
+            0.0,
+            -4.0,
+            4.0,
+            role="initial",
+        ),
+        Parameter(
+            "theta2_dot0",
+            r"\dot{\theta}_{2,0}",
+            0.25,
+            -4.0,
+            4.0,
+            role="initial",
+        ),
+    ),
+    state=(
+        StateVar("theta1", r"\theta_1", "coordinate"),
+        StateVar("theta2", r"\theta_2", "coordinate"),
+        StateVar("theta1_dot", r"\dot{\theta}_1", "velocity"),
+        StateVar("theta2_dot", r"\dot{\theta}_2", "velocity"),
+        StateVar("x1", "x_1", "embedding"),
+        StateVar("y1", "y_1", "embedding"),
+        StateVar("x2", "x_2", "embedding"),
+        StateVar("y2", "y_2", "embedding"),
+    ),
+    projections={
+        "bobPositions": ("x1", "y1", "x2", "y2"),
+        "theta1Phase": ("theta1", "theta1_dot"),
+        "theta2Phase": ("theta2", "theta2_dot"),
+    },
+    conserved=(Conserved("H", "H", "time translation", generator=_time_translation),),
+    lenses=("doublePendulumMotion", "doublePendulumPhase"),
+    data_path="/data/double_pendulum.json",
+    variants=(
+        ParameterVariant(
+            id="chaotic",
+            label="Chaotic exchange",
+            parameters={
+                "m1": 1.0,
+                "m2": 1.0,
+                "ell1": 1.0,
+                "ell2": 1.0,
+                "g": 9.81,
+                "theta1_0": 1.2,
+                "theta2_0": -0.2,
+                "theta1_dot0": 0.0,
+                "theta2_dot0": 0.25,
+            },
+            data_path="/data/double_pendulum.json",
+        ),
+        ParameterVariant(
+            id="near-linear",
+            label="Near-linear",
+            parameters={
+                "m1": 1.0,
+                "m2": 1.0,
+                "ell1": 1.0,
+                "ell2": 1.0,
+                "g": 9.81,
+                "theta1_0": 0.25,
+                "theta2_0": 0.18,
+                "theta1_dot0": 0.0,
+                "theta2_dot0": 0.0,
+            },
+            data_path="/data/double_pendulum_near_linear.json",
+        ),
+        ParameterVariant(
+            id="unequal-links",
+            label="Unequal links",
+            parameters={
+                "m1": 1.0,
+                "m2": 0.65,
+                "ell1": 1.0,
+                "ell2": 0.7,
+                "g": 9.81,
+                "theta1_0": 1.0,
+                "theta2_0": 0.35,
+                "theta1_dot0": 0.1,
+                "theta2_dot0": -0.35,
+            },
+            data_path="/data/double_pendulum_unequal_links.json",
+        ),
+    ),
+)
+
+
 LORENZ = SystemSpec(
     id="lorenz-attractor",
     title="Lorenz Attractor",
@@ -635,6 +757,7 @@ SPECS: tuple[SystemSpec, ...] = (
     IDEAL_SPRING,
     KEPLER,
     BEAD_ON_HOOP,
+    DOUBLE_PENDULUM,
     LORENZ,
     HENON_HEILES,
     VARIABLE_SPEED_WAVEFRONT,
