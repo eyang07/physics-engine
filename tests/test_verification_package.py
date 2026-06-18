@@ -636,6 +636,7 @@ def test_generation_publishes_complete_drone_package(tmp_path) -> None:
     reachability_dir = tmp_path / "drone-geofence-axis" / reachability.path
     assert (reachability_dir / REACHABILITY_HANDOFF_INDEX_FILENAME).is_file()
     artifacts = read_reachability_handoff(reachability_dir)
+    assert package.reachability == artifacts
     assert {artifact.obligation_id for artifact in artifacts} == {
         "geofence-barrier-forward-invariance",
         "velocity-bound-one-step-invariance",
@@ -647,6 +648,40 @@ def test_generation_publishes_complete_drone_package(tmp_path) -> None:
         assert artifact.obligation.rigor == "external-required"
         assert artifact.discharges is False
         assert artifact.external_status == "external-required"
+
+
+def test_read_package_rejects_reachability_artifact_claiming_discharge(
+    tmp_path,
+) -> None:
+    write_verification_packages_for_examples(tmp_path)
+    artifact_path = (
+        tmp_path
+        / "drone-geofence-axis"
+        / "reachability"
+        / "geofence-barrier-forward-invariance.reachability.json"
+    )
+    payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+    payload["discharges"] = True
+    artifact_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="never discharge"):
+        read_package(tmp_path / "drone-geofence-axis")
+
+
+def test_read_package_rejects_reachability_box_drift(tmp_path) -> None:
+    write_verification_packages_for_examples(tmp_path)
+    artifact_path = (
+        tmp_path
+        / "drone-geofence-axis"
+        / "reachability"
+        / "geofence-barrier-forward-invariance.reachability.json"
+    )
+    payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+    payload["box"]["q1"][0] = "-99"
+    artifact_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="box does not match"):
+        read_package(tmp_path / "drone-geofence-axis")
 
 
 def test_generation_publishes_complete_vertical_axis_package(tmp_path) -> None:

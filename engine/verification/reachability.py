@@ -353,17 +353,87 @@ def read_reachability_handoff(
     index = ReachabilityHandoffIndex.from_dict(
         json.loads(index_path.read_text(encoding="utf-8"))
     )
-    artifacts = tuple(
-        ReachabilityHandoffArtifact.from_dict(
-            json.loads((input_dir / path).read_text(encoding="utf-8"))
+    artifacts: list[ReachabilityHandoffArtifact] = []
+    for _, path in index.artifacts:
+        artifact_path = input_dir / path
+        if not artifact_path.is_file():
+            raise ValueError(
+                f"reachability handoff index references missing artifact {path!r}"
+            )
+        artifacts.append(
+            ReachabilityHandoffArtifact.from_dict(
+                json.loads(artifact_path.read_text(encoding="utf-8"))
+            )
         )
-        for _, path in index.artifacts
-    )
     if tuple(artifact.obligation_id for artifact in artifacts) != tuple(
         obligation_id for obligation_id, _ in index.artifacts
     ):
         raise ValueError("reachability handoff artifact order/id mismatch")
-    return artifacts
+    return tuple(artifacts)
+
+
+def validate_reachability_handoff_artifacts(
+    problem: VerificationProblem,
+    artifacts: tuple[ReachabilityHandoffArtifact, ...],
+) -> None:
+    """Validate non-discharging reachability handoffs against ``problem``.
+
+    This is package-contract validation only. It checks that the handoff files
+    are faithful inputs for an external reachability backend; it does not run
+    that backend and records no discharge.
+    """
+
+    obligations = {obligation.id: obligation for obligation in problem.obligations}
+    enclosure_statuses = {
+        status.id: status for status in problem.enclosure_statuses
+    }
+    seen: set[str] = set()
+    for artifact in artifacts:
+        if artifact.problem_id != problem.id:
+            raise ValueError(
+                "reachability handoff problemId does not match package problem"
+            )
+        if artifact.obligation_id in seen:
+            raise ValueError(
+                "reachability handoff repeats obligation "
+                f"{artifact.obligation_id!r}"
+            )
+        seen.add(artifact.obligation_id)
+        obligation = obligations.get(artifact.obligation_id)
+        if obligation is None:
+            raise ValueError(
+                "reachability handoff references unknown obligation "
+                f"{artifact.obligation_id!r}"
+            )
+        if artifact.obligation != obligation:
+            raise ValueError(
+                "reachability handoff obligation payload does not match the IR"
+            )
+        if problem.dynamics is None or artifact.dynamics != problem.dynamics:
+            raise ValueError(
+                "reachability handoff dynamics payload does not match the IR"
+            )
+        status = enclosure_statuses.get(artifact.enclosure_status_id)
+        if status is None:
+            raise ValueError(
+                "reachability handoff references unknown enclosure status "
+                f"{artifact.enclosure_status_id!r}"
+            )
+        if status.obligation_id != artifact.obligation_id:
+            raise ValueError(
+                "reachability handoff enclosure status targets a different obligation"
+            )
+        if artifact.box != status.box:
+            raise ValueError(
+                "reachability handoff box does not match the enclosure status"
+            )
+        if artifact.domain_constraints != status.domain_constraints:
+            raise ValueError(
+                "reachability handoff domain constraints do not match the "
+                "enclosure status"
+            )
+        if artifact.discharges or artifact.external_status != "external-required":
+            raise ValueError("reachability handoff must be non-discharging")
 
 
 __all__ = [
@@ -376,5 +446,6 @@ __all__ = [
     "one_step_image",
     "reachability_handoff_artifacts",
     "read_reachability_handoff",
+    "validate_reachability_handoff_artifacts",
     "write_reachability_handoff",
 ]

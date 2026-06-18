@@ -113,6 +113,9 @@ artifacts.
     index. Each artifact carries the discrete dynamics, recorded exact-rational
     box/domain constraints, and obligation for an external validated-numerics
     backend, with `discharges=false` and `externalStatus="external-required"`.
+    Package reads validate these handoff artifacts against the IR and their
+    referenced enclosure statuses, rejecting drift or any artifact that claims
+    discharge.
   - Viewer-renderable verification examples now include
     `upright-pendulum-safety` and `controlled-spring-regulator-safety`, each
     with its own controlled trajectory, region geometry, candidate-certificate

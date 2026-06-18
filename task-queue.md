@@ -117,17 +117,7 @@ enclosure under stated assumptions), strictly distinct from `measured` (level 1)
 from any external `proved` / `certified` result. The engine proposes; external
 backends dispose._
 
-1. **BE-077: Validate reachability adapter artifacts in package reads**
-    - Goal: Once BE-076 writes non-discharging reachability handoff files, make package
-      reads validate that every reachability artifact references a real obligation,
-      matches the problem dynamics/box contract, and is labeled non-discharging.
-    - Scope: `engine/export/verification_package.py`, `engine/verification/`
-      reachability artifact readers, and `tests/`.
-    - Acceptance: package reads reject a tampered reachability artifact or one that
-      claims discharge; valid generated packages round-trip; obligations remain
-      `external-required`; focused tests pass.
-
-2. **BE-078: Summarize reachability handoff coverage in package reports**
+1. **BE-078: Summarize reachability handoff coverage in package reports**
     - Goal: Surface how many non-discharging reachability handoff artifacts each
       generated package exports, so the backend inventory shows which obligations
       have concrete handoff files without implying discharge.
@@ -136,3 +126,14 @@ backends dispose._
     - Acceptance: the package summary or a deterministic companion report lists
       reachability handoff counts per package; missing/empty handoff inventories are
       represented honestly; no entry claims proof or certification; focused tests pass.
+
+2. **BE-079: Cross-check reachability handoff coverage against certified coverage**
+    - Goal: Ensure the reachability handoff inventory stays aligned with the
+      certified-status coverage report: every handoff-backed obligation is a real
+      certified-numeric obligation, and missing handoffs are reported rather than
+      silently ignored.
+    - Scope: `engine/export/verification_package.py`,
+      `engine/verification/reachability.py`, and `tests/`.
+    - Acceptance: a backend validator reports certified obligations with and without
+      reachability handoffs; it rejects a handoff for a non-certified obligation; no
+      report claims proof or external discharge; focused tests pass.

@@ -60,6 +60,7 @@ from engine.verification.reachability import (
     one_step_image,
     reachability_handoff_artifacts,
     read_reachability_handoff,
+    validate_reachability_handoff_artifacts,
     write_reachability_handoff,
 )
 from engine.verification.certified import (
@@ -196,6 +197,7 @@ __all__ = [
     "partitioned_enclosure",
     "reachability_handoff_artifacts",
     "read_reachability_handoff",
+    "validate_reachability_handoff_artifacts",
     "render_inspection_markdown",
     "scalar_field_region_geometries",
     "scalar_field_region_geometry",

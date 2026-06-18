@@ -191,7 +191,7 @@ controlled trajectories, time-aligned candidate-certificate series, sampled
 certified-numeric evidence tiers distinct, plus a certified-status coverage
 validator that audits the recorded level-2 enclosure metadata without discharging
 obligations, and non-discharging reachability handoff artifacts for external
-validated-numerics backends). The
+validated-numerics backends with package-read validation). The
 discrete-time analogue
 `x_{k+1} = F(k, x_k, u_k, d_k; θ)` now exists backend-only
 (`engine/dynamics/discrete.py`, spec in `docs/discrete-dynamics.md`) with

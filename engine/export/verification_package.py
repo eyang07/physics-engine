@@ -38,8 +38,11 @@ from engine.verification import (
     UnsupportedExpressionError,
     VerificationProblem,
     enclose_expression,
+    read_reachability_handoff,
+    validate_reachability_handoff_artifacts,
     write_reachability_handoff,
 )
+from engine.verification.reachability import ReachabilityHandoffArtifact
 from engine.verification.adapter_stubs import (
     AdapterStubReport,
     obligation_adapter_stubs,
@@ -321,6 +324,7 @@ class VerificationPackage:
     trajectory: Mapping[str, Any]
     inspection: Mapping[str, Any] | None = None
     adapter_stubs: Mapping[str, Any] | None = None
+    reachability: tuple[ReachabilityHandoffArtifact, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -828,12 +832,25 @@ def read_package(directory: str | Path) -> VerificationPackage:
                     "disturbance set does not match the IR"
                 )
 
+    reachability: tuple[ReachabilityHandoffArtifact, ...] | None = None
+    reachability_component = manifest.component(COMPONENT_REACHABILITY)
+    if reachability_component is not None:
+        reachability_dir = package_dir / reachability_component.path
+        if not reachability_dir.is_dir():
+            raise ValueError(
+                f"verification package {manifest.problem_id!r} missing "
+                f"{COMPONENT_REACHABILITY} directory {reachability_component.path}"
+            )
+        reachability = read_reachability_handoff(reachability_dir)
+        validate_reachability_handoff_artifacts(problem, reachability)
+
     return VerificationPackage(
         manifest=manifest,
         problem=problem,
         trajectory=trajectory,
         inspection=inspection,
         adapter_stubs=adapter_stubs,
+        reachability=reachability,
     )
 
 
