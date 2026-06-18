@@ -47,21 +47,7 @@ below make the measured margin geometrically legible and surface the package
 inventory in the inspector. Keep rendering honest — measured stays measured,
 candidates stay candidates, nothing reads as proved._
 
-1. **FE-024: Annotate the disturbance set on Tier-3 stages**
-   - Goal: A Tier-3 stage renders the rollout and regions, but the wind box `W =
-     [-w, w]` the robust obligation is quantified over is invisible. Add an honest,
-     read-only annotation of the disturbance bound `w` (and, where plane-expressible,
-     its effect on the tightened safe margin) to the stage for packages that carry
-     a disturbance spec, so a reader can see what the robustness is *against*. Draw
-     nothing for nominal packages.
-   - Scope: `viewer/src/verificationStage.ts` (disturbance annotation), the IR
-     reader in `viewer/src/data/verification.ts` if needed, `viewer/src/styles.css`,
-     and the viewer visual test.
-   - Acceptance: selecting a Tier-3 package shows the disturbance-bound annotation;
-     a nominal package shows none; the rollout/region rendering is unchanged;
-     nothing reads as proved; `npm run build` and the visual test pass.
-
-2. **FE-025: Surface adapter-stub descriptors in the IR inspector**
+1. **FE-025: Surface adapter-stub descriptors in the IR inspector**
    - Goal: Each package now carries optional non-discharging adapter stubs (BE-044)
      naming external backend categories (reachability, SOS/certificate synthesis,
      deductive prover) that could consume each obligation, but the viewer never
@@ -77,7 +63,7 @@ candidates stay candidates, nothing reads as proved._
      shows no section; obligations stay `external-required`; `npm run build` and the
      visual test pass.
 
-3. **FE-026: Per-obligation worst-margin readout aligned to the rollout**
+2. **FE-026: Per-obligation worst-margin readout aligned to the rollout**
    - Goal: Certificate lanes plot candidate values over the rollout, but the
      measured signed worst `margin` (BE-036) per obligation is shown only as a
      static ledger number. Add a small, honest worst-margin readout for the
@@ -90,7 +76,7 @@ candidates stay candidates, nothing reads as proved._
      the rollout, consistent with the ledger value; nothing recomputes physics in
      TypeScript; nothing reads as proved; `npm run build` and the visual test pass.
 
-4. **FE-027: Label each barrier lane for intersection-safe-set packages**
+3. **FE-027: Label each barrier lane for intersection-safe-set packages**
    - Goal: The geofence∩obstacle package (BE-050) carries two candidate barriers
      together — the geofence box barrier and the signed-distance keep-out barrier
      `B_obs = rho - |q - c|` — but the certificate lanes do not name which lane is
@@ -105,7 +91,7 @@ candidates stay candidates, nothing reads as proved._
      intersection semantics stated; single-barrier packages are unchanged; both
      barriers stay labeled candidate; `npm run build` and the visual test pass.
 
-5. **FE-028: Verification catalog overview from the package discovery index**
+4. **FE-028: Verification catalog overview from the package discovery index**
    - Goal: The Verification view wires examples one by one, but the published
      discovery index (`packages.index.json`, surfaced on the viewer index by
      BE-047) already lists every package by model, status, and counts. Add a
@@ -121,7 +107,7 @@ candidates stay candidates, nothing reads as proved._
      existing per-example list; nothing reads as proved; `npm run build` and the
      visual test pass.
 
-6. **FE-029: Show the package Tier/regime badge in the catalog (after BE-054)**
+5. **FE-029: Show the package Tier/regime badge in the catalog (after BE-054)**
    - Goal: Once the discovery index carries the Tier/regime descriptor (BE-054 —
      nominal Tier-1/2 vs disturbance-robust Tier-3), surface it as an honest badge
      on each catalog entry so a reader can tell a nominal geofence package from a
@@ -134,7 +120,7 @@ candidates stay candidates, nothing reads as proved._
      descriptor; entries without the descriptor show no badge; nothing reads as
      proved; `npm run build` and the visual test pass.
 
-7. **FE-030: Render the measured violation reference scenario (after BE-056)**
+6. **FE-030: Render the measured violation reference scenario (after BE-056)**
     - Goal: Every published package currently *holds*, so the viewer's measured
       violation surface (red worst-violation markers and legend) is never
       exercised. Once the Tier-2 boundary-corner violation scenario exports

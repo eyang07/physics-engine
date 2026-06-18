@@ -321,6 +321,50 @@ select {
   display: none;
 }
 
+/* Tier-3 disturbance-set annotation: the wind box the robust claim is quantified
+   over, in the free bottom-left corner of the stage. Read-only, like the other
+   legends. */
+.verif-disturbance-annotation {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 2;
+  display: grid;
+  gap: 4px;
+  max-width: 240px;
+  padding: 8px 11px;
+  border: 1px solid var(--cool-dim);
+  border-left: 2px solid var(--cool);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost-strong);
+  backdrop-filter: blur(20px);
+  pointer-events: none;
+}
+
+.verif-disturbance-annotation[hidden] {
+  display: none;
+}
+
+.verif-disturbance-annotation__title {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.verif-disturbance-annotation__bound {
+  color: var(--cool);
+  font-size: var(--text-sm);
+}
+
+.verif-disturbance-annotation__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
 .verif-roles-legend__entry {
   display: flex;
   align-items: center;

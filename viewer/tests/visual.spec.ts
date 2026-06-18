@@ -1009,6 +1009,49 @@ for (const viewport of [
     });
   });
 
+  test(`Verification stage annotates the disturbance set on Tier-3 packages at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const catalogItems = page.locator("#verificationCatalog .catalog-item");
+    const annotation = page.locator(".verif-disturbance-annotation");
+
+    // Nominal Tier-1 geofence package (3rd entry): no disturbance annotation.
+    await catalogItems.nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+    await page.waitForTimeout(300);
+    await expect(annotation).toBeHidden();
+
+    // Tier-3 disturbance-robust geofence package: the wind box `W` it is
+    // quantified over is annotated on the stage, honestly labeled assumed (not
+    // discharged), while the rollout keeps painting.
+    await catalogItems.nth(6).click();
+    await expect(
+      page.getByRole("heading", { name: /drone disturbed geofence axis/i }),
+    ).toBeVisible();
+    await page.waitForTimeout(600);
+    await expect(annotation).toBeVisible();
+    await expect(annotation).toContainText(/disturbance set/i);
+    await expect(annotation).toContainText(/not discharged/i);
+    await expect(annotation.locator(".katex").first()).toBeVisible();
+    await expectCanvasNonBlank(page, "#verificationCanvas");
+
+    // Switching back to a nominal package hides the annotation again.
+    await catalogItems.nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+    await page.waitForTimeout(300);
+    await expect(annotation).toBeHidden();
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-disturbance-set.png`),
+    });
+  });
+
   test(`Verification obligation ledger reads unsampled obligations as not sampled at ${viewport.name}`, async ({
     page,
   }) => {
