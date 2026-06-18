@@ -890,10 +890,12 @@ export async function loadVerificationAdapterStubs(
 
 /**
  * Assemble a problem's package into one self-contained bundle for download:
- * fetch the manifest and every component it indexes, embedding each component's
- * payload keyed by its kind. The embedded manifest is the backend's own, so the
- * bundle re-reads to exactly the components the backend wrote. Throws if any
- * indexed file is missing, so a download never silently drops a component.
+ * fetch the manifest and inline each single-file (`.json`) component's payload
+ * keyed by its kind. Directory / aggregate components (e.g. the reachability
+ * handoff — a folder of per-obligation files) cannot be inlined as one payload;
+ * they stay referenced by the embedded manifest but are not embedded. Throws if
+ * an indexed JSON file is missing, so a download never silently drops a file
+ * component.
  */
 export async function assembleVerificationPackageBundle(
   packagePath: string,
@@ -910,6 +912,11 @@ export async function assembleVerificationPackageBundle(
   const base = packageBasePath(packagePath);
   const components: Record<string, unknown> = {};
   for (const component of manifest.components) {
+    // Only single-file JSON components are inlined; a directory component is
+    // referenced by the manifest, not embedded as one payload.
+    if (!component.path.endsWith(".json")) {
+      continue;
+    }
     const response = await fetch(`${base}/${component.path}`);
     if (!response.ok) {
       throw new Error(`Missing package component ${component.kind} (${component.path}).`);

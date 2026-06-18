@@ -299,22 +299,28 @@ for (const viewport of [
 
     // Every catalog entry carries its regime descriptor from the discovery index.
     const items = page.locator("#verificationCatalog .catalog-item");
-    await expect(items).toHaveCount(10);
-    await expect(page.locator("#verificationCatalog .catalog-item__regime")).toHaveCount(10);
+    await expect(items).toHaveCount(12);
+    await expect(page.locator("#verificationCatalog .catalog-item__regime")).toHaveCount(12);
 
-    // The three disturbance-robust (Tier-3) packages read "robust"; the rest are
+    // The disturbance-robust (Tier-3) packages read "robust"; the rest are
     // "nominal".
     const robust = page.locator("#verificationCatalog .catalog-item__regime--robust");
-    await expect(robust).toHaveCount(3);
+    await expect(robust).toHaveCount(4);
     await expect(robust.first()).toHaveText("robust");
-    await expect(page.locator("#verificationCatalog .catalog-item__regime--nominal")).toHaveCount(7);
+    await expect(page.locator("#verificationCatalog .catalog-item__regime--nominal")).toHaveCount(8);
 
-    // The disturbed geofence entry (7th) is badged robust; the nominal geofence
-    // entry (3rd) is badged nominal.
+    // The disturbed geofence package is badged robust; the nominal geofence
+    // package is badged nominal.
     await expect(
-      items.nth(6).locator(".catalog-item__regime"),
+      page
+        .locator('#verificationCatalog .catalog-item[data-problem-id="drone-disturbed-geofence-axis"] .catalog-item__regime')
+        .first(),
     ).toHaveText("robust");
-    await expect(items.nth(2).locator(".catalog-item__regime")).toHaveText("nominal");
+    await expect(
+      page
+        .locator('#verificationCatalog .catalog-item[data-problem-id="drone-geofence-axis"] .catalog-item__regime')
+        .first(),
+    ).toHaveText("nominal");
     await page.screenshot({
       path: testInfo.outputPath(`${viewport.name}-verification-regime-badges.png`),
     });
@@ -337,7 +343,7 @@ for (const viewport of [
     await page.waitForSelector("#verificationDomain.domain--active");
     await page.waitForSelector("#verificationSummary .verif-summary");
 
-    await expect(page.locator("#verificationCatalog .catalog-item")).toHaveCount(10);
+    await expect(page.locator("#verificationCatalog .catalog-item")).toHaveCount(12);
     await expect(page.locator("#verificationCatalog .catalog-item__regime")).toHaveCount(0);
   });
 
@@ -351,12 +357,13 @@ for (const viewport of [
     await page.waitForSelector("#verificationDomain.domain--active");
     await page.waitForSelector("#verificationSummary .verif-summary");
 
-    const catalogItems = page.locator("#verificationCatalog .catalog-item");
     const regime = page.locator("#verificationMasthead .verif-masthead__regime");
 
     // A nominal package: the masthead restates "nominal" with no disturbance
     // detail.
-    await catalogItems.nth(2).click();
+    await page
+      .locator('#verificationCatalog .catalog-item[data-problem-id="drone-geofence-axis"]')
+      .click();
     await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
     await expect(regime).toHaveClass(/verif-masthead__regime--nominal/);
     await expect(regime.locator(".verif-masthead__regime-kind")).toHaveText("nominal");
@@ -364,7 +371,9 @@ for (const viewport of [
 
     // A disturbance-robust package: the masthead names the regime, the
     // disturbance parameters, and the robust obligation ids it cites.
-    await catalogItems.nth(6).click();
+    await page
+      .locator('#verificationCatalog .catalog-item[data-problem-id="drone-disturbed-geofence-axis"]')
+      .click();
     await expect(
       page.getByRole("heading", { name: /drone disturbed geofence axis/i }),
     ).toBeVisible();
@@ -412,7 +421,7 @@ for (const viewport of [
 
     // The catalog lists every exported problem; the first is active by default.
     const catalogItems = page.locator("#verificationCatalog .catalog-item");
-    await expect(catalogItems).toHaveCount(10);
+    await expect(catalogItems).toHaveCount(12);
     await expect(page.locator("#verificationCatalog .catalog-item--active")).toHaveCount(1);
 
     // The default problem animates its controlled trajectory on the exported
@@ -534,22 +543,24 @@ for (const viewport of [
     await page.waitForSelector("#verificationDomain.domain--active");
     await page.waitForSelector("#verificationSummary .verif-summary");
 
-    const catalogItems = page.locator("#verificationCatalog .catalog-item");
     const legend = page.locator(".verif-violation-legend");
 
-    // A holding keep-out package (5th entry) draws no violation markers and hides
-    // the violation legend.
-    await catalogItems.nth(4).click();
+    // A holding keep-out package draws no violation markers and hides the
+    // violation legend.
+    await page
+      .locator('#verificationCatalog .catalog-item[data-problem-id="drone-obstacle-keepout"]')
+      .click();
     await expect(page.getByRole("heading", { name: /^drone obstacle keepout$/i })).toBeVisible();
     await page.waitForTimeout(300);
     await expect(page.locator("#verificationCanvas")).toHaveAttribute("data-violation-markers", "0");
     await expect(legend).toBeHidden();
 
-    // The boundary-corner violation scenario (6th entry) exports a measured-
-    // violated run: the stage draws the violation marker, names the obligation
-    // the run left, and headlines its negative margin — labeled measured
-    // evidence, never a disproof.
-    await catalogItems.nth(5).click();
+    // The boundary-corner violation scenario exports a measured-violated run: the
+    // stage draws the violation marker, names the obligation the run left, and
+    // headlines its negative margin — labeled measured evidence, never a disproof.
+    await page
+      .locator('#verificationCatalog .catalog-item[data-problem-id="drone-obstacle-keepout-violation"]')
+      .click();
     await expect(
       page.getByRole("heading", { name: /drone obstacle keepout violation/i }),
     ).toBeVisible();
@@ -584,7 +595,9 @@ for (const viewport of [
 
     // The violation scenario's run carries a worst.time (1.54): the legend names
     // the moment the simulated run crossed into the unsafe set.
-    await page.locator("#verificationCatalog .catalog-item").nth(5).click();
+    await page
+      .locator('#verificationCatalog .catalog-item[data-problem-id="drone-obstacle-keepout-violation"]')
+      .click();
     await expect(
       page.getByRole("heading", { name: /drone obstacle keepout violation/i }),
     ).toBeVisible();
@@ -648,7 +661,7 @@ for (const viewport of [
     await page.waitForSelector("#verificationSummary .verif-summary");
 
     const items = page.locator("#verificationCatalog .catalog-item");
-    await expect(items).toHaveCount(10);
+    await expect(items).toHaveCount(12);
 
     // Every item carries its obligation/candidate counts from the index summary.
     for (let index = 0; index < 3; index += 1) {
@@ -683,7 +696,7 @@ for (const viewport of [
     await page.waitForSelector("#verificationSummary .verif-summary");
 
     const items = page.locator("#verificationCatalog .catalog-item");
-    await expect(items).toHaveCount(10);
+    await expect(items).toHaveCount(12);
 
     // Grounded in the discovery index, each entry now lists the full
     // region/obligation/candidate counts and the package status.
@@ -699,10 +712,10 @@ for (const viewport of [
     );
     await expect(first.locator(".catalog-item__status")).toHaveText("candidate");
     // Every entry carries the status chip and a region count.
-    await expect(page.locator("#verificationCatalog .catalog-item__status")).toHaveCount(10);
+    await expect(page.locator("#verificationCatalog .catalog-item__status")).toHaveCount(12);
     await expect(
       page.locator('#verificationCatalog .catalog-item__count[data-count="regions"]'),
-    ).toHaveCount(10);
+    ).toHaveCount(12);
 
     // Selecting an entry still opens its problem.
     await items.nth(2).click();
@@ -730,7 +743,7 @@ for (const viewport of [
     await page.waitForSelector("#verificationSummary .verif-summary");
 
     const items = page.locator("#verificationCatalog .catalog-item");
-    await expect(items).toHaveCount(10);
+    await expect(items).toHaveCount(12);
     // Counts still render from the viewer summary; no regime badge survives.
     await expect(
       items.nth(0).locator('.catalog-item__count[data-count="obligations"]'),
@@ -1273,17 +1286,19 @@ for (const viewport of [
     await page.waitForSelector("#verificationDomain.domain--active");
     await page.waitForSelector("#verificationSummary .verif-summary");
 
-    const catalogItems = page.locator("#verificationCatalog .catalog-item");
-
-    // Nominal Tier-1 geofence package (3rd entry): no robust badge anywhere.
-    await catalogItems.nth(2).click();
+    // Nominal Tier-1 geofence package: no robust badge anywhere.
+    await page
+      .locator('#verificationCatalog .catalog-item[data-problem-id="drone-geofence-axis"]')
+      .click();
     await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
     await expect(page.locator("#verifLedger .verif-badge--robust")).toHaveCount(0);
 
     // Tier-3 disturbance-robust geofence package: its robust obligations carry the
     // honest "robust ∀ d ∈ W" badge and surface the cited wind box, while still
     // reading external-required (never discharged).
-    await catalogItems.nth(6).click();
+    await page
+      .locator('#verificationCatalog .catalog-item[data-problem-id="drone-disturbed-geofence-axis"]')
+      .click();
     await expect(
       page.getByRole("heading", { name: /drone disturbed geofence axis/i }),
     ).toBeVisible();
@@ -1311,11 +1326,16 @@ for (const viewport of [
     await page.waitForSelector("#verificationDomain.domain--active");
     await page.waitForSelector("#verificationSummary .verif-summary");
 
-    const catalogItems = page.locator("#verificationCatalog .catalog-item");
+    const geofenceAxis = page.locator(
+      '#verificationCatalog .catalog-item[data-problem-id="drone-geofence-axis"]',
+    );
+    const disturbedGeofenceAxis = page.locator(
+      '#verificationCatalog .catalog-item[data-problem-id="drone-disturbed-geofence-axis"]',
+    );
     const annotation = page.locator(".verif-disturbance-annotation");
 
-    // Nominal Tier-1 geofence package (3rd entry): no disturbance annotation.
-    await catalogItems.nth(2).click();
+    // Nominal Tier-1 geofence package: no disturbance annotation.
+    await geofenceAxis.click();
     await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
     await page.waitForTimeout(300);
     await expect(annotation).toBeHidden();
@@ -1323,7 +1343,7 @@ for (const viewport of [
     // Tier-3 disturbance-robust geofence package: the wind box `W` it is
     // quantified over is annotated on the stage, honestly labeled assumed (not
     // discharged), while the rollout keeps painting.
-    await catalogItems.nth(6).click();
+    await disturbedGeofenceAxis.click();
     await expect(
       page.getByRole("heading", { name: /drone disturbed geofence axis/i }),
     ).toBeVisible();
@@ -1335,7 +1355,7 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#verificationCanvas");
 
     // Switching back to a nominal package hides the annotation again.
-    await catalogItems.nth(2).click();
+    await geofenceAxis.click();
     await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
     await page.waitForTimeout(300);
     await expect(annotation).toBeHidden();
@@ -1642,7 +1662,18 @@ for (const viewport of [
     const kinds = bundle.manifest.components.map((component: { kind: string }) => component.kind);
     expect(kinds).toContain("problem-ir");
     expect(kinds).toContain("viewer-trajectory");
-    expect(Object.keys(bundle.components).sort()).toEqual([...kinds].sort());
+    // Single-file JSON components are inlined; a directory component (the
+    // reachability handoff) stays referenced by the manifest but is not embedded.
+    const embedded = Object.keys(bundle.components);
+    expect(embedded).toContain("problem-ir");
+    expect(embedded).toContain("viewer-trajectory");
+    expect(kinds).toEqual(expect.arrayContaining(embedded));
+    const directoryComponents = bundle.manifest.components.filter(
+      (component: { path: string }) => !component.path.endsWith(".json"),
+    );
+    for (const component of directoryComponents) {
+      expect(embedded).not.toContain(component.kind);
+    }
     // The embedded IR is the backend-agnostic problem (no viewer trajectory); the
     // viewer-trajectory component carries the animated series.
     expect(bundle.components["problem-ir"].id).toBe("upright-pendulum-safety");
@@ -1852,21 +1883,23 @@ for (const viewport of [
     await page.getByRole("button", { name: "Verification" }).click();
     await page.waitForSelector("#verificationSummary .verif-summary");
 
-    const catalogItems = page.locator("#verificationCatalog .catalog-item");
-
-    // A single-barrier keep-out package (5th entry): lanes are unchanged — no
-    // barrier name labels and no intersection note.
-    await catalogItems.nth(4).click();
+    // A single-barrier keep-out package: lanes are unchanged — no barrier name
+    // labels and no intersection note.
+    await page
+      .locator('#verificationCatalog .catalog-item[data-problem-id="drone-obstacle-keepout"]')
+      .click();
     await expect(page.getByRole("heading", { name: /drone obstacle keepout/i })).toBeVisible();
     await expect(page.locator("#verificationCertificateLanes .diagnostic__barrier")).toHaveCount(0);
     await expect(page.locator("#verificationCertificateLanes .diagnostic-intersection")).toHaveCount(
       0,
     );
 
-    // The geofence∩obstacle package (8th entry) carries two candidate barriers
-    // whose intersection is the safe set: each lane is named, and the
-    // intersection semantics are stated once — both stay candidates.
-    await catalogItems.nth(7).click();
+    // The geofence∩obstacle package carries two candidate barriers whose
+    // intersection is the safe set: each lane is named, and the intersection
+    // semantics are stated once — both stay candidates.
+    await page
+      .locator('#verificationCatalog .catalog-item[data-problem-id="drone-geofence-obstacle"]')
+      .click();
     await expect(page.getByRole("heading", { name: /drone geofence obstacle/i })).toBeVisible();
     const barriers = page.locator("#verificationCertificateLanes .diagnostic__barrier");
     await expect(barriers).toHaveCount(2);
