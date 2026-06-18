@@ -1819,6 +1819,15 @@ select {
   border-color: var(--cool-dim);
 }
 
+/* Level-2 certified-numeric marker: a distinct green, clearly stronger than the
+   measured teal and the external-required purple, but never "proved"/"safe". */
+.verif-badge--certified {
+  margin-left: 0;
+  color: #1b6e3b;
+  border-color: rgba(27, 110, 59, 0.4);
+  background: rgba(27, 110, 59, 0.1);
+}
+
 /* ---- Dossier scoped overrides (Verification domain only) ----------------- */
 
 /* The docket: a typeset index, not buttons-as-tiles. Model id in mono, title in
@@ -1916,6 +1925,71 @@ select {
   color: var(--cool);
   border-color: var(--cool-dim);
   background: var(--cool-dim);
+}
+
+#verificationDomain .verif-badge--certified {
+  color: #1b6e3b;
+  border-color: rgba(27, 110, 59, 0.4);
+  background: rgba(27, 110, 59, 0.1);
+}
+
+/* The certified-numeric (level-2) enclosure detail on an obligation card. */
+.verif-enclosure {
+  display: grid;
+  gap: 4px;
+  margin-top: var(--space-2);
+  padding: 8px 10px;
+  border: 1px solid rgba(27, 110, 59, 0.3);
+  border-left: 2px solid #1b6e3b;
+  border-radius: var(--radius-sm);
+  background: rgba(27, 110, 59, 0.06);
+}
+
+.verif-enclosure__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.verif-enclosure__label {
+  color: #1b6e3b;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.verif-enclosure__rung {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.verif-enclosure__box,
+.verif-enclosure__interval {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+}
+
+.verif-enclosure__box-label,
+.verif-enclosure__interval-label {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.verif-enclosure__box-ids,
+.verif-enclosure__interval-value {
+  font-family: var(--font-mono, monospace);
+}
+
+.verif-enclosure__assumption,
+.verif-enclosure__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
 }
 
 #verificationDomain .verif-role--safe {

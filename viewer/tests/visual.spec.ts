@@ -1413,8 +1413,68 @@ for (const viewport of [
     const currentText = ((await current.textContent()) ?? "").toLowerCase();
     expect(currentText).not.toContain("proved");
     expect(currentText).not.toContain("certified");
+    // A problem with no certified-numeric enclosure carries no certified badge.
+    await expect(page.locator("#verifLedger .verif-badge--certified")).toHaveCount(0);
     await page.screenshot({
       path: testInfo.outputPath(`${viewport.name}-verification-rigor-ladder.png`),
+    });
+  });
+
+  test(`Verification rigor ladder reaches certified-numeric (level 2) at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // The geofence package: the trusted evaluator certified all four obligations
+    // at level 2 (sound enclosures under stated assumptions).
+    await page
+      .locator('#verificationCatalog .catalog-item[data-problem-id="drone-geofence-axis"]')
+      .click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+
+    // Each obligation carries a certified-numeric badge in the ledger, distinct
+    // from its external-required rigor badge — still not discharged.
+    const certified = page.locator("#verifLedger .verif-badge--certified");
+    await expect(certified).toHaveCount(4);
+    await expect(certified.first()).toHaveText("certified-numeric");
+    await expect(
+      page.locator("#verifLedger .verif-badge--external-required").first(),
+    ).toBeVisible();
+
+    // The masthead claim and certification scale reflect the highest established
+    // rung (2), honestly labeled sound-under-assumptions, not discharged.
+    const claim = page.locator("#verificationMasthead .verif-claim__text");
+    await expect(claim).toContainText(/certified-numeric/i);
+    await expect(claim).toContainText(/not discharged/i);
+    await expect(
+      page.locator('#verificationMasthead .verif-scale__rung[data-level="2"]'),
+    ).toHaveClass(/verif-scale__rung--current/);
+    await expect(page.locator("#verificationMasthead .verif-scale__caption")).toContainText(
+      /certified-numeric/i,
+    );
+
+    // The rigor ladder marks level 2 as the current rung.
+    const current = page.locator("#verifRigorLadder .verif-ladder__step--current");
+    await expect(current).toHaveCount(1);
+    await expect(current).toHaveAttribute("data-level", "2");
+
+    // The obligation card surfaces the certified enclosure box it is sound over —
+    // concrete and honest, still not a proof.
+    await openVerificationDetails(page);
+    const enclosure = page.locator("#verifObligations .verif-enclosure").first();
+    await expect(enclosure).toBeVisible();
+    await expect(enclosure).toContainText(/sound over box/i);
+    await expect(enclosure.locator(".verif-enclosure__label")).toHaveText("certified-numeric");
+    // The honest disclaimer rides along verbatim — a sound enclosure, not a proof.
+    await expect(enclosure).toContainText(/sound enclosure/i);
+    await expect(enclosure).toContainText(/not.{0,4}proof/i);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-certified-level2.png`),
     });
   });
 

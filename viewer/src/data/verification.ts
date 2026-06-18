@@ -217,9 +217,41 @@ export interface VerificationProblem {
   obligations: IrObligation[];
   candidates: IrCandidate[];
   proofStatuses: ProofStatus[];
+  /** Level-2 certified-numeric enclosure statuses (BE-067/074), one per
+   * obligation the sound evaluator closed over its stated box. */
+  enclosureStatuses: EnclosureStatus[];
   dynamics: IrDynamics | null;
   trajectory: VerificationTrajectory | null;
   metadata: Record<string, unknown>;
+}
+
+/**
+ * A level-2 certified-numeric enclosure status (rigor level 2): a sound interval
+ * enclosure of one obligation over its stated box under recorded soundness
+ * assumptions. It is strictly distinct from `measured` (level 1) and from any
+ * external `proved`/`certified` result: `rigor` is `certified-numeric`,
+ * `externalStatus` stays `external-required`, and it is "sound over this box
+ * under this model", never "safe".
+ */
+export interface EnclosureStatus {
+  id: string;
+  obligationId: string;
+  comparison: string;
+  rhs: number | null;
+  /** `certified-holds` (the enclosure closes the obligation) or
+   * `certified-violated`. */
+  verdict: string;
+  /** Always `certified-numeric`. */
+  rigor: string;
+  /** Always `external-required` — a sound enclosure is not a discharge. */
+  externalStatus: string;
+  /** The box the enclosure is certified over, per variable, as exact rationals. */
+  box: Record<string, [string, string]>;
+  /** The computed enclosure interval, as exact rationals. */
+  enclosure: { lower: string; upper: string } | null;
+  soundnessAssumptions: string[];
+  regionId: string | null;
+  note: string | null;
 }
 
 export interface VerificationProblemSummary {
@@ -470,6 +502,43 @@ function parseProofStatus(value: unknown): ProofStatus | null {
   };
 }
 
+function parseEnclosureStatus(value: unknown): EnclosureStatus | null {
+  const record = asRecord(value);
+  if (!record || typeof record.id !== "string" || typeof record.obligationId !== "string") {
+    return null;
+  }
+  // The box is per-variable [lower, upper] exact-rational string pairs; keep only
+  // well-formed entries so a malformed box never throws on display.
+  const box: Record<string, [string, string]> = {};
+  const rawBox = asRecord(record.box);
+  if (rawBox) {
+    for (const [name, interval] of Object.entries(rawBox)) {
+      if (Array.isArray(interval) && interval.length === 2) {
+        box[name] = [String(interval[0]), String(interval[1])];
+      }
+    }
+  }
+  const rawEnclosure = asRecord(record.enclosure);
+  const enclosure =
+    rawEnclosure && rawEnclosure.lower !== undefined && rawEnclosure.upper !== undefined
+      ? { lower: String(rawEnclosure.lower), upper: String(rawEnclosure.upper) }
+      : null;
+  return {
+    id: record.id,
+    obligationId: record.obligationId,
+    comparison: asString(record.comparison, "<="),
+    rhs: asOptionalNumber(record.rhs),
+    verdict: asString(record.verdict),
+    rigor: asString(record.rigor),
+    externalStatus: asString(record.externalStatus, "external-required"),
+    box,
+    enclosure,
+    soundnessAssumptions: asStringArray(record.soundnessAssumptions),
+    regionId: asOptionalString(record.regionId),
+    note: asOptionalString(record.note),
+  };
+}
+
 function parseAssumption(value: unknown): IrAssumption | null {
   const record = asRecord(value);
   if (!record || typeof record.id !== "string") {
@@ -570,6 +639,7 @@ export function parseVerificationProblem(raw: unknown): VerificationProblem {
     obligations: parseArray(record.obligations, parseObligation),
     candidates: parseArray(record.candidates, parseCandidate),
     proofStatuses: parseArray(record.proofStatuses, parseProofStatus),
+    enclosureStatuses: parseArray(record.enclosureStatuses, parseEnclosureStatus),
     dynamics: parseDynamics(record.dynamics),
     trajectory: parseVerificationTrajectory(record.trajectory),
     metadata: asRecord(record.metadata) ?? {},

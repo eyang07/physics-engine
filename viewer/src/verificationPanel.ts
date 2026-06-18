@@ -12,6 +12,7 @@ import type {
   AdapterCategory,
   AdapterStub,
   AdapterStubs,
+  EnclosureStatus,
   IrAssumption,
   IrObligation,
   IrRegion,
@@ -89,9 +90,15 @@ const CERTIFICATION_RUNG: Record<number, string> = {
 const RIGOR_GLOSS: Record<string, string> = {
   "external-required": "awaiting external discharge",
   measured: "sampled evidence — not a certificate",
+  "certified-numeric": "sound enclosure over the stated box — not a proof, still external-required",
   symbolic: "symbolic identity",
   candidate: "candidate — not certified",
 };
+
+// The verdict the trusted evaluator emits when a sound enclosure closes an
+// obligation; only this verdict establishes rigor level 2 for that obligation.
+const CERTIFIED_HOLDS = "certified-holds";
+const RIGOR_CERTIFIED_NUMERIC = "certified-numeric";
 
 // Measured proof-status outcomes, surfaced honestly: a clean sample is
 // evidence, never a discharge. The obligation always still awaits external
@@ -285,21 +292,19 @@ export class VerificationPanel {
     }
     masthead.append(head);
 
-    // Claim status — a single formal line. The engine emits only measured
-    // evidence, so unless a status reports external discharge the claim is
-    // measured-but-undischarged.
-    const discharged = this.currentRigorLevel(problem) === 0;
+    // Claim status — a single formal line. The engine can establish a sound
+    // certified-numeric enclosure (level 2) itself, but never an external
+    // discharge; either way the claim stays honest about what is and isn't proved.
+    const level = this.currentRigorLevel(problem);
+    const claimText =
+      level === 0
+        ? "externally discharged"
+        : level === 2
+          ? "certified-numeric · sound under stated assumptions · not discharged"
+          : "measured evidence · not discharged";
     const claim = el("p", "verif-claim");
     claim.append(el("span", "verif-claim__label", "Claim status"));
-    claim.append(
-      el(
-        "span",
-        "verif-claim__text",
-        discharged
-          ? "externally discharged"
-          : "measured evidence · not discharged",
-      ),
-    );
+    claim.append(el("span", "verif-claim__text", claimText));
     masthead.append(claim);
 
     masthead.append(this.renderCertificationScale(problem));
@@ -645,38 +650,66 @@ export class VerificationPanel {
     node.append(track);
 
     const open = RIGOR_LADDER.filter((step) => step.level > current).map((step) => step.level);
+    const establishedGloss =
+      current === 2
+        ? "certified-numeric — sound enclosures under stated assumptions"
+        : "measured evidence";
     const caption =
       open.length > 0
-        ? `Established to rung ${current} (measured evidence). Rungs ${open[0]}–${open[open.length - 1]} require external discharge.`
+        ? `Established to rung ${current} (${establishedGloss}). Rungs ${open[0]}–${open[open.length - 1]} require external discharge.`
         : "Externally discharged.";
     node.append(el("p", "verif-scale__caption", caption));
     return node;
   }
 
-  // The rigor level this problem currently sits at. The engine emits only
-  // measured evidence, so unless a status reports an external discharge the
-  // problem is at level 1. Levels 2-4 are reached only through external
-  // backends, never inferred from the engine's own output.
+  // The highest rigor rung this problem has established. An external discharge
+  // (levels 3-4) is reached only through external backends, never inferred here.
+  // The engine itself can reach level 2 — a sound certified-numeric enclosure
+  // under stated assumptions — when its trusted evaluator closes an obligation;
+  // otherwise the problem sits at level 1 (measured evidence).
   private currentRigorLevel(problem: VerificationProblem): number {
     const discharged = problem.proofStatuses.some(
       (status) => status.externalStatus !== "" && status.externalStatus !== "external-required",
     );
-    return discharged ? 0 : 1;
+    if (discharged) {
+      return 0;
+    }
+    return this.hasCertifiedNumeric(problem) ? 2 : 1;
+  }
+
+  // The obligation ids the trusted evaluator certified at level 2 (a sound
+  // enclosure that closes the obligation). Only `certified-holds` /
+  // `certified-numeric` statuses count — never a weaker or fabricated tag.
+  private certifiedObligationIds(problem: VerificationProblem): Set<string> {
+    return new Set(
+      problem.enclosureStatuses
+        .filter(
+          (status) =>
+            status.verdict === CERTIFIED_HOLDS && status.rigor === RIGOR_CERTIFIED_NUMERIC,
+        )
+        .map((status) => status.obligationId),
+    );
+  }
+
+  private hasCertifiedNumeric(problem: VerificationProblem): boolean {
+    return this.certifiedObligationIds(problem).size > 0;
   }
 
   // The four-level rigor ladder with the problem's current level marked, so a
   // measured outcome can never be read as a proof or certificate (VISION §7).
   private renderRigorLadder(problem: VerificationProblem): HTMLElement {
     const node = section("Rigor level", "verifRigorLadder");
+    const current = this.currentRigorLevel(problem);
     node.append(
       el(
         "p",
         "verif-meta",
-        "The engine generates candidates and obligations; external sound methods discharge them. This problem sits at the measured level — evidence, not proof.",
+        current === 2
+          ? "The engine's trusted evaluator certified at least one obligation with a sound enclosure (level 2) under stated assumptions — not a proof or external certificate; external discharge is still required."
+          : "The engine generates candidates and obligations; external sound methods discharge them. This problem sits at the measured level — evidence, not proof.",
       ),
     );
 
-    const current = this.currentRigorLevel(problem);
     const list = el("ol", "verif-ladder");
     RIGOR_LADDER.forEach((step) => {
       const item = el("li", "verif-ladder__step");
@@ -740,6 +773,10 @@ export class VerificationPanel {
     // bound it is quantified over (FE-023).
     const assumptionById = new Map(problem.assumptions.map((assumption) => [assumption.id, assumption]));
 
+    // Obligations the trusted evaluator certified at level 2 (FE-032): a sound
+    // enclosure that closes the obligation over its stated box.
+    const certified = this.certifiedObligationIds(problem);
+
     const list = el("ul", "verif-ledger");
     problem.obligations.forEach((obligation) => {
       const row = el("li", "verif-ledger__row");
@@ -755,6 +792,12 @@ export class VerificationPanel {
       const outcome = outcomeByObligation.get(obligation.id) ?? "external-required";
       const badges = el("div", "verif-ledger__badges");
       badges.append(this.proofStatusBadge(outcome), rigorBadge(obligation.rigor));
+      // Level 2: the obligation carries a sound certified-numeric enclosure.
+      // Distinct from the measured outcome and the external-required rigor — it
+      // is "sound over this box under this model", never proved or safe.
+      if (certified.has(obligation.id)) {
+        badges.append(this.certifiedBadge());
+      }
       // Tier-3: a disturbance-robust obligation is quantified over the wind box
       // W. Mark it honestly — robust, but still external-required, never
       // discharged.
@@ -829,6 +872,16 @@ export class VerificationPanel {
     const badge = el("span", "verif-badge verif-badge--robust", "robust ∀ d ∈ W");
     badge.title =
       "disturbance-robust: quantified over every admissible disturbance in the wind box W — still external-required, not discharged";
+    return badge;
+  }
+
+  // The honest level-2 marker: the trusted evaluator closed the obligation with a
+  // sound interval enclosure over its stated box. Distinct from measured (level
+  // 1) and from proved — "sound over this box under this model", never "safe",
+  // and the obligation still requires external discharge.
+  private certifiedBadge(): HTMLElement {
+    const badge = el("span", "verif-badge verif-badge--certified", "certified-numeric");
+    badge.title = RIGOR_GLOSS[RIGOR_CERTIFIED_NUMERIC];
     return badge;
   }
 
@@ -954,9 +1007,25 @@ export class VerificationPanel {
     for (const series of problem.trajectory?.certificateSeries ?? []) {
       series.obligationIds.forEach((id) => laneObligationIds.add(id));
     }
+    // The certified-numeric enclosure per obligation (FE-032), so an obligation
+    // card can show the box it was certified sound over.
+    const enclosureByObligation = new Map<string, EnclosureStatus>();
+    for (const status of problem.enclosureStatuses) {
+      if (status.verdict === CERTIFIED_HOLDS && status.rigor === RIGOR_CERTIFIED_NUMERIC) {
+        enclosureByObligation.set(status.obligationId, status);
+      }
+    }
     const list = el("div", "verif-cards");
     problem.obligations.forEach((obligation) => {
-      list.append(this.obligationCard(obligation, regionName, assumptionIds, laneObligationIds));
+      list.append(
+        this.obligationCard(
+          obligation,
+          regionName,
+          assumptionIds,
+          laneObligationIds,
+          enclosureByObligation.get(obligation.id) ?? null,
+        ),
+      );
     });
     node.append(list);
     return node;
@@ -1042,6 +1111,7 @@ export class VerificationPanel {
     regionName: Map<string, string>,
     assumptionIds: Set<string>,
     laneObligationIds: Set<string>,
+    enclosure: EnclosureStatus | null,
   ): HTMLElement {
     const card = el("div", "verif-card");
     card.id = obligationCardId(obligation.id);
@@ -1049,6 +1119,9 @@ export class VerificationPanel {
     const head = el("div", "verif-card__head");
     head.append(el("strong", "verif-card__name", obligation.name));
     head.append(rigorBadge(obligation.rigor));
+    if (enclosure) {
+      head.append(this.certifiedBadge());
+    }
     card.append(head);
 
     if (obligation.expression) {
@@ -1085,6 +1158,13 @@ export class VerificationPanel {
       card.append(el("p", "verif-card__desc", obligation.description));
     }
 
+    // The level-2 certified-numeric enclosure: the box the obligation was
+    // certified sound over and the computed enclosure, kept honest — "sound over
+    // this box under this model", still external-required.
+    if (enclosure) {
+      card.append(this.renderEnclosure(enclosure));
+    }
+
     // Only obligations a certificate lane bears on can highlight their measured
     // evidence; the rest expose no affordance.
     if (laneObligationIds.has(obligation.id)) {
@@ -1096,6 +1176,55 @@ export class VerificationPanel {
       card.append(toggle);
     }
     return card;
+  }
+
+  // The certified-numeric (level-2) enclosure detail for an obligation: the box
+  // it was certified sound over, the computed enclosure, and the recorded
+  // soundness assumptions, with the engine's honesty note verbatim. A sound
+  // enclosure under stated assumptions — never a proof, never "safe".
+  private renderEnclosure(enclosure: EnclosureStatus): HTMLElement {
+    const node = el("div", "verif-enclosure");
+
+    const head = el("div", "verif-enclosure__head");
+    head.append(el("span", "verif-enclosure__label", "certified-numeric"));
+    head.append(el("span", "verif-enclosure__rung", "rigor level 2"));
+    node.append(head);
+
+    // The box the enclosure is certified over, per variable, verbatim as exact
+    // rationals.
+    const boxNames = Object.keys(enclosure.box);
+    if (boxNames.length > 0) {
+      const box = el("p", "verif-enclosure__box");
+      box.append(el("span", "verif-enclosure__box-label", "sound over box "));
+      const parts = boxNames.map((name) => {
+        const [lower, upper] = enclosure.box[name];
+        return `${name} ∈ [${lower}, ${upper}]`;
+      });
+      box.append(el("span", "verif-enclosure__box-ids", parts.join(", ")));
+      node.append(box);
+    }
+
+    if (enclosure.enclosure) {
+      const interval = el("p", "verif-enclosure__interval");
+      interval.append(el("span", "verif-enclosure__interval-label", "enclosure "));
+      interval.append(
+        el(
+          "span",
+          "verif-enclosure__interval-value",
+          `[${enclosure.enclosure.lower}, ${enclosure.enclosure.upper}] ${enclosure.comparison} ${formatNumber(enclosure.rhs ?? 0)}`,
+        ),
+      );
+      node.append(interval);
+    }
+
+    enclosure.soundnessAssumptions.forEach((assumption) => {
+      node.append(el("p", "verif-enclosure__assumption", assumption));
+    });
+
+    if (enclosure.note) {
+      node.append(el("p", "verif-enclosure__note", enclosure.note));
+    }
+    return node;
   }
 
   // Toggle which obligation's measured evidence is emphasized in the certificate

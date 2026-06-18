@@ -47,24 +47,35 @@ below make the measured margin geometrically legible and surface the package
 inventory in the inspector. Keep rendering honest — measured stays measured,
 candidates stay candidates, nothing reads as proved._
 
-1. **FE-032: Surface the certified-numeric (level-2) status on the rigor ladder (after BE-074)**
-   - Goal: The dossier rigor ladder currently pins every problem at level 1
-     (measured), because the viewer export carries no level-2 status. Once the
-     backend exports the `certified-numeric` per-obligation status into the
-     viewer data (BE-074), surface it honestly: mark each certified obligation at
-     rigor level 2 (a sound enclosure under stated assumptions) distinctly from
-     measured-only and external-required, and reflect the highest established
-     rung on the certification scale. A certified-numeric status is "sound over
-     this box under this model", never "safe" — keep the levels strictly
-     distinct and nothing reading as proved.
-   - Scope: `viewer/src/verificationPanel.ts` (rigor ladder + obligation ledger),
-     `viewer/src/data/verification.ts` (read the certified status), `viewer/src/
+1. **FE-035: Draw the certified enclosure box on the phase-plane stage**
+   - Goal: An obligation's certified-numeric enclosure (FE-032) records the box it
+     is sound over in state-variable coordinates, but the stage never shows where
+     on the phase plane that box lies. Draw a read-only certified-box overlay on
+     the (q1, v1) stage for obligations whose enclosure box is plane-expressible,
+     so a reader can see the region the obligation was certified sound over. Draw
+     nothing for obligations with no certified enclosure or a non-plane box.
+     Honest — "sound over this box under this model", never "safe".
+   - Scope: `viewer/src/verificationStage.ts` (certified-box overlay),
+     `viewer/src/data/verification.ts` if the box needs exposure to the stage,
+     `viewer/src/styles.css`, and the viewer visual test.
+   - Acceptance: a package with a plane-expressible certified box shows the box
+     overlay on the stage; a package with no certified enclosure shows none; the
+     rollout/region rendering is otherwise unchanged; nothing reads as proved;
+     `npm run build` and the visual test pass.
+
+2. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
+   - Goal: The catalog lists every package's region/obligation/candidate counts
+     and Tier/regime, but not how many of its obligations reach level 2. Once the
+     discovery index carries a per-package certified-numeric count, surface it as
+     an honest catalog readout (e.g. "2/4 certified-numeric") so a reader can tell
+     which packages climb the rigor ladder without opening them. Read only the
+     index count; certified-numeric is a sound enclosure, never proved or safe.
+   - Scope: `viewer/src/data/verification.ts` (read the certified count from the
+     discovery index), `viewer/src/main.ts` (catalog readout), `viewer/src/
      styles.css`, and the viewer visual test.
-   - Acceptance: an obligation exporting a certified-numeric status shows level-2
-     rigor distinct from measured and external; the certification scale reflects
-     the highest established rung; problems without any certified status are
-     unchanged at level 1; nothing reads as proved; `npm run build` and the
-     visual test pass.
+   - Acceptance: each catalog entry shows its certified-numeric coverage from the
+     index; entries without the count show none; nothing reads as proved;
+     `npm run build` and the visual test pass.
 
 ## Backend Queue
 
