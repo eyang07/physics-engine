@@ -85,6 +85,9 @@ type ViolationMarker = {
   // The signed worst margin (BE-036), negative for a violation: the depth the
   // measured run entered the unsafe set. Measured evidence, never a disproof.
   margin: number | null;
+  // The rollout time the run reached this point (BE-056), when exported: the
+  // moment the simulated run crossed into the unsafe set. Null otherwise.
+  time: number | null;
 };
 // A measured-holds closest-approach annotation: the worst (tightest) sampled
 // point and its signed margin to the obligation boundary. Measured slack, never
@@ -152,6 +155,7 @@ function violationMarkers(
       label,
       worstValue: status.worstValue,
       margin: status.worstMargin,
+      time: status.worstTime,
     });
   }
   return markers;
@@ -645,6 +649,16 @@ export class VerificationStage {
         value.textContent = formatMeasured(marker.worstValue);
         value.title = "worst measured value";
         entry.append(value);
+      }
+      // When in the rollout the run crossed into the unsafe set (BE-056). A
+      // read-only time annotation from the exported worst.time; omitted for a
+      // worst record that carries no time (e.g. a region-grid sample).
+      if (marker.time !== null && Number.isFinite(marker.time)) {
+        const time = document.createElement("span");
+        time.className = "verif-violation-legend__time";
+        time.textContent = `entered at t = ${formatMeasured(marker.time)}`;
+        time.title = "the rollout time the simulated run crossed into the unsafe set — measured, not a proof";
+        entry.append(time);
       }
       entry.addEventListener("click", () => {
         this.setFocusedViolation(this.focusedViolation === index ? null : index);

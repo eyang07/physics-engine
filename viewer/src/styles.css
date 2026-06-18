@@ -431,7 +431,8 @@ select {
 .verif-violation-legend__entry {
   display: flex;
   align-items: center;
-  gap: 7px;
+  flex-wrap: wrap;
+  gap: 3px 7px;
   width: 100%;
   margin: 0;
   padding: 3px 5px;
@@ -493,6 +494,17 @@ select {
 
 .verif-violation-legend__margin {
   font-weight: 600;
+}
+
+/* When the run entered the unsafe set, on its own line under the named
+   violation. Read-only, measured. */
+.verif-violation-legend__time {
+  flex-basis: 100%;
+  padding-left: 17px;
+  color: var(--text-muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* The honest framing: a measured run reached the unsafe set — not a disproof of

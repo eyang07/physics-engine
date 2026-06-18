@@ -166,6 +166,12 @@ export interface ProofStatus {
   worstMargin: number | null;
   /** The worst sampled point, in `projection.variables` order; null if absent. */
   worstPoint: number[] | null;
+  /**
+   * The rollout time of the worst sample, when the status was evaluated along a
+   * trajectory (BE-056): the moment the run reached its worst point. Null for
+   * region-grid samples or any worst record that exports no time.
+   */
+  worstTime: number | null;
   /** The sampled point's projection onto state axes; null when not exported. */
   projection: ProofStatusProjection | null;
   note: string | null;
@@ -451,6 +457,7 @@ function parseProofStatus(value: unknown): ProofStatus | null {
     worstValue: worst ? asOptionalNumber(worst.value) : null,
     worstMargin: worst ? asOptionalNumber(worst.margin) : null,
     worstPoint: worstPoint.length > 0 ? worstPoint : null,
+    worstTime: worst ? asOptionalNumber(worst.time) : null,
     projection:
       projectionVariables.length > 0
         ? {

@@ -47,22 +47,23 @@ below make the measured margin geometrically legible and surface the package
 inventory in the inspector. Keep rendering honest — measured stays measured,
 candidates stay candidates, nothing reads as proved._
 
-1. **FE-031: Mark when the measured violation occurs on the rollout**
-   - Goal: The measured violation scenario (FE-030) draws the worst-violation
-     marker on the phase plane and names the obligation the run left, but the
-     run carries a `worst.time` (and the trajectory a time axis), so *when* in
-     the rollout the run entered the unsafe set is not yet legible. Surface that
-     time honestly — a read-only playhead/time annotation tied to the violation's
-     exported `worst.time`, so a reader can see the moment the simulated run
-     crossed the boundary. Measured evidence only; draw nothing for holding runs
-     or violations that export no time.
-   - Scope: `viewer/src/verificationStage.ts` (violation time annotation),
-     `viewer/src/data/verification.ts` if the worst time needs exposure,
-     `viewer/src/styles.css`, and the viewer visual test.
-   - Acceptance: the violation scenario shows the time its run entered the unsafe
-     set, consistent with the exported `worst.time`; holding runs and time-less
-     violations show none; the rollout/marker rendering is otherwise unchanged;
-     nothing reads as proved; `npm run build` and the visual test pass.
+1. **FE-033: Surface the open problem's Tier/regime in the dossier masthead**
+   - Goal: The catalog now badges each package's Tier/regime (FE-029), but once a
+     problem is open the dossier masthead never restates whether it is nominal or
+     disturbance-robust, nor which disturbance parameters / robust obligations the
+     discovery index records for it. Surface the open problem's regime descriptor
+     honestly in the masthead — "nominal" vs "disturbance-robust", and for a robust
+     package the disturbance parameters and the robust obligation ids it cites —
+     read straight from the discovery index. A robust package is still
+     external-required, never discharged.
+   - Scope: `viewer/src/main.ts` (pass the selected problem's regime to the panel),
+     `viewer/src/verificationPanel.ts` (masthead regime line), `viewer/src/data/
+     verification.ts` if needed, `viewer/src/styles.css`, and the viewer visual test.
+   - Acceptance: opening a disturbance-robust package shows its regime, disturbance
+     parameters, and robust obligation ids in the masthead; a nominal package shows
+     a nominal regime and no disturbance detail; a problem with no discovery-index
+     descriptor shows no regime line; nothing reads as proved; `npm run build` and
+     the visual test pass.
 
 2. **FE-032: Surface the certified-numeric (level-2) status on the rigor ladder (after BE-074)**
    - Goal: The dossier rigor ladder currently pins every problem at level 1

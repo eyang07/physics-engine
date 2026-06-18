@@ -515,6 +515,71 @@ for (const viewport of [
     });
   });
 
+  test(`Verification stage marks when the violation occurs on the rollout at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // The violation scenario's run carries a worst.time (1.54): the legend names
+    // the moment the simulated run crossed into the unsafe set.
+    await page.locator("#verificationCatalog .catalog-item").nth(5).click();
+    await expect(
+      page.getByRole("heading", { name: /drone obstacle keepout violation/i }),
+    ).toBeVisible();
+    await page.waitForTimeout(400);
+    const time = page.locator(".verif-violation-legend .verif-violation-legend__time");
+    await expect(time).toHaveCount(1);
+    await expect(time).toContainText(/entered at t = 1\.54/);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-violation-time.png`),
+    });
+  });
+
+  test(`Verification stage omits the violation time when none is exported at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Inject a measured-violated sample that maps onto the pendulum's (theta,
+    // omega) axes but carries no worst.time — the marker draws, but no time
+    // annotation appears.
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.proofStatuses.push({
+        id: "injected-violation-no-time",
+        obligationId: "energy-barrier-excludes-near-bottom",
+        status: "measured-violated",
+        worst: { value: 1.5, point: [2.5, 0.3] },
+        evaluation: {
+          kind: "region-grid",
+          sampleCount: 10,
+          source: "injected",
+          variables: ["theta", "omega"],
+          stateAxes: ["theta", "omega"],
+          variableToStateAxis: { theta: "theta", omega: "omega" },
+        },
+      });
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // The violation marker is drawn, but with no exported time there is no time
+    // annotation.
+    await expect(page.locator("#verificationCanvas")).toHaveAttribute("data-violation-markers", "1");
+    await expect(page.locator(".verif-violation-legend")).toBeVisible();
+    await expect(page.locator(".verif-violation-legend__time")).toHaveCount(0);
+  });
+
   test(`Verification catalog shows counts and active selection at ${viewport.name}`, async ({
     page,
   }, testInfo) => {
