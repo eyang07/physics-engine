@@ -63,20 +63,7 @@ candidates stay candidates, nothing reads as proved._
      existing per-example list; nothing reads as proved; `npm run build` and the
      visual test pass.
 
-2. **FE-029: Show the package Tier/regime badge in the catalog (after BE-054)**
-   - Goal: Once the discovery index carries the Tier/regime descriptor (BE-054 —
-     nominal Tier-1/2 vs disturbance-robust Tier-3), surface it as an honest badge
-     on each catalog entry so a reader can tell a nominal geofence package from a
-     disturbance-robust one without opening it. Read only the index descriptor;
-     claim nothing beyond the rigor of the listed package.
-   - Scope: `viewer/src/verificationPanel.ts` or `viewer/src/home.ts` (catalog
-     badge, builds on FE-028), `viewer/src/data/verification.ts`,
-     `viewer/src/styles.css`, and the viewer visual test.
-   - Acceptance: each catalog entry shows its Tier/regime badge matching the index
-     descriptor; entries without the descriptor show no badge; nothing reads as
-     proved; `npm run build` and the visual test pass.
-
-3. **FE-030: Render the measured violation reference scenario (after BE-056)**
+2. **FE-030: Render the measured violation reference scenario (after BE-056)**
     - Goal: Every published package currently *holds*, so the viewer's measured
       violation surface (red worst-violation markers and legend) is never
       exercised. Once the Tier-2 boundary-corner violation scenario exports

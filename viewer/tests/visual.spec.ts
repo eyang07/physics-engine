@@ -287,6 +287,60 @@ for (const viewport of [
     await expect(page.locator("#systemTitle")).toHaveText("Simple Pendulum");
   });
 
+  test(`Verification catalog badges each entry's Tier/regime at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // Every catalog entry carries its regime descriptor from the discovery index.
+    const items = page.locator("#verificationCatalog .catalog-item");
+    await expect(items).toHaveCount(10);
+    await expect(page.locator("#verificationCatalog .catalog-item__regime")).toHaveCount(10);
+
+    // The three disturbance-robust (Tier-3) packages read "robust"; the rest are
+    // "nominal".
+    const robust = page.locator("#verificationCatalog .catalog-item__regime--robust");
+    await expect(robust).toHaveCount(3);
+    await expect(robust.first()).toHaveText("robust");
+    await expect(page.locator("#verificationCatalog .catalog-item__regime--nominal")).toHaveCount(7);
+
+    // The disturbed geofence entry (7th) is badged robust; the nominal geofence
+    // entry (3rd) is badged nominal.
+    await expect(
+      items.nth(6).locator(".catalog-item__regime"),
+    ).toHaveText("robust");
+    await expect(items.nth(2).locator(".catalog-item__regime")).toHaveText("nominal");
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-regime-badges.png`),
+    });
+  });
+
+  test(`Verification catalog omits regime badges without the discovery index at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // No discovery index (older export): the catalog still lists every problem,
+    // but no entry carries a regime badge.
+    await page.route("**/data/verification/packages/packages.index.json", (route) =>
+      route.fulfill({ status: 404, body: "" }),
+    );
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    await expect(page.locator("#verificationCatalog .catalog-item")).toHaveCount(10);
+    await expect(page.locator("#verificationCatalog .catalog-item__regime")).toHaveCount(0);
+  });
+
   test(`Verification stage renders trajectory and certificate lanes at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

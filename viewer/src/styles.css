@@ -212,6 +212,30 @@ select {
   border-color: var(--hairline-strong);
 }
 
+/* The Tier/regime badge (FE-029): a disturbance-robust package reads cool and
+   distinct; a nominal one stays muted. A descriptor-only label. */
+.catalog-item__regime {
+  align-self: start;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.catalog-item__regime--nominal {
+  color: var(--text-muted);
+}
+
+.catalog-item__regime--robust {
+  color: var(--cool);
+  border-color: var(--cool-dim);
+  background: var(--cool-dim);
+}
+
 /* ---- Verification domain (catalog · inspector) --------------------------- */
 
 #verificationDomain.domain--active {

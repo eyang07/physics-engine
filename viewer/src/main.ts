@@ -27,7 +27,9 @@ import {
   loadVerificationAdapterStubs,
   loadVerificationIndex,
   loadVerificationPackageManifest,
+  loadVerificationPackageRegimes,
   loadVerificationProblem,
+  type PackageRegime,
   type VerificationProblem,
   type VerificationProblemSummary,
 } from "./data/verification";
@@ -152,6 +154,9 @@ let pendulumBounds: Bounds | null = null;
 // Monotonic guard so a slow trajectory load can't overwrite a newer selection.
 let loadToken = 0;
 let verificationProblems: VerificationProblemSummary[] = [];
+// The Tier/regime descriptor per problem id (BE-054), from the package discovery
+// index — used only to badge catalog entries; empty when the index is absent.
+let verificationRegimes = new Map<string, PackageRegime>();
 let selectedProblemId: string | null = null;
 
 function syncPlayButton() {
@@ -269,6 +274,13 @@ function renderVerificationCatalog() {
     );
 
     button.append(category, title, counts);
+    // The Tier/regime badge (BE-054) lets a reader tell a nominal package from a
+    // disturbance-robust one without opening it. Only shown when the discovery
+    // index carries the descriptor; it claims nothing beyond the listed rigor.
+    const regime = verificationRegimes.get(problem.id);
+    if (regime) {
+      button.append(regimeBadge(regime));
+    }
     button.addEventListener("click", () => {
       void selectVerificationProblem(problem.id);
     });
@@ -281,6 +293,23 @@ function countBadge(label: string, value: number): HTMLSpanElement {
   badge.className = "catalog-item__count";
   badge.dataset.count = label;
   badge.textContent = `${value} ${label}`;
+  return badge;
+}
+
+// The catalog Tier/regime badge: "robust" for a disturbance-robust (Tier-3)
+// package, "nominal" otherwise — read straight from the index descriptor, never
+// claiming more than the listed package's rigor.
+function regimeBadge(regime: PackageRegime): HTMLSpanElement {
+  const robust = regime.kind === "disturbance-robust";
+  const badge = document.createElement("span");
+  badge.className = `catalog-item__regime catalog-item__regime--${
+    robust ? "robust" : "nominal"
+  }`;
+  badge.dataset.regime = regime.kind;
+  badge.textContent = robust ? "robust" : "nominal";
+  badge.title = robust
+    ? "disturbance-robust (Tier-3): obligations quantified over a wind box — still external-required, not discharged"
+    : "nominal (Tier-1/2): no disturbance channel";
   return badge;
 }
 
@@ -590,8 +619,14 @@ async function initialize() {
 }
 
 async function initializeVerification() {
-  const index = await loadVerificationIndex();
+  // The discovery index's regime descriptors are optional, joined to the catalog
+  // by problem id; a missing index simply leaves entries unbadged.
+  const [index, regimes] = await Promise.all([
+    loadVerificationIndex(),
+    loadVerificationPackageRegimes(),
+  ]);
   verificationProblems = index.problems;
+  verificationRegimes = regimes;
   renderVerificationCatalog();
   if (verificationProblems.length === 0) {
     verificationStage.clear();

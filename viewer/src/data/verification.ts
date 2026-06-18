@@ -240,7 +240,19 @@ export interface VerificationIndex {
   problems: VerificationProblemSummary[];
 }
 
+/**
+ * The Tier/regime descriptor a package carries in the discovery index (BE-054):
+ * `nominal` for Tier-1/2 packages, `disturbance-robust` for Tier-3 ones (quantified
+ * over a wind box). It claims nothing beyond the rigor of the listed package.
+ */
+export interface PackageRegime {
+  kind: string;
+  disturbanceParameters: string[];
+  robustObligationIds: string[];
+}
+
 const INDEX_PATH = "/data/verification/index.json";
+const PACKAGE_INDEX_PATH = "/data/verification/packages/packages.index.json";
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
@@ -587,6 +599,49 @@ export async function loadVerificationIndex(path = INDEX_PATH): Promise<Verifica
     console.warn("Verification index unavailable:", error);
     return { version: 0, problems: [] };
   }
+}
+
+function parseRegime(value: unknown): PackageRegime | null {
+  const record = asRecord(value);
+  if (!record || typeof record.kind !== "string") {
+    return null;
+  }
+  return {
+    kind: record.kind,
+    disturbanceParameters: asStringArray(record.disturbanceParameters),
+    robustObligationIds: asStringArray(record.robustObligationIds),
+  };
+}
+
+/**
+ * Load the package discovery index's Tier/regime descriptors (BE-054), keyed by
+ * problem id, so the catalog can badge each entry by its regime without opening
+ * it. A missing or malformed index resolves to an empty map, so entries simply
+ * carry no badge.
+ */
+export async function loadVerificationPackageRegimes(
+  path = PACKAGE_INDEX_PATH,
+): Promise<Map<string, PackageRegime>> {
+  const regimes = new Map<string, PackageRegime>();
+  try {
+    const response = await fetch(path);
+    if (!response.ok) {
+      return regimes;
+    }
+    const record = asRecord((await response.json()) as unknown) ?? {};
+    for (const entry of parseArray(record.packages, (item) => asRecord(item) ?? null)) {
+      if (typeof entry.problemId !== "string") {
+        continue;
+      }
+      const regime = parseRegime(entry.regime);
+      if (regime) {
+        regimes.set(entry.problemId, regime);
+      }
+    }
+  } catch (error) {
+    console.warn("Verification package index unavailable:", error);
+  }
+  return regimes;
 }
 
 /** Load and parse a single verification problem's IR. */
