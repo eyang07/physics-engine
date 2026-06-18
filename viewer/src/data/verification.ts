@@ -623,6 +623,39 @@ export interface PackageManifest {
   components: PackageComponent[];
 }
 
+/**
+ * The non-discharging adapter-stub descriptors (BE-044), an optional package
+ * component. Each stub names an external backend category that *could* consume
+ * an obligation and the obligation shape it would have to handle. Every stub is
+ * a tool-agnostic pointer only: `discharges` is always false, and every
+ * obligation stays external-required.
+ */
+export interface AdapterCategory {
+  category: string;
+  summary: string;
+  consumesTargets: string[];
+  consumes: string;
+  produces: string;
+}
+
+export interface AdapterStub {
+  obligationId: string;
+  category: string;
+  target: string;
+  applicable: boolean;
+  requiredShapeFeatures: string[];
+  /** Always false: a stub is a descriptor, never a discharge. */
+  discharges: boolean;
+  note: string | null;
+}
+
+export interface AdapterStubs {
+  problemId: string;
+  note: string | null;
+  categories: AdapterCategory[];
+  stubs: AdapterStub[];
+}
+
 /** A single self-contained bundle assembled for download: the manifest plus each
  * component's payload, keyed by component kind. Re-reading it recovers the same
  * components the backend wrote. */
@@ -691,6 +724,80 @@ export async function loadVerificationPackageManifest(
     return parsePackageManifest((await response.json()) as unknown);
   } catch (error) {
     console.warn("Verification package manifest unavailable:", error);
+    return null;
+  }
+}
+
+function parseAdapterCategory(value: unknown): AdapterCategory | null {
+  const record = asRecord(value);
+  if (!record || typeof record.category !== "string") {
+    return null;
+  }
+  return {
+    category: record.category,
+    summary: asString(record.summary),
+    consumesTargets: asStringArray(record.consumesTargets),
+    consumes: asString(record.consumes),
+    produces: asString(record.produces),
+  };
+}
+
+function parseAdapterStub(value: unknown): AdapterStub | null {
+  const record = asRecord(value);
+  if (!record || typeof record.obligationId !== "string" || typeof record.category !== "string") {
+    return null;
+  }
+  return {
+    obligationId: record.obligationId,
+    category: record.category,
+    target: asString(record.target),
+    applicable: record.applicable !== false,
+    requiredShapeFeatures: asStringArray(record.requiredShapeFeatures),
+    // A stub is a descriptor only: honor the exported value but never treat a
+    // stub as discharging anything.
+    discharges: record.discharges === true,
+    note: asOptionalString(record.note),
+  };
+}
+
+function parseAdapterStubs(raw: unknown): AdapterStubs | null {
+  const record = asRecord(raw);
+  if (!record || typeof record.problemId !== "string") {
+    return null;
+  }
+  const stubs = parseArray(record.stubs, parseAdapterStub);
+  if (stubs.length === 0) {
+    return null;
+  }
+  return {
+    problemId: record.problemId,
+    note: asOptionalString(record.note),
+    categories: parseArray(record.categories, parseAdapterCategory),
+    stubs,
+  };
+}
+
+/**
+ * Load a package's non-discharging adapter-stub descriptors, when the manifest
+ * indexes them. A package without the `adapter-stubs` component, or a missing /
+ * malformed file, resolves to null so the view simply omits the section.
+ */
+export async function loadVerificationAdapterStubs(
+  packagePath: string,
+  manifest: PackageManifest,
+): Promise<AdapterStubs | null> {
+  const component = manifest.components.find((entry) => entry.kind === "adapter-stubs");
+  if (!component) {
+    return null;
+  }
+  try {
+    const response = await fetch(`${packageBasePath(packagePath)}/${component.path}`);
+    if (!response.ok) {
+      return null;
+    }
+    return parseAdapterStubs((await response.json()) as unknown);
+  } catch (error) {
+    console.warn("Verification adapter stubs unavailable:", error);
     return null;
   }
 }

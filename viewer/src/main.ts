@@ -24,6 +24,7 @@ import { drawPoincareSectionScene } from "./poincareSectionCanvas";
 import { VerificationPanel } from "./verificationPanel";
 import { VerificationStage } from "./verificationStage";
 import {
+  loadVerificationAdapterStubs,
   loadVerificationIndex,
   loadVerificationPackageManifest,
   loadVerificationProblem,
@@ -305,14 +306,17 @@ async function selectVerificationProblem(problemId: string) {
         ? loadVerificationPackageManifest(summary.packagePath)
         : Promise.resolve(null),
     ]);
+    // The non-discharging adapter stubs are an optional package component; load
+    // them only when a manifest indexes them, resolving to null otherwise.
+    const pkg =
+      manifest && summary.packagePath
+        ? { manifest, path: summary.packagePath }
+        : null;
+    const stubs = pkg ? await loadVerificationAdapterStubs(pkg.path, pkg.manifest) : null;
     // A stale click (the user moved on) should not overwrite the newer problem.
     if (selectedProblemId === summary.id) {
       verificationStage.show(problem);
-      const pkg =
-        manifest && summary.packagePath
-          ? { manifest, path: summary.packagePath }
-          : null;
-      verificationPanel.render(problem, summary.irPath, pkg);
+      verificationPanel.render(problem, summary.irPath, pkg, stubs);
       setFigureCaption(problem);
     }
   } catch (error) {

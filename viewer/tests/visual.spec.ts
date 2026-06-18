@@ -1342,6 +1342,63 @@ for (const viewport of [
     await expect(page.locator("#verifPackage")).toHaveCount(0);
   });
 
+  test(`Verification IR details list non-discharging adapter stubs at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // The default problem publishes adapter stubs; they live in the appendix.
+    await openVerificationDetails(page);
+    const stubsSection = page.locator("#verifAdapterStubs");
+    await expect(stubsSection).toBeVisible();
+    // Each stub names an external backend category and is marked non-discharging.
+    await expect(stubsSection.locator(".verif-adapter-stub__category").first()).toBeVisible();
+    const discharges = stubsSection.locator(".verif-adapter-stub__discharges");
+    expect(await discharges.count()).toBeGreaterThan(0);
+    await expect(discharges.first()).toHaveText("discharges: false");
+    // The obligation shape each category would have to handle is surfaced.
+    await expect(stubsSection.locator(".verif-adapter-stub__shape").first()).toContainText(
+      /target/,
+    );
+    // The honesty note (no stub attempts/records/claims discharge) rides along.
+    await expect(stubsSection).toContainText(/discharge/i);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-adapter-stubs.png`),
+    });
+  });
+
+  test(`Verification IR details omit adapter stubs when none are published at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Strip the adapter-stubs component from the manifest (older export with no
+    // published stubs); the manifest still indexes its other components.
+    await page.route("**/data/verification/packages/**/package.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.components = (json.components ?? []).filter(
+        (component: { kind?: string }) => component.kind !== "adapter-stubs",
+      );
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+    await openVerificationDetails(page);
+
+    // The manifest is still published (inventory shows), but with no stubs
+    // component the adapter-stub section is absent entirely.
+    await expect(page.locator("#verifPackage")).toBeVisible();
+    await expect(page.locator("#verifAdapterStubs")).toHaveCount(0);
+  });
+
   test(`Verification certificate lane emphasizes the obligations it bears on at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

@@ -1077,6 +1077,72 @@ select {
   line-height: 1.5;
 }
 
+/* Non-discharging adapter stubs (FE-025): per obligation, the external backend
+   categories that could consume it, each marked discharges: false. */
+.verif-adapter-stubs {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.verif-adapter-stub {
+  padding: 7px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost);
+}
+
+.verif-adapter-stub__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.verif-adapter-stub__category {
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.verif-adapter-stub__discharges {
+  color: var(--required);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+}
+
+.verif-adapter-stub__shape {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+/* The adapter-stub obligation heading jumps to the obligation's card, styled
+   like the other jump links but with its own class so global jump counts that
+   target measured-status links are unaffected. */
+.verif-adapter-stub__jump {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px dotted var(--hairline-strong);
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.verif-adapter-stub__jump:hover,
+.verif-adapter-stub__jump:focus-visible {
+  outline: none;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .verif-evidence-toggle {
   justify-self: start;
   margin: 0;

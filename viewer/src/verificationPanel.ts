@@ -9,6 +9,8 @@
 import katex from "katex";
 
 import type {
+  AdapterStub,
+  AdapterStubs,
   IrAssumption,
   IrObligation,
   IrRegion,
@@ -206,6 +208,7 @@ export class VerificationPanel {
     problem: VerificationProblem,
     irPath: string | null = null,
     pkg: VerificationPackageRef | null = null,
+    stubs: AdapterStubs | null = null,
   ): void {
     this.obligationCards.clear();
     this.assumptionCards.clear();
@@ -228,6 +231,9 @@ export class VerificationPanel {
     body.append(this.renderExports(problem, irPath, pkg));
     if (pkg) {
       body.append(this.renderPackageInventory(pkg));
+    }
+    if (stubs && stubs.stubs.length > 0) {
+      body.append(this.renderAdapterStubs(problem, stubs));
     }
     if (problem.dynamics) {
       body.append(this.renderDynamics(problem));
@@ -401,6 +407,91 @@ export class VerificationPanel {
       ),
     );
     return node;
+  }
+
+  // The non-discharging adapter stubs (BE-044): per obligation, the external
+  // backend categories that could consume it and the obligation shape each would
+  // have to handle. Every entry is labeled discharges: false — a stub is a
+  // descriptor, never a discharge, and every obligation stays external-required.
+  // Renders only what the stubs component exports.
+  private renderAdapterStubs(problem: VerificationProblem, stubs: AdapterStubs): HTMLElement {
+    const node = section("Adapter stubs", "verifAdapterStubs");
+    // The backend's own honesty note, verbatim.
+    if (stubs.note) {
+      node.append(el("p", "verif-meta", stubs.note));
+    }
+
+    const obligationName = new Map(problem.obligations.map((o) => [o.id, o.name]));
+    // The category summary for each category id, surfaced as a tooltip so the
+    // categories component is inspectable without bulk.
+    const categorySummary = new Map(stubs.categories.map((c) => [c.category, c.summary]));
+
+    // Group the stubs by obligation, in the problem's obligation order, then any
+    // stub whose obligation is not in this problem (defensive).
+    const byObligation = new Map<string, AdapterStub[]>();
+    for (const stub of stubs.stubs) {
+      const list = byObligation.get(stub.obligationId) ?? [];
+      list.push(stub);
+      byObligation.set(stub.obligationId, list);
+    }
+    const order = [
+      ...problem.obligations.map((o) => o.id).filter((id) => byObligation.has(id)),
+      ...[...byObligation.keys()].filter((id) => !obligationName.has(id)),
+    ];
+
+    const list = el("div", "verif-cards");
+    order.forEach((obligationId) => {
+      const card = el("div", "verif-card");
+      const head = el("div", "verif-card__head");
+      head.append(this.adapterObligationName(obligationId, obligationName));
+      card.append(head);
+
+      const entries = el("ul", "verif-adapter-stubs");
+      (byObligation.get(obligationId) ?? []).forEach((stub) => {
+        const item = el("li", "verif-adapter-stub");
+        const top = el("div", "verif-adapter-stub__head");
+        const category = el("span", "verif-adapter-stub__category", stub.category);
+        const summary = categorySummary.get(stub.category);
+        if (summary) {
+          category.title = summary;
+        }
+        top.append(category);
+        // The standing honesty marker: a stub never discharges.
+        top.append(el("span", "verif-adapter-stub__discharges", "discharges: false"));
+        item.append(top);
+
+        // The obligation shape this category would have to handle.
+        const shapeParts = [`target ${stub.target}`];
+        if (stub.requiredShapeFeatures.length > 0) {
+          shapeParts.push(`shape: ${stub.requiredShapeFeatures.join(", ")}`);
+        }
+        item.append(el("p", "verif-adapter-stub__shape", shapeParts.join(" · ")));
+        entries.append(item);
+      });
+      card.append(entries);
+      list.append(card);
+    });
+    node.append(list);
+    return node;
+  }
+
+  // An obligation heading for an adapter-stub card: links to the obligation's
+  // full card when the obligation is part of this problem, otherwise an inert
+  // heading.
+  private adapterObligationName(
+    obligationId: string,
+    obligationName: Map<string, string>,
+  ): HTMLElement {
+    const label = obligationName.get(obligationId) ?? obligationId;
+    if (!obligationName.has(obligationId)) {
+      return el("strong", "verif-card__name", label);
+    }
+    // A distinct jump class (not verif-card__name--jump) so the measured-status
+    // jump count stays unaffected; styled identically.
+    const link = el("button", "verif-card__name verif-adapter-stub__jump", label);
+    link.type = "button";
+    link.addEventListener("click", () => this.jumpToObligation(obligationId));
+    return link;
   }
 
   // Assemble and download the package as one JSON file. Fetching the components
