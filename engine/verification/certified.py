@@ -25,6 +25,7 @@ from typing import Mapping
 from engine.numerics.intervals import Interval
 from engine.verification.enclosure import enclose_expression
 from engine.verification.ir import (
+    EnclosureDomainConstraintSpec,
     EnclosureStatusSpec,
     ExpressionSpec,
     ObligationSpec,
@@ -91,6 +92,7 @@ def certified_enclosure_status(
     soundness_assumptions: tuple[str, ...] = (),
     region_id: str | None = None,
     note: str | None = None,
+    domain_constraints: tuple[EnclosureDomainConstraintSpec, ...] = (),
 ) -> EnclosureStatusSpec | None:
     """Emit a certified-numeric status for ``obligation`` over ``box``.
 
@@ -123,6 +125,7 @@ def certified_enclosure_status(
         rhs=obligation.rhs,
         region_id=region_id if region_id is not None else obligation.region_id,
         soundness_assumptions=tuple(soundness_assumptions),
+        domain_constraints=domain_constraints,
         **extra,
     )
 
@@ -136,6 +139,7 @@ def certified_partitioned_enclosure_status(
     soundness_assumptions: tuple[str, ...] = (),
     region_id: str | None = None,
     note: str | None = None,
+    domain_constraints: tuple[EnclosureDomainConstraintSpec, ...] = (),
 ) -> EnclosureStatusSpec | None:
     """Emit a certified-numeric status from a finite branch partition.
 
@@ -176,6 +180,7 @@ def certified_partitioned_enclosure_status(
         rhs=obligation.rhs,
         region_id=region_id if region_id is not None else obligation.region_id,
         soundness_assumptions=tuple(soundness_assumptions) + partition_assumptions,
+        domain_constraints=domain_constraints,
         **extra,
     )
 

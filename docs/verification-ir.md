@@ -95,16 +95,25 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    a machine-readable status (`measured-holds`, `measured-violated`, or
    `external-required`). These records are measured evidence only and keep
    `externalStatus="external-required"` distinct from the sampled status.
-10. **Deferred (out of v3):** richer
+10. **Certified enclosure domains can record constraints.**
+   `enclosureStatuses` may record `domainConstraints` in addition to their
+   exact-rational rectangular `box`. A constrained status means the enclosure
+   claim is over `box` intersected with the listed predicates (for example, a
+   standoff annulus inside a rectangular chart), not over the whole rectangle.
+   The status remains `rigor="certified-numeric"` and
+   `externalStatus="external-required"`; recording a constrained domain does
+   not by itself discharge an obligation. Validators reject constraints that
+   reference unknown symbols or variables outside the recorded box.
+11. **Deferred (out of v3):** richer
    assumption languages beyond scalar expression comparisons, boundary
    topology guarantees, real external backends, and any proof-result storage.
-11. **Adapter diagnostics are outcomes, not proofs.** Verification adapters
+12. **Adapter diagnostics are outcomes, not proofs.** Verification adapters
    report normalized diagnostics through `VerificationDiagnostic` with
    statuses such as `not-attempted`, `externally-required`, `unsupported`,
    and `malformed`. The inspection stub writes these diagnostics to a
    machine-readable outcome artifact; it still cannot record success,
    discharge, proof, or certification.
-12. **Adapter capability checks are explicit.** `engine.verification`
+13. **Adapter capability checks are explicit.** `engine.verification`
    classifies each obligation into a target family such as
    `continuous-lyapunov`, `discrete-barrier`, or `obligation-only`, and records
    structural shape features such as region scoping, excluded points,
@@ -117,7 +126,7 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    currently mixed-candidate ownership and candidate obligations without
    encoded dynamics, are classified as malformed adapter targets rather than as
    unsupported proof attempts.
-13. **Target-specific prechecks are structural only.** The SOS-polynomial
+14. **Target-specific prechecks are structural only.** The SOS-polynomial
    requirement checker verifies that certificate targets have polynomial
    dynamics, regions, candidate expressions, and obligation expressions before
    a future SOS-style adapter could attempt them. It emits only unsupported or
@@ -129,8 +138,8 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
 ## Files
 
 - `engine/verification/ir.py` — `DynamicsSpec`, `InputSpec`,
-  `AssumptionSpec`, `CandidateSpec`, `RegionGeometrySpec`, extended
-  `VerificationProblem`, schema bump.
+  `AssumptionSpec`, `CandidateSpec`, `RegionGeometrySpec`,
+  `EnclosureDomainConstraintSpec`, extended `VerificationProblem`, schema bump.
 - `engine/verification/diagnostics.py` — typed adapter diagnostics with a
   small status/severity vocabulary for inspection and future backend
   integrations.

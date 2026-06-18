@@ -86,6 +86,12 @@ artifacts.
     argument is enclosed exactly and the sqrt endpoint uses the verified
     outward-rounded mpmath path; broader annulus regions remain measured-only
     until tighter enclosures are added.
+  - Enclosure statuses can record additional domain constraints alongside their
+    rectangular box, so future certified-numeric claims over annular/standoff
+    regions can state `box ∩ constraints` explicitly instead of certifying an
+    unsafe rectangle. This is a contract/metadata capability only; the trusted
+    evaluator must still produce and test the actual enclosure before any status
+    is emitted.
   - Viewer-renderable verification examples now include
     `upright-pendulum-safety` and `controlled-spring-regulator-safety`, each
     with its own controlled trajectory, region geometry, candidate-certificate

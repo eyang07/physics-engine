@@ -73,6 +73,67 @@ class ExpressionSpec:
 
 
 @dataclass(frozen=True)
+class EnclosureDomainConstraintSpec:
+    """A recorded constraint restricting an enclosure status' certified domain.
+
+    A certified enclosure may be over a rectangular ``box`` alone, or over that
+    box intersected with additional constraints such as an annular standoff
+    predicate. Recording the constraint is part of the claim: downstream
+    validators and tests must sample/evaluate inside the constrained domain, not
+    silently treat the entire box as certified.
+    """
+
+    id: str
+    expression: ExpressionSpec
+    comparison: str
+    rhs: float = 0.0
+    variables: tuple[str, ...] = ()
+    description: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.id:
+            raise ValueError("enclosure domain constraint id must be non-empty")
+        if self.comparison not in _ASSUMPTION_COMPARISONS:
+            raise ValueError(
+                "enclosure domain constraint comparison must be one of "
+                "<=, <, >=, >, =, !="
+            )
+        if not self.variables:
+            raise ValueError(
+                "enclosure domain constraint must record the variables it depends on"
+            )
+        if len(set(self.variables)) != len(self.variables):
+            raise ValueError(
+                "enclosure domain constraint variables must be unique"
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "id": self.id,
+            "expression": self.expression.to_dict(),
+            "comparison": self.comparison,
+            "rhs": self.rhs,
+            "variables": list(self.variables),
+        }
+        if self.description:
+            payload["description"] = self.description
+        return payload
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "EnclosureDomainConstraintSpec":
+        return cls(
+            id=_require(data, "id", "enclosure domain constraint"),
+            expression=ExpressionSpec.from_dict(
+                _require(data, "expression", "enclosure domain constraint")
+            ),
+            comparison=_require(data, "comparison", "enclosure domain constraint"),
+            rhs=float(data.get("rhs", 0.0)),
+            variables=tuple(data.get("variables", ())),
+            description=data.get("description", ""),
+        )
+
+
+@dataclass(frozen=True)
 class VariableSpec:
     name: str
     latex: str
@@ -720,6 +781,7 @@ class EnclosureStatusSpec:
     rigor: str = RIGOR_CERTIFIED_NUMERIC
     external_status: str = "external-required"
     note: str = _DEFAULT_ENCLOSURE_NOTE
+    domain_constraints: tuple[EnclosureDomainConstraintSpec, ...] = ()
 
     def __post_init__(self) -> None:
         if self.rigor != RIGOR_CERTIFIED_NUMERIC:
@@ -754,6 +816,9 @@ class EnclosureStatusSpec:
                 ) from error
             if box_lo > box_hi:
                 raise ValueError(f"box interval for {name!r} is inverted")
+        constraint_ids = [constraint.id for constraint in self.domain_constraints]
+        if len(set(constraint_ids)) != len(constraint_ids):
+            raise ValueError("enclosure domain constraint ids must be unique")
 
         # The recorded enclosure must actually support the recorded verdict; a
         # fabricated verdict whose enclosure does not close the obligation is
@@ -784,6 +849,10 @@ class EnclosureStatusSpec:
             "soundnessAssumptions": list(self.soundness_assumptions),
             "note": self.note,
         }
+        if self.domain_constraints:
+            payload["domainConstraints"] = [
+                constraint.to_dict() for constraint in self.domain_constraints
+            ]
         if self.region_id is not None:
             payload["regionId"] = self.region_id
         return payload
@@ -812,6 +881,10 @@ class EnclosureStatusSpec:
             rigor=data.get("rigor", RIGOR_CERTIFIED_NUMERIC),
             external_status=data.get("externalStatus", "external-required"),
             note=data.get("note", _DEFAULT_ENCLOSURE_NOTE),
+            domain_constraints=tuple(
+                EnclosureDomainConstraintSpec.from_dict(item)
+                for item in data.get("domainConstraints", ())
+            ),
         )
 
 
@@ -1012,6 +1085,23 @@ class VerificationProblem:
                     "unknown enclosure status box symbols: "
                     f"{sorted(unknown_box_variables)}"
                 )
+            box_symbols = {name for name, _, _ in status.box}
+            for constraint in status.domain_constraints:
+                unknown_constraint_variables = set(constraint.variables) - {
+                    *known_variables,
+                    *parameter_names,
+                }
+                if unknown_constraint_variables:
+                    raise ValueError(
+                        "unknown enclosure status domain constraint variables: "
+                        f"{sorted(unknown_constraint_variables)}"
+                    )
+                outside_box = set(constraint.variables) - box_symbols
+                if outside_box:
+                    raise ValueError(
+                        "enclosure status domain constraint variables must be "
+                        f"inside the recorded box: {sorted(outside_box)}"
+                    )
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {

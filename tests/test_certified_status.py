@@ -14,6 +14,7 @@ import sympy as sp
 
 from engine.numerics import Interval
 from engine.verification import (
+    EnclosureDomainConstraintSpec,
     EnclosureStatusSpec,
     EnclosurePartition,
     ExpressionSpec,
@@ -131,10 +132,34 @@ def test_partitioned_producer_unions_branch_enclosures() -> None:
     assert any("Partition 'left'" in item for item in status.soundness_assumptions)
 
 
+def test_producer_records_domain_constraints() -> None:
+    x = sp.Symbol("x", real=True)
+    constraint = EnclosureDomainConstraintSpec(
+        id="right-half",
+        expression=expression_spec(x),
+        comparison=">=",
+        rhs=0.0,
+        variables=("x",),
+        description="x stays in the right half of the box",
+    )
+    status = certified_enclosure_status(
+        id="enc-constrained",
+        obligation=_obligation(x - 2, "<="),
+        box={"x": Interval(0, 1)},
+        domain_constraints=(constraint,),
+    )
+    assert status is not None
+    assert status.domain_constraints == (constraint,)
+    payload = status.to_dict()
+    assert payload["domainConstraints"][0]["id"] == "right-half"
+    assert EnclosureStatusSpec.from_dict(payload) == status
+
+
 # -- round-trip ----------------------------------------------------------
 
 
 def test_enclosure_status_round_trips() -> None:
+    q1 = sp.Symbol("q1", real=True)
     status = EnclosureStatusSpec(
         id="enc",
         obligation_id="ob-1",
@@ -144,6 +169,16 @@ def test_enclosure_status_round_trips() -> None:
         enclosure_lower="-5/4",
         enclosure_upper="-1/8",
         soundness_assumptions=("exact zero-order-hold map", "rational params"),
+        domain_constraints=(
+            EnclosureDomainConstraintSpec(
+                id="standoff",
+                expression=expression_spec(q1**2),
+                comparison=">=",
+                rhs=0.25,
+                variables=("q1",),
+                description="sample only inside the standoff predicate",
+            ),
+        ),
     )
     restored = EnclosureStatusSpec.from_dict(status.to_dict())
     assert restored == status
@@ -205,6 +240,48 @@ def test_inverted_enclosure_rejected() -> None:
             box=(("x", "0", "1"),),
             enclosure_lower="0",
             enclosure_upper="-1",
+        )
+
+
+def test_domain_constraint_variables_must_be_known_and_inside_box() -> None:
+    x, y = sp.symbols("x y", real=True)
+    status = EnclosureStatusSpec(
+        id="enc",
+        obligation_id="ob-1",
+        comparison="<=",
+        verdict="certified-holds",
+        box=(("x", "0", "1"),),
+        enclosure_lower="-1",
+        enclosure_upper="0",
+        domain_constraints=(
+            EnclosureDomainConstraintSpec(
+                id="needs-y",
+                expression=expression_spec(x + y),
+                comparison="<=",
+                variables=("x", "y"),
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match="inside the recorded box"):
+        VerificationProblem(
+            id="p",
+            name="problem",
+            source="test",
+            variables=(
+                VariableSpec(name="x", latex="x"),
+                VariableSpec(name="y", latex="y"),
+            ),
+            parameters=(),
+            regions=(),
+            obligations=(
+                ObligationSpec(
+                    id="ob-1",
+                    name="margin",
+                    expression=expression_spec(x - 5),
+                    comparison="<=",
+                ),
+            ),
+            enclosure_statuses=(status,),
         )
 
 

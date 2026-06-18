@@ -234,16 +234,20 @@ enclosure under stated assumptions), strictly distinct from `measured` (level 1)
 from any external `proved` / `certified` result. The engine proposes; external
 backends dispose._
 
-1. **BE-073: Affine-form refinement for the distance barrier**
-    - Goal: Add an affine / Taylor-model enclosure form to tighten the `sqrt` distance
-      barrier where pure intervals over-inflate (tightness only; soundness from the
-      same trusted base), closing avoidance obligations the box form cannot.
-    - Scope: `engine/numerics/intervals.py` or `engine/verification/` (affine form),
+1. **BE-073: Constrained-domain refinement for the distance barrier**
+    - Goal: Use the recorded `box ∩ domainConstraints` contract to tighten the
+      `sqrt` distance barrier over a standoff/annulus slice, so a keep-out
+      avoidance obligation can certify over a constrained domain without claiming
+      the whole enclosing rectangle is safe.
+    - Scope: `engine/verification/` (constrained-domain enclosure or affine/Taylor
+      refinement over recorded constraints), `scripts/export_verification_problems.py`,
       and `tests/`.
-    - Acceptance: the affine enclosure is tighter than the interval-box enclosure on
-      the keep-out obligation while still containing every sampled value; a
-      previously-too-loose avoidance obligation certifies; soundness tests pass;
-      nothing claims proof.
+    - Acceptance: the refined enclosure is tighter than the unconstrained interval
+      box on a keep-out obligation while still containing every sampled value inside
+      the recorded constrained domain; a previously-too-loose constrained keep-out
+      domain certifies with `domainConstraints` recorded; sampled points outside the
+      constraint are not treated as certified; soundness tests pass; nothing claims
+      proof.
 
 2. **BE-074: Surface the certified level-2 status across the summary and rigor ladder**
     - Goal: Make the certified-numeric tier legible — extend the BE-061 cross-package
