@@ -107,7 +107,7 @@ class Conserved:
     expression: Callable[[LagrangianSystem], sp.Expr] | None = None
     generator: Callable[[LagrangianSystem], InfinitesimalSymmetry] | None = None
 
-    def expression_for(self, system: LagrangianSystem) -> sp.Expr | None:
+    def expression_for(self, system: LagrangianSystem | FirstOrderSystem) -> sp.Expr | None:
         """Return the symbolic conserved quantity for this system."""
 
         if self.generator is not None:
@@ -201,14 +201,19 @@ class SystemSpec:
         """
 
         system = self.build()
-        if not isinstance(system, LagrangianSystem):
+        if isinstance(system, LagrangianSystem):
+            state_symbols = (*system.q, *system.qdot)
+            parameter_symbols = system.lagrangian.free_symbols
+        elif isinstance(system, FirstOrderSystem):
+            state_symbols = system.state
+            parameter_symbols = set(system.parameters)
+        else:
             return {}
-        state_symbols = (*system.q, *system.qdot)
         array = np.asarray(states, dtype=float)
         columns = [array[:, index] for index in range(len(state_symbols))]
         substitutions = {
             symbol: parameter_values[symbol.name]
-            for symbol in system.lagrangian.free_symbols
+            for symbol in parameter_symbols
             if symbol.name in parameter_values
         }
 
@@ -479,6 +484,20 @@ def first_order_system_entry(spec: SystemSpec, system: FirstOrderSystem) -> dict
         for symbol, expression in zip(system.state, system.rhs, strict=True)
     ]
     jacobian = system.jacobian()
+    conserved: list[dict[str, Any]] = []
+    for quantity in spec.conserved:
+        item: dict[str, Any] = {
+            "name": quantity.name,
+            "latex": quantity.latex,
+            "symmetry": quantity.symmetry,
+        }
+        expression = quantity.expression_for(system)
+        if expression is not None:
+            rendered_expression = (
+                sp.simplify(expression) if system.simplify_derivatives else expression
+            )
+            item["expression_latex"] = latex(rendered_expression)
+        conserved.append(item)
 
     entry = {
         "id": spec.id,
@@ -490,7 +509,7 @@ def first_order_system_entry(spec: SystemSpec, system: FirstOrderSystem) -> dict
         "parameters": [parameter.to_dict() for parameter in spec.parameters],
         "state": [variable.to_dict() for variable in spec.state],
         "projections": {name: list(group) for name, group in spec.projections.items()},
-        "conserved": [],
+        "conserved": conserved,
         "effectivePotentials": [],
         "lenses": list(spec.lenses),
         "dynamics": {

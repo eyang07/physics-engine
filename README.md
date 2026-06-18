@@ -77,6 +77,7 @@ Registered viewer examples:
 - Kepler problem
 - Bead on a rotating hoop
 - Double pendulum, including precomputed parameter variants
+- N-body gravity, including figure-eight and Sun-plus-planets variants
 - Lorenz attractor, including precomputed rho variants
 - Hénon-Heiles system
 - Variable-speed wavefront propagation

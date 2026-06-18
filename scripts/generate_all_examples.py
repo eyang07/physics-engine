@@ -17,6 +17,10 @@ from scripts.generate_ideal_spring import (
 )
 from scripts.generate_kepler_problem import write_kepler_trajectory
 from scripts.generate_lorenz_attractor import write_lorenz_trajectory, write_lorenz_variant_trajectories
+from scripts.generate_n_body_gravity import (
+    write_n_body_trajectory,
+    write_n_body_variant_trajectories,
+)
 from scripts.generate_pendulum import write_pendulum_trajectory
 from scripts.generate_sphere_geodesic import write_sphere_geodesic_trajectory
 from scripts.generate_uniform_gravity import write_uniform_gravity_trajectory
@@ -61,6 +65,14 @@ def main() -> None:
         viewer_output=Path("viewer/public/data/double_pendulum.json"),
     )
     write_double_pendulum_variant_trajectories(
+        Path("data/generated"),
+        viewer_output_dir=Path("viewer/public/data"),
+    )
+    write_n_body_trajectory(
+        Path("data/generated/n_body_gravity.json"),
+        viewer_output=Path("viewer/public/data/n_body_gravity.json"),
+    )
+    write_n_body_variant_trajectories(
         Path("data/generated"),
         viewer_output_dir=Path("viewer/public/data"),
     )

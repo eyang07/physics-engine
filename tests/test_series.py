@@ -20,6 +20,7 @@ from scripts.generate_double_pendulum import generate_double_pendulum_trajectory
 from scripts.generate_henon_heiles import generate_henon_heiles_trajectory
 from scripts.generate_ideal_spring import generate_ideal_spring_trajectory
 from scripts.generate_kepler_problem import generate_kepler_trajectory
+from scripts.generate_n_body_gravity import generate_n_body_trajectory
 from scripts.generate_pendulum import generate_pendulum_trajectory
 from scripts.generate_sphere_geodesic import generate_sphere_geodesic_trajectory
 from scripts.generate_uniform_gravity import generate_uniform_gravity_trajectory
@@ -36,6 +37,7 @@ CASES = {
         example_specs.DOUBLE_PENDULUM,
         generate_double_pendulum_trajectory,
     ),
+    "n-body-gravity": (example_specs.N_BODY_GRAVITY, generate_n_body_trajectory),
     "henon-heiles": (example_specs.HENON_HEILES, generate_henon_heiles_trajectory),
 }
 

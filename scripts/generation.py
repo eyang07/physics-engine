@@ -31,6 +31,15 @@ def _invariant_residual_record(residual: InvariantResidual) -> dict[str, Any]:
     }
 
 
+def invariant_residual_records(series: Mapping[str, Sequence[float]]) -> list[dict[str, Any]]:
+    """Return measured residual metadata for sampled invariant series."""
+
+    return [
+        _invariant_residual_record(residual)
+        for residual in invariant_residuals(series).values()
+    ]
+
+
 def physical_parameter_defaults(spec: SystemSpec) -> dict[str, float]:
     """Return default values for the symbols that appear in the Lagrangian."""
 
@@ -93,10 +102,7 @@ def generate_lagrangian_trajectory(
     output_metadata = dict(metadata) if metadata is not None else None
     if series:
         output_metadata = dict(output_metadata or {})
-        output_metadata["invariantResiduals"] = [
-            _invariant_residual_record(residual)
-            for residual in invariant_residuals(series).values()
-        ]
+        output_metadata["invariantResiduals"] = invariant_residual_records(series)
     return Trajectory.from_arrays(
         time=time,
         states=states,

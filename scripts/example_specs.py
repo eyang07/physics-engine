@@ -30,6 +30,13 @@ from systems.henon_heiles import build_system as build_henon_heiles
 from systems.ideal_spring import build_system as build_ideal_spring
 from systems.kepler_problem import build_system as build_kepler
 from systems.lorenz_attractor import build_system as build_lorenz
+from systems.n_body_gravity import (
+    build_system as build_n_body_gravity,
+    total_angular_momentum_z,
+    total_energy as n_body_total_energy,
+    total_momentum_x,
+    total_momentum_y,
+)
 from systems.pendulum import build_system as build_pendulum
 from systems.sphere_geodesic import build_system as build_sphere_geodesic
 from systems.uniform_gravity import build_system as build_uniform_gravity
@@ -208,6 +215,14 @@ LENSES: tuple[Lens, ...] = (
         description="Angular phase slices for the two coupled pendulum links.",
         projections=("theta1Phase", "theta2Phase"),
         conserved=("H",),
+    ),
+    Lens(
+        id="nBodyOrbits",
+        title="N-body Orbits",
+        kind="configuration-space",
+        description="Per-body orbit trails in the center-of-mass frame.",
+        projections=("body1Orbit", "body2Orbit", "body3Orbit"),
+        conserved=("H", "P_x", "P_y", "L_z"),
     ),
     Lens(
         id="lorenzAttractor",
@@ -625,6 +640,118 @@ DOUBLE_PENDULUM = SystemSpec(
 )
 
 
+_FIGURE_EIGHT_PARAMETERS = {
+    "G": 1.0,
+    "m1": 1.0,
+    "m2": 1.0,
+    "m3": 1.0,
+    "x1_0": -0.97000436,
+    "y1_0": 0.24308753,
+    "x2_0": 0.97000436,
+    "y2_0": -0.24308753,
+    "x3_0": 0.0,
+    "y3_0": 0.0,
+    "vx1_0": 0.466203685,
+    "vy1_0": 0.43236573,
+    "vx2_0": 0.466203685,
+    "vy2_0": 0.43236573,
+    "vx3_0": -0.93240737,
+    "vy3_0": -0.86473146,
+}
+
+_SUN_TWO_PLANETS_PARAMETERS = {
+    "G": 1.0,
+    "m1": 1.0,
+    "m2": 0.001,
+    "m3": 0.0005,
+    "x1_0": 0.0,
+    "y1_0": 0.0,
+    "x2_0": 1.0,
+    "y2_0": 0.0,
+    "x3_0": 1.65,
+    "y3_0": 0.0,
+    "vx1_0": 0.0,
+    "vy1_0": 0.0,
+    "vx2_0": 0.0,
+    "vy2_0": 1.0,
+    "vx3_0": 0.0,
+    "vy3_0": 0.78,
+}
+
+
+N_BODY_GRAVITY = SystemSpec(
+    id="n-body-gravity",
+    title="N-body Gravity",
+    category="Classical Mechanics",
+    description=(
+        "A planar Newtonian three-body export, generated in the center-of-mass "
+        "frame from the general N-body field."
+    ),
+    build=build_n_body_gravity,
+    parameters=(
+        Parameter("G", "G", _FIGURE_EIGHT_PARAMETERS["G"], 0.1, 5.0),
+        Parameter("m1", "m_1", _FIGURE_EIGHT_PARAMETERS["m1"], 0.0001, 3.0),
+        Parameter("m2", "m_2", _FIGURE_EIGHT_PARAMETERS["m2"], 0.0001, 3.0),
+        Parameter("m3", "m_3", _FIGURE_EIGHT_PARAMETERS["m3"], 0.0001, 3.0),
+        Parameter("x1_0", "x_{1,0}", _FIGURE_EIGHT_PARAMETERS["x1_0"], -2.0, 2.0, role="initial"),
+        Parameter("y1_0", "y_{1,0}", _FIGURE_EIGHT_PARAMETERS["y1_0"], -2.0, 2.0, role="initial"),
+        Parameter("x2_0", "x_{2,0}", _FIGURE_EIGHT_PARAMETERS["x2_0"], -2.0, 2.0, role="initial"),
+        Parameter("y2_0", "y_{2,0}", _FIGURE_EIGHT_PARAMETERS["y2_0"], -2.0, 2.0, role="initial"),
+        Parameter("x3_0", "x_{3,0}", _FIGURE_EIGHT_PARAMETERS["x3_0"], -2.0, 2.0, role="initial"),
+        Parameter("y3_0", "y_{3,0}", _FIGURE_EIGHT_PARAMETERS["y3_0"], -2.0, 2.0, role="initial"),
+        Parameter("vx1_0", "v_{x1,0}", _FIGURE_EIGHT_PARAMETERS["vx1_0"], -2.0, 2.0, role="initial"),
+        Parameter("vy1_0", "v_{y1,0}", _FIGURE_EIGHT_PARAMETERS["vy1_0"], -2.0, 2.0, role="initial"),
+        Parameter("vx2_0", "v_{x2,0}", _FIGURE_EIGHT_PARAMETERS["vx2_0"], -2.0, 2.0, role="initial"),
+        Parameter("vy2_0", "v_{y2,0}", _FIGURE_EIGHT_PARAMETERS["vy2_0"], -2.0, 2.0, role="initial"),
+        Parameter("vx3_0", "v_{x3,0}", _FIGURE_EIGHT_PARAMETERS["vx3_0"], -2.0, 2.0, role="initial"),
+        Parameter("vy3_0", "v_{y3,0}", _FIGURE_EIGHT_PARAMETERS["vy3_0"], -2.0, 2.0, role="initial"),
+    ),
+    state=(
+        StateVar("x1", "x_1", "coordinate"),
+        StateVar("y1", "y_1", "coordinate"),
+        StateVar("x2", "x_2", "coordinate"),
+        StateVar("y2", "y_2", "coordinate"),
+        StateVar("x3", "x_3", "coordinate"),
+        StateVar("y3", "y_3", "coordinate"),
+        StateVar("vx1", "v_{x1}", "velocity"),
+        StateVar("vy1", "v_{y1}", "velocity"),
+        StateVar("vx2", "v_{x2}", "velocity"),
+        StateVar("vy2", "v_{y2}", "velocity"),
+        StateVar("vx3", "v_{x3}", "velocity"),
+        StateVar("vy3", "v_{y3}", "velocity"),
+    ),
+    projections={
+        "body1Orbit": ("x1", "y1"),
+        "body2Orbit": ("x2", "y2"),
+        "body3Orbit": ("x3", "y3"),
+        "configurationPlane": ("x1", "y1", "x2", "y2", "x3", "y3"),
+    },
+    conserved=(
+        Conserved("H", "H", "time translation", expression=n_body_total_energy),
+        Conserved("P_x", "P_x", "x translation", expression=total_momentum_x),
+        Conserved("P_y", "P_y", "y translation", expression=total_momentum_y),
+        Conserved("L_z", "L_z", "planar rotation", expression=total_angular_momentum_z),
+    ),
+    lenses=("nBodyOrbits",),
+    data_path="/data/n_body_gravity.json",
+    system_kind="first-order-flow",
+    variants=(
+        ParameterVariant(
+            id="figure-eight",
+            label="Figure eight",
+            parameters=_FIGURE_EIGHT_PARAMETERS,
+            data_path="/data/n_body_gravity.json",
+        ),
+        ParameterVariant(
+            id="sun-two-planets",
+            label="Sun + two planets",
+            parameters=_SUN_TWO_PLANETS_PARAMETERS,
+            data_path="/data/n_body_gravity_sun_two_planets.json",
+        ),
+    ),
+)
+
+
 LORENZ = SystemSpec(
     id="lorenz-attractor",
     title="Lorenz Attractor",
@@ -758,6 +885,7 @@ SPECS: tuple[SystemSpec, ...] = (
     KEPLER,
     BEAD_ON_HOOP,
     DOUBLE_PENDULUM,
+    N_BODY_GRAVITY,
     LORENZ,
     HENON_HEILES,
     VARIABLE_SPEED_WAVEFRONT,

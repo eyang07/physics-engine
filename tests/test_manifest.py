@@ -17,11 +17,19 @@ from engine.export import Trajectory, validate_viewer_verification_problems
 from engine.export.manifest import SystemSpec, build_manifest, system_entry
 from engine.dynamics import CotangentHamiltonianSystem
 from engine.mechanics.lagrangian import LagrangianSystem
-from scripts.example_specs import DOUBLE_PENDULUM, IDEAL_SPRING, LENSES, LORENZ, SPECS
+from scripts.example_specs import (
+    DOUBLE_PENDULUM,
+    IDEAL_SPRING,
+    LENSES,
+    LORENZ,
+    N_BODY_GRAVITY,
+    SPECS,
+)
 from scripts.export_verification_problems import upright_pendulum_problem
 from scripts.generate_double_pendulum import write_double_pendulum_variant_trajectories
 from scripts.generate_ideal_spring import write_ideal_spring_variant_trajectories
 from scripts.generate_lorenz_attractor import write_lorenz_variant_trajectories
+from scripts.generate_n_body_gravity import write_n_body_variant_trajectories
 
 
 def _write_ideal_spring_variants(
@@ -54,10 +62,21 @@ def _write_double_pendulum_variants(
     )
 
 
+def _write_n_body_variants(
+    output_dir: Path,
+    viewer_output_dir: Path,
+) -> list[Trajectory]:
+    return write_n_body_variant_trajectories(
+        output_dir,
+        viewer_output_dir=viewer_output_dir,
+    )
+
+
 VARIANT_TRAJECTORY_WRITERS: dict[str, Callable[[Path, Path], list[Trajectory]]] = {
     DOUBLE_PENDULUM.id: _write_double_pendulum_variants,
     IDEAL_SPRING.id: _write_ideal_spring_variants,
     LORENZ.id: _write_lorenz_variants,
+    N_BODY_GRAVITY.id: _write_n_body_variants,
 }
 
 
@@ -142,8 +161,12 @@ def test_state_schema_matches_system(spec) -> None:
         assert momenta == [symbol.name for symbol in system.momenta]
         assert velocities == []
     else:
-        assert coordinates == [symbol.name for symbol in system.state_symbols]
-        assert velocities == []
+        dynamic_state = [
+            variable.name
+            for variable in spec.state
+            if variable.kind in {"coordinate", "velocity", "momentum"}
+        ]
+        assert dynamic_state == [symbol.name for symbol in system.state_symbols]
 
 
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
@@ -409,11 +432,11 @@ def test_entry_carries_structured_derivation(spec) -> None:
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
 def test_conserved_quantities_render(spec) -> None:
     entry = system_entry(spec)
-    if entry.get("dynamics"):
+
+    if not spec.conserved:
         assert entry["conserved"] == []
         return
-
-    assert entry["conserved"], "each system should declare at least one invariant"
+    assert entry["conserved"], "systems with invariants should declare them"
     for quantity in entry["conserved"]:
         assert quantity["latex"]
         assert quantity["symmetry"]
@@ -426,7 +449,13 @@ def test_conserved_quantities_use_noether_generators(spec) -> None:
     system = spec.build()
     entry = system_entry(spec)
     if not isinstance(system, LagrangianSystem):
-        assert entry["conserved"] == []
+        assert [quantity["name"] for quantity in entry["conserved"]] == [
+            quantity.name for quantity in spec.conserved
+        ]
+        for declared, rendered in zip(spec.conserved, entry["conserved"], strict=True):
+            assert declared.expression is not None
+            assert declared.generator is None
+            assert rendered["expression_latex"]
         return
 
     for declared, rendered in zip(spec.conserved, entry["conserved"], strict=True):

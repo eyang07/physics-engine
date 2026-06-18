@@ -15,6 +15,7 @@ class FirstOrderSystem:
     rhs: tuple[sp.Expr, ...]
     parameters: tuple[sp.Symbol, ...] = ()
     time: sp.Symbol = sp.Symbol("t", real=True)
+    simplify_derivatives: bool = True
 
     def __post_init__(self) -> None:
         if len(self.state) != len(self.rhs):
@@ -25,12 +26,15 @@ class FirstOrderSystem:
         return self.state
 
     def jacobian(self) -> sp.Matrix:
-        return sp.simplify(sp.Matrix(self.rhs).jacobian(self.state))
+        jacobian = sp.Matrix(self.rhs).jacobian(self.state)
+        return sp.simplify(jacobian) if self.simplify_derivatives else jacobian
 
     def divergence(self) -> sp.Expr:
-        return sp.simplify(
-            sum(sp.diff(component, symbol) for component, symbol in zip(self.rhs, self.state, strict=True))
+        divergence = sum(
+            sp.diff(component, symbol)
+            for component, symbol in zip(self.rhs, self.state, strict=True)
         )
+        return sp.simplify(divergence) if self.simplify_derivatives else divergence
 
     def fixed_points(
         self,
