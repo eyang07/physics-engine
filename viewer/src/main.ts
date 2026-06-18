@@ -362,10 +362,12 @@ async function selectVerificationProblem(problemId: string) {
         ? { manifest, path: summary.packagePath }
         : null;
     const stubs = pkg ? await loadVerificationAdapterStubs(pkg.path, pkg.manifest) : null;
+    // The open problem's Tier/regime from the discovery index, when listed.
+    const regime = verificationPackageIndex.get(summary.id)?.regime ?? null;
     // A stale click (the user moved on) should not overwrite the newer problem.
     if (selectedProblemId === summary.id) {
       verificationStage.show(problem);
-      verificationPanel.render(problem, summary.irPath, pkg, stubs);
+      verificationPanel.render(problem, summary.irPath, pkg, stubs, regime);
       setFigureCaption(problem);
     }
   } catch (error) {

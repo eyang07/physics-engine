@@ -15,6 +15,7 @@ import type {
   IrObligation,
   IrRegion,
   PackageManifest,
+  PackageRegime,
   ProofStatus,
   RegionRole,
   VerificationProblem,
@@ -209,13 +210,14 @@ export class VerificationPanel {
     irPath: string | null = null,
     pkg: VerificationPackageRef | null = null,
     stubs: AdapterStubs | null = null,
+    regime: PackageRegime | null = null,
   ): void {
     this.obligationCards.clear();
     this.assumptionCards.clear();
     this.selectedEvidenceObligation = null;
 
     // Masthead band (full width above the figure + obligations).
-    this.mastheadEl.replaceChildren(this.renderMasthead(problem));
+    this.mastheadEl.replaceChildren(this.renderMasthead(problem, regime));
 
     // Obligations column.
     const obligations = el("div", "verif-summary");
@@ -259,7 +261,7 @@ export class VerificationPanel {
   // The dossier masthead: the problem title and model, a one-line claim status,
   // and the certification scale (the page's signature). It carries the honesty
   // thesis up front — measured evidence, not a discharge.
-  private renderMasthead(problem: VerificationProblem): HTMLElement {
+  private renderMasthead(problem: VerificationProblem, regime: PackageRegime | null): HTMLElement {
     const masthead = el("div", "verif-masthead");
 
     const head = el("div", "verif-masthead__head");
@@ -273,6 +275,12 @@ export class VerificationPanel {
       tag.append(el("span", "verif-masthead__model-label", "model"));
       tag.append(el("code", "verif-masthead__model-id", model));
       head.append(tag);
+    }
+    // The open problem's Tier/regime from the discovery index (FE-033): nominal
+    // vs disturbance-robust, with the disturbance parameters and robust
+    // obligations a robust package cites. Shown only when the descriptor exists.
+    if (regime) {
+      head.append(this.renderRegime(regime));
     }
     masthead.append(head);
 
@@ -295,6 +303,43 @@ export class VerificationPanel {
 
     masthead.append(this.renderCertificationScale(problem));
     return masthead;
+  }
+
+  // The open problem's Tier/regime, read straight from the discovery index: a
+  // disturbance-robust package names the disturbance parameters and the robust
+  // obligation ids it cites. A robust package is still external-required, never
+  // discharged — the regime says what the claim is quantified over, nothing more.
+  private renderRegime(regime: PackageRegime): HTMLElement {
+    const robust = regime.kind === "disturbance-robust";
+    const node = el(
+      "div",
+      `verif-masthead__regime verif-masthead__regime--${robust ? "robust" : "nominal"}`,
+    );
+    node.append(el("span", "verif-masthead__regime-label", "regime"));
+    node.append(
+      el("span", "verif-masthead__regime-kind", robust ? "disturbance-robust" : "nominal"),
+    );
+    node.title = robust
+      ? "disturbance-robust (Tier-3): obligations quantified over a wind box — still external-required, not discharged"
+      : "nominal (Tier-1/2): no disturbance channel";
+
+    if (robust && regime.disturbanceParameters.length > 0) {
+      const detail = el("span", "verif-masthead__regime-detail");
+      detail.append(el("span", "verif-masthead__regime-detail-label", "disturbance "));
+      detail.append(
+        el("code", "verif-masthead__regime-detail-ids", regime.disturbanceParameters.join(", ")),
+      );
+      node.append(detail);
+    }
+    if (robust && regime.robustObligationIds.length > 0) {
+      const detail = el("span", "verif-masthead__regime-detail");
+      detail.append(el("span", "verif-masthead__regime-detail-label", "robust obligations "));
+      detail.append(
+        el("code", "verif-masthead__regime-detail-ids", regime.robustObligationIds.join(", ")),
+      );
+      node.append(detail);
+    }
+    return node;
   }
 
   // The export appendix: the backend-agnostic IR on its own, and — distinct from

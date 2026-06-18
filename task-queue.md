@@ -47,23 +47,21 @@ below make the measured margin geometrically legible and surface the package
 inventory in the inspector. Keep rendering honest — measured stays measured,
 candidates stay candidates, nothing reads as proved._
 
-1. **FE-033: Surface the open problem's Tier/regime in the dossier masthead**
-   - Goal: The catalog now badges each package's Tier/regime (FE-029), but once a
-     problem is open the dossier masthead never restates whether it is nominal or
-     disturbance-robust, nor which disturbance parameters / robust obligations the
-     discovery index records for it. Surface the open problem's regime descriptor
-     honestly in the masthead — "nominal" vs "disturbance-robust", and for a robust
-     package the disturbance parameters and the robust obligation ids it cites —
-     read straight from the discovery index. A robust package is still
-     external-required, never discharged.
-   - Scope: `viewer/src/main.ts` (pass the selected problem's regime to the panel),
-     `viewer/src/verificationPanel.ts` (masthead regime line), `viewer/src/data/
-     verification.ts` if needed, `viewer/src/styles.css`, and the viewer visual test.
-   - Acceptance: opening a disturbance-robust package shows its regime, disturbance
-     parameters, and robust obligation ids in the masthead; a nominal package shows
-     a nominal regime and no disturbance detail; a problem with no discovery-index
-     descriptor shows no regime line; nothing reads as proved; `npm run build` and
-     the visual test pass.
+1. **FE-034: Surface the adapter-stub backend categories overview**
+   - Goal: The adapter-stub section (FE-025) lists, per obligation, the external
+     categories that could consume it, but the categories' own descriptors — each
+     category's summary and what it `consumes` / `produces` — are exported in the
+     stubs component yet only surfaced as a one-line tooltip. Add a read-only
+     "backend categories" overview to the adapter-stub section listing each
+     category once (reachability, SOS/certificate synthesis, deductive prover)
+     with its summary and consumes/produces, every entry labeled non-discharging.
+     Render only what the stubs component exports.
+   - Scope: `viewer/src/verificationPanel.ts` (categories overview within the
+     adapter-stub section), `viewer/src/styles.css`, and the viewer visual test.
+   - Acceptance: a package with adapter stubs shows the backend categories with
+     their summary and consumes/produces, each marked non-discharging; a package
+     without stubs shows no section; obligations stay `external-required`; nothing
+     reads as proved; `npm run build` and the visual test pass.
 
 2. **FE-032: Surface the certified-numeric (level-2) status on the rigor ladder (after BE-074)**
    - Goal: The dossier rigor ladder currently pins every problem at level 1

@@ -341,6 +341,63 @@ for (const viewport of [
     await expect(page.locator("#verificationCatalog .catalog-item__regime")).toHaveCount(0);
   });
 
+  test(`Verification masthead restates the open problem's Tier/regime at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const catalogItems = page.locator("#verificationCatalog .catalog-item");
+    const regime = page.locator("#verificationMasthead .verif-masthead__regime");
+
+    // A nominal package: the masthead restates "nominal" with no disturbance
+    // detail.
+    await catalogItems.nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+    await expect(regime).toHaveClass(/verif-masthead__regime--nominal/);
+    await expect(regime.locator(".verif-masthead__regime-kind")).toHaveText("nominal");
+    await expect(regime.locator(".verif-masthead__regime-detail")).toHaveCount(0);
+
+    // A disturbance-robust package: the masthead names the regime, the
+    // disturbance parameters, and the robust obligation ids it cites.
+    await catalogItems.nth(6).click();
+    await expect(
+      page.getByRole("heading", { name: /drone disturbed geofence axis/i }),
+    ).toBeVisible();
+    await expect(regime).toHaveClass(/verif-masthead__regime--robust/);
+    await expect(regime.locator(".verif-masthead__regime-kind")).toHaveText("disturbance-robust");
+    await expect(regime).toContainText(/disturbance/i);
+    await expect(regime).toContainText("w1");
+    await expect(regime).toContainText(/robust obligations/i);
+    await expect(regime).toContainText(/geofence-barrier-robust-forward-invariance/);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-masthead-regime.png`),
+    });
+  });
+
+  test(`Verification masthead omits the regime without the discovery index at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // No discovery index: the masthead carries no regime line.
+    await page.route("**/data/verification/packages/packages.index.json", (route) =>
+      route.fulfill({ status: 404, body: "" }),
+    );
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    await expect(page.locator("#verificationMasthead .verif-masthead__regime")).toHaveCount(0);
+  });
+
   test(`Verification stage renders trajectory and certificate lanes at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

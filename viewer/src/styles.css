@@ -693,6 +693,50 @@ select {
   color: var(--text-primary);
 }
 
+/* The open problem's Tier/regime (FE-033): full-width under the heading row, so
+   the disturbance parameters and robust obligations a robust package cites stay
+   legible. A descriptor-only line — claims nothing beyond the listed rigor. */
+.verif-masthead__regime {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--space-2);
+}
+
+.verif-masthead__regime-label {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.verif-masthead__regime-kind {
+  padding: 0 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+.verif-masthead__regime--robust .verif-masthead__regime-kind {
+  color: var(--cool);
+  border-color: var(--cool-dim);
+  background: var(--cool-dim);
+}
+
+.verif-masthead__regime-detail {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.verif-masthead__regime-detail-ids {
+  font-family: var(--font-mono, monospace);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
 /* Claim status — one formal line. */
 .verif-claim {
   display: flex;
