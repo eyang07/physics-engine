@@ -166,6 +166,12 @@ export interface ProofStatus {
   worstMargin: number | null;
   /** The worst sampled point, in `projection.variables` order; null if absent. */
   worstPoint: number[] | null;
+  /**
+   * The rollout time of the worst sample, when the status was evaluated along a
+   * trajectory (BE-056): the moment the run reached its worst point. Null for
+   * region-grid samples or any worst record that exports no time.
+   */
+  worstTime: number | null;
   /** The sampled point's projection onto state axes; null when not exported. */
   projection: ProofStatusProjection | null;
   note: string | null;
@@ -175,6 +181,10 @@ export interface IrAssumption {
   id: string;
   description: string | null;
   expression: IrExpression | null;
+  /** The bound comparison and right-hand side, when the assumption is an
+   * inequality (e.g. a disturbance/wind box `|w| <= w_max`). */
+  comparison: string;
+  rhs: number | null;
 }
 
 export interface IrDynamics {
@@ -236,7 +246,33 @@ export interface VerificationIndex {
   problems: VerificationProblemSummary[];
 }
 
+/**
+ * The Tier/regime descriptor a package carries in the discovery index (BE-054):
+ * `nominal` for Tier-1/2 packages, `disturbance-robust` for Tier-3 ones (quantified
+ * over a wind box). It claims nothing beyond the rigor of the listed package.
+ */
+export interface PackageRegime {
+  kind: string;
+  disturbanceParameters: string[];
+  robustObligationIds: string[];
+}
+
+/**
+ * One entry of the package discovery index (`packages.index.json`, BE-047): the
+ * published, self-describing listing of every package by model, status, counts,
+ * and Tier/regime. It claims nothing beyond each listed package's rigor.
+ */
+export interface PackageIndexEntry {
+  problemId: string;
+  name: string;
+  model: string | null;
+  status: string;
+  counts: { regions: number; obligations: number; candidates: number };
+  regime: PackageRegime | null;
+}
+
 const INDEX_PATH = "/data/verification/index.json";
+const PACKAGE_INDEX_PATH = "/data/verification/packages/packages.index.json";
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
@@ -421,6 +457,7 @@ function parseProofStatus(value: unknown): ProofStatus | null {
     worstValue: worst ? asOptionalNumber(worst.value) : null,
     worstMargin: worst ? asOptionalNumber(worst.margin) : null,
     worstPoint: worstPoint.length > 0 ? worstPoint : null,
+    worstTime: worst ? asOptionalNumber(worst.time) : null,
     projection:
       projectionVariables.length > 0
         ? {
@@ -442,6 +479,8 @@ function parseAssumption(value: unknown): IrAssumption | null {
     id: record.id,
     description: asOptionalString(record.description),
     expression: parseExpression(record.expression),
+    comparison: asString(record.comparison, "<="),
+    rhs: asOptionalNumber(record.rhs),
   };
 }
 
@@ -583,6 +622,59 @@ export async function loadVerificationIndex(path = INDEX_PATH): Promise<Verifica
   }
 }
 
+function parseRegime(value: unknown): PackageRegime | null {
+  const record = asRecord(value);
+  if (!record || typeof record.kind !== "string") {
+    return null;
+  }
+  return {
+    kind: record.kind,
+    disturbanceParameters: asStringArray(record.disturbanceParameters),
+    robustObligationIds: asStringArray(record.robustObligationIds),
+  };
+}
+
+/**
+ * Load the package discovery index (`packages.index.json`, BE-047), keyed by
+ * problem id, so the catalog can be grounded in the published listing — model,
+ * status, counts, and Tier/regime — rather than re-deriving it per example. A
+ * missing or malformed index resolves to an empty map, so the catalog simply
+ * degrades to the per-example viewer index.
+ */
+export async function loadVerificationPackageIndex(
+  path = PACKAGE_INDEX_PATH,
+): Promise<Map<string, PackageIndexEntry>> {
+  const entries = new Map<string, PackageIndexEntry>();
+  try {
+    const response = await fetch(path);
+    if (!response.ok) {
+      return entries;
+    }
+    const record = asRecord((await response.json()) as unknown) ?? {};
+    for (const raw of parseArray(record.packages, (item) => asRecord(item) ?? null)) {
+      if (typeof raw.problemId !== "string") {
+        continue;
+      }
+      const counts = asRecord(raw.counts) ?? {};
+      entries.set(raw.problemId, {
+        problemId: raw.problemId,
+        name: asString(raw.name, raw.problemId),
+        model: asOptionalString(raw.model),
+        status: asString(raw.status, "candidate"),
+        counts: {
+          regions: asOptionalNumber(counts.regions) ?? 0,
+          obligations: asOptionalNumber(counts.obligations) ?? 0,
+          candidates: asOptionalNumber(counts.candidates) ?? 0,
+        },
+        regime: parseRegime(raw.regime),
+      });
+    }
+  } catch (error) {
+    console.warn("Verification package index unavailable:", error);
+  }
+  return entries;
+}
+
 /** Load and parse a single verification problem's IR. */
 export async function loadVerificationProblem(dataPath: string): Promise<VerificationProblem> {
   const response = await fetch(dataPath);
@@ -615,6 +707,39 @@ export interface PackageManifest {
   status: string;
   counts: { regions: number; obligations: number; candidates: number };
   components: PackageComponent[];
+}
+
+/**
+ * The non-discharging adapter-stub descriptors (BE-044), an optional package
+ * component. Each stub names an external backend category that *could* consume
+ * an obligation and the obligation shape it would have to handle. Every stub is
+ * a tool-agnostic pointer only: `discharges` is always false, and every
+ * obligation stays external-required.
+ */
+export interface AdapterCategory {
+  category: string;
+  summary: string;
+  consumesTargets: string[];
+  consumes: string;
+  produces: string;
+}
+
+export interface AdapterStub {
+  obligationId: string;
+  category: string;
+  target: string;
+  applicable: boolean;
+  requiredShapeFeatures: string[];
+  /** Always false: a stub is a descriptor, never a discharge. */
+  discharges: boolean;
+  note: string | null;
+}
+
+export interface AdapterStubs {
+  problemId: string;
+  note: string | null;
+  categories: AdapterCategory[];
+  stubs: AdapterStub[];
 }
 
 /** A single self-contained bundle assembled for download: the manifest plus each
@@ -685,6 +810,80 @@ export async function loadVerificationPackageManifest(
     return parsePackageManifest((await response.json()) as unknown);
   } catch (error) {
     console.warn("Verification package manifest unavailable:", error);
+    return null;
+  }
+}
+
+function parseAdapterCategory(value: unknown): AdapterCategory | null {
+  const record = asRecord(value);
+  if (!record || typeof record.category !== "string") {
+    return null;
+  }
+  return {
+    category: record.category,
+    summary: asString(record.summary),
+    consumesTargets: asStringArray(record.consumesTargets),
+    consumes: asString(record.consumes),
+    produces: asString(record.produces),
+  };
+}
+
+function parseAdapterStub(value: unknown): AdapterStub | null {
+  const record = asRecord(value);
+  if (!record || typeof record.obligationId !== "string" || typeof record.category !== "string") {
+    return null;
+  }
+  return {
+    obligationId: record.obligationId,
+    category: record.category,
+    target: asString(record.target),
+    applicable: record.applicable !== false,
+    requiredShapeFeatures: asStringArray(record.requiredShapeFeatures),
+    // A stub is a descriptor only: honor the exported value but never treat a
+    // stub as discharging anything.
+    discharges: record.discharges === true,
+    note: asOptionalString(record.note),
+  };
+}
+
+function parseAdapterStubs(raw: unknown): AdapterStubs | null {
+  const record = asRecord(raw);
+  if (!record || typeof record.problemId !== "string") {
+    return null;
+  }
+  const stubs = parseArray(record.stubs, parseAdapterStub);
+  if (stubs.length === 0) {
+    return null;
+  }
+  return {
+    problemId: record.problemId,
+    note: asOptionalString(record.note),
+    categories: parseArray(record.categories, parseAdapterCategory),
+    stubs,
+  };
+}
+
+/**
+ * Load a package's non-discharging adapter-stub descriptors, when the manifest
+ * indexes them. A package without the `adapter-stubs` component, or a missing /
+ * malformed file, resolves to null so the view simply omits the section.
+ */
+export async function loadVerificationAdapterStubs(
+  packagePath: string,
+  manifest: PackageManifest,
+): Promise<AdapterStubs | null> {
+  const component = manifest.components.find((entry) => entry.kind === "adapter-stubs");
+  if (!component) {
+    return null;
+  }
+  try {
+    const response = await fetch(`${packageBasePath(packagePath)}/${component.path}`);
+    if (!response.ok) {
+      return null;
+    }
+    return parseAdapterStubs((await response.json()) as unknown);
+  } catch (error) {
+    console.warn("Verification adapter stubs unavailable:", error);
     return null;
   }
 }

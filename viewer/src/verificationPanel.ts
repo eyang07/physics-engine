@@ -9,9 +9,14 @@
 import katex from "katex";
 
 import type {
+  AdapterCategory,
+  AdapterStub,
+  AdapterStubs,
+  IrAssumption,
   IrObligation,
   IrRegion,
   PackageManifest,
+  PackageRegime,
   ProofStatus,
   RegionRole,
   VerificationProblem,
@@ -205,13 +210,15 @@ export class VerificationPanel {
     problem: VerificationProblem,
     irPath: string | null = null,
     pkg: VerificationPackageRef | null = null,
+    stubs: AdapterStubs | null = null,
+    regime: PackageRegime | null = null,
   ): void {
     this.obligationCards.clear();
     this.assumptionCards.clear();
     this.selectedEvidenceObligation = null;
 
     // Masthead band (full width above the figure + obligations).
-    this.mastheadEl.replaceChildren(this.renderMasthead(problem));
+    this.mastheadEl.replaceChildren(this.renderMasthead(problem, regime));
 
     // Obligations column.
     const obligations = el("div", "verif-summary");
@@ -225,6 +232,12 @@ export class VerificationPanel {
     details.append(el("summary", "verif-details__summary", "Appendix — problem record (IR)"));
     const body = el("div", "verif-details__body");
     body.append(this.renderExports(problem, irPath, pkg));
+    if (pkg) {
+      body.append(this.renderPackageInventory(pkg));
+    }
+    if (stubs && stubs.stubs.length > 0) {
+      body.append(this.renderAdapterStubs(problem, stubs));
+    }
     if (problem.dynamics) {
       body.append(this.renderDynamics(problem));
     }
@@ -249,7 +262,7 @@ export class VerificationPanel {
   // The dossier masthead: the problem title and model, a one-line claim status,
   // and the certification scale (the page's signature). It carries the honesty
   // thesis up front — measured evidence, not a discharge.
-  private renderMasthead(problem: VerificationProblem): HTMLElement {
+  private renderMasthead(problem: VerificationProblem, regime: PackageRegime | null): HTMLElement {
     const masthead = el("div", "verif-masthead");
 
     const head = el("div", "verif-masthead__head");
@@ -263,6 +276,12 @@ export class VerificationPanel {
       tag.append(el("span", "verif-masthead__model-label", "model"));
       tag.append(el("code", "verif-masthead__model-id", model));
       head.append(tag);
+    }
+    // The open problem's Tier/regime from the discovery index (FE-033): nominal
+    // vs disturbance-robust, with the disturbance parameters and robust
+    // obligations a robust package cites. Shown only when the descriptor exists.
+    if (regime) {
+      head.append(this.renderRegime(regime));
     }
     masthead.append(head);
 
@@ -285,6 +304,43 @@ export class VerificationPanel {
 
     masthead.append(this.renderCertificationScale(problem));
     return masthead;
+  }
+
+  // The open problem's Tier/regime, read straight from the discovery index: a
+  // disturbance-robust package names the disturbance parameters and the robust
+  // obligation ids it cites. A robust package is still external-required, never
+  // discharged — the regime says what the claim is quantified over, nothing more.
+  private renderRegime(regime: PackageRegime): HTMLElement {
+    const robust = regime.kind === "disturbance-robust";
+    const node = el(
+      "div",
+      `verif-masthead__regime verif-masthead__regime--${robust ? "robust" : "nominal"}`,
+    );
+    node.append(el("span", "verif-masthead__regime-label", "regime"));
+    node.append(
+      el("span", "verif-masthead__regime-kind", robust ? "disturbance-robust" : "nominal"),
+    );
+    node.title = robust
+      ? "disturbance-robust (Tier-3): obligations quantified over a wind box — still external-required, not discharged"
+      : "nominal (Tier-1/2): no disturbance channel";
+
+    if (robust && regime.disturbanceParameters.length > 0) {
+      const detail = el("span", "verif-masthead__regime-detail");
+      detail.append(el("span", "verif-masthead__regime-detail-label", "disturbance "));
+      detail.append(
+        el("code", "verif-masthead__regime-detail-ids", regime.disturbanceParameters.join(", ")),
+      );
+      node.append(detail);
+    }
+    if (robust && regime.robustObligationIds.length > 0) {
+      const detail = el("span", "verif-masthead__regime-detail");
+      detail.append(el("span", "verif-masthead__regime-detail-label", "robust obligations "));
+      detail.append(
+        el("code", "verif-masthead__regime-detail-ids", regime.robustObligationIds.join(", ")),
+      );
+      node.append(detail);
+    }
+    return node;
   }
 
   // The export appendix: the backend-agnostic IR on its own, and — distinct from
@@ -350,6 +406,184 @@ export class VerificationPanel {
       ),
     );
     return node;
+  }
+
+  // A read-only inventory of the published BE-039 package: the manifest's model,
+  // status, and counts, and every indexed component (kind, filename,
+  // description), so the bundle's contents are inspectable without downloading
+  // it. Renders only what the manifest exports; the bundle gathers measured
+  // evidence and candidates and discharges nothing.
+  private renderPackageInventory(pkg: VerificationPackageRef): HTMLElement {
+    const node = section("Package", "verifPackage");
+    const manifest = pkg.manifest;
+
+    const meta = el("dl", "verif-package-meta");
+    const addMeta = (label: string, value: string): void => {
+      meta.append(el("dt", "verif-package-meta__term", label));
+      meta.append(el("dd", "verif-package-meta__value", value));
+    };
+    addMeta("model", manifest.model || "—");
+    addMeta("status", manifest.status);
+    addMeta(
+      "counts",
+      `${manifest.counts.regions} regions · ${manifest.counts.obligations} obligations · ` +
+        `${manifest.counts.candidates} candidates`,
+    );
+    node.append(meta);
+
+    const list = el("ul", "verif-package-components");
+    manifest.components.forEach((component) => {
+      const item = el("li", "verif-package-component");
+      const head = el("div", "verif-package-component__head");
+      head.append(el("span", "verif-package-component__kind", component.kind));
+      head.append(el("code", "verif-package-component__file", component.path));
+      item.append(head);
+      if (component.description) {
+        item.append(el("p", "verif-package-component__desc", component.description));
+      }
+      list.append(item);
+    });
+    node.append(list);
+
+    node.append(
+      el(
+        "p",
+        "verif-meta",
+        "Inventory of the bundle's indexed components — the same measured evidence and candidates as the IR; it discharges nothing.",
+      ),
+    );
+    return node;
+  }
+
+  // The non-discharging adapter stubs (BE-044): per obligation, the external
+  // backend categories that could consume it and the obligation shape each would
+  // have to handle. Every entry is labeled discharges: false — a stub is a
+  // descriptor, never a discharge, and every obligation stays external-required.
+  // Renders only what the stubs component exports.
+  // The backend categories overview (FE-034): each external category that could
+  // consume an obligation, with its summary and what it consumes / produces,
+  // read straight from the stubs component. Every category is a non-discharging
+  // handoff descriptor — it describes a backend role, never a result.
+  private renderAdapterCategories(categories: AdapterCategory[]): HTMLElement {
+    const wrap = el("div", "verif-adapter-categories");
+    wrap.append(
+      el(
+        "p",
+        "verif-meta",
+        "Backend categories that could consume these obligations — descriptors only, none discharging.",
+      ),
+    );
+    const list = el("ul", "verif-adapter-categories__list");
+    categories.forEach((category) => {
+      const item = el("li", "verif-adapter-category");
+      const head = el("div", "verif-adapter-category__head");
+      head.append(el("span", "verif-adapter-category__name", category.category));
+      head.append(el("span", "verif-adapter-category__discharges", "discharges: false"));
+      item.append(head);
+      if (category.summary) {
+        item.append(el("p", "verif-adapter-category__summary", category.summary));
+      }
+      const io = (label: string, text: string): void => {
+        if (!text) {
+          return;
+        }
+        const row = el("p", "verif-adapter-category__io");
+        row.append(el("span", "verif-adapter-category__io-label", label));
+        row.append(el("span", "verif-adapter-category__io-text", text));
+        item.append(row);
+      };
+      io("consumes ", category.consumes);
+      io("produces ", category.produces);
+      list.append(item);
+    });
+    wrap.append(list);
+    return wrap;
+  }
+
+  private renderAdapterStubs(problem: VerificationProblem, stubs: AdapterStubs): HTMLElement {
+    const node = section("Adapter stubs", "verifAdapterStubs");
+    // The backend's own honesty note, verbatim.
+    if (stubs.note) {
+      node.append(el("p", "verif-meta", stubs.note));
+    }
+
+    // The backend categories overview: each category once, with its summary and
+    // what it consumes / produces, before the per-obligation stub list.
+    if (stubs.categories.length > 0) {
+      node.append(this.renderAdapterCategories(stubs.categories));
+    }
+
+    const obligationName = new Map(problem.obligations.map((o) => [o.id, o.name]));
+    // The category summary for each category id, surfaced as a tooltip so the
+    // categories component is inspectable without bulk.
+    const categorySummary = new Map(stubs.categories.map((c) => [c.category, c.summary]));
+
+    // Group the stubs by obligation, in the problem's obligation order, then any
+    // stub whose obligation is not in this problem (defensive).
+    const byObligation = new Map<string, AdapterStub[]>();
+    for (const stub of stubs.stubs) {
+      const list = byObligation.get(stub.obligationId) ?? [];
+      list.push(stub);
+      byObligation.set(stub.obligationId, list);
+    }
+    const order = [
+      ...problem.obligations.map((o) => o.id).filter((id) => byObligation.has(id)),
+      ...[...byObligation.keys()].filter((id) => !obligationName.has(id)),
+    ];
+
+    const list = el("div", "verif-cards");
+    order.forEach((obligationId) => {
+      const card = el("div", "verif-card");
+      const head = el("div", "verif-card__head");
+      head.append(this.adapterObligationName(obligationId, obligationName));
+      card.append(head);
+
+      const entries = el("ul", "verif-adapter-stubs");
+      (byObligation.get(obligationId) ?? []).forEach((stub) => {
+        const item = el("li", "verif-adapter-stub");
+        const top = el("div", "verif-adapter-stub__head");
+        const category = el("span", "verif-adapter-stub__category", stub.category);
+        const summary = categorySummary.get(stub.category);
+        if (summary) {
+          category.title = summary;
+        }
+        top.append(category);
+        // The standing honesty marker: a stub never discharges.
+        top.append(el("span", "verif-adapter-stub__discharges", "discharges: false"));
+        item.append(top);
+
+        // The obligation shape this category would have to handle.
+        const shapeParts = [`target ${stub.target}`];
+        if (stub.requiredShapeFeatures.length > 0) {
+          shapeParts.push(`shape: ${stub.requiredShapeFeatures.join(", ")}`);
+        }
+        item.append(el("p", "verif-adapter-stub__shape", shapeParts.join(" · ")));
+        entries.append(item);
+      });
+      card.append(entries);
+      list.append(card);
+    });
+    node.append(list);
+    return node;
+  }
+
+  // An obligation heading for an adapter-stub card: links to the obligation's
+  // full card when the obligation is part of this problem, otherwise an inert
+  // heading.
+  private adapterObligationName(
+    obligationId: string,
+    obligationName: Map<string, string>,
+  ): HTMLElement {
+    const label = obligationName.get(obligationId) ?? obligationId;
+    if (!obligationName.has(obligationId)) {
+      return el("strong", "verif-card__name", label);
+    }
+    // A distinct jump class (not verif-card__name--jump) so the measured-status
+    // jump count stays unaffected; styled identically.
+    const link = el("button", "verif-card__name verif-adapter-stub__jump", label);
+    link.type = "button";
+    link.addEventListener("click", () => this.jumpToObligation(obligationId));
+    return link;
   }
 
   // Assemble and download the package as one JSON file. Fetching the components
@@ -502,6 +736,10 @@ export class VerificationPanel {
       }
     }
 
+    // The assumptions, by id, so a robust obligation can surface the disturbance
+    // bound it is quantified over (FE-023).
+    const assumptionById = new Map(problem.assumptions.map((assumption) => [assumption.id, assumption]));
+
     const list = el("ul", "verif-ledger");
     problem.obligations.forEach((obligation) => {
       const row = el("li", "verif-ledger__row");
@@ -517,6 +755,13 @@ export class VerificationPanel {
       const outcome = outcomeByObligation.get(obligation.id) ?? "external-required";
       const badges = el("div", "verif-ledger__badges");
       badges.append(this.proofStatusBadge(outcome), rigorBadge(obligation.rigor));
+      // Tier-3: a disturbance-robust obligation is quantified over the wind box
+      // W. Mark it honestly — robust, but still external-required, never
+      // discharged.
+      const disturbance = this.disturbanceBound(obligation, assumptionById);
+      if (disturbance) {
+        badges.append(this.robustBadge());
+      }
       head.append(name, badges);
       row.append(head);
 
@@ -542,6 +787,12 @@ export class VerificationPanel {
         );
         meta.append(within);
       }
+      // The cited disturbance box the robust claim is quantified over, rendered
+      // verbatim from the assumption's bound (e.g. |w_1| <= 0.5). Read-only — it
+      // says what the robustness is against, not that it is discharged.
+      if (disturbance) {
+        meta.append(this.disturbanceBoundChip(disturbance));
+      }
       if (meta.childElementCount > 0) {
         row.append(meta);
       }
@@ -549,6 +800,54 @@ export class VerificationPanel {
     });
     node.append(list);
     return node;
+  }
+
+  // The disturbance-box assumption a robust (Tier-3) obligation is quantified
+  // over, if any. A robust obligation cites a wind/disturbance-box assumption
+  // (its id names the disturbance/wind bound); nominal obligations — including
+  // the nominal velocity bound — cite none. Read only from the IR.
+  private disturbanceBound(
+    obligation: IrObligation,
+    assumptionById: Map<string, IrAssumption>,
+  ): IrAssumption | null {
+    for (const id of obligation.assumptionIds) {
+      if (!/disturbance|wind/i.test(id)) {
+        continue;
+      }
+      const assumption = assumptionById.get(id);
+      if (assumption) {
+        return assumption;
+      }
+    }
+    return null;
+  }
+
+  // The honest robust marker: the obligation holds for every admissible
+  // disturbance in the wind box W — but it is still external-required, never
+  // discharged by the engine.
+  private robustBadge(): HTMLElement {
+    const badge = el("span", "verif-badge verif-badge--robust", "robust ∀ d ∈ W");
+    badge.title =
+      "disturbance-robust: quantified over every admissible disturbance in the wind box W — still external-required, not discharged";
+    return badge;
+  }
+
+  // The cited disturbance bound, rendered verbatim from the assumption (e.g.
+  // |w_1| <= 0.5), so a reader can see what the robustness is quantified against.
+  private disturbanceBoundChip(assumption: IrAssumption): HTMLElement {
+    const chip = el("span", "verif-ledger__disturbance");
+    chip.append(el("span", "verif-ledger__disturbance-label", "robust within "));
+    if (assumption.expression && assumption.rhs !== null) {
+      chip.append(
+        mathSpan(
+          `${assumption.expression.latex} ${comparisonLatex(assumption.comparison)} ${formatNumber(assumption.rhs)}`,
+        ),
+      );
+    } else {
+      chip.append(el("span", "verif-ledger__disturbance-id", assumption.id));
+    }
+    chip.title = "the disturbance box W the robust claim is quantified over — measured/assumed, not a proof";
+    return chip;
   }
 
   private renderDynamics(problem: VerificationProblem): HTMLElement {

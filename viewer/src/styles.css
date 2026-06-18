@@ -212,6 +212,41 @@ select {
   border-color: var(--hairline-strong);
 }
 
+/* The package status chip (FE-028), grounded in the discovery index listing. */
+.catalog-item__status {
+  padding: 1px 8px;
+  border: 1px solid var(--candidate-tint);
+  border-radius: var(--radius-pill);
+  color: var(--candidate);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* The Tier/regime badge (FE-029): a disturbance-robust package reads cool and
+   distinct; a nominal one stays muted. A descriptor-only label. */
+.catalog-item__regime {
+  align-self: start;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.catalog-item__regime--nominal {
+  color: var(--text-muted);
+}
+
+.catalog-item__regime--robust {
+  color: var(--cool);
+  border-color: var(--cool-dim);
+  background: var(--cool-dim);
+}
+
 /* ---- Verification domain (catalog · inspector) --------------------------- */
 
 #verificationDomain.domain--active {
@@ -321,6 +356,50 @@ select {
   display: none;
 }
 
+/* Tier-3 disturbance-set annotation: the wind box the robust claim is quantified
+   over, in the free bottom-left corner of the stage. Read-only, like the other
+   legends. */
+.verif-disturbance-annotation {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 2;
+  display: grid;
+  gap: 4px;
+  max-width: 240px;
+  padding: 8px 11px;
+  border: 1px solid var(--cool-dim);
+  border-left: 2px solid var(--cool);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost-strong);
+  backdrop-filter: blur(20px);
+  pointer-events: none;
+}
+
+.verif-disturbance-annotation[hidden] {
+  display: none;
+}
+
+.verif-disturbance-annotation__title {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.verif-disturbance-annotation__bound {
+  color: var(--cool);
+  font-size: var(--text-sm);
+}
+
+.verif-disturbance-annotation__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
 .verif-roles-legend__entry {
   display: flex;
   align-items: center;
@@ -352,7 +431,8 @@ select {
 .verif-violation-legend__entry {
   display: flex;
   align-items: center;
-  gap: 7px;
+  flex-wrap: wrap;
+  gap: 3px 7px;
   width: 100%;
   margin: 0;
   padding: 3px 5px;
@@ -402,13 +482,38 @@ select {
   word-break: break-word;
 }
 
-.verif-violation-legend__value {
+.verif-violation-legend__value,
+.verif-violation-legend__margin {
   flex: none;
   color: rgba(232, 86, 70, 0.95);
   font-family: "IBM Plex Mono", monospace;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.verif-violation-legend__margin {
+  font-weight: 600;
+}
+
+/* When the run entered the unsafe set, on its own line under the named
+   violation. Read-only, measured. */
+.verif-violation-legend__time {
+  flex-basis: 100%;
+  padding-left: 17px;
+  color: var(--text-muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The honest framing: a measured run reached the unsafe set — not a disproof of
+   safety. Sits under the named violations. */
+.verif-violation-legend__note {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.4;
 }
 
 /* Closest-approach (measured-holds) legend: bottom-right so it never collides
@@ -586,6 +691,50 @@ select {
   font-family: var(--font-mono, monospace);
   font-size: var(--text-sm);
   color: var(--text-primary);
+}
+
+/* The open problem's Tier/regime (FE-033): full-width under the heading row, so
+   the disturbance parameters and robust obligations a robust package cites stay
+   legible. A descriptor-only line — claims nothing beyond the listed rigor. */
+.verif-masthead__regime {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--space-2);
+}
+
+.verif-masthead__regime-label {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.verif-masthead__regime-kind {
+  padding: 0 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+.verif-masthead__regime--robust .verif-masthead__regime-kind {
+  color: var(--cool);
+  border-color: var(--cool-dim);
+  background: var(--cool-dim);
+}
+
+.verif-masthead__regime-detail {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.verif-masthead__regime-detail-ids {
+  font-family: var(--font-mono, monospace);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 /* Claim status — one formal line. */
@@ -970,6 +1119,199 @@ select {
   cursor: progress;
 }
 
+/* Read-only package inventory (FE-022): the manifest's model/status/counts and
+   the indexed components, inspectable without downloading the bundle. */
+.verif-package-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+
+.verif-package-meta__term {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.verif-package-meta__value {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.verif-package-components {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.verif-package-component {
+  padding: 8px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost);
+}
+
+.verif-package-component__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.verif-package-component__kind {
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.verif-package-component__file {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.verif-package-component__desc {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+/* Non-discharging adapter stubs (FE-025): per obligation, the external backend
+   categories that could consume it, each marked discharges: false. */
+.verif-adapter-stubs {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.verif-adapter-stub {
+  padding: 7px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost);
+}
+
+.verif-adapter-stub__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.verif-adapter-stub__category {
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.verif-adapter-stub__discharges {
+  color: var(--required);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+}
+
+.verif-adapter-stub__shape {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+/* Backend categories overview (FE-034): each category once, with its summary and
+   consumes/produces — descriptors only, none discharging. */
+.verif-adapter-categories {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.verif-adapter-categories__list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.verif-adapter-category {
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-left: 2px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost);
+}
+
+.verif-adapter-category__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.verif-adapter-category__name {
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.verif-adapter-category__discharges {
+  color: var(--required);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+}
+
+.verif-adapter-category__summary {
+  margin: 4px 0 0;
+  color: var(--text-secondary, var(--text-muted));
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.verif-adapter-category__io {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.verif-adapter-category__io-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* The adapter-stub obligation heading jumps to the obligation's card, styled
+   like the other jump links but with its own class so global jump counts that
+   target measured-status links are unaffected. */
+.verif-adapter-stub__jump {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px dotted var(--hairline-strong);
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.verif-adapter-stub__jump:hover,
+.verif-adapter-stub__jump:focus-visible {
+  outline: none;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .verif-evidence-toggle {
   justify-self: start;
   margin: 0;
@@ -1188,6 +1530,22 @@ select {
 .verif-ledger__within-ids {
   font-family: var(--font-mono, monospace);
   color: var(--text-muted);
+}
+
+/* The cited disturbance box a robust obligation is quantified over. */
+.verif-ledger__disturbance {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--cool);
+}
+
+.verif-ledger__disturbance-label {
+  color: var(--text-muted);
+}
+
+.verif-ledger__disturbance .verif-math {
+  color: var(--cool);
 }
 
 .verif-ledger__name {
@@ -1453,6 +1811,14 @@ select {
   color: var(--text-muted);
 }
 
+/* Tier-3 disturbance-robust marker: distinct from the rigor badges, sitting
+   right after them rather than pushed to the far edge. */
+.verif-badge--robust {
+  margin-left: 0;
+  color: var(--cool);
+  border-color: var(--cool-dim);
+}
+
 /* ---- Dossier scoped overrides (Verification domain only) ----------------- */
 
 /* The docket: a typeset index, not buttons-as-tiles. Model id in mono, title in
@@ -1544,6 +1910,12 @@ select {
 #verificationDomain .verif-badge--candidate {
   color: var(--candidate);
   border-color: var(--candidate-tint);
+}
+
+#verificationDomain .verif-badge--robust {
+  color: var(--cool);
+  border-color: var(--cool-dim);
+  background: var(--cool-dim);
 }
 
 #verificationDomain .verif-role--safe {
@@ -2078,6 +2450,34 @@ input[type="range"]::-moz-range-thumb {
   text-transform: uppercase;
 }
 
+/* The barrier this lane is, in an intersection-safe-set package (FE-027).
+   A candidate label only — it pushes to the trailing edge of the lane head. */
+.diagnostic__barrier {
+  margin-left: auto;
+  color: var(--measured);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+/* The intersection-safe-set semantics, stated once above the named barrier
+   lanes. */
+.diagnostic-intersection {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--hairline);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.diagnostic-intersection__math .katex {
+  color: var(--text-primary);
+}
+
 .diagnostic__caption .katex {
   color: var(--text-faint);
 }
@@ -2093,6 +2493,33 @@ input[type="range"]::-moz-range-thumb {
   display: block;
   width: 100%;
   height: 36px;
+}
+
+/* The selected obligation's worst sampled margin (BE-036), aligned to the
+   rollout lane above it. Measured evidence — consistent with the ledger. */
+.diagnostic__margin {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: 3px;
+}
+
+.diagnostic__margin[hidden] {
+  display: none;
+}
+
+.diagnostic__margin-label {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.diagnostic__margin-value {
+  color: var(--measured);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
 }
 
 .diagnostic__section {

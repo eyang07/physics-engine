@@ -287,6 +287,117 @@ for (const viewport of [
     await expect(page.locator("#systemTitle")).toHaveText("Simple Pendulum");
   });
 
+  test(`Verification catalog badges each entry's Tier/regime at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // Every catalog entry carries its regime descriptor from the discovery index.
+    const items = page.locator("#verificationCatalog .catalog-item");
+    await expect(items).toHaveCount(10);
+    await expect(page.locator("#verificationCatalog .catalog-item__regime")).toHaveCount(10);
+
+    // The three disturbance-robust (Tier-3) packages read "robust"; the rest are
+    // "nominal".
+    const robust = page.locator("#verificationCatalog .catalog-item__regime--robust");
+    await expect(robust).toHaveCount(3);
+    await expect(robust.first()).toHaveText("robust");
+    await expect(page.locator("#verificationCatalog .catalog-item__regime--nominal")).toHaveCount(7);
+
+    // The disturbed geofence entry (7th) is badged robust; the nominal geofence
+    // entry (3rd) is badged nominal.
+    await expect(
+      items.nth(6).locator(".catalog-item__regime"),
+    ).toHaveText("robust");
+    await expect(items.nth(2).locator(".catalog-item__regime")).toHaveText("nominal");
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-regime-badges.png`),
+    });
+  });
+
+  test(`Verification catalog omits regime badges without the discovery index at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // No discovery index (older export): the catalog still lists every problem,
+    // but no entry carries a regime badge.
+    await page.route("**/data/verification/packages/packages.index.json", (route) =>
+      route.fulfill({ status: 404, body: "" }),
+    );
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    await expect(page.locator("#verificationCatalog .catalog-item")).toHaveCount(10);
+    await expect(page.locator("#verificationCatalog .catalog-item__regime")).toHaveCount(0);
+  });
+
+  test(`Verification masthead restates the open problem's Tier/regime at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const catalogItems = page.locator("#verificationCatalog .catalog-item");
+    const regime = page.locator("#verificationMasthead .verif-masthead__regime");
+
+    // A nominal package: the masthead restates "nominal" with no disturbance
+    // detail.
+    await catalogItems.nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+    await expect(regime).toHaveClass(/verif-masthead__regime--nominal/);
+    await expect(regime.locator(".verif-masthead__regime-kind")).toHaveText("nominal");
+    await expect(regime.locator(".verif-masthead__regime-detail")).toHaveCount(0);
+
+    // A disturbance-robust package: the masthead names the regime, the
+    // disturbance parameters, and the robust obligation ids it cites.
+    await catalogItems.nth(6).click();
+    await expect(
+      page.getByRole("heading", { name: /drone disturbed geofence axis/i }),
+    ).toBeVisible();
+    await expect(regime).toHaveClass(/verif-masthead__regime--robust/);
+    await expect(regime.locator(".verif-masthead__regime-kind")).toHaveText("disturbance-robust");
+    await expect(regime).toContainText(/disturbance/i);
+    await expect(regime).toContainText("w1");
+    await expect(regime).toContainText(/robust obligations/i);
+    await expect(regime).toContainText(/geofence-barrier-robust-forward-invariance/);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-masthead-regime.png`),
+    });
+  });
+
+  test(`Verification masthead omits the regime without the discovery index at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // No discovery index: the masthead carries no regime line.
+    await page.route("**/data/verification/packages/packages.index.json", (route) =>
+      route.fulfill({ status: 404, body: "" }),
+    );
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    await expect(page.locator("#verificationMasthead .verif-masthead__regime")).toHaveCount(0);
+  });
+
   test(`Verification stage renders trajectory and certificate lanes at ${viewport.name}`, async ({
     page,
   }, testInfo) => {
@@ -413,6 +524,119 @@ for (const viewport of [
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-violation.png`) });
   });
 
+  test(`Verification renders the measured violation reference scenario at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const catalogItems = page.locator("#verificationCatalog .catalog-item");
+    const legend = page.locator(".verif-violation-legend");
+
+    // A holding keep-out package (5th entry) draws no violation markers and hides
+    // the violation legend.
+    await catalogItems.nth(4).click();
+    await expect(page.getByRole("heading", { name: /^drone obstacle keepout$/i })).toBeVisible();
+    await page.waitForTimeout(300);
+    await expect(page.locator("#verificationCanvas")).toHaveAttribute("data-violation-markers", "0");
+    await expect(legend).toBeHidden();
+
+    // The boundary-corner violation scenario (6th entry) exports a measured-
+    // violated run: the stage draws the violation marker, names the obligation
+    // the run left, and headlines its negative margin — labeled measured
+    // evidence, never a disproof.
+    await catalogItems.nth(5).click();
+    await expect(
+      page.getByRole("heading", { name: /drone obstacle keepout violation/i }),
+    ).toBeVisible();
+    await page.waitForTimeout(400);
+    await expect(page.locator("#verificationCanvas")).toHaveAttribute("data-violation-markers", "1");
+    await expect(legend).toBeVisible();
+    await expect(legend.locator(".verif-violation-legend__name")).toContainText(
+      /obstacle-keepout.*avoidance/,
+    );
+    await expect(legend.locator(".verif-violation-legend__margin")).toHaveText("-0.25");
+    await expect(legend.locator(".verif-violation-legend__note")).toContainText(
+      /entered the unsafe set/i,
+    );
+    await expect(legend.locator(".verif-violation-legend__note")).toContainText(
+      /not a disproof/i,
+    );
+    await expectCanvasNonBlank(page, "#verificationCanvas");
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-violation-scenario.png`),
+    });
+  });
+
+  test(`Verification stage marks when the violation occurs on the rollout at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // The violation scenario's run carries a worst.time (1.54): the legend names
+    // the moment the simulated run crossed into the unsafe set.
+    await page.locator("#verificationCatalog .catalog-item").nth(5).click();
+    await expect(
+      page.getByRole("heading", { name: /drone obstacle keepout violation/i }),
+    ).toBeVisible();
+    await page.waitForTimeout(400);
+    const time = page.locator(".verif-violation-legend .verif-violation-legend__time");
+    await expect(time).toHaveCount(1);
+    await expect(time).toContainText(/entered at t = 1\.54/);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-violation-time.png`),
+    });
+  });
+
+  test(`Verification stage omits the violation time when none is exported at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Inject a measured-violated sample that maps onto the pendulum's (theta,
+    // omega) axes but carries no worst.time — the marker draws, but no time
+    // annotation appears.
+    await page.route("**/data/verification/upright-pendulum-safety.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.proofStatuses.push({
+        id: "injected-violation-no-time",
+        obligationId: "energy-barrier-excludes-near-bottom",
+        status: "measured-violated",
+        worst: { value: 1.5, point: [2.5, 0.3] },
+        evaluation: {
+          kind: "region-grid",
+          sampleCount: 10,
+          source: "injected",
+          variables: ["theta", "omega"],
+          stateAxes: ["theta", "omega"],
+          variableToStateAxis: { theta: "theta", omega: "omega" },
+        },
+      });
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // The violation marker is drawn, but with no exported time there is no time
+    // annotation.
+    await expect(page.locator("#verificationCanvas")).toHaveAttribute("data-violation-markers", "1");
+    await expect(page.locator(".verif-violation-legend")).toBeVisible();
+    await expect(page.locator(".verif-violation-legend__time")).toHaveCount(0);
+  });
+
   test(`Verification catalog shows counts and active selection at ${viewport.name}`, async ({
     page,
   }, testInfo) => {
@@ -446,6 +670,74 @@ for (const viewport of [
     await expect(items.nth(1)).toHaveClass(/catalog-item--active/);
     await expect(items.nth(0)).not.toHaveClass(/catalog-item--active/);
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-catalog.png`) });
+  });
+
+  test(`Verification catalog is grounded in the package discovery index at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const items = page.locator("#verificationCatalog .catalog-item");
+    await expect(items).toHaveCount(10);
+
+    // Grounded in the discovery index, each entry now lists the full
+    // region/obligation/candidate counts and the package status.
+    const first = items.nth(0);
+    await expect(first.locator('.catalog-item__count[data-count="regions"]')).toHaveText(
+      /\d+ regions/,
+    );
+    await expect(first.locator('.catalog-item__count[data-count="obligations"]')).toHaveText(
+      /\d+ obligations/,
+    );
+    await expect(first.locator('.catalog-item__count[data-count="candidates"]')).toHaveText(
+      /\d+ candidates/,
+    );
+    await expect(first.locator(".catalog-item__status")).toHaveText("candidate");
+    // Every entry carries the status chip and a region count.
+    await expect(page.locator("#verificationCatalog .catalog-item__status")).toHaveCount(10);
+    await expect(
+      page.locator('#verificationCatalog .catalog-item__count[data-count="regions"]'),
+    ).toHaveCount(10);
+
+    // Selecting an entry still opens its problem.
+    await items.nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-catalog-grounded.png`),
+    });
+  });
+
+  test(`Verification catalog degrades without the discovery index at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // No discovery index (older export): the catalog still lists every problem,
+    // grounded in the per-example viewer index, and selection still works.
+    await page.route("**/data/verification/packages/packages.index.json", (route) =>
+      route.fulfill({ status: 404, body: "" }),
+    );
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const items = page.locator("#verificationCatalog .catalog-item");
+    await expect(items).toHaveCount(10);
+    // Counts still render from the viewer summary; no regime badge survives.
+    await expect(
+      items.nth(0).locator('.catalog-item__count[data-count="obligations"]'),
+    ).toHaveText(/\d+ obligations/);
+    await expect(page.locator("#verificationCatalog .catalog-item__regime")).toHaveCount(0);
+    await items.nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
   });
 
   test(`Verification stage legends measured violations at ${viewport.name}`, async ({
@@ -971,6 +1263,87 @@ for (const viewport of [
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-drone.png`) });
   });
 
+  test(`Verification obligation ledger marks disturbance-robust obligations at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const catalogItems = page.locator("#verificationCatalog .catalog-item");
+
+    // Nominal Tier-1 geofence package (3rd entry): no robust badge anywhere.
+    await catalogItems.nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+    await expect(page.locator("#verifLedger .verif-badge--robust")).toHaveCount(0);
+
+    // Tier-3 disturbance-robust geofence package: its robust obligations carry the
+    // honest "robust ∀ d ∈ W" badge and surface the cited wind box, while still
+    // reading external-required (never discharged).
+    await catalogItems.nth(6).click();
+    await expect(
+      page.getByRole("heading", { name: /drone disturbed geofence axis/i }),
+    ).toBeVisible();
+    const robustBadges = page.locator("#verifLedger .verif-badge--robust");
+    expect(await robustBadges.count()).toBeGreaterThan(0);
+    await expect(robustBadges.first()).toContainText("robust");
+    // The cited disturbance box appears alongside the robust obligation rows.
+    await expect(page.locator("#verifLedger .verif-ledger__disturbance").first()).toBeVisible();
+    // The robustness changes nothing about the obligation's rigor: still external.
+    await expect(
+      page.locator("#verifLedger .verif-badge--external-required").first(),
+    ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-robust-ledger.png`),
+    });
+  });
+
+  test(`Verification stage annotates the disturbance set on Tier-3 packages at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const catalogItems = page.locator("#verificationCatalog .catalog-item");
+    const annotation = page.locator(".verif-disturbance-annotation");
+
+    // Nominal Tier-1 geofence package (3rd entry): no disturbance annotation.
+    await catalogItems.nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+    await page.waitForTimeout(300);
+    await expect(annotation).toBeHidden();
+
+    // Tier-3 disturbance-robust geofence package: the wind box `W` it is
+    // quantified over is annotated on the stage, honestly labeled assumed (not
+    // discharged), while the rollout keeps painting.
+    await catalogItems.nth(6).click();
+    await expect(
+      page.getByRole("heading", { name: /drone disturbed geofence axis/i }),
+    ).toBeVisible();
+    await page.waitForTimeout(600);
+    await expect(annotation).toBeVisible();
+    await expect(annotation).toContainText(/disturbance set/i);
+    await expect(annotation).toContainText(/not discharged/i);
+    await expect(annotation.locator(".katex").first()).toBeVisible();
+    await expectCanvasNonBlank(page, "#verificationCanvas");
+
+    // Switching back to a nominal package hides the annotation again.
+    await catalogItems.nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+    await page.waitForTimeout(300);
+    await expect(annotation).toBeHidden();
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-disturbance-set.png`),
+    });
+  });
+
   test(`Verification obligation ledger reads unsampled obligations as not sampled at ${viewport.name}`, async ({
     page,
   }) => {
@@ -1064,6 +1437,54 @@ for (const viewport of [
       0,
     );
     await expect(page.locator("#verificationCertificateLanes .diagnostic--dimmed")).toHaveCount(0);
+  });
+
+  test(`Verification certificate lane shows the selected obligation's worst margin at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // The drone (3rd entry) has a geofence barrier lane bearing on the
+    // initial-containment obligation, whose ledger margin is non-trivial.
+    await page.locator("#verificationCatalog .catalog-item").nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+
+    // The ledger headlines that obligation's signed worst margin (BE-036).
+    const ledgerMargin = page
+      .locator('#verifLedger .verif-ledger__row[data-obligation="geofence-barrier-initial-containment"] .verif-ledger__margin');
+    const ledgerText = (await ledgerMargin.textContent())?.replace(/^margin\s+/, "").trim() ?? "";
+    expect(ledgerText).toMatch(/[+-]\d/);
+
+    // No margin readout on the lanes until that obligation's evidence is selected.
+    await expect(page.locator("#verificationCertificateLanes .diagnostic__margin:visible")).toHaveCount(
+      0,
+    );
+
+    // Selecting the obligation's evidence reveals its worst margin on the lane
+    // that bears on it, aligned to the rollout — and it matches the ledger value.
+    await openVerificationDetails(page);
+    const toggle = page.locator(
+      "#verif-obligation-geofence-barrier-initial-containment .verif-evidence-toggle",
+    );
+    await toggle.click();
+    const readout = page.locator(
+      "#verificationCertificateLanes .diagnostic--emphasized .diagnostic__margin",
+    );
+    await expect(readout).toBeVisible();
+    await expect(readout.locator(".diagnostic__margin-value")).toHaveText(ledgerText);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-margin-readout.png`),
+    });
+
+    // Re-selecting clears the readout along with the emphasis.
+    await toggle.click();
+    await expect(page.locator("#verificationCertificateLanes .diagnostic__margin:visible")).toHaveCount(
+      0,
+    );
   });
 
   test(`Verification evidence selection clears when the problem changes at ${viewport.name}`, async ({
@@ -1197,6 +1618,16 @@ for (const viewport of [
     await expect(page.locator(".verif-package__inspect")).toContainText("viewer-trajectory");
     await expect(page.locator(".verif-package__note")).toContainText(/discharges nothing/i);
 
+    // The read-only inventory (FE-022) lists the manifest's model/status/counts
+    // and each indexed component, inspectable without downloading the bundle.
+    const inventory = page.locator("#verifPackage");
+    await expect(inventory).toBeVisible();
+    await expect(inventory.locator(".verif-package-meta")).toContainText("candidate");
+    const components = inventory.locator(".verif-package-component");
+    expect(await components.count()).toBeGreaterThan(0);
+    await expect(inventory.locator(".verif-package-component__kind").first()).toBeVisible();
+    await expect(inventory.locator(".verif-package-component__file").first()).toBeVisible();
+
     // Downloading assembles one file whose embedded manifest re-reads to the same
     // components the backend wrote, each component's payload embedded by kind.
     const [downloaded] = await Promise.all([
@@ -1246,6 +1677,83 @@ for (const viewport of [
 
     await expect(page.locator(".verif-download-package")).toHaveCount(0);
     await expect(page.locator(".verif-download-ir")).toBeVisible();
+
+    // With no published package the inventory section is absent entirely.
+    await expect(page.locator("#verifPackage")).toHaveCount(0);
+  });
+
+  test(`Verification IR details list non-discharging adapter stubs at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // The default problem publishes adapter stubs; they live in the appendix.
+    await openVerificationDetails(page);
+    const stubsSection = page.locator("#verifAdapterStubs");
+    await expect(stubsSection).toBeVisible();
+    // Each stub names an external backend category and is marked non-discharging.
+    await expect(stubsSection.locator(".verif-adapter-stub__category").first()).toBeVisible();
+    const discharges = stubsSection.locator(".verif-adapter-stub__discharges");
+    expect(await discharges.count()).toBeGreaterThan(0);
+    await expect(discharges.first()).toHaveText("discharges: false");
+    // The obligation shape each category would have to handle is surfaced.
+    await expect(stubsSection.locator(".verif-adapter-stub__shape").first()).toContainText(
+      /target/,
+    );
+    // The honesty note (no stub attempts/records/claims discharge) rides along.
+    await expect(stubsSection).toContainText(/discharge/i);
+
+    // The backend categories overview (FE-034) lists each category once with its
+    // summary and consumes/produces, every category non-discharging.
+    const categories = stubsSection.locator(".verif-adapter-category");
+    expect(await categories.count()).toBeGreaterThan(0);
+    await expect(
+      stubsSection.locator(".verif-adapter-category__name", { hasText: "reachability" }),
+    ).toBeVisible();
+    await expect(
+      stubsSection.locator(".verif-adapter-category__io-label", { hasText: /consumes/i }).first(),
+    ).toBeVisible();
+    await expect(
+      stubsSection.locator(".verif-adapter-category__io-label", { hasText: /produces/i }).first(),
+    ).toBeVisible();
+    await expect(categories.first().locator(".verif-adapter-category__discharges")).toHaveText(
+      "discharges: false",
+    );
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-adapter-stubs.png`),
+    });
+  });
+
+  test(`Verification IR details omit adapter stubs when none are published at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Strip the adapter-stubs component from the manifest (older export with no
+    // published stubs); the manifest still indexes its other components.
+    await page.route("**/data/verification/packages/**/package.json", async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.components = (json.components ?? []).filter(
+        (component: { kind?: string }) => component.kind !== "adapter-stubs",
+      );
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+    await openVerificationDetails(page);
+
+    // The manifest is still published (inventory shows), but with no stubs
+    // component the adapter-stub section is absent entirely.
+    await expect(page.locator("#verifPackage")).toBeVisible();
+    await expect(page.locator("#verifAdapterStubs")).toHaveCount(0);
   });
 
   test(`Verification certificate lane emphasizes the obligations it bears on at ${viewport.name}`, async ({
@@ -1333,6 +1841,45 @@ for (const viewport of [
     await expect(
       page.locator("#verificationCertificateLanes .diagnostic--selectable"),
     ).toHaveCount(2);
+  });
+
+  test(`Verification certificate lanes name barriers for an intersection safe set at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const catalogItems = page.locator("#verificationCatalog .catalog-item");
+
+    // A single-barrier keep-out package (5th entry): lanes are unchanged — no
+    // barrier name labels and no intersection note.
+    await catalogItems.nth(4).click();
+    await expect(page.getByRole("heading", { name: /drone obstacle keepout/i })).toBeVisible();
+    await expect(page.locator("#verificationCertificateLanes .diagnostic__barrier")).toHaveCount(0);
+    await expect(page.locator("#verificationCertificateLanes .diagnostic-intersection")).toHaveCount(
+      0,
+    );
+
+    // The geofence∩obstacle package (8th entry) carries two candidate barriers
+    // whose intersection is the safe set: each lane is named, and the
+    // intersection semantics are stated once — both stay candidates.
+    await catalogItems.nth(7).click();
+    await expect(page.getByRole("heading", { name: /drone geofence obstacle/i })).toBeVisible();
+    const barriers = page.locator("#verificationCertificateLanes .diagnostic__barrier");
+    await expect(barriers).toHaveCount(2);
+    await expect(barriers.filter({ hasText: /geofence/i })).toHaveCount(1);
+    await expect(barriers.filter({ hasText: /keepout|keep out/i })).toHaveCount(1);
+    const note = page.locator("#verificationCertificateLanes .diagnostic-intersection");
+    await expect(note).toBeVisible();
+    await expect(note).toContainText(/intersection/i);
+    await expect(note).toContainText(/candidate/i);
+    await expect(note.locator(".katex")).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-intersection-barriers.png`),
+    });
   });
 
   test(`Verification surfaces show honest empty states at ${viewport.name}`, async ({

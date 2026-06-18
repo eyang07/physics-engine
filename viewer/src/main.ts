@@ -24,9 +24,13 @@ import { drawPoincareSectionScene } from "./poincareSectionCanvas";
 import { VerificationPanel } from "./verificationPanel";
 import { VerificationStage } from "./verificationStage";
 import {
+  loadVerificationAdapterStubs,
   loadVerificationIndex,
+  loadVerificationPackageIndex,
   loadVerificationPackageManifest,
   loadVerificationProblem,
+  type PackageIndexEntry,
+  type PackageRegime,
   type VerificationProblem,
   type VerificationProblemSummary,
 } from "./data/verification";
@@ -151,6 +155,10 @@ let pendulumBounds: Bounds | null = null;
 // Monotonic guard so a slow trajectory load can't overwrite a newer selection.
 let loadToken = 0;
 let verificationProblems: VerificationProblemSummary[] = [];
+// The package discovery index per problem id (BE-047): the published listing the
+// catalog is grounded in (model, status, counts, regime). Empty when the index
+// is absent, in which case the catalog degrades to the per-example viewer index.
+let verificationPackageIndex = new Map<string, PackageIndexEntry>();
 let selectedProblemId: string | null = null;
 
 function syncPlayButton() {
@@ -251,23 +259,38 @@ function renderVerificationCatalog() {
     button.dataset.problemId = problem.id;
     button.classList.toggle("catalog-item--active", problem.id === selectedProblemId);
 
+    // Ground each entry's model/status/counts in the published discovery index
+    // when available, degrading to the per-example viewer summary otherwise.
+    const entry = verificationPackageIndex.get(problem.id);
+    const model = entry?.model ?? problem.model;
+    const status = entry?.status ?? problem.status;
+    const itemCounts = entry?.counts ?? problem.counts;
+
     const category = document.createElement("span");
     category.className = "catalog-item__category";
-    category.textContent = problem.model ?? problem.status;
+    category.textContent = model ?? status;
 
     const title = document.createElement("strong");
     title.textContent = problem.name;
 
-    // Obligation/candidate counts from the index summary let the workbench be
-    // scanned without opening each problem.
+    // The full region/obligation/candidate counts let the workbench be scanned
+    // without opening each problem; a status chip names the listed rigor.
     const counts = document.createElement("span");
     counts.className = "catalog-item__counts";
     counts.append(
-      countBadge("obligations", problem.counts.obligations),
-      countBadge("candidates", problem.counts.candidates),
+      countBadge("regions", itemCounts.regions),
+      countBadge("obligations", itemCounts.obligations),
+      countBadge("candidates", itemCounts.candidates),
+      statusChip(status),
     );
 
     button.append(category, title, counts);
+    // The Tier/regime badge (BE-054) lets a reader tell a nominal package from a
+    // disturbance-robust one without opening it. Only shown when the discovery
+    // index carries the descriptor; it claims nothing beyond the listed rigor.
+    if (entry?.regime) {
+      button.append(regimeBadge(entry.regime));
+    }
     button.addEventListener("click", () => {
       void selectVerificationProblem(problem.id);
     });
@@ -275,11 +298,38 @@ function renderVerificationCatalog() {
   });
 }
 
+// The package status as a small chip (e.g. "candidate"), read from the listing —
+// it names the rigor of the listed package, nothing more.
+function statusChip(status: string): HTMLSpanElement {
+  const chip = document.createElement("span");
+  chip.className = "catalog-item__status";
+  chip.dataset.status = status;
+  chip.textContent = status;
+  return chip;
+}
+
 function countBadge(label: string, value: number): HTMLSpanElement {
   const badge = document.createElement("span");
   badge.className = "catalog-item__count";
   badge.dataset.count = label;
   badge.textContent = `${value} ${label}`;
+  return badge;
+}
+
+// The catalog Tier/regime badge: "robust" for a disturbance-robust (Tier-3)
+// package, "nominal" otherwise — read straight from the index descriptor, never
+// claiming more than the listed package's rigor.
+function regimeBadge(regime: PackageRegime): HTMLSpanElement {
+  const robust = regime.kind === "disturbance-robust";
+  const badge = document.createElement("span");
+  badge.className = `catalog-item__regime catalog-item__regime--${
+    robust ? "robust" : "nominal"
+  }`;
+  badge.dataset.regime = regime.kind;
+  badge.textContent = robust ? "robust" : "nominal";
+  badge.title = robust
+    ? "disturbance-robust (Tier-3): obligations quantified over a wind box — still external-required, not discharged"
+    : "nominal (Tier-1/2): no disturbance channel";
   return badge;
 }
 
@@ -305,14 +355,19 @@ async function selectVerificationProblem(problemId: string) {
         ? loadVerificationPackageManifest(summary.packagePath)
         : Promise.resolve(null),
     ]);
+    // The non-discharging adapter stubs are an optional package component; load
+    // them only when a manifest indexes them, resolving to null otherwise.
+    const pkg =
+      manifest && summary.packagePath
+        ? { manifest, path: summary.packagePath }
+        : null;
+    const stubs = pkg ? await loadVerificationAdapterStubs(pkg.path, pkg.manifest) : null;
+    // The open problem's Tier/regime from the discovery index, when listed.
+    const regime = verificationPackageIndex.get(summary.id)?.regime ?? null;
     // A stale click (the user moved on) should not overwrite the newer problem.
     if (selectedProblemId === summary.id) {
       verificationStage.show(problem);
-      const pkg =
-        manifest && summary.packagePath
-          ? { manifest, path: summary.packagePath }
-          : null;
-      verificationPanel.render(problem, summary.irPath, pkg);
+      verificationPanel.render(problem, summary.irPath, pkg, stubs, regime);
       setFigureCaption(problem);
     }
   } catch (error) {
@@ -586,8 +641,15 @@ async function initialize() {
 }
 
 async function initializeVerification() {
-  const index = await loadVerificationIndex();
+  // The discovery index grounds the catalog (model, status, counts, regime),
+  // joined by problem id; a missing index degrades to the per-example viewer
+  // index.
+  const [index, packageIndex] = await Promise.all([
+    loadVerificationIndex(),
+    loadVerificationPackageIndex(),
+  ]);
   verificationProblems = index.problems;
+  verificationPackageIndex = packageIndex;
   renderVerificationCatalog();
   if (verificationProblems.length === 0) {
     verificationStage.clear();

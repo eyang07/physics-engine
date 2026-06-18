@@ -7,12 +7,42 @@
  * world from the Systems gallery: it renders only verification data and never
  * re-derives physics.
  */
+import katex from "katex";
+
 import { PlaybackClock, sampleTrajectory, trajectoryDuration } from "./playback";
-import { CertificateLanes } from "./certificateLanes";
+import { CertificateLanes, type ObligationWorst } from "./certificateLanes";
 import { dossier, dossierRole } from "./design/dossier";
 import type { ProofStatus, RegionGeometry, VerificationProblem } from "./data/verification";
 import type { Trajectory } from "./data/trajectory";
 import { clamp, formatMeasured, formatSignedMeasured } from "./util";
+
+const COMPARISON_LATEX: Record<string, string> = {
+  "<=": "\\le",
+  ">=": "\\ge",
+  "<": "<",
+  ">": ">",
+  "==": "=",
+  "=": "=",
+};
+
+// The disturbance (wind) box a Tier-3 robust package is quantified over, read
+// verbatim from the assumption that bounds the disturbance channel (its id names
+// the disturbance/wind bound). Nominal packages carry no such assumption and get
+// no annotation. The returned LaTeX is the bound itself (e.g. |w_1| \le 0.5), so
+// the stage states what the robustness is *against* — assumed, never discharged.
+function disturbanceBoundLatex(problem: VerificationProblem): string | null {
+  for (const assumption of problem.assumptions) {
+    if (!/disturbance|wind/i.test(assumption.id)) {
+      continue;
+    }
+    if (!assumption.expression || assumption.rhs === null) {
+      continue;
+    }
+    const cmp = COMPARISON_LATEX[assumption.comparison] ?? assumption.comparison;
+    return `${assumption.expression.latex} ${cmp} ${formatMeasured(assumption.rhs)}`;
+  }
+  return null;
+}
 
 // The light dossier figure ground: cool paper with a faint hairline grid, drawn
 // in place of the dark chrome stage background so the figure reads as a typeset
@@ -47,7 +77,18 @@ type Bounds = {
   maxY: number;
 };
 
-type ViolationMarker = { x: number; y: number; label: string; worstValue: number | null };
+type ViolationMarker = {
+  x: number;
+  y: number;
+  label: string;
+  worstValue: number | null;
+  // The signed worst margin (BE-036), negative for a violation: the depth the
+  // measured run entered the unsafe set. Measured evidence, never a disproof.
+  margin: number | null;
+  // The rollout time the run reached this point (BE-056), when exported: the
+  // moment the simulated run crossed into the unsafe set. Null otherwise.
+  time: number | null;
+};
 // A measured-holds closest-approach annotation: the worst (tightest) sampled
 // point and its signed margin to the obligation boundary. Measured slack, never
 // a discharge.
@@ -108,9 +149,34 @@ function violationMarkers(
       continue;
     }
     const label = obligationName.get(status.obligationId) ?? status.obligationId;
-    markers.push({ x: placed.x, y: placed.y, label, worstValue: status.worstValue });
+    markers.push({
+      x: placed.x,
+      y: placed.y,
+      label,
+      worstValue: status.worstValue,
+      margin: status.worstMargin,
+      time: status.worstTime,
+    });
   }
   return markers;
+}
+
+// The tightest sampled record per obligation (BE-036): the most negative signed
+// margin across its sampled statuses and the worst sampled candidate value,
+// matching the ledger's headline margin. Lets a selected obligation surface its
+// worst margin on the certificate lanes that bear on it. Measured evidence only.
+function worstByObligation(statuses: ProofStatus[]): Map<string, ObligationWorst> {
+  const worst = new Map<string, ObligationWorst>();
+  for (const status of statuses) {
+    if (status.worstMargin === null) {
+      continue;
+    }
+    const prev = worst.get(status.obligationId);
+    if (prev === undefined || status.worstMargin < prev.margin) {
+      worst.set(status.obligationId, { margin: status.worstMargin, value: status.worstValue });
+    }
+  }
+  return worst;
 }
 
 // The closest-approach point per holding obligation: its worst (tightest) sample
@@ -412,6 +478,7 @@ export class VerificationStage {
   private readonly legend: HTMLElement;
   private readonly holdsLegend: HTMLElement;
   private readonly rolesLegend: HTMLElement;
+  private readonly disturbanceLegend: HTMLElement;
   private trajectory: Trajectory | null = null;
   private bounds: Bounds | null = null;
   private regions: RegionGeometry[] = [];
@@ -451,6 +518,12 @@ export class VerificationStage {
     this.rolesLegend.className = "verif-roles-legend";
     this.rolesLegend.hidden = true;
     canvas.parentElement?.append(this.rolesLegend);
+    // The Tier-3 disturbance-set annotation: the wind box the robust claim is
+    // quantified over, shown only for packages that carry a disturbance spec.
+    this.disturbanceLegend = document.createElement("div");
+    this.disturbanceLegend.className = "verif-disturbance-annotation";
+    this.disturbanceLegend.hidden = true;
+    canvas.parentElement?.append(this.disturbanceLegend);
     this.playButton.addEventListener("click", () => this.togglePlay());
   }
 
@@ -464,6 +537,7 @@ export class VerificationStage {
       this.bounds = null;
       this.regions = [];
       this.renderRolesLegend([]);
+      this.renderDisturbanceAnnotation(null);
       this.setViolations([]);
       this.setHolds([]);
       this.syncPlayButton();
@@ -479,6 +553,7 @@ export class VerificationStage {
     this.regions = problem.regionGeometry;
     this.bounds = boundsForFocus(this.trajectory, problem.regionGeometry);
     this.renderRolesLegend(problem.regionGeometry);
+    this.renderDisturbanceAnnotation(disturbanceBoundLatex(problem));
     const obligationName = new Map(
       problem.obligations.map((obligation) => [obligation.id, obligation.name]),
     );
@@ -488,7 +563,11 @@ export class VerificationStage {
       violationMarkers(problem.proofStatuses, axisX, axisY, obligationName),
     );
     this.setHolds(holdsMarkers(problem.proofStatuses, axisX, axisY, obligationName));
-    this.certificateLanes.show(vt.series, vt.certificateSeries);
+    this.certificateLanes.show(
+      vt.series,
+      vt.certificateSeries,
+      worstByObligation(problem.proofStatuses),
+    );
     this.syncPlayButton();
     this.resize();
   }
@@ -554,20 +633,46 @@ export class VerificationStage {
       name.className = "verif-violation-legend__name";
       name.textContent = marker.label;
       entry.append(tag, name);
-      // Show how far the sample broke the obligation, when the backend exported
-      // a worst value. A missing value simply omits the chip — no broken chrome.
-      if (marker.worstValue !== null) {
+      // The signed negative margin (BE-036): how far the run crossed the
+      // obligation boundary into the unsafe set. This is the headline of the
+      // violation — measured evidence, never a disproof of safety.
+      if (marker.margin !== null) {
+        const margin = document.createElement("span");
+        margin.className = "verif-violation-legend__margin";
+        margin.textContent = formatSignedMeasured(marker.margin);
+        margin.title = "signed worst margin (negative = entered the unsafe set) — measured, not a proof";
+        entry.append(margin);
+      } else if (marker.worstValue !== null) {
+        // Fall back to the worst value when no signed margin was exported.
         const value = document.createElement("span");
         value.className = "verif-violation-legend__value";
         value.textContent = formatMeasured(marker.worstValue);
         value.title = "worst measured value";
         entry.append(value);
       }
+      // When in the rollout the run crossed into the unsafe set (BE-056). A
+      // read-only time annotation from the exported worst.time; omitted for a
+      // worst record that carries no time (e.g. a region-grid sample).
+      if (marker.time !== null && Number.isFinite(marker.time)) {
+        const time = document.createElement("span");
+        time.className = "verif-violation-legend__time";
+        time.textContent = `entered at t = ${formatMeasured(marker.time)}`;
+        time.title = "the rollout time the simulated run crossed into the unsafe set — measured, not a proof";
+        entry.append(time);
+      }
       entry.addEventListener("click", () => {
         this.setFocusedViolation(this.focusedViolation === index ? null : index);
       });
       this.legend.append(entry);
     });
+    // The honest framing: a measured run reached the unsafe set on these
+    // samples. That is evidence the controller can be driven out — never a
+    // disproof of safety, and it leaves every obligation external-required.
+    const note = document.createElement("p");
+    note.className = "verif-violation-legend__note";
+    note.textContent =
+      "This simulated run entered the unsafe set — measured evidence, not a disproof of safety.";
+    this.legend.append(note);
     this.legend.hidden = false;
   }
 
@@ -635,6 +740,31 @@ export class VerificationStage {
     this.rolesLegend.hidden = false;
   }
 
+  // The Tier-3 disturbance-set annotation: the wind box `W` the robust claim is
+  // quantified over, rendered verbatim from the disturbance assumption. Hidden
+  // for nominal packages (no disturbance spec). Read-only and honest — it states
+  // what the robustness is against, never that anything is discharged.
+  private renderDisturbanceAnnotation(boundLatex: string | null): void {
+    this.disturbanceLegend.replaceChildren();
+    if (!boundLatex) {
+      this.disturbanceLegend.hidden = true;
+      return;
+    }
+    const title = document.createElement("p");
+    title.className = "verif-disturbance-annotation__title";
+    title.textContent = "disturbance set W";
+    this.disturbanceLegend.append(title);
+    const bound = document.createElement("div");
+    bound.className = "verif-disturbance-annotation__bound";
+    katex.render(boundLatex, bound, { throwOnError: false });
+    this.disturbanceLegend.append(bound);
+    const note = document.createElement("p");
+    note.className = "verif-disturbance-annotation__note";
+    note.textContent = "the wind box the robust claim is quantified over — assumed, not discharged";
+    this.disturbanceLegend.append(note);
+    this.disturbanceLegend.hidden = false;
+  }
+
   /** Emphasize the certificate lanes bearing on an obligation (null clears). */
   emphasizeCertificates(obligationId: string | null): void {
     this.certificateLanes.setEmphasis(obligationId);
@@ -654,6 +784,7 @@ export class VerificationStage {
     this.bounds = null;
     this.regions = [];
     this.renderRolesLegend([]);
+    this.renderDisturbanceAnnotation(null);
     this.setViolations([]);
     this.setHolds([]);
     this.syncPlayButton();
