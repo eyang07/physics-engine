@@ -234,19 +234,7 @@ enclosure under stated assumptions), strictly distinct from `measured` (level 1)
 from any external `proved` / `certified` result. The engine proposes; external
 backends dispose._
 
-1. **BE-075: Cross-package certified-status validator**
-    - Goal: Validate, across the whole drone family, which obligations close at level 2
-      and that every certified status is internally consistent (its enclosure satisfies
-      the recorded verdict over the recorded box and its assumptions are recorded),
-      failing loudly on a fabricated or inconsistent certified status.
-    - Scope: `engine/verification/` or `engine/export/verification_package.py`, and
-      `tests/`.
-    - Acceptance: a validator re-checks that every published certified-numeric status'
-      enclosure actually satisfies its obligation over the recorded box and rejects a
-      tampered one; it reports the family-wide certified coverage; nothing claims
-      proof; focused tests pass.
-
-2. **BE-076: Real `reachability` export adapter (non-discharging handoff)**
+1. **BE-076: Real `reachability` export adapter (non-discharging handoff)**
     - Goal: Replace the reachability adapter *stub* with a concrete artifact — write
       each one-step obligation as an enclosure / reachability problem an external
       validated-numerics tool could consume, closing the IR's "optional backend
@@ -258,3 +246,13 @@ backends dispose._
       file per obligation (dynamics, box, obligation), labeled non-discharging; no
       external result is fabricated; obligations stay external-required until a backend
       actually returns one; generated data stays uncommitted; focused tests pass.
+
+2. **BE-077: Validate reachability adapter artifacts in package reads**
+    - Goal: Once BE-076 writes non-discharging reachability handoff files, make package
+      reads validate that every reachability artifact references a real obligation,
+      matches the problem dynamics/box contract, and is labeled non-discharging.
+    - Scope: `engine/export/verification_package.py`, `engine/verification/`
+      reachability artifact readers, and `tests/`.
+    - Acceptance: package reads reject a tampered reachability artifact or one that
+      claims discharge; valid generated packages round-trip; obligations remain
+      `external-required`; focused tests pass.

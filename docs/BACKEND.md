@@ -100,6 +100,13 @@ artifacts.
     worst measured margins separately from worst certified enclosure margins.
     These are catalog fields only; certified-numeric remains a sound enclosure
     under stated assumptions, not proof or safety certification.
+  - Cross-package certified-status coverage validation audits published
+    `certified-numeric` statuses against their referenced obligations, recorded
+    verdict/enclosure margins, soundness assumptions, and (where directly
+    re-derivable) the trusted fail-closed evaluator enclosure. Refined
+    partitioned, constrained-domain, and set-valued disturbance statuses must
+    record the assumptions that justify their tighter enclosure. The report
+    catalogs which obligations close at level 2; it does not discharge them.
   - Viewer-renderable verification examples now include
     `upright-pendulum-safety` and `controlled-spring-regulator-safety`, each
     with its own controlled trajectory, region geometry, candidate-certificate

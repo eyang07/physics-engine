@@ -27,6 +27,7 @@ from engine.export import (
     read_package_index,
     read_package_summaries,
     render_package_summary_markdown,
+    validate_certified_status_coverage,
     validate_drone_flagship_package_consistency,
     write_package,
 )
@@ -830,6 +831,97 @@ def test_drone_flagship_packages_share_one_consistent_model(tmp_path) -> None:
     assert "drone-disturbed-obstacle-keepout" in report.problem_ids
     assert "planar obstacle keep-out geometry" in report.signature_groups
     assert "shared guard-band scalar" in report.signature_groups
+
+
+def test_certified_status_validator_reports_drone_family_coverage(tmp_path) -> None:
+    write_verification_packages_for_examples(tmp_path)
+    index = read_package_index(tmp_path)
+    packages = tuple(
+        read_package(tmp_path / entry.problem_id)
+        for entry in index.entries
+        if entry.problem_id.startswith("drone-")
+    )
+
+    report = validate_certified_status_coverage(packages)
+
+    assert "drone-geofence-axis" in report.problem_ids
+    assert "drone-geofence-obstacle" in report.problem_ids
+    assert report.certified_numeric > 0
+    assert report.measured_only > 0
+    assert (
+        report.certified_numeric + report.measured_only + report.external_required
+        == report.obligation_count
+    )
+    assert (
+        "geofence-barrier-forward-invariance"
+        in report.certified_obligations_by_problem["drone-geofence-axis"]
+    )
+    assert (
+        "obstacle-keepout-one-step-avoidance"
+        in report.certified_obligations_by_problem["drone-geofence-obstacle"]
+    )
+
+
+def test_certified_status_validator_rejects_tampered_direct_enclosure(
+    tmp_path,
+) -> None:
+    write_verification_packages_for_examples(tmp_path)
+    index = read_package_index(tmp_path)
+    packages = [
+        read_package(tmp_path / entry.problem_id)
+        for entry in index.entries
+        if entry.problem_id.startswith("drone-")
+    ]
+    package_index = next(
+        i
+        for i, package in enumerate(packages)
+        if package.problem.id == "drone-geofence-axis"
+    )
+    package = packages[package_index]
+    problem = package.problem
+    status_index = next(
+        i
+        for i, status in enumerate(problem.enclosure_statuses)
+        if "initial-containment" in status.obligation_id
+    )
+    statuses = list(problem.enclosure_statuses)
+    status = statuses[status_index]
+    statuses[status_index] = replace(status, enclosure_lower=status.enclosure_upper)
+    packages[package_index] = replace(
+        package,
+        problem=replace(problem, enclosure_statuses=tuple(statuses)),
+    )
+
+    with pytest.raises(ValueError, match="trusted evaluator enclosure"):
+        validate_certified_status_coverage(packages)
+
+
+def test_certified_status_validator_rejects_missing_soundness_assumptions(
+    tmp_path,
+) -> None:
+    write_verification_packages_for_examples(tmp_path)
+    index = read_package_index(tmp_path)
+    packages = [
+        read_package(tmp_path / entry.problem_id)
+        for entry in index.entries
+        if entry.problem_id.startswith("drone-")
+    ]
+    package_index = next(
+        i
+        for i, package in enumerate(packages)
+        if package.problem.enclosure_statuses
+    )
+    package = packages[package_index]
+    problem = package.problem
+    statuses = list(problem.enclosure_statuses)
+    statuses[0] = replace(statuses[0], soundness_assumptions=())
+    packages[package_index] = replace(
+        package,
+        problem=replace(problem, enclosure_statuses=tuple(statuses)),
+    )
+
+    with pytest.raises(ValueError, match="missing soundness assumptions"):
+        validate_certified_status_coverage(packages)
 
 
 def test_drone_flagship_consistency_rejects_injected_geometry_drift(tmp_path) -> None:

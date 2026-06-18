@@ -31,7 +31,13 @@ from engine.export.verification_contract import (
     validate_viewer_verification_problems,
     validate_viewer_verification_trajectory,
 )
-from engine.verification import RIGOR_CERTIFIED_NUMERIC, VerificationProblem
+from engine.numerics import Interval
+from engine.verification import (
+    RIGOR_CERTIFIED_NUMERIC,
+    UnsupportedExpressionError,
+    VerificationProblem,
+    enclose_expression,
+)
 from engine.verification.adapter_stubs import (
     AdapterStubReport,
     obligation_adapter_stubs,
@@ -50,7 +56,7 @@ PACKAGE_INDEX_FILENAME = "packages.index.json"
 
 # A deterministic human-readable cross-package survey written beside the packages,
 # the catalog-level analogue of the inspection adapter's per-problem report. It
-# reports measured (sampled) status only; it certifies nothing.
+# reports measured and certified-numeric evidence tiers; it proves nothing.
 PACKAGE_SUMMARY_FILENAME = "packages.summary.md"
 
 # Component kinds the manifest may index, with their on-disk filenames. The IR
@@ -319,6 +325,43 @@ class DroneFlagshipConsistencyReport:
 
     problem_ids: tuple[str, ...]
     signature_groups: Mapping[str, tuple[str, ...]]
+
+
+@dataclass(frozen=True)
+class CertifiedStatusCoverageReport:
+    """Cross-package catalog of certified-numeric enclosure coverage.
+
+    This is an audit report, not a proof result. It records which obligations
+    currently carry a level-2 enclosure and how many remain measured-only or
+    external-required-only. Every obligation still awaits external discharge.
+    """
+
+    problem_ids: tuple[str, ...]
+    obligation_count: int
+    certified_numeric: int
+    measured_only: int
+    external_required: int
+    certified_obligations_by_problem: Mapping[str, tuple[str, ...]]
+
+    def __post_init__(self) -> None:
+        counts = (
+            self.obligation_count,
+            self.certified_numeric,
+            self.measured_only,
+            self.external_required,
+        )
+        if any(
+            not isinstance(count, int) or isinstance(count, bool) or count < 0
+            for count in counts
+        ):
+            raise ValueError("certified status coverage counts must be nonnegative")
+        if (
+            self.certified_numeric + self.measured_only + self.external_required
+            != self.obligation_count
+        ):
+            raise ValueError(
+                "certified status coverage counts must cover every obligation"
+            )
 
 
 @dataclass(frozen=True)
@@ -1040,6 +1083,233 @@ def validate_drone_flagship_package_consistency(
     return DroneFlagshipConsistencyReport(
         problem_ids=problem_ids,
         signature_groups=checked_groups,
+    )
+
+
+def _sympy_fraction(value: Any) -> Fraction:
+    return Fraction(int(value.p), int(value.q))
+
+
+def _box_intervals(status: Any) -> dict[str, Interval]:
+    return {
+        name: Interval(Fraction(lower), Fraction(upper))
+        for name, lower, upper in status.box
+    }
+
+
+def _status_supports_recorded_verdict(status: Any) -> bool:
+    lower = Fraction(status.enclosure_lower)
+    upper = Fraction(status.enclosure_upper)
+    rhs = Fraction(str(status.rhs))
+    if status.verdict == "certified-holds":
+        if status.comparison == "<=":
+            return upper <= rhs
+        if status.comparison == "<":
+            return upper < rhs
+        if status.comparison == ">=":
+            return lower >= rhs
+        if status.comparison == ">":
+            return lower > rhs
+    elif status.verdict == "certified-violated":
+        if status.comparison == "<=":
+            return lower > rhs
+        if status.comparison == "<":
+            return lower >= rhs
+        if status.comparison == ">=":
+            return upper < rhs
+        if status.comparison == ">":
+            return upper <= rhs
+    return False
+
+
+def _is_partitioned_status(status: Any) -> bool:
+    return any(
+        assumption.startswith("Partition ")
+        for assumption in status.soundness_assumptions
+    )
+
+
+def _validate_certified_statuses_for_problem(problem: VerificationProblem) -> None:
+    obligations = {obligation.id: obligation for obligation in problem.obligations}
+    variables = {variable.name for variable in problem.variables}
+    parameters = {parameter.name for parameter in problem.parameters}
+    regions = {region.id for region in problem.regions}
+
+    for status in problem.enclosure_statuses:
+        if status.rigor != RIGOR_CERTIFIED_NUMERIC:
+            raise ValueError(
+                f"problem {problem.id!r} has enclosure status {status.id!r} "
+                f"with non-certified-numeric rigor {status.rigor!r}"
+            )
+        if status.external_status != "external-required":
+            raise ValueError(
+                f"problem {problem.id!r} enclosure status {status.id!r} must "
+                "remain external-required"
+            )
+        obligation = obligations.get(status.obligation_id)
+        if obligation is None:
+            raise ValueError(
+                f"problem {problem.id!r} enclosure status {status.id!r} "
+                f"references unknown obligation {status.obligation_id!r}"
+            )
+        if status.comparison != obligation.comparison:
+            raise ValueError(
+                f"problem {problem.id!r} enclosure status {status.id!r} "
+                "comparison does not match its obligation"
+            )
+        if Fraction(str(status.rhs)) != Fraction(str(obligation.rhs)):
+            raise ValueError(
+                f"problem {problem.id!r} enclosure status {status.id!r} "
+                "rhs does not match its obligation"
+            )
+        if status.region_id != obligation.region_id:
+            raise ValueError(
+                f"problem {problem.id!r} enclosure status {status.id!r} "
+                "region does not match its obligation"
+            )
+        if not status.soundness_assumptions:
+            raise ValueError(
+                f"problem {problem.id!r} enclosure status {status.id!r} "
+                "is missing soundness assumptions"
+            )
+        if not _status_supports_recorded_verdict(status):
+            raise ValueError(
+                f"problem {problem.id!r} enclosure status {status.id!r} "
+                "recorded enclosure does not support its verdict"
+            )
+
+        box = _box_intervals(status)
+        unknown_box_symbols = set(box) - variables - parameters
+        if unknown_box_symbols:
+            raise ValueError(
+                f"problem {problem.id!r} enclosure status {status.id!r} "
+                f"has unknown box symbols {sorted(unknown_box_symbols)}"
+            )
+        if status.region_id is not None and status.region_id not in regions:
+            raise ValueError(
+                f"problem {problem.id!r} enclosure status {status.id!r} "
+                f"references unknown region {status.region_id!r}"
+            )
+        for constraint in status.domain_constraints:
+            outside_box = set(constraint.variables) - set(box)
+            if outside_box:
+                raise ValueError(
+                    f"problem {problem.id!r} enclosure status {status.id!r} "
+                    "has domain constraint variables outside the recorded box: "
+                    f"{sorted(outside_box)}"
+                )
+
+        if status.domain_constraints:
+            if not any(
+                "domainConstraints" in assumption
+                or "constrained domain" in assumption
+                for assumption in status.soundness_assumptions
+            ):
+                raise ValueError(
+                    f"problem {problem.id!r} enclosure status {status.id!r} "
+                    "has domain constraints without a recorded constrained-domain "
+                    "soundness assumption"
+                )
+            continue
+
+        if _is_partitioned_status(status):
+            continue
+
+        try:
+            trusted = enclose_expression(obligation.expression, box)
+        except UnsupportedExpressionError as error:
+            if any(
+                "branch" in assumption or "enclosing expression" in assumption
+                or "set-valued disturbance enclosure" in assumption
+                for assumption in status.soundness_assumptions
+            ):
+                continue
+            raise ValueError(
+                f"problem {problem.id!r} enclosure status {status.id!r} "
+                "could not be re-derived by the trusted evaluator and does not "
+                "record a branch/enclosing-expression soundness assumption"
+            ) from error
+        recorded_lower = Fraction(status.enclosure_lower)
+        recorded_upper = Fraction(status.enclosure_upper)
+        if (
+            recorded_lower > _sympy_fraction(trusted.lower)
+            or recorded_upper < _sympy_fraction(trusted.upper)
+        ):
+            raise ValueError(
+                f"problem {problem.id!r} enclosure status {status.id!r} "
+                "does not contain the trusted evaluator enclosure"
+            )
+
+
+def _problem_evidence_tiers(
+    problem: VerificationProblem,
+) -> tuple[set[str], set[str], set[str]]:
+    certified = {status.obligation_id for status in problem.enclosure_statuses}
+    measured = {
+        status.obligation_id
+        for status in problem.proof_statuses
+        if status.status in (_SUMMARY_STATUS_HOLDS, _SUMMARY_STATUS_VIOLATED)
+    }
+    obligations = {obligation.id for obligation in problem.obligations}
+    measured_only = measured - certified
+    external = obligations - certified - measured_only
+    return certified, measured_only, external
+
+
+def validate_certified_status_coverage(
+    packages: Iterable[VerificationPackage | VerificationProblem],
+) -> CertifiedStatusCoverageReport:
+    """Validate certified-numeric statuses and report family-wide coverage.
+
+    The validator audits the recorded level-2 enclosure statuses in each
+    package. It checks that every certified status is tied to a real obligation,
+    keeps external discharge required, records soundness assumptions, supports
+    its recorded verdict, and, for direct non-refined statuses, still contains
+    the trusted fail-closed evaluator's enclosure. It reports coverage only; it
+    never records proof discharge.
+    """
+
+    problems: list[VerificationProblem] = []
+    for item in packages:
+        if isinstance(item, VerificationPackage):
+            problems.append(item.problem)
+        elif isinstance(item, VerificationProblem):
+            problems.append(item)
+        else:
+            raise ValueError(
+                "certified status validation expects VerificationPackage or "
+                "VerificationProblem entries"
+            )
+
+    problem_ids = tuple(problem.id for problem in problems)
+    if len(problem_ids) != len(set(problem_ids)):
+        raise ValueError("certified status validation got duplicate packages")
+
+    certified_by_problem: dict[str, tuple[str, ...]] = {}
+    obligation_count = certified_count = measured_only_count = external_count = 0
+    for problem in problems:
+        _validate_certified_statuses_for_problem(problem)
+        certified, measured_only, external = _problem_evidence_tiers(problem)
+        obligations_by_id = {
+            obligation.id: obligation for obligation in problem.obligations
+        }
+        certified_by_problem[problem.id] = tuple(
+            obligation_id
+            for obligation_id in obligations_by_id
+            if obligation_id in certified
+        )
+        obligation_count += len(problem.obligations)
+        certified_count += len(certified)
+        measured_only_count += len(measured_only)
+        external_count += len(external)
+
+    return CertifiedStatusCoverageReport(
+        problem_ids=problem_ids,
+        obligation_count=obligation_count,
+        certified_numeric=certified_count,
+        measured_only=measured_only_count,
+        external_required=external_count,
+        certified_obligations_by_problem=certified_by_problem,
     )
 
 
