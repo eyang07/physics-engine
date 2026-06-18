@@ -26,9 +26,10 @@ import { VerificationStage } from "./verificationStage";
 import {
   loadVerificationAdapterStubs,
   loadVerificationIndex,
+  loadVerificationPackageIndex,
   loadVerificationPackageManifest,
-  loadVerificationPackageRegimes,
   loadVerificationProblem,
+  type PackageIndexEntry,
   type PackageRegime,
   type VerificationProblem,
   type VerificationProblemSummary,
@@ -154,9 +155,10 @@ let pendulumBounds: Bounds | null = null;
 // Monotonic guard so a slow trajectory load can't overwrite a newer selection.
 let loadToken = 0;
 let verificationProblems: VerificationProblemSummary[] = [];
-// The Tier/regime descriptor per problem id (BE-054), from the package discovery
-// index — used only to badge catalog entries; empty when the index is absent.
-let verificationRegimes = new Map<string, PackageRegime>();
+// The package discovery index per problem id (BE-047): the published listing the
+// catalog is grounded in (model, status, counts, regime). Empty when the index
+// is absent, in which case the catalog degrades to the per-example viewer index.
+let verificationPackageIndex = new Map<string, PackageIndexEntry>();
 let selectedProblemId: string | null = null;
 
 function syncPlayButton() {
@@ -257,35 +259,53 @@ function renderVerificationCatalog() {
     button.dataset.problemId = problem.id;
     button.classList.toggle("catalog-item--active", problem.id === selectedProblemId);
 
+    // Ground each entry's model/status/counts in the published discovery index
+    // when available, degrading to the per-example viewer summary otherwise.
+    const entry = verificationPackageIndex.get(problem.id);
+    const model = entry?.model ?? problem.model;
+    const status = entry?.status ?? problem.status;
+    const itemCounts = entry?.counts ?? problem.counts;
+
     const category = document.createElement("span");
     category.className = "catalog-item__category";
-    category.textContent = problem.model ?? problem.status;
+    category.textContent = model ?? status;
 
     const title = document.createElement("strong");
     title.textContent = problem.name;
 
-    // Obligation/candidate counts from the index summary let the workbench be
-    // scanned without opening each problem.
+    // The full region/obligation/candidate counts let the workbench be scanned
+    // without opening each problem; a status chip names the listed rigor.
     const counts = document.createElement("span");
     counts.className = "catalog-item__counts";
     counts.append(
-      countBadge("obligations", problem.counts.obligations),
-      countBadge("candidates", problem.counts.candidates),
+      countBadge("regions", itemCounts.regions),
+      countBadge("obligations", itemCounts.obligations),
+      countBadge("candidates", itemCounts.candidates),
+      statusChip(status),
     );
 
     button.append(category, title, counts);
     // The Tier/regime badge (BE-054) lets a reader tell a nominal package from a
     // disturbance-robust one without opening it. Only shown when the discovery
     // index carries the descriptor; it claims nothing beyond the listed rigor.
-    const regime = verificationRegimes.get(problem.id);
-    if (regime) {
-      button.append(regimeBadge(regime));
+    if (entry?.regime) {
+      button.append(regimeBadge(entry.regime));
     }
     button.addEventListener("click", () => {
       void selectVerificationProblem(problem.id);
     });
     verificationCatalog.append(button);
   });
+}
+
+// The package status as a small chip (e.g. "candidate"), read from the listing —
+// it names the rigor of the listed package, nothing more.
+function statusChip(status: string): HTMLSpanElement {
+  const chip = document.createElement("span");
+  chip.className = "catalog-item__status";
+  chip.dataset.status = status;
+  chip.textContent = status;
+  return chip;
 }
 
 function countBadge(label: string, value: number): HTMLSpanElement {
@@ -619,14 +639,15 @@ async function initialize() {
 }
 
 async function initializeVerification() {
-  // The discovery index's regime descriptors are optional, joined to the catalog
-  // by problem id; a missing index simply leaves entries unbadged.
-  const [index, regimes] = await Promise.all([
+  // The discovery index grounds the catalog (model, status, counts, regime),
+  // joined by problem id; a missing index degrades to the per-example viewer
+  // index.
+  const [index, packageIndex] = await Promise.all([
     loadVerificationIndex(),
-    loadVerificationPackageRegimes(),
+    loadVerificationPackageIndex(),
   ]);
   verificationProblems = index.problems;
-  verificationRegimes = regimes;
+  verificationPackageIndex = packageIndex;
   renderVerificationCatalog();
   if (verificationProblems.length === 0) {
     verificationStage.clear();

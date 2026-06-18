@@ -47,23 +47,7 @@ below make the measured margin geometrically legible and surface the package
 inventory in the inspector. Keep rendering honest — measured stays measured,
 candidates stay candidates, nothing reads as proved._
 
-1. **FE-028: Verification catalog overview from the package discovery index**
-   - Goal: The Verification view wires examples one by one, but the published
-     discovery index (`packages.index.json`, surfaced on the viewer index by
-     BE-047) already lists every package by model, status, and counts. Add a
-     read-only catalog overview that lists all packages from the index — model,
-     status, region/obligation/candidate counts — as a grounded package picker,
-     rather than re-deriving the list per example. Render only what the index
-     exports.
-   - Scope: `viewer/src/verificationPanel.ts` or `viewer/src/home.ts` (catalog
-     overview), `viewer/src/data/verification.ts` (read the published index),
-     `viewer/src/styles.css`, and the viewer visual test.
-   - Acceptance: the catalog lists every indexed package with its model/status/
-     counts and selecting one opens its problem; a missing index degrades to the
-     existing per-example list; nothing reads as proved; `npm run build` and the
-     visual test pass.
-
-2. **FE-031: Mark when the measured violation occurs on the rollout**
+1. **FE-031: Mark when the measured violation occurs on the rollout**
    - Goal: The measured violation scenario (FE-030) draws the worst-violation
      marker on the phase plane and names the obligation the run left, but the
      run carries a `worst.time` (and the trajectory a time axis), so *when* in
@@ -80,7 +64,7 @@ candidates stay candidates, nothing reads as proved._
      violations show none; the rollout/marker rendering is otherwise unchanged;
      nothing reads as proved; `npm run build` and the visual test pass.
 
-3. **FE-032: Surface the certified-numeric (level-2) status on the rigor ladder (after BE-074)**
+2. **FE-032: Surface the certified-numeric (level-2) status on the rigor ladder (after BE-074)**
    - Goal: The dossier rigor ladder currently pins every problem at level 1
      (measured), because the viewer export carries no level-2 status. Once the
      backend exports the `certified-numeric` per-obligation status into the

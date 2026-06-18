@@ -212,6 +212,17 @@ select {
   border-color: var(--hairline-strong);
 }
 
+/* The package status chip (FE-028), grounded in the discovery index listing. */
+.catalog-item__status {
+  padding: 1px 8px;
+  border: 1px solid var(--candidate-tint);
+  border-radius: var(--radius-pill);
+  color: var(--candidate);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 /* The Tier/regime badge (FE-029): a disturbance-robust package reads cool and
    distinct; a nominal one stays muted. A descriptor-only label. */
 .catalog-item__regime {

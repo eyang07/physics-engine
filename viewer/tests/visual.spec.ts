@@ -550,6 +550,74 @@ for (const viewport of [
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-verification-catalog.png`) });
   });
 
+  test(`Verification catalog is grounded in the package discovery index at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const items = page.locator("#verificationCatalog .catalog-item");
+    await expect(items).toHaveCount(10);
+
+    // Grounded in the discovery index, each entry now lists the full
+    // region/obligation/candidate counts and the package status.
+    const first = items.nth(0);
+    await expect(first.locator('.catalog-item__count[data-count="regions"]')).toHaveText(
+      /\d+ regions/,
+    );
+    await expect(first.locator('.catalog-item__count[data-count="obligations"]')).toHaveText(
+      /\d+ obligations/,
+    );
+    await expect(first.locator('.catalog-item__count[data-count="candidates"]')).toHaveText(
+      /\d+ candidates/,
+    );
+    await expect(first.locator(".catalog-item__status")).toHaveText("candidate");
+    // Every entry carries the status chip and a region count.
+    await expect(page.locator("#verificationCatalog .catalog-item__status")).toHaveCount(10);
+    await expect(
+      page.locator('#verificationCatalog .catalog-item__count[data-count="regions"]'),
+    ).toHaveCount(10);
+
+    // Selecting an entry still opens its problem.
+    await items.nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-catalog-grounded.png`),
+    });
+  });
+
+  test(`Verification catalog degrades without the discovery index at ${viewport.name}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // No discovery index (older export): the catalog still lists every problem,
+    // grounded in the per-example viewer index, and selection still works.
+    await page.route("**/data/verification/packages/packages.index.json", (route) =>
+      route.fulfill({ status: 404, body: "" }),
+    );
+
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationDomain.domain--active");
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const items = page.locator("#verificationCatalog .catalog-item");
+    await expect(items).toHaveCount(10);
+    // Counts still render from the viewer summary; no regime badge survives.
+    await expect(
+      items.nth(0).locator('.catalog-item__count[data-count="obligations"]'),
+    ).toHaveText(/\d+ obligations/);
+    await expect(page.locator("#verificationCatalog .catalog-item__regime")).toHaveCount(0);
+    await items.nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+  });
+
   test(`Verification stage legends measured violations at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

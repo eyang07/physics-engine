@@ -251,6 +251,20 @@ export interface PackageRegime {
   robustObligationIds: string[];
 }
 
+/**
+ * One entry of the package discovery index (`packages.index.json`, BE-047): the
+ * published, self-describing listing of every package by model, status, counts,
+ * and Tier/regime. It claims nothing beyond each listed package's rigor.
+ */
+export interface PackageIndexEntry {
+  problemId: string;
+  name: string;
+  model: string | null;
+  status: string;
+  counts: { regions: number; obligations: number; candidates: number };
+  regime: PackageRegime | null;
+}
+
 const INDEX_PATH = "/data/verification/index.json";
 const PACKAGE_INDEX_PATH = "/data/verification/packages/packages.index.json";
 
@@ -614,34 +628,44 @@ function parseRegime(value: unknown): PackageRegime | null {
 }
 
 /**
- * Load the package discovery index's Tier/regime descriptors (BE-054), keyed by
- * problem id, so the catalog can badge each entry by its regime without opening
- * it. A missing or malformed index resolves to an empty map, so entries simply
- * carry no badge.
+ * Load the package discovery index (`packages.index.json`, BE-047), keyed by
+ * problem id, so the catalog can be grounded in the published listing — model,
+ * status, counts, and Tier/regime — rather than re-deriving it per example. A
+ * missing or malformed index resolves to an empty map, so the catalog simply
+ * degrades to the per-example viewer index.
  */
-export async function loadVerificationPackageRegimes(
+export async function loadVerificationPackageIndex(
   path = PACKAGE_INDEX_PATH,
-): Promise<Map<string, PackageRegime>> {
-  const regimes = new Map<string, PackageRegime>();
+): Promise<Map<string, PackageIndexEntry>> {
+  const entries = new Map<string, PackageIndexEntry>();
   try {
     const response = await fetch(path);
     if (!response.ok) {
-      return regimes;
+      return entries;
     }
     const record = asRecord((await response.json()) as unknown) ?? {};
-    for (const entry of parseArray(record.packages, (item) => asRecord(item) ?? null)) {
-      if (typeof entry.problemId !== "string") {
+    for (const raw of parseArray(record.packages, (item) => asRecord(item) ?? null)) {
+      if (typeof raw.problemId !== "string") {
         continue;
       }
-      const regime = parseRegime(entry.regime);
-      if (regime) {
-        regimes.set(entry.problemId, regime);
-      }
+      const counts = asRecord(raw.counts) ?? {};
+      entries.set(raw.problemId, {
+        problemId: raw.problemId,
+        name: asString(raw.name, raw.problemId),
+        model: asOptionalString(raw.model),
+        status: asString(raw.status, "candidate"),
+        counts: {
+          regions: asOptionalNumber(counts.regions) ?? 0,
+          obligations: asOptionalNumber(counts.obligations) ?? 0,
+          candidates: asOptionalNumber(counts.candidates) ?? 0,
+        },
+        regime: parseRegime(raw.regime),
+      });
     }
   } catch (error) {
     console.warn("Verification package index unavailable:", error);
   }
-  return regimes;
+  return entries;
 }
 
 /** Load and parse a single verification problem's IR. */
