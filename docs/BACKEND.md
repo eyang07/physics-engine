@@ -94,6 +94,12 @@ artifacts.
     rectangular box. Constrained certified-numeric producers state claims over
     `box ∩ constraints` explicitly and must still derive sound endpoints through
     the trusted fail-closed evaluator before any status is emitted.
+  - The generated cross-package verification summary reports the evidence tier
+    per obligation: `certified-numeric` (level 2 enclosure), `measured-only`
+    (level 1 sampled evidence), or `external-required` only. It also reports
+    worst measured margins separately from worst certified enclosure margins.
+    These are catalog fields only; certified-numeric remains a sound enclosure
+    under stated assumptions, not proof or safety certification.
   - Viewer-renderable verification examples now include
     `upright-pendulum-safety` and `controlled-spring-regulator-safety`, each
     with its own controlled trajectory, region geometry, candidate-certificate

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from fractions import Fraction
 import json
 from pathlib import Path
 from typing import Any
@@ -30,7 +31,7 @@ from engine.export.verification_contract import (
     validate_viewer_verification_problems,
     validate_viewer_verification_trajectory,
 )
-from engine.verification import VerificationProblem
+from engine.verification import RIGOR_CERTIFIED_NUMERIC, VerificationProblem
 from engine.verification.adapter_stubs import (
     AdapterStubReport,
     obligation_adapter_stubs,
@@ -1143,10 +1144,11 @@ def _read_component(
 # --- BE-061: cross-package human-readable summary report --------------------
 #
 # The discovery index is machine-readable; this is its human-readable companion.
-# It surveys every generated package's measured status at a glance -- model,
-# regime, obligation count, how many obligation surfaces measured-hold vs are
-# measured-violated under sampling, and the worst (most negative) signed margin.
-# Pure cataloging: it reports sampled evidence, it certifies nothing.
+# It surveys every generated package's evidence tier at a glance -- model,
+# regime, obligation count, how many obligations have a level-2
+# certified-numeric enclosure, how many remain measured-only, how many have only
+# external-required obligations, plus sampled and certified margins. Pure
+# cataloging: it reports recorded evidence and still proves nothing.
 
 _SUMMARY_STATUS_HOLDS = "measured-holds"
 _SUMMARY_STATUS_VIOLATED = "measured-violated"
@@ -1155,17 +1157,50 @@ _SUMMARY_STATUS_EXTERNAL = "external-required"
 
 @dataclass(frozen=True)
 class PackageSummary:
-    """One package's measured-status survey row, derived from its IR and manifest."""
+    """One package's evidence-tier survey row, derived from its IR and manifest."""
 
     problem_id: str
     name: str
     model: str
     regime: str
     obligation_count: int
+    certified_numeric: int
+    measured_only: int
+    external_required: int
     measured_holds: int
     measured_violated: int
-    external_required: int
-    worst_margin: float | None
+    measured_external_required: int
+    worst_measured_margin: float | None
+    worst_certified_margin: float | None
+
+    def __post_init__(self) -> None:
+        counts = (
+            self.obligation_count,
+            self.certified_numeric,
+            self.measured_only,
+            self.external_required,
+            self.measured_holds,
+            self.measured_violated,
+            self.measured_external_required,
+        )
+        if any(
+            not isinstance(count, int) or isinstance(count, bool) or count < 0
+            for count in counts
+        ):
+            raise ValueError("package summary counts must be nonnegative integers")
+        if (
+            self.certified_numeric + self.measured_only + self.external_required
+            != self.obligation_count
+        ):
+            raise ValueError(
+                "package summary evidence-tier counts must cover each obligation"
+            )
+
+    @property
+    def worst_margin(self) -> float | None:
+        """Backward-compatible alias for the sampled worst margin."""
+
+        return self.worst_measured_margin
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -1174,28 +1209,66 @@ class PackageSummary:
             "model": self.model,
             "regime": self.regime,
             "obligationCount": self.obligation_count,
+            "certifiedNumeric": self.certified_numeric,
+            "measuredOnly": self.measured_only,
+            "externalRequired": self.external_required,
             "measuredHolds": self.measured_holds,
             "measuredViolated": self.measured_violated,
-            "externalRequired": self.external_required,
-            "worstMargin": self.worst_margin,
+            "measuredExternalRequired": self.measured_external_required,
+            "worstMeasuredMargin": self.worst_measured_margin,
+            "worstCertifiedMargin": self.worst_certified_margin,
+            "worstMargin": self.worst_measured_margin,
         }
+
+
+def _status_margin(comparison: str, lower: str, upper: str, rhs: float) -> float:
+    rhs_fraction = Fraction(str(rhs))
+    if comparison in ("<=", "<"):
+        return float(rhs_fraction - Fraction(upper))
+    if comparison in (">=", ">"):
+        return float(Fraction(lower) - rhs_fraction)
+    raise ValueError("comparison must be one of <=, <, >=, >")
 
 
 def _summarize_problem(
     manifest: PackageManifest,
     problem: VerificationProblem,
 ) -> PackageSummary:
-    holds = violated = external = 0
-    margins: list[float] = []
+    holds = violated = measured_external = 0
+    measured_margins: list[float] = []
+    measured_obligation_ids: set[str] = set()
     for status in problem.proof_statuses:
         if status.status == _SUMMARY_STATUS_HOLDS:
             holds += 1
+            measured_obligation_ids.add(status.obligation_id)
         elif status.status == _SUMMARY_STATUS_VIOLATED:
             violated += 1
+            measured_obligation_ids.add(status.obligation_id)
         elif status.status == _SUMMARY_STATUS_EXTERNAL:
-            external += 1
+            measured_external += 1
         if status.worst_margin is not None:
-            margins.append(float(status.worst_margin))
+            measured_margins.append(float(status.worst_margin))
+
+    certified_obligation_ids: set[str] = set()
+    certified_margins: list[float] = []
+    for status in problem.enclosure_statuses:
+        if status.rigor != RIGOR_CERTIFIED_NUMERIC:
+            continue
+        certified_obligation_ids.add(status.obligation_id)
+        certified_margins.append(
+            _status_margin(
+                status.comparison,
+                status.enclosure_lower,
+                status.enclosure_upper,
+                status.rhs,
+            )
+        )
+
+    all_obligation_ids = {obligation.id for obligation in problem.obligations}
+    measured_only_obligation_ids = measured_obligation_ids - certified_obligation_ids
+    external_obligation_ids = (
+        all_obligation_ids - certified_obligation_ids - measured_only_obligation_ids
+    )
     regime = REGIME_NOMINAL if manifest.regime is None else manifest.regime.kind
     return PackageSummary(
         problem_id=manifest.problem_id,
@@ -1203,21 +1276,25 @@ def _summarize_problem(
         model=manifest.model,
         regime=regime,
         obligation_count=len(problem.obligations),
+        certified_numeric=len(certified_obligation_ids),
+        measured_only=len(measured_only_obligation_ids),
+        external_required=len(external_obligation_ids),
         measured_holds=holds,
         measured_violated=violated,
-        external_required=external,
-        worst_margin=min(margins) if margins else None,
+        measured_external_required=measured_external,
+        worst_measured_margin=min(measured_margins) if measured_margins else None,
+        worst_certified_margin=min(certified_margins) if certified_margins else None,
     )
 
 
 def summarize_packages(
     packages: Iterable[VerificationPackage],
 ) -> tuple[PackageSummary, ...]:
-    """Survey the measured status of each package, in the given order.
+    """Survey the evidence tier of each package, in the given order.
 
     Reads each package's manifest (model, regime) and IR (obligation count,
-    sampled proof statuses) only; it reports measured evidence and certifies
-    nothing.
+    sampled proof statuses, and certified-numeric enclosure statuses) only; it
+    reports recorded evidence and proves nothing.
     """
 
     return tuple(
@@ -1253,9 +1330,9 @@ def render_package_summary_markdown(
 ) -> str:
     """Render a deterministic human-readable cross-package summary report.
 
-    The report is sampled evidence only: a measured-holds count is clean samples,
-    never a proof or certificate, and every obligation still requires external
-    discharge.
+    The report separates measured sampling evidence from certified-numeric
+    enclosure bounds. Neither is a proof or external certificate, and every
+    obligation still requires external discharge.
     """
 
     lines = [
@@ -1263,23 +1340,29 @@ def render_package_summary_markdown(
         "",
         f"- packages: {len(summaries)}",
         "",
-        "A cross-package measured-status survey of every generated verification",
-        "package. It reports sampled (measured) evidence only: a measured-holds",
-        "count is clean samples, never a proof or certificate, and every obligation",
-        "still requires external discharge. The worst margin is the most negative",
-        "(or, if none are violated, the smallest nonnegative) signed distance any",
-        "sample reached toward an obligation boundary.",
+        "A cross-package evidence-tier survey of every generated verification",
+        "package. `measured-only` is level 1 sampled evidence. `certified-numeric`",
+        "is level 2: a sound enclosure over its recorded box and assumptions.",
+        "Neither level is a proof or external certificate, and every obligation",
+        "still has `externalStatus=\"external-required\"` until a real external",
+        "backend discharges it. The measured and certified margins are signed",
+        "distances to the obligation boundary; negative means the recorded",
+        "evidence crossed the boundary.",
         "",
-        "| package | model | regime | obligations | measured-holds | "
-        "measured-violated | external-required | worst margin |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| package | model | regime | obligations | certified-numeric | "
+        "measured-only | external-required | measured-holds | measured-violated | "
+        "measured-external | worst measured margin | worst certified margin |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for summary in summaries:
         lines.append(
             f"| `{summary.problem_id}` | `{summary.model}` | {summary.regime} | "
-            f"{summary.obligation_count} | {summary.measured_holds} | "
-            f"{summary.measured_violated} | {summary.external_required} | "
-            f"{_format_margin(summary.worst_margin)} |"
+            f"{summary.obligation_count} | {summary.certified_numeric} | "
+            f"{summary.measured_only} | {summary.external_required} | "
+            f"{summary.measured_holds} | {summary.measured_violated} | "
+            f"{summary.measured_external_required} | "
+            f"{_format_margin(summary.worst_measured_margin)} | "
+            f"{_format_margin(summary.worst_certified_margin)} |"
         )
     lines.append("")
     return "\n".join(lines)

@@ -208,8 +208,9 @@ def test_package_summary_surveys_measured_status_consistent_with_manifests(
 ) -> None:
     # BE-061: the human-readable summary lists every package with its model,
     # regime, obligation count, measured hold/violation counts, and worst margin,
-    # consistent with the per-package manifests. It reports measured evidence and
-    # certifies nothing.
+    # consistent with the per-package manifests. BE-074 adds the level-2
+    # certified-numeric evidence tier beside measured-only and external-required
+    # obligations without treating any tier as proof.
     manifests = write_verification_packages(tmp_path)
     summaries = read_package_summaries(tmp_path)
 
@@ -226,24 +227,48 @@ def test_package_summary_surveys_measured_status_consistent_with_manifests(
         )
         # The obligation count matches the manifest's counts.
         assert summary.obligation_count == manifest.counts["obligations"]
-        # The measured tallies cover every proof status (none lost or double-counted).
         package = read_package(tmp_path / summary.problem_id)
+        # The evidence-tier tallies cover every obligation once.
+        assert (
+            summary.certified_numeric
+            + summary.measured_only
+            + summary.external_required
+        ) == summary.obligation_count
+        assert summary.certified_numeric == len(
+            {status.obligation_id for status in package.problem.enclosure_statuses}
+        )
+        # The measured tallies cover every proof status (none lost or double-counted).
         assert (
             summary.measured_holds
             + summary.measured_violated
-            + summary.external_required
+            + summary.measured_external_required
         ) == len(package.problem.proof_statuses)
+        if summary.certified_numeric:
+            assert summary.worst_certified_margin is not None
+        else:
+            assert summary.worst_certified_margin is None
 
     summary_by_id = {summary.problem_id: summary for summary in summaries}
     # The measured-violation reference scenario reports its violation and a
     # negative worst margin; a holding package keeps a nonnegative worst margin.
     violation = summary_by_id["drone-obstacle-keepout-violation"]
     assert violation.measured_violated >= 1
-    assert violation.worst_margin is not None and violation.worst_margin < 0.0
+    assert violation.worst_measured_margin is not None
+    assert violation.worst_measured_margin < 0.0
+    # The violation rollout is measured evidence on a concrete trajectory. The
+    # same problem may still carry a certified-numeric enclosure over a separate
+    # recorded assumption box; these lanes must stay distinct.
+    if violation.certified_numeric:
+        assert violation.worst_certified_margin is not None
+        assert violation.worst_certified_margin >= 0.0
 
     holding = summary_by_id["drone-geofence-axis"]
     assert holding.measured_violated == 0
-    assert holding.worst_margin is not None and holding.worst_margin >= 0.0
+    assert holding.certified_numeric > 0
+    assert holding.worst_measured_margin is not None
+    assert holding.worst_measured_margin >= 0.0
+    assert holding.worst_certified_margin is not None
+    assert holding.worst_certified_margin >= 0.0
 
     # A disturbance-robust package is labeled as such.
     assert summary_by_id["drone-disturbed-geofence-axis"].regime == REGIME_DISTURBANCE_ROBUST
@@ -258,9 +283,12 @@ def test_package_summary_is_deterministic_and_re_readable(tmp_path) -> None:
     # Re-deriving the summary from the published packages yields identical text.
     rerendered = render_package_summary_markdown(read_package_summaries(tmp_path))
     assert written == rerendered
-    # It is an honest measured survey -- never a proof or certificate.
-    assert "never a proof or certificate" in written
-    assert "proved" not in written and "certified" not in written
+    # It is an honest evidence-tier survey -- certified-numeric is level 2, not proof.
+    assert "certified-numeric" in written
+    assert "measured-only" in written
+    assert "worst certified margin" in written
+    assert "Neither level is a proof or external certificate" in written
+    assert "proved" not in written
     # The header counts every package.
     assert "- packages: " in written
 

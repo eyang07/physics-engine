@@ -186,8 +186,9 @@ selected sqrt-bearing keep-out constrained domains, and verification-problem IR 
 (continuous and discrete dynamics, control/disturbance channels, explicit
 assumptions, candidate certificates, plus self-contained viewer-facing
 verification exports: measured `regionGeometry` grids and boundary polylines,
-controlled trajectories, time-aligned candidate-certificate series, and sampled
-`proofStatuses`). The
+controlled trajectories, time-aligned candidate-certificate series, sampled
+`proofStatuses`, and package summaries that keep measured-only and
+certified-numeric evidence tiers distinct). The
 discrete-time analogue
 `x_{k+1} = F(k, x_k, u_k, d_k; θ)` now exists backend-only
 (`engine/dynamics/discrete.py`, spec in `docs/discrete-dynamics.md`) with
