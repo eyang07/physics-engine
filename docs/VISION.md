@@ -181,12 +181,12 @@ disturbance sets, closed-loop reduction, and deterministic rollouts
 (backend-only). It also implements backend-only safe/unsafe sublevel sets,
 candidate Lyapunov/barrier functions, proof obligations, measured sampled
 checks, selected exact-rational certified-numeric interval enclosures for the
-Tier-1 drone geofence family, and verification-problem IR v3 (continuous and
-discrete dynamics, control/disturbance channels, explicit assumptions,
-candidate certificates, plus self-contained viewer-facing verification exports:
-measured `regionGeometry` grids and boundary polylines, controlled
-trajectories, time-aligned candidate-certificate series, and sampled
-`proofStatuses`). The
+Tier-1 drone geofence family and Tier-3 disturbed geofence-axis obligations, and
+verification-problem IR v3 (continuous and discrete dynamics,
+control/disturbance channels, explicit assumptions, candidate certificates, plus
+self-contained viewer-facing verification exports: measured `regionGeometry`
+grids and boundary polylines, controlled trajectories, time-aligned
+candidate-certificate series, and sampled `proofStatuses`). The
 discrete-time analogue
 `x_{k+1} = F(k, x_k, u_k, d_k; θ)` now exists backend-only
 (`engine/dynamics/discrete.py`, spec in `docs/discrete-dynamics.md`) with

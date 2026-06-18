@@ -75,6 +75,12 @@ artifacts.
     for the inner-set one-step obligation. Any box whose enclosure does not
     close remains measured-only / external-required, never promoted to a false
     safety verdict.
+  - Certified-numeric set-valued enclosures for the horizontal and vertical
+    Tier-3 disturbed geofence-axis packages: exact-rational boxes include the
+    disturbance parameter (`w1` or `w3`) and close the robust forward-invariance
+    and robust velocity-bound obligations over the recorded wind box. Sqrt-bearing
+    obstacle/planar robust avoidance remains measured-only until the sqrt
+    enclosure path handles it.
   - Viewer-renderable verification examples now include
     `upright-pendulum-safety` and `controlled-spring-regulator-safety`, each
     with its own controlled trajectory, region geometry, candidate-certificate

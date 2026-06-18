@@ -234,19 +234,7 @@ enclosure under stated assumptions), strictly distinct from `measured` (level 1)
 from any external `proved` / `certified` result. The engine proposes; external
 backends dispose._
 
-1. **BE-071: Robust set-valued enclosure over the disturbance box (Tier-3)**
-   - Goal: Certify the Tier-3 robust obligations by enclosing the worst case over the
-     disturbance box `W` (carrying `w` as an interval parameter), so the robust
-     forward-invariance / avoidance claims gain level-2 status quantified over every
-     admissible disturbance.
-   - Scope: `scripts/export_verification_problems.py` (attach to the disturbed
-     packages), and `tests/`.
-   - Acceptance: the Tier-3 packages carry certified-numeric robust statuses whose
-     enclosures cover every disturbance in `W` (verified by sampling `w`); they stay
-     measured-only where the enclosure does not close; generated data stays
-     uncommitted; focused tests pass.
-
-2. **BE-072: Certified keep-out avoidance via the mpmath sqrt path**
+1. **BE-072: Certified keep-out avoidance via the mpmath sqrt path**
     - Goal: Certify the obstacle keep-out / intersection avoidance obligations — the
       `sqrt`-bearing distance barrier — exercising the mpmath enclosure layer, so the
       Tier-2 and intersection packages reach level 2.
@@ -257,7 +245,7 @@ backends dispose._
       the obligation over the standoff / interior box; measured statuses unchanged;
       nothing claims proof; generated data stays uncommitted; focused tests pass.
 
-3. **BE-073: Affine-form refinement for the distance barrier**
+2. **BE-073: Affine-form refinement for the distance barrier**
     - Goal: Add an affine / Taylor-model enclosure form to tighten the `sqrt` distance
       barrier where pure intervals over-inflate (tightness only; soundness from the
       same trusted base), closing avoidance obligations the box form cannot.
@@ -268,7 +256,7 @@ backends dispose._
       previously-too-loose avoidance obligation certifies; soundness tests pass;
       nothing claims proof.
 
-4. **BE-074: Surface the certified level-2 status across the summary and rigor ladder**
+3. **BE-074: Surface the certified level-2 status across the summary and rigor ladder**
     - Goal: Make the certified-numeric tier legible — extend the BE-061 cross-package
       summary and the package rigor ladder to report, per obligation, certified-numeric
       vs measured-only vs external-required, keeping the three rigor levels strictly
@@ -281,7 +269,7 @@ backends dispose._
       the report stays deterministic; generated data stays uncommitted; focused tests
       pass.
 
-5. **BE-075: Cross-package certified-status validator**
+4. **BE-075: Cross-package certified-status validator**
     - Goal: Validate, across the whole drone family, which obligations close at level 2
       and that every certified status is internally consistent (its enclosure satisfies
       the recorded verdict over the recorded box and its assumptions are recorded),
@@ -293,7 +281,7 @@ backends dispose._
       tampered one; it reports the family-wide certified coverage; nothing claims
       proof; focused tests pass.
 
-6. **BE-076: Real `reachability` export adapter (non-discharging handoff)**
+5. **BE-076: Real `reachability` export adapter (non-discharging handoff)**
     - Goal: Replace the reachability adapter *stub* with a concrete artifact — write
       each one-step obligation as an enclosure / reachability problem an external
       validated-numerics tool could consume, closing the IR's "optional backend

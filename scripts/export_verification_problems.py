@@ -2017,10 +2017,28 @@ def drone_disturbed_geofence_problem(
     # The robust forward-invariance claim is asserted only within the inner
     # interval and the tightened speed bound; sample within that region (the
     # disturbance bound is non-plane and external-required).
-    return replace(
+    problem = replace(
         problem,
         proof_statuses=sampled_region_proof_statuses(
             problem, restrict_to_assumption_regions=True
+        ),
+    )
+    return replace(
+        problem,
+        enclosure_statuses=_disturbed_axis_certified_statuses(
+            problem,
+            position=q,
+            velocity=v,
+            disturbance=w,
+            q_bounds=params.q1_bounds,
+            lower_band=params.horizontal_band,
+            upper_band=params.horizontal_band,
+            robust_speed_cap=robust_speed_cap,
+            nominal_velocity_bound=nominal_velocity_bound,
+            robust_velocity_bound=robust_velocity_bound,
+            reach=uh,
+            disturbance_bound=w_max,
+            timestep=dt,
         ),
     )
 
@@ -2039,6 +2057,152 @@ def drone_disturbed_geofence_trajectory(
     result = horizontal_axis_rollout(params)
     time = result.steps.astype(float) * params.timestep
     return time, result.states
+
+
+def _disturbed_axis_certified_statuses(
+    problem: VerificationProblem,
+    *,
+    position: sp.Symbol,
+    velocity: sp.Symbol,
+    disturbance: sp.Symbol,
+    q_bounds: tuple[float, float],
+    lower_band: float | sp.Expr,
+    upper_band: float | sp.Expr,
+    robust_speed_cap: sp.Expr,
+    nominal_velocity_bound: sp.Expr,
+    robust_velocity_bound: sp.Expr,
+    reach: sp.Expr,
+    disturbance_bound: sp.Expr,
+    timestep: sp.Expr,
+) -> tuple[EnclosureStatusSpec, ...]:
+    """Certified set-valued Tier-3 axis enclosures over the disturbance box."""
+
+    r = _drone_rational
+    q = position
+    v = velocity
+    w = disturbance
+    q_min, q_max = q_bounds
+    q_lo = r(q_min)
+    q_hi = r(q_max)
+    inner_low = q_lo + r(lower_band)
+    inner_high = q_hi - r(upper_band)
+    dt = timestep
+    half_dt2 = dt**2 / 2
+    obligation_by_name = {ob.name: ob for ob in problem.obligations}
+    statuses: list[EnclosureStatusSpec] = []
+
+    def geofence_margin(q_next: sp.Expr) -> sp.Expr:
+        return sp.Max(q_lo - q_next, q_next - q_hi)
+
+    robust_forward = obligation_by_name["geofence-barrier:robust-forward-invariance"]
+    forward_box = {
+        q.name: Interval(inner_low, inner_high),
+        v.name: Interval(-robust_speed_cap, robust_speed_cap),
+        w.name: Interval(-disturbance_bound, disturbance_bound),
+    }
+    forward_status = certified_enclosure_status(
+        id="enclosure:geofence-barrier:robust-forward-invariance:disturbance-box",
+        obligation=replace(
+            robust_forward,
+            expression=expression_spec(geofence_margin(q + dt * v + half_dt2 * w)),
+        ),
+        box=forward_box,
+        soundness_assumptions=(
+            "Exact zero-order-hold sampled-data map with rational DroneParams; "
+            "the set-valued disturbance enclosure is exact-rational with no rounding.",
+            f"Box quantifies over every {w.name} in the recorded wind box W and "
+            "over the tightened robust speed/inner-position assumption region.",
+        ),
+        note=(
+            "Certified-numeric set-valued enclosure over the recorded disturbance "
+            "box; this is not proof or safety certification."
+        ),
+    )
+    if forward_status is not None:
+        statuses.append(forward_status)
+
+    robust_velocity = obligation_by_name["robust-velocity-bound:one-step-invariance"]
+    velocity_box = {
+        q.name: Interval(q_lo, q_hi),
+        v.name: Interval(-nominal_velocity_bound, nominal_velocity_bound),
+        w.name: Interval(-disturbance_bound, disturbance_bound),
+    }
+
+    def guard_partitions(
+        expression_for: Callable[[sp.Expr], sp.Expr],
+    ) -> tuple[EnclosurePartition, ...]:
+        lower_brake_v = v + dt * reach + dt * w
+        upper_brake_v = v - dt * reach + dt * w
+        coast_v = v + dt * w
+        return (
+            EnclosurePartition(
+                label="lower-guard-outward-disturbed-brake",
+                expression=expression_spec(expression_for(lower_brake_v)),
+                box={
+                    q.name: Interval(q_lo, inner_low),
+                    v.name: Interval(-nominal_velocity_bound, 0),
+                    w.name: Interval(-disturbance_bound, disturbance_bound),
+                },
+            ),
+            EnclosurePartition(
+                label="lower-guard-inward-disturbed-coast",
+                expression=expression_spec(expression_for(coast_v)),
+                box={
+                    q.name: Interval(q_lo, inner_low),
+                    v.name: Interval(0, nominal_velocity_bound),
+                    w.name: Interval(-disturbance_bound, disturbance_bound),
+                },
+            ),
+            EnclosurePartition(
+                label="guard-interior-disturbed-coast",
+                expression=expression_spec(expression_for(coast_v)),
+                box={
+                    q.name: Interval(inner_low, inner_high),
+                    v.name: Interval(-nominal_velocity_bound, nominal_velocity_bound),
+                    w.name: Interval(-disturbance_bound, disturbance_bound),
+                },
+            ),
+            EnclosurePartition(
+                label="upper-guard-inward-disturbed-coast",
+                expression=expression_spec(expression_for(coast_v)),
+                box={
+                    q.name: Interval(inner_high, q_hi),
+                    v.name: Interval(-nominal_velocity_bound, 0),
+                    w.name: Interval(-disturbance_bound, disturbance_bound),
+                },
+            ),
+            EnclosurePartition(
+                label="upper-guard-outward-disturbed-brake",
+                expression=expression_spec(expression_for(upper_brake_v)),
+                box={
+                    q.name: Interval(inner_high, q_hi),
+                    v.name: Interval(0, nominal_velocity_bound),
+                    w.name: Interval(-disturbance_bound, disturbance_bound),
+                },
+            ),
+        )
+
+    velocity_status = certified_partitioned_enclosure_status(
+        id="enclosure:robust-velocity-bound:one-step-invariance:disturbance-box",
+        obligation=robust_velocity,
+        box=velocity_box,
+        partitions=guard_partitions(
+            lambda v_next: sp.Abs(v_next) - robust_velocity_bound
+        ),
+        soundness_assumptions=(
+            "Exact zero-order-hold sampled-data map with rational DroneParams; "
+            "each disturbed branch enclosure is exact-rational with no rounding.",
+            f"The branch boxes cover the geofence position interval, the nominal "
+            f"velocity precondition, and every {w.name} in W.",
+        ),
+        note=(
+            "Certified-numeric set-valued enclosure over the recorded disturbance "
+            "box; this is not proof or safety certification."
+        ),
+    )
+    if velocity_status is not None:
+        statuses.append(velocity_status)
+    return tuple(statuses)
 
 
 def drone_vertical_disturbed_geofence_problem(
@@ -2318,10 +2482,28 @@ def drone_vertical_disturbed_geofence_problem(
     # The robust forward-invariance claim is asserted only within the inner
     # interval and the tightened speed bound; sample within that region (the
     # disturbance bound is non-plane and external-required).
-    return replace(
+    problem = replace(
         problem,
         proof_statuses=sampled_region_proof_statuses(
             problem, restrict_to_assumption_regions=True
+        ),
+    )
+    return replace(
+        problem,
+        enclosure_statuses=_disturbed_axis_certified_statuses(
+            problem,
+            position=q,
+            velocity=v,
+            disturbance=w,
+            q_bounds=params.q3_bounds,
+            lower_band=params.floor_band,
+            upper_band=params.ceiling_band,
+            robust_speed_cap=robust_speed_cap,
+            nominal_velocity_bound=nominal_velocity_bound,
+            robust_velocity_bound=robust_velocity_bound,
+            reach=reach,
+            disturbance_bound=w_max,
+            timestep=dt,
         ),
     )
 
