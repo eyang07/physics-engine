@@ -1147,6 +1147,54 @@ for (const viewport of [
     await expect(page.locator("#verificationCertificateLanes .diagnostic--dimmed")).toHaveCount(0);
   });
 
+  test(`Verification certificate lane shows the selected obligation's worst margin at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    // The drone (3rd entry) has a geofence barrier lane bearing on the
+    // initial-containment obligation, whose ledger margin is non-trivial.
+    await page.locator("#verificationCatalog .catalog-item").nth(2).click();
+    await expect(page.getByRole("heading", { name: /drone geofence axis/i })).toBeVisible();
+
+    // The ledger headlines that obligation's signed worst margin (BE-036).
+    const ledgerMargin = page
+      .locator('#verifLedger .verif-ledger__row[data-obligation="geofence-barrier-initial-containment"] .verif-ledger__margin');
+    const ledgerText = (await ledgerMargin.textContent())?.replace(/^margin\s+/, "").trim() ?? "";
+    expect(ledgerText).toMatch(/[+-]\d/);
+
+    // No margin readout on the lanes until that obligation's evidence is selected.
+    await expect(page.locator("#verificationCertificateLanes .diagnostic__margin:visible")).toHaveCount(
+      0,
+    );
+
+    // Selecting the obligation's evidence reveals its worst margin on the lane
+    // that bears on it, aligned to the rollout — and it matches the ledger value.
+    await openVerificationDetails(page);
+    const toggle = page.locator(
+      "#verif-obligation-geofence-barrier-initial-containment .verif-evidence-toggle",
+    );
+    await toggle.click();
+    const readout = page.locator(
+      "#verificationCertificateLanes .diagnostic--emphasized .diagnostic__margin",
+    );
+    await expect(readout).toBeVisible();
+    await expect(readout.locator(".diagnostic__margin-value")).toHaveText(ledgerText);
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-margin-readout.png`),
+    });
+
+    // Re-selecting clears the readout along with the emphasis.
+    await toggle.click();
+    await expect(page.locator("#verificationCertificateLanes .diagnostic__margin:visible")).toHaveCount(
+      0,
+    );
+  });
+
   test(`Verification evidence selection clears when the problem changes at ${viewport.name}`, async ({
     page,
   }) => {

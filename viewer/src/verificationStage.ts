@@ -10,7 +10,7 @@
 import katex from "katex";
 
 import { PlaybackClock, sampleTrajectory, trajectoryDuration } from "./playback";
-import { CertificateLanes } from "./certificateLanes";
+import { CertificateLanes, type ObligationWorst } from "./certificateLanes";
 import { dossier, dossierRole } from "./design/dossier";
 import type { ProofStatus, RegionGeometry, VerificationProblem } from "./data/verification";
 import type { Trajectory } from "./data/trajectory";
@@ -141,6 +141,24 @@ function violationMarkers(
     markers.push({ x: placed.x, y: placed.y, label, worstValue: status.worstValue });
   }
   return markers;
+}
+
+// The tightest sampled record per obligation (BE-036): the most negative signed
+// margin across its sampled statuses and the worst sampled candidate value,
+// matching the ledger's headline margin. Lets a selected obligation surface its
+// worst margin on the certificate lanes that bear on it. Measured evidence only.
+function worstByObligation(statuses: ProofStatus[]): Map<string, ObligationWorst> {
+  const worst = new Map<string, ObligationWorst>();
+  for (const status of statuses) {
+    if (status.worstMargin === null) {
+      continue;
+    }
+    const prev = worst.get(status.obligationId);
+    if (prev === undefined || status.worstMargin < prev.margin) {
+      worst.set(status.obligationId, { margin: status.worstMargin, value: status.worstValue });
+    }
+  }
+  return worst;
 }
 
 // The closest-approach point per holding obligation: its worst (tightest) sample
@@ -527,7 +545,11 @@ export class VerificationStage {
       violationMarkers(problem.proofStatuses, axisX, axisY, obligationName),
     );
     this.setHolds(holdsMarkers(problem.proofStatuses, axisX, axisY, obligationName));
-    this.certificateLanes.show(vt.series, vt.certificateSeries);
+    this.certificateLanes.show(
+      vt.series,
+      vt.certificateSeries,
+      worstByObligation(problem.proofStatuses),
+    );
     this.syncPlayButton();
     this.resize();
   }

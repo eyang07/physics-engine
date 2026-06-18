@@ -11,16 +11,26 @@ import katex from "katex";
 
 import { dossier } from "./design/dossier";
 import type { CertificateSeries } from "./data/trajectory";
-import { clamp } from "./util";
+import { clamp, formatSignedMeasured } from "./util";
+
+/** The tightest sampled record for one obligation (BE-036): its signed worst
+ * margin to the boundary and the worst sampled candidate value, the same
+ * measured evidence the ledger headlines. */
+export type ObligationWorst = { margin: number; value: number | null };
 
 type Lane = {
   row: HTMLElement;
   obligationIds: string[];
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
+  readout: HTMLElement;
   values: number[];
   baseline: number;
   amplitude: number;
+  // The selected obligation's worst record, drawn as a closest-approach level on
+  // this lane while that obligation is selected; null when nothing is selected
+  // or this lane does not bear on it.
+  selectedWorst: ObligationWorst | null;
 };
 
 const COMPARISON_LATEX: Record<string, string> = {
@@ -92,6 +102,9 @@ function prepareCanvas(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D)
 export class CertificateLanes {
   private lanes: Lane[] = [];
   private selectedRow: HTMLElement | null = null;
+  // The per-obligation worst record (BE-036), so a selected obligation's worst
+  // sampled margin can be surfaced on the lanes that bear on it.
+  private worstByObligation = new Map<string, ObligationWorst>();
 
   // Notified when a lane is selected (with the obligations it bears on) or
   // cleared (null), so the host can emphasize the matching obligations.
@@ -107,10 +120,16 @@ export class CertificateLanes {
     this.container.replaceChildren();
     this.lanes = [];
     this.selectedRow = null;
+    this.worstByObligation = new Map();
   }
 
-  show(series: Record<string, number[]>, records: CertificateSeries[]): void {
+  show(
+    series: Record<string, number[]>,
+    records: CertificateSeries[],
+    worstByObligation: Map<string, ObligationWorst> = new Map(),
+  ): void {
     this.clear();
+    this.worstByObligation = worstByObligation;
     records.forEach((record) => this.buildRow(record, series));
     if (this.lanes.length === 0) {
       // Make the absence legible: a problem can simply carry no measured
@@ -151,13 +170,39 @@ export class CertificateLanes {
   setEmphasis(obligationId: string | null): void {
     this.lanes.forEach((lane) => {
       lane.row.classList.remove("diagnostic--emphasized", "diagnostic--dimmed");
-      if (obligationId === null) {
-        return;
+      const bears = obligationId !== null && lane.obligationIds.includes(obligationId);
+      if (obligationId !== null) {
+        lane.row.classList.add(bears ? "diagnostic--emphasized" : "diagnostic--dimmed");
       }
-      lane.row.classList.add(
-        lane.obligationIds.includes(obligationId) ? "diagnostic--emphasized" : "diagnostic--dimmed",
-      );
+      // The selected obligation's worst sampled margin (BE-036), surfaced on the
+      // lane(s) that bear on it. The same measured value the ledger headlines —
+      // never a proof.
+      const worst = bears && obligationId !== null ? this.worstByObligation.get(obligationId) ?? null : null;
+      this.setLaneReadout(lane, worst);
     });
+  }
+
+  // Show (or hide) a lane's worst-margin readout: the signed BE-036 margin as a
+  // chip, with the worst sampled candidate value drawn as a closest-approach
+  // level line on the lane (see drawLane). Measured evidence only.
+  private setLaneReadout(lane: Lane, worst: ObligationWorst | null): void {
+    lane.selectedWorst = worst;
+    if (!worst) {
+      lane.readout.hidden = true;
+      lane.readout.textContent = "";
+      return;
+    }
+    lane.readout.replaceChildren();
+    const label = document.createElement("span");
+    label.className = "diagnostic__margin-label";
+    label.textContent = "worst margin";
+    const value = document.createElement("span");
+    value.className = "diagnostic__margin-value";
+    value.textContent = formatSignedMeasured(worst.margin);
+    lane.readout.append(label, value);
+    lane.readout.title =
+      "signed worst sampled margin to the obligation boundary (BE-036) — measured evidence, consistent with the ledger, not a proof";
+    lane.readout.hidden = false;
   }
 
   private buildRow(record: CertificateSeries, series: Record<string, number[]>): void {
@@ -207,7 +252,12 @@ export class CertificateLanes {
 
     const lane = document.createElement("canvas");
     lane.className = "diagnostic__residual diagnostic__certificate";
-    row.append(head, lane);
+    // The worst-margin readout for the selected obligation; hidden until this
+    // lane bears on a selected obligation with an exported worst record.
+    const readout = document.createElement("div");
+    readout.className = "diagnostic__margin";
+    readout.hidden = true;
+    row.append(head, lane, readout);
     this.container.append(row);
 
     const laneCtx = lane.getContext("2d");
@@ -217,9 +267,11 @@ export class CertificateLanes {
         obligationIds: record.obligationIds,
         canvas: lane,
         ctx: laneCtx,
+        readout,
         values,
         baseline,
         amplitude,
+        selectedWorst: null,
       });
     }
   }
@@ -229,7 +281,7 @@ export class CertificateLanes {
 // baseline). The curve auto-scales to its own excursion so its sign and shape
 // relative to the threshold read clearly; the playhead tracks the run.
 function drawLane(lane: Lane, phase: number): void {
-  const { canvas, ctx, values, baseline, amplitude } = lane;
+  const { canvas, ctx, values, baseline, amplitude, selectedWorst } = lane;
   const { width, height } = prepareCanvas(canvas, ctx);
 
   const count = values.length;
@@ -254,6 +306,23 @@ function drawLane(lane: Lane, phase: number): void {
   ctx.lineTo(width, mid);
   ctx.stroke();
   ctx.restore();
+
+  // The selected obligation's worst sampled candidate value (BE-036), as a
+  // closest-approach level on this lane: the gap from the threshold baseline to
+  // this level is the signed worst margin the readout names. Measured evidence
+  // drawn against the rollout, never a proof.
+  if (selectedWorst && selectedWorst.value !== null && Number.isFinite(selectedWorst.value)) {
+    const wy = yOf(selectedWorst.value);
+    ctx.save();
+    ctx.setLineDash([2, 3]);
+    ctx.strokeStyle = dossier.graphite;
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    ctx.moveTo(0, wy);
+    ctx.lineTo(width, wy);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // The measured signal: a soft teal area under a teal trace — no glow.
   ctx.beginPath();
