@@ -102,8 +102,12 @@ organizes; external tools dispose**: nothing in the IR stores proof results.
    standoff annulus inside a rectangular chart), not over the whole rectangle.
    The status remains `rigor="certified-numeric"` and
    `externalStatus="external-required"`; recording a constrained domain does
-   not by itself discharge an obligation. Validators reject constraints that
-   reference unknown symbols or variables outside the recorded box.
+   not by itself discharge an obligation. The current trusted constrained
+   producer uses the fail-closed evaluator for both the unconstrained lower
+   endpoint and the recorded upper-bound refinement; the refinement assumptions
+   must explain why the upper-bound expression encloses the obligation on
+   `box ∩ domainConstraints`. Validators reject constraints that reference
+   unknown symbols or variables outside the recorded box.
 11. **Deferred (out of v3):** richer
    assumption languages beyond scalar expression comparisons, boundary
    topology guarantees, real external backends, and any proof-result storage.

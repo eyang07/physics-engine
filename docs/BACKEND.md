@@ -82,16 +82,18 @@ artifacts.
     obstacle/planar robust avoidance remains measured-only until the sqrt
     enclosure path handles it.
   - Certified-numeric sqrt enclosures for the nominal obstacle keep-out and
-    geofence∩obstacle packages on a conservative standoff/interior box. The sqrt
-    argument is enclosed exactly and the sqrt endpoint uses the verified
-    outward-rounded mpmath path; broader annulus regions remain measured-only
-    until tighter enclosures are added.
+    geofence∩obstacle packages over a recorded guard-band-interior box
+    intersected with the standoff `domainConstraints`. The unconstrained
+    rectangle is too loose and includes points outside the standoff predicate;
+    the certified-numeric claim is only over the constrained domain. The sqrt
+    argument is enclosed exactly, sqrt endpoints use the verified
+    outward-rounded mpmath path, and the distance-barrier upper endpoint is
+    tightened by the recorded standoff lower bound. Points outside the
+    constraint remain measured-only / external-required.
   - Enclosure statuses can record additional domain constraints alongside their
-    rectangular box, so future certified-numeric claims over annular/standoff
-    regions can state `box ∩ constraints` explicitly instead of certifying an
-    unsafe rectangle. This is a contract/metadata capability only; the trusted
-    evaluator must still produce and test the actual enclosure before any status
-    is emitted.
+    rectangular box. Constrained certified-numeric producers state claims over
+    `box ∩ constraints` explicitly and must still derive sound endpoints through
+    the trusted fail-closed evaluator before any status is emitted.
   - Viewer-renderable verification examples now include
     `upright-pendulum-safety` and `controlled-spring-regulator-safety`, each
     with its own controlled trajectory, region geometry, candidate-certificate

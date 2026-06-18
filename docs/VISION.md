@@ -182,7 +182,7 @@ disturbance sets, closed-loop reduction, and deterministic rollouts
 candidate Lyapunov/barrier functions, proof obligations, measured sampled
 checks, selected exact-rational certified-numeric interval enclosures for the
 Tier-1 drone geofence family, Tier-3 disturbed geofence-axis obligations, and
-selected sqrt-bearing keep-out boxes, and verification-problem IR v3
+selected sqrt-bearing keep-out constrained domains, and verification-problem IR v3
 (continuous and discrete dynamics, control/disturbance channels, explicit
 assumptions, candidate certificates, plus self-contained viewer-facing
 verification exports: measured `regionGeometry` grids and boundary polylines,

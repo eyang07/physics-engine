@@ -53,6 +53,7 @@ from engine.verification.enclosure import (
 from engine.verification.reachability import one_step_image
 from engine.verification.certified import (
     EnclosurePartition,
+    certified_constrained_upper_refinement_status,
     certified_enclosure_status,
     certified_partitioned_enclosure_status,
     partitioned_enclosure,
@@ -159,6 +160,7 @@ __all__ = [
     "UnsupportedExpressionError",
     "CertificateTrajectoryDiagnostics",
     "certificate_series_for_trajectory",
+    "certified_constrained_upper_refinement_status",
     "certified_enclosure_status",
     "certified_partitioned_enclosure_status",
     "classifications_by_obligation",

@@ -10,6 +10,13 @@ the whole box. When the enclosure does not close it, the obligation stays
 measured-only (an honest "not certified"), so ``None`` is returned rather than a
 weaker or fabricated status.
 
+For constrained domains, the trusted producer still derives endpoints through
+the same fail-closed evaluator: it combines the unconstrained lower endpoint
+with a caller-supplied upper-bound expression whose soundness over
+``box`` intersected with ``domain_constraints`` must be recorded in the status
+assumptions. This is for monotone refinements such as a distance barrier over a
+recorded standoff predicate; it is not a proof-discharge path.
+
 A certified-numeric enclosure is rigor level 2: sound over the stated box under
 the recorded assumptions. It is never a proof or external certificate; the
 obligation still requires external discharge to be proved.
@@ -46,6 +53,48 @@ def _verdict(comparison: str, enclosure: Interval, rhs: Fraction) -> str | None:
     if _enclosure_violated(comparison, lower, upper, rhs):
         return "certified-violated"
     return None
+
+
+def _serialized_box(box: Mapping[str, Interval]) -> tuple[tuple[str, str, str], ...]:
+    return tuple(
+        sorted(
+            (name, str(interval.lower), str(interval.upper))
+            for name, interval in box.items()
+        )
+    )
+
+
+def _status_from_enclosure(
+    *,
+    id: str,
+    obligation: ObligationSpec,
+    box: Mapping[str, Interval],
+    enclosure: Interval,
+    soundness_assumptions: tuple[str, ...],
+    region_id: str | None,
+    note: str | None,
+    domain_constraints: tuple[EnclosureDomainConstraintSpec, ...],
+) -> EnclosureStatusSpec | None:
+    rhs = Fraction(str(obligation.rhs))
+    verdict = _verdict(obligation.comparison, enclosure, rhs)
+    if verdict is None:
+        return None
+
+    extra = {} if note is None else {"note": note}
+    return EnclosureStatusSpec(
+        id=id,
+        obligation_id=obligation.id,
+        comparison=obligation.comparison,
+        verdict=verdict,
+        box=_serialized_box(box),
+        enclosure_lower=str(enclosure.lower),
+        enclosure_upper=str(enclosure.upper),
+        rhs=obligation.rhs,
+        region_id=region_id if region_id is not None else obligation.region_id,
+        soundness_assumptions=tuple(soundness_assumptions),
+        domain_constraints=domain_constraints,
+        **extra,
+    )
 
 
 @dataclass(frozen=True)
@@ -102,31 +151,65 @@ def certified_enclosure_status(
     """
 
     enclosure = enclose_expression(obligation.expression, box)
-    rhs = Fraction(str(obligation.rhs))
-    verdict = _verdict(obligation.comparison, enclosure, rhs)
-    if verdict is None:
-        return None
-
-    serialized_box = tuple(
-        sorted(
-            (name, str(interval.lower), str(interval.upper))
-            for name, interval in box.items()
-        )
-    )
-    extra = {} if note is None else {"note": note}
-    return EnclosureStatusSpec(
+    return _status_from_enclosure(
         id=id,
-        obligation_id=obligation.id,
-        comparison=obligation.comparison,
-        verdict=verdict,
-        box=serialized_box,
-        enclosure_lower=str(enclosure.lower),
-        enclosure_upper=str(enclosure.upper),
-        rhs=obligation.rhs,
-        region_id=region_id if region_id is not None else obligation.region_id,
+        obligation=obligation,
+        enclosure=enclosure,
+        box=box,
+        region_id=region_id,
         soundness_assumptions=tuple(soundness_assumptions),
         domain_constraints=domain_constraints,
-        **extra,
+        note=note,
+    )
+
+
+def certified_constrained_upper_refinement_status(
+    *,
+    id: str,
+    obligation: ObligationSpec,
+    box: Mapping[str, Interval],
+    upper_bound: ExpressionSpec,
+    domain_constraints: tuple[EnclosureDomainConstraintSpec, ...],
+    soundness_assumptions: tuple[str, ...] = (),
+    region_id: str | None = None,
+    note: str | None = None,
+) -> EnclosureStatusSpec | None:
+    """Emit a constrained-domain status from a sound upper refinement.
+
+    The recorded claim is over ``box`` intersected with
+    ``domain_constraints``. The lower endpoint is the fail-closed enclosure of
+    the original obligation over the full box; the upper endpoint is the
+    fail-closed enclosure of ``upper_bound`` over the same box. Callers must
+    record why ``upper_bound`` encloses the original obligation on the
+    constrained domain. If the refined interval still does not close the
+    obligation, ``None`` is returned.
+
+    This helper is intentionally only for ``<=``/``<`` obligations, where an
+    upper bound can establish the holds verdict. It never proves or externally
+    certifies an obligation.
+    """
+
+    if obligation.comparison not in ("<=", "<"):
+        raise ValueError(
+            "constrained upper refinement only supports <= and < obligations"
+        )
+    if not domain_constraints:
+        raise ValueError(
+            "constrained upper refinement requires recorded domain constraints"
+        )
+
+    unconstrained = enclose_expression(obligation.expression, box)
+    upper_enclosure = enclose_expression(upper_bound, box)
+    enclosure = Interval(unconstrained.lower, upper_enclosure.upper)
+    return _status_from_enclosure(
+        id=id,
+        obligation=obligation,
+        box=box,
+        enclosure=enclosure,
+        soundness_assumptions=soundness_assumptions,
+        region_id=region_id,
+        note=note,
+        domain_constraints=domain_constraints,
     )
 
 
@@ -149,17 +232,6 @@ def certified_partitioned_enclosure_status(
     """
 
     enclosure = partitioned_enclosure(partitions)
-    rhs = Fraction(str(obligation.rhs))
-    verdict = _verdict(obligation.comparison, enclosure, rhs)
-    if verdict is None:
-        return None
-
-    serialized_box = tuple(
-        sorted(
-            (name, str(interval.lower), str(interval.upper))
-            for name, interval in box.items()
-        )
-    )
     partition_assumptions = tuple(
         f"Partition {partition.label!r} enclosed over "
         + ", ".join(
@@ -168,25 +240,21 @@ def certified_partitioned_enclosure_status(
         )
         for partition in partitions
     )
-    extra = {} if note is None else {"note": note}
-    return EnclosureStatusSpec(
+    return _status_from_enclosure(
         id=id,
-        obligation_id=obligation.id,
-        comparison=obligation.comparison,
-        verdict=verdict,
-        box=serialized_box,
-        enclosure_lower=str(enclosure.lower),
-        enclosure_upper=str(enclosure.upper),
-        rhs=obligation.rhs,
-        region_id=region_id if region_id is not None else obligation.region_id,
+        obligation=obligation,
+        enclosure=enclosure,
+        box=box,
+        region_id=region_id,
         soundness_assumptions=tuple(soundness_assumptions) + partition_assumptions,
         domain_constraints=domain_constraints,
-        **extra,
+        note=note,
     )
 
 
 __all__ = [
     "EnclosurePartition",
+    "certified_constrained_upper_refinement_status",
     "certified_enclosure_status",
     "certified_partitioned_enclosure_status",
     "partitioned_enclosure",

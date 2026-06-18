@@ -36,11 +36,13 @@ from engine.numerics import Interval, integrate_fixed_step
 from engine.verification import (
     AssumptionSpec,
     CandidateSpec,
+    EnclosureDomainConstraintSpec,
     EnclosurePartition,
     EnclosureStatusSpec,
     InspectionAdapterReport,
     VerificationProblem,
     certificate_series_for_trajectory,
+    certified_constrained_upper_refinement_status,
     certified_enclosure_status,
     certified_partitioned_enclosure_status,
     expression_spec,
@@ -1353,27 +1355,32 @@ def _obstacle_keepout_certified_statuses(
     params: DroneParams,
     obstacle: ObstacleSpec,
 ) -> tuple[EnclosureStatusSpec, ...]:
-    """Certified sqrt enclosure for the keep-out avoidance corridor.
+    """Certified sqrt enclosure for the constrained keep-out corridor.
 
-    The full standoff annulus is not a rectangle. This level-2 status records a
-    conservative axis-aligned standoff/interior box on the right side of the
-    obstacle where the sqrt interval enclosure closes. Other parts of the
-    annulus remain measured/external-required until tighter forms are added.
+    The full standoff annulus is not a rectangle. This level-2 status records
+    the guard-band interior rectangle and the standoff predicate as
+    ``domainConstraints``; the certified domain is their intersection, not the
+    whole rectangle.
     """
 
     r = _drone_rational
     q1, q2 = DRONE_STATE[0], DRONE_STATE[1]
     cx, cy = obstacle.center
+    rho = r(obstacle.radius)
     q1_min, q1_max = params.q1_bounds
-    _q2_min, _q2_max = params.q2_bounds
+    q2_min, q2_max = params.q2_bounds
+    dt = r(params.timestep)
     band = r(params.horizontal_band)
     standoff = r(obstacle.standoff_radius)
-    lateral = min(r(obstacle.radius) / 2, band / 2)
-    q1_lower = r(cx) + standoff
+    speed_max = sp.sqrt(2) * r(params.horizontal_velocity_bound)
+    drift = dt * speed_max
+    dist = sp.sqrt((q1 - r(cx)) ** 2 + (q2 - r(cy)) ** 2)
+
+    q1_lower = r(q1_min) + band
     q1_upper = r(q1_max) - band
-    q2_lower = r(cy) - lateral
-    q2_upper = r(cy) + lateral
-    if q1_lower > q1_upper:
+    q2_lower = r(q2_min) + band
+    q2_upper = r(q2_max) - band
+    if q1_lower > q1_upper or q2_lower > q2_upper:
         return ()
 
     obligation = next(
@@ -1381,24 +1388,40 @@ def _obstacle_keepout_certified_statuses(
         for ob in problem.obligations
         if ob.name == "obstacle-keepout:one-step-avoidance"
     )
-    status = certified_enclosure_status(
-        id="enclosure:obstacle-keepout:one-step-avoidance:sqrt-standoff-box",
+    standoff_constraint = EnclosureDomainConstraintSpec(
+        id="drone-maintains-obstacle-standoff",
+        expression=expression_spec(standoff - dist),
+        comparison="<=",
+        rhs=0.0,
+        variables=(q1.name, q2.name),
+        description=(
+            "|q - c| >= R: the certified-numeric enclosure is asserted only on "
+            "the standoff-constrained part of the recorded guard-band interior box."
+        ),
+    )
+    box = {
+        q1.name: Interval(q1_lower, q1_upper),
+        q2.name: Interval(q2_lower, q2_upper),
+    }
+    status = certified_constrained_upper_refinement_status(
+        id="enclosure:obstacle-keepout:one-step-avoidance:standoff-constrained-domain",
         obligation=obligation,
-        box={
-            q1.name: Interval(q1_lower, q1_upper),
-            q2.name: Interval(q2_lower, q2_upper),
-        },
+        box=box,
+        upper_bound=expression_spec(rho + drift - standoff),
+        domain_constraints=(standoff_constraint,),
         soundness_assumptions=(
             "Exact-rational interval arithmetic encloses the polynomial sqrt "
             "argument; sqrt endpoints use the verified outward-rounded mpmath path.",
-            "Box is a conservative standoff/interior rectangle: q1 is at least the "
-            "standoff radius to the right of the obstacle center, q2 stays within "
-            "a small centered lateral band, and the box lies inside the geofence "
-            "guard-band interior.",
+            "The recorded certified domain is the guard-band interior box "
+            "intersected with domainConstraints, including |q - c| >= R.",
+            "On that constrained domain, rho - |q - c| + dt*Vmax is bounded above "
+            "by rho - R + dt*Vmax; the status enclosure uses that monotone "
+            "distance refinement for the upper endpoint.",
         ),
         note=(
-            "Certified-numeric sqrt enclosure on the recorded standoff/interior "
-            "box only; the rest of the annulus remains measured/external-required."
+            "Certified-numeric sqrt enclosure on the recorded box intersected "
+            "with domainConstraints only. The full rectangle includes points "
+            "outside the standoff predicate and is not certified as a rectangle."
         ),
     )
     return () if status is None else (status,)

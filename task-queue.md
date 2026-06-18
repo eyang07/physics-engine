@@ -234,22 +234,7 @@ enclosure under stated assumptions), strictly distinct from `measured` (level 1)
 from any external `proved` / `certified` result. The engine proposes; external
 backends dispose._
 
-1. **BE-073: Constrained-domain refinement for the distance barrier**
-    - Goal: Use the recorded `box ∩ domainConstraints` contract to tighten the
-      `sqrt` distance barrier over a standoff/annulus slice, so a keep-out
-      avoidance obligation can certify over a constrained domain without claiming
-      the whole enclosing rectangle is safe.
-    - Scope: `engine/verification/` (constrained-domain enclosure or affine/Taylor
-      refinement over recorded constraints), `scripts/export_verification_problems.py`,
-      and `tests/`.
-    - Acceptance: the refined enclosure is tighter than the unconstrained interval
-      box on a keep-out obligation while still containing every sampled value inside
-      the recorded constrained domain; a previously-too-loose constrained keep-out
-      domain certifies with `domainConstraints` recorded; sampled points outside the
-      constraint are not treated as certified; soundness tests pass; nothing claims
-      proof.
-
-2. **BE-074: Surface the certified level-2 status across the summary and rigor ladder**
+1. **BE-074: Surface the certified level-2 status across the summary and rigor ladder**
     - Goal: Make the certified-numeric tier legible — extend the BE-061 cross-package
       summary and the package rigor ladder to report, per obligation, certified-numeric
       vs measured-only vs external-required, keeping the three rigor levels strictly
@@ -262,7 +247,7 @@ backends dispose._
       the report stays deterministic; generated data stays uncommitted; focused tests
       pass.
 
-3. **BE-075: Cross-package certified-status validator**
+2. **BE-075: Cross-package certified-status validator**
     - Goal: Validate, across the whole drone family, which obligations close at level 2
       and that every certified status is internally consistent (its enclosure satisfies
       the recorded verdict over the recorded box and its assumptions are recorded),
@@ -274,7 +259,7 @@ backends dispose._
       tampered one; it reports the family-wide certified coverage; nothing claims
       proof; focused tests pass.
 
-4. **BE-076: Real `reachability` export adapter (non-discharging handoff)**
+3. **BE-076: Real `reachability` export adapter (non-discharging handoff)**
     - Goal: Replace the reachability adapter *stub* with a concrete artifact — write
       each one-step obligation as an enclosure / reachability problem an external
       validated-numerics tool could consume, closing the IR's "optional backend

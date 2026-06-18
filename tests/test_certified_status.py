@@ -22,6 +22,7 @@ from engine.verification import (
     RIGOR_CERTIFIED_NUMERIC,
     VariableSpec,
     VerificationProblem,
+    certified_constrained_upper_refinement_status,
     certified_enclosure_status,
     certified_partitioned_enclosure_status,
     expression_spec,
@@ -153,6 +154,62 @@ def test_producer_records_domain_constraints() -> None:
     payload = status.to_dict()
     assert payload["domainConstraints"][0]["id"] == "right-half"
     assert EnclosureStatusSpec.from_dict(payload) == status
+
+
+def test_constrained_upper_refinement_tightens_upper_endpoint() -> None:
+    x = sp.Symbol("x", real=True)
+    constraint = EnclosureDomainConstraintSpec(
+        id="right-tail",
+        expression=expression_spec(2 - x),
+        comparison="<=",
+        rhs=0.0,
+        variables=("x",),
+        description="x >= 2 inside the recorded box",
+    )
+    status = certified_constrained_upper_refinement_status(
+        id="enc-constrained-upper",
+        obligation=_obligation(1 - x, "<="),
+        box={"x": Interval(-1, 3)},
+        upper_bound=expression_spec(-1),
+        domain_constraints=(constraint,),
+        soundness_assumptions=("On the constrained domain x >= 2, 1 - x <= -1.",),
+    )
+    assert status is not None
+    assert status.verdict == "certified-holds"
+    assert status.enclosure_lower == "-2"
+    assert status.enclosure_upper == "-1"
+    assert status.domain_constraints == (constraint,)
+
+
+def test_constrained_upper_refinement_requires_constraints() -> None:
+    x = sp.Symbol("x", real=True)
+    with pytest.raises(ValueError, match="requires recorded domain constraints"):
+        certified_constrained_upper_refinement_status(
+            id="enc-unconstrained-upper",
+            obligation=_obligation(1 - x, "<="),
+            box={"x": Interval(-1, 2)},
+            upper_bound=expression_spec(-1),
+            domain_constraints=(),
+        )
+
+
+def test_constrained_upper_refinement_returns_none_when_it_does_not_close() -> None:
+    x = sp.Symbol("x", real=True)
+    constraint = EnclosureDomainConstraintSpec(
+        id="right-half",
+        expression=expression_spec(-x),
+        comparison="<=",
+        rhs=0.0,
+        variables=("x",),
+    )
+    status = certified_constrained_upper_refinement_status(
+        id="enc-loose-constrained-upper",
+        obligation=_obligation(2 - x, "<="),
+        box={"x": Interval(-1, 2)},
+        upper_bound=expression_spec(2),
+        domain_constraints=(constraint,),
+    )
+    assert status is None
 
 
 # -- round-trip ----------------------------------------------------------
