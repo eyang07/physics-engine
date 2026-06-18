@@ -1318,10 +1318,16 @@ def drone_obstacle_keepout_problem(
     problem = replace(problem, region_geometry=geometry)
     # The avoidance claim holds only where the standoff and interior assumptions
     # hold; sample within that region (the velocity bound is external-required).
-    return replace(
+    problem = replace(
         problem,
         proof_statuses=sampled_region_proof_statuses(
             problem, restrict_to_assumption_regions=True
+        ),
+    )
+    return replace(
+        problem,
+        enclosure_statuses=_obstacle_keepout_certified_statuses(
+            problem, params=params, obstacle=obstacle
         ),
     )
 
@@ -1339,6 +1345,63 @@ def drone_obstacle_keepout_trajectory(
     result = horizontal_plane_rollout(params)
     time = result.steps.astype(float) * params.timestep
     return time, result.states[:, :2]
+
+
+def _obstacle_keepout_certified_statuses(
+    problem: VerificationProblem,
+    *,
+    params: DroneParams,
+    obstacle: ObstacleSpec,
+) -> tuple[EnclosureStatusSpec, ...]:
+    """Certified sqrt enclosure for the keep-out avoidance corridor.
+
+    The full standoff annulus is not a rectangle. This level-2 status records a
+    conservative axis-aligned standoff/interior box on the right side of the
+    obstacle where the sqrt interval enclosure closes. Other parts of the
+    annulus remain measured/external-required until tighter forms are added.
+    """
+
+    r = _drone_rational
+    q1, q2 = DRONE_STATE[0], DRONE_STATE[1]
+    cx, cy = obstacle.center
+    q1_min, q1_max = params.q1_bounds
+    _q2_min, _q2_max = params.q2_bounds
+    band = r(params.horizontal_band)
+    standoff = r(obstacle.standoff_radius)
+    lateral = min(r(obstacle.radius) / 2, band / 2)
+    q1_lower = r(cx) + standoff
+    q1_upper = r(q1_max) - band
+    q2_lower = r(cy) - lateral
+    q2_upper = r(cy) + lateral
+    if q1_lower > q1_upper:
+        return ()
+
+    obligation = next(
+        ob
+        for ob in problem.obligations
+        if ob.name == "obstacle-keepout:one-step-avoidance"
+    )
+    status = certified_enclosure_status(
+        id="enclosure:obstacle-keepout:one-step-avoidance:sqrt-standoff-box",
+        obligation=obligation,
+        box={
+            q1.name: Interval(q1_lower, q1_upper),
+            q2.name: Interval(q2_lower, q2_upper),
+        },
+        soundness_assumptions=(
+            "Exact-rational interval arithmetic encloses the polynomial sqrt "
+            "argument; sqrt endpoints use the verified outward-rounded mpmath path.",
+            "Box is a conservative standoff/interior rectangle: q1 is at least the "
+            "standoff radius to the right of the obstacle center, q2 stays within "
+            "a small centered lateral band, and the box lies inside the geofence "
+            "guard-band interior.",
+        ),
+        note=(
+            "Certified-numeric sqrt enclosure on the recorded standoff/interior "
+            "box only; the rest of the annulus remains measured/external-required."
+        ),
+    )
+    return () if status is None else (status,)
 
 
 def drone_obstacle_keepout_violation_trajectory(
@@ -1725,10 +1788,16 @@ def drone_geofence_obstacle_problem(
     # Each one-step claim holds only within its assumption region (the geofence
     # claim in the inner interval, the keep-out claim in the standoff annulus);
     # sample within that region (the velocity bound is external-required).
-    return replace(
+    problem = replace(
         problem,
         proof_statuses=sampled_region_proof_statuses(
             problem, restrict_to_assumption_regions=True
+        ),
+    )
+    return replace(
+        problem,
+        enclosure_statuses=_obstacle_keepout_certified_statuses(
+            problem, params=params, obstacle=obstacle
         ),
     )
 

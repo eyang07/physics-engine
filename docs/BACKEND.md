@@ -81,6 +81,11 @@ artifacts.
     and robust velocity-bound obligations over the recorded wind box. Sqrt-bearing
     obstacle/planar robust avoidance remains measured-only until the sqrt
     enclosure path handles it.
+  - Certified-numeric sqrt enclosures for the nominal obstacle keep-out and
+    geofence∩obstacle packages on a conservative standoff/interior box. The sqrt
+    argument is enclosed exactly and the sqrt endpoint uses the verified
+    outward-rounded mpmath path; broader annulus regions remain measured-only
+    until tighter enclosures are added.
   - Viewer-renderable verification examples now include
     `upright-pendulum-safety` and `controlled-spring-regulator-safety`, each
     with its own controlled trajectory, region geometry, candidate-certificate
