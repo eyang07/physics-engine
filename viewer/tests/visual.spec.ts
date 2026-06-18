@@ -1534,6 +1534,45 @@ for (const viewport of [
     ).toHaveCount(2);
   });
 
+  test(`Verification certificate lanes name barriers for an intersection safe set at ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.waitForSelector("#systemsDomain.domain--active");
+    await page.getByRole("button", { name: "Verification" }).click();
+    await page.waitForSelector("#verificationSummary .verif-summary");
+
+    const catalogItems = page.locator("#verificationCatalog .catalog-item");
+
+    // A single-barrier keep-out package (5th entry): lanes are unchanged — no
+    // barrier name labels and no intersection note.
+    await catalogItems.nth(4).click();
+    await expect(page.getByRole("heading", { name: /drone obstacle keepout/i })).toBeVisible();
+    await expect(page.locator("#verificationCertificateLanes .diagnostic__barrier")).toHaveCount(0);
+    await expect(page.locator("#verificationCertificateLanes .diagnostic-intersection")).toHaveCount(
+      0,
+    );
+
+    // The geofence∩obstacle package (8th entry) carries two candidate barriers
+    // whose intersection is the safe set: each lane is named, and the
+    // intersection semantics are stated once — both stay candidates.
+    await catalogItems.nth(7).click();
+    await expect(page.getByRole("heading", { name: /drone geofence obstacle/i })).toBeVisible();
+    const barriers = page.locator("#verificationCertificateLanes .diagnostic__barrier");
+    await expect(barriers).toHaveCount(2);
+    await expect(barriers.filter({ hasText: /geofence/i })).toHaveCount(1);
+    await expect(barriers.filter({ hasText: /keepout|keep out/i })).toHaveCount(1);
+    const note = page.locator("#verificationCertificateLanes .diagnostic-intersection");
+    await expect(note).toBeVisible();
+    await expect(note).toContainText(/intersection/i);
+    await expect(note).toContainText(/candidate/i);
+    await expect(note.locator(".katex")).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath(`${viewport.name}-verification-intersection-barriers.png`),
+    });
+  });
+
   test(`Verification surfaces show honest empty states at ${viewport.name}`, async ({
     page,
   }, testInfo) => {

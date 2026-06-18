@@ -47,22 +47,7 @@ below make the measured margin geometrically legible and surface the package
 inventory in the inspector. Keep rendering honest — measured stays measured,
 candidates stay candidates, nothing reads as proved._
 
-1. **FE-027: Label each barrier lane for intersection-safe-set packages**
-   - Goal: The geofence∩obstacle package (BE-050) carries two candidate barriers
-     together — the geofence box barrier and the signed-distance keep-out barrier
-     `B_obs = rho - |q - c|` — but the certificate lanes do not name which lane is
-     which or that safety is their intersection `{max(B_geo, B_obs) <= 0}`. Label
-     each lane by its barrier and surface the intersection semantics honestly, so a
-     reader can tell the box barrier from the keep-out barrier. Both stay
-     candidates.
-   - Scope: `viewer/src/certificateLanes.ts` (lane labeling), the IR reader if
-     barrier identity needs exposure, `viewer/src/styles.css`, and the viewer
-     visual test.
-   - Acceptance: the intersection package shows each barrier lane named and the
-     intersection semantics stated; single-barrier packages are unchanged; both
-     barriers stay labeled candidate; `npm run build` and the visual test pass.
-
-2. **FE-028: Verification catalog overview from the package discovery index**
+1. **FE-028: Verification catalog overview from the package discovery index**
    - Goal: The Verification view wires examples one by one, but the published
      discovery index (`packages.index.json`, surfaced on the viewer index by
      BE-047) already lists every package by model, status, and counts. Add a
@@ -78,7 +63,7 @@ candidates stay candidates, nothing reads as proved._
      existing per-example list; nothing reads as proved; `npm run build` and the
      visual test pass.
 
-3. **FE-029: Show the package Tier/regime badge in the catalog (after BE-054)**
+2. **FE-029: Show the package Tier/regime badge in the catalog (after BE-054)**
    - Goal: Once the discovery index carries the Tier/regime descriptor (BE-054 —
      nominal Tier-1/2 vs disturbance-robust Tier-3), surface it as an honest badge
      on each catalog entry so a reader can tell a nominal geofence package from a
@@ -91,7 +76,7 @@ candidates stay candidates, nothing reads as proved._
      descriptor; entries without the descriptor show no badge; nothing reads as
      proved; `npm run build` and the visual test pass.
 
-4. **FE-030: Render the measured violation reference scenario (after BE-056)**
+3. **FE-030: Render the measured violation reference scenario (after BE-056)**
     - Goal: Every published package currently *holds*, so the viewer's measured
       violation surface (red worst-violation markers and legend) is never
       exercised. Once the Tier-2 boundary-corner violation scenario exports

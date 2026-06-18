@@ -2281,6 +2281,34 @@ input[type="range"]::-moz-range-thumb {
   text-transform: uppercase;
 }
 
+/* The barrier this lane is, in an intersection-safe-set package (FE-027).
+   A candidate label only — it pushes to the trailing edge of the lane head. */
+.diagnostic__barrier {
+  margin-left: auto;
+  color: var(--measured);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+/* The intersection-safe-set semantics, stated once above the named barrier
+   lanes. */
+.diagnostic-intersection {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--hairline);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.diagnostic-intersection__math .katex {
+  color: var(--text-primary);
+}
+
 .diagnostic__caption .katex {
   color: var(--text-faint);
 }

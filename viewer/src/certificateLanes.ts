@@ -63,6 +63,26 @@ function baseSymbol(record: CertificateSeries): string {
   return (record.candidateId ?? "").toLowerCase().includes("lyapunov") ? "V" : "B";
 }
 
+// A safe-set barrier lane: a candidate-value series for a barrier that bears on
+// at least one obligation. When a package carries two or more of these together,
+// its safe set is their intersection (FE-027).
+function isSafeSetBarrierLane(record: CertificateSeries): boolean {
+  return (
+    record.kind === "candidate-value" &&
+    record.obligationIds.length > 0 &&
+    baseSymbol(record) === "B"
+  );
+}
+
+// A readable name for a barrier lane, humanized from the exported candidate id
+// (e.g. `geofence-box-barrier` -> `geofence box`). Labels the series; it does
+// not reclassify it.
+function barrierLabel(record: CertificateSeries): string {
+  const id = record.candidateId ?? "";
+  const trimmed = id.replace(/-?barrier$/i, "").replace(/[-_]+/g, " ").trim();
+  return trimmed || id || "barrier";
+}
+
 function symbolLatex(record: CertificateSeries): string {
   const base = baseSymbol(record);
   return record.kind === "flow-derivative" ? `\\dot{${base}}` : base;
@@ -130,7 +150,13 @@ export class CertificateLanes {
   ): void {
     this.clear();
     this.worstByObligation = worstByObligation;
-    records.forEach((record) => this.buildRow(record, series));
+    // An intersection safe set carries two or more safe-set barrier lanes
+    // together; only then do the lanes name each barrier and state the
+    // intersection semantics, leaving single-barrier packages unchanged.
+    const isIntersection = records.filter(isSafeSetBarrierLane).length >= 2;
+    records.forEach((record) =>
+      this.buildRow(record, series, isIntersection && isSafeSetBarrierLane(record)),
+    );
     if (this.lanes.length === 0) {
       // Make the absence legible: a problem can simply carry no measured
       // certificate series. State that rather than leaving an empty panel.
@@ -138,7 +164,29 @@ export class CertificateLanes {
       empty.className = "diagnostic-empty";
       empty.textContent = "No measured certificate series for this problem.";
       this.container.append(empty);
+    } else if (isIntersection) {
+      this.container.prepend(this.intersectionNote());
     }
+  }
+
+  // The intersection-safe-set semantics, stated once above the named barrier
+  // lanes: a state is safe only where every candidate barrier holds, i.e. the
+  // safe set is their intersection {max_i B_i <= 0}. Both barriers stay
+  // candidates — this names and relates them, it certifies nothing.
+  private intersectionNote(): HTMLElement {
+    const note = document.createElement("div");
+    note.className = "diagnostic-intersection";
+    const lead = document.createElement("span");
+    lead.className = "diagnostic-intersection__lead";
+    lead.textContent = "Safe set is the intersection of these candidate barriers:";
+    const math = document.createElement("span");
+    math.className = "diagnostic-intersection__math";
+    renderLatex(math, "\\{\\max_i B_i \\le 0\\}");
+    const tail = document.createElement("span");
+    tail.className = "diagnostic-intersection__tail";
+    tail.textContent = "— safe only where every barrier holds. Both stay candidates, not certified.";
+    note.append(lead, math, tail);
+    return note;
   }
 
   update(phase: number): void {
@@ -205,7 +253,11 @@ export class CertificateLanes {
     lane.readout.hidden = false;
   }
 
-  private buildRow(record: CertificateSeries, series: Record<string, number[]>): void {
+  private buildRow(
+    record: CertificateSeries,
+    series: Record<string, number[]>,
+    named: boolean,
+  ): void {
     const values = series[record.series];
     if (!values || values.length === 0) {
       return;
@@ -249,6 +301,15 @@ export class CertificateLanes {
       caption.textContent = record.kind === "flow-derivative" ? "flow derivative" : "candidate value";
     }
     head.append(symbol, caption);
+    // In an intersection package, name which barrier this lane is (box vs
+    // keep-out), so a reader can tell the two candidate barriers apart. It stays
+    // a candidate label — the lane certifies nothing.
+    if (named) {
+      const barrier = document.createElement("span");
+      barrier.className = "diagnostic__barrier";
+      barrier.textContent = barrierLabel(record);
+      head.append(barrier);
+    }
 
     const lane = document.createElement("canvas");
     lane.className = "diagnostic__residual diagnostic__certificate";
