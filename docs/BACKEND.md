@@ -97,9 +97,11 @@ artifacts.
   - The generated cross-package verification summary reports the evidence tier
     per obligation: `certified-numeric` (level 2 enclosure), `measured-only`
     (level 1 sampled evidence), or `external-required` only. It also reports
-    worst measured margins separately from worst certified enclosure margins.
-    These are catalog fields only; certified-numeric remains a sound enclosure
-    under stated assumptions, not proof or safety certification.
+    reachability handoff artifact counts and worst measured margins separately
+    from worst certified enclosure margins. These are catalog fields only;
+    certified-numeric remains a sound enclosure under stated assumptions, and a
+    reachability handoff is only a non-discharging external-backend input, not
+    proof or safety certification.
   - Cross-package certified-status coverage validation audits published
     `certified-numeric` statuses against their referenced obligations, recorded
     verdict/enclosure margins, soundness assumptions, and (where directly

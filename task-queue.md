@@ -128,17 +128,7 @@ enclosure under stated assumptions), strictly distinct from `measured` (level 1)
 from any external `proved` / `certified` result. The engine proposes; external
 backends dispose._
 
-1. **BE-078: Summarize reachability handoff coverage in package reports**
-    - Goal: Surface how many non-discharging reachability handoff artifacts each
-      generated package exports, so the backend inventory shows which obligations
-      have concrete handoff files without implying discharge.
-    - Scope: `engine/export/verification_package.py` (package summary/index metadata
-      if needed), `engine/verification/reachability.py`, and `tests/`.
-    - Acceptance: the package summary or a deterministic companion report lists
-      reachability handoff counts per package; missing/empty handoff inventories are
-      represented honestly; no entry claims proof or certification; focused tests pass.
-
-2. **BE-079: Cross-check reachability handoff coverage against certified coverage**
+1. **BE-079: Cross-check reachability handoff coverage against certified coverage**
     - Goal: Ensure the reachability handoff inventory stays aligned with the
       certified-status coverage report: every handoff-backed obligation is a real
       certified-numeric obligation, and missing handoffs are reported rather than
@@ -148,3 +138,16 @@ backends dispose._
     - Acceptance: a backend validator reports certified obligations with and without
       reachability handoffs; it rejects a handoff for a non-certified obligation; no
       report claims proof or external discharge; focused tests pass.
+
+2. **BE-080: Add a reachability handoff dependency index**
+    - Goal: Make each package's reachability handoff prerequisites inspectable
+      without opening every artifact, by publishing a deterministic dependency
+      index that maps handoffs to obligation ids, enclosure status ids, assumption
+      ids, and domain-constraint counts.
+    - Scope: `engine/verification/reachability.py`,
+      `engine/export/verification_package.py`, and `tests/`.
+    - Acceptance: the reachability index lists each artifact's obligation id,
+      enclosure status id, obligation assumption ids, domain-constraint count,
+      `discharges=false`, and `externalStatus="external-required"`; package
+      readback validates the dependency index against the artifacts and IR; no
+      entry claims proof, certification, or discharge; focused tests pass.

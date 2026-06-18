@@ -61,7 +61,8 @@ PACKAGE_INDEX_FILENAME = "packages.index.json"
 
 # A deterministic human-readable cross-package survey written beside the packages,
 # the catalog-level analogue of the inspection adapter's per-problem report. It
-# reports measured and certified-numeric evidence tiers; it proves nothing.
+# reports measured and certified-numeric evidence tiers plus non-discharging
+# reachability handoff inventory; it proves nothing.
 PACKAGE_SUMMARY_FILENAME = "packages.summary.md"
 
 # Component kinds the manifest may index, with their on-disk filenames. The IR
@@ -1453,8 +1454,9 @@ def _read_component(
 # It surveys every generated package's evidence tier at a glance -- model,
 # regime, obligation count, how many obligations have a level-2
 # certified-numeric enclosure, how many remain measured-only, how many have only
-# external-required obligations, plus sampled and certified margins. Pure
-# cataloging: it reports recorded evidence and still proves nothing.
+# external-required obligations, how many reachability handoff files are present,
+# plus sampled and certified margins. Pure cataloging: it reports recorded
+# evidence and still proves nothing.
 
 _SUMMARY_STATUS_HOLDS = "measured-holds"
 _SUMMARY_STATUS_VIOLATED = "measured-violated"
@@ -1473,6 +1475,7 @@ class PackageSummary:
     certified_numeric: int
     measured_only: int
     external_required: int
+    reachability_handoffs: int
     measured_holds: int
     measured_violated: int
     measured_external_required: int
@@ -1485,6 +1488,7 @@ class PackageSummary:
             self.certified_numeric,
             self.measured_only,
             self.external_required,
+            self.reachability_handoffs,
             self.measured_holds,
             self.measured_violated,
             self.measured_external_required,
@@ -1518,6 +1522,7 @@ class PackageSummary:
             "certifiedNumeric": self.certified_numeric,
             "measuredOnly": self.measured_only,
             "externalRequired": self.external_required,
+            "reachabilityHandoffs": self.reachability_handoffs,
             "measuredHolds": self.measured_holds,
             "measuredViolated": self.measured_violated,
             "measuredExternalRequired": self.measured_external_required,
@@ -1539,6 +1544,8 @@ def _status_margin(comparison: str, lower: str, upper: str, rhs: float) -> float
 def _summarize_problem(
     manifest: PackageManifest,
     problem: VerificationProblem,
+    *,
+    reachability: Sequence[ReachabilityHandoffArtifact] | None = None,
 ) -> PackageSummary:
     holds = violated = measured_external = 0
     measured_margins: list[float] = []
@@ -1585,6 +1592,7 @@ def _summarize_problem(
         certified_numeric=len(certified_obligation_ids),
         measured_only=len(measured_only_obligation_ids),
         external_required=len(external_obligation_ids),
+        reachability_handoffs=0 if reachability is None else len(reachability),
         measured_holds=holds,
         measured_violated=violated,
         measured_external_required=measured_external,
@@ -1599,12 +1607,18 @@ def summarize_packages(
     """Survey the evidence tier of each package, in the given order.
 
     Reads each package's manifest (model, regime) and IR (obligation count,
-    sampled proof statuses, and certified-numeric enclosure statuses) only; it
-    reports recorded evidence and proves nothing.
+    sampled proof statuses, certified-numeric enclosure statuses, and loaded
+    reachability handoff inventory) only; it reports recorded evidence and proves
+    nothing.
     """
 
     return tuple(
-        _summarize_problem(package.manifest, package.problem) for package in packages
+        _summarize_problem(
+            package.manifest,
+            package.problem,
+            reachability=package.reachability,
+        )
+        for package in packages
     )
 
 
@@ -1621,6 +1635,7 @@ def read_package_summaries(directory: str | Path) -> tuple[PackageSummary, ...]:
         _summarize_problem(
             package.manifest,
             package.problem,
+            reachability=package.reachability,
         )
         for entry in index.entries
         for package in (read_package(package_dir / entry.problem_id),)
@@ -1637,7 +1652,8 @@ def render_package_summary_markdown(
     """Render a deterministic human-readable cross-package summary report.
 
     The report separates measured sampling evidence from certified-numeric
-    enclosure bounds. Neither is a proof or external certificate, and every
+    enclosure bounds and catalogs non-discharging reachability handoff files.
+    None of these entries is a proof or external certificate, and every
     obligation still requires external discharge.
     """
 
@@ -1653,18 +1669,22 @@ def render_package_summary_markdown(
         "still has `externalStatus=\"external-required\"` until a real external",
         "backend discharges it. The measured and certified margins are signed",
         "distances to the obligation boundary; negative means the recorded",
-        "evidence crossed the boundary.",
+        "evidence crossed the boundary. `reachability handoffs` counts concrete",
+        "non-discharging handoff artifacts for external validated-numerics",
+        "backends; zero means the package exports no such artifacts.",
         "",
         "| package | model | regime | obligations | certified-numeric | "
-        "measured-only | external-required | measured-holds | measured-violated | "
-        "measured-external | worst measured margin | worst certified margin |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "measured-only | external-required | reachability handoffs | "
+        "measured-holds | measured-violated | measured-external | "
+        "worst measured margin | worst certified margin |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for summary in summaries:
         lines.append(
             f"| `{summary.problem_id}` | `{summary.model}` | {summary.regime} | "
             f"{summary.obligation_count} | {summary.certified_numeric} | "
             f"{summary.measured_only} | {summary.external_required} | "
+            f"{summary.reachability_handoffs} | "
             f"{summary.measured_holds} | {summary.measured_violated} | "
             f"{summary.measured_external_required} | "
             f"{_format_margin(summary.worst_measured_margin)} | "

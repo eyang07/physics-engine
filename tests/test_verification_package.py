@@ -217,7 +217,8 @@ def test_package_summary_surveys_measured_status_consistent_with_manifests(
     # regime, obligation count, measured hold/violation counts, and worst margin,
     # consistent with the per-package manifests. BE-074 adds the level-2
     # certified-numeric evidence tier beside measured-only and external-required
-    # obligations without treating any tier as proof.
+    # obligations without treating any tier as proof. BE-078 catalogs
+    # non-discharging reachability handoff artifacts without implying discharge.
     manifests = write_verification_packages(tmp_path)
     summaries = read_package_summaries(tmp_path)
 
@@ -243,6 +244,9 @@ def test_package_summary_surveys_measured_status_consistent_with_manifests(
         ) == summary.obligation_count
         assert summary.certified_numeric == len(
             {status.obligation_id for status in package.problem.enclosure_statuses}
+        )
+        assert summary.reachability_handoffs == (
+            0 if package.reachability is None else len(package.reachability)
         )
         # The measured tallies cover every proof status (none lost or double-counted).
         assert (
@@ -272,10 +276,15 @@ def test_package_summary_surveys_measured_status_consistent_with_manifests(
     holding = summary_by_id["drone-geofence-axis"]
     assert holding.measured_violated == 0
     assert holding.certified_numeric > 0
+    assert holding.reachability_handoffs == 3
     assert holding.worst_measured_margin is not None
     assert holding.worst_measured_margin >= 0.0
     assert holding.worst_certified_margin is not None
     assert holding.worst_certified_margin >= 0.0
+
+    # Continuous case-study packages can publish a reachability component with
+    # an empty handoff index; the summary reports that honestly as zero.
+    assert summary_by_id["upright-pendulum-safety"].reachability_handoffs == 0
 
     # A disturbance-robust package is labeled as such.
     assert summary_by_id["drone-disturbed-geofence-axis"].regime == REGIME_DISTURBANCE_ROBUST
@@ -293,6 +302,8 @@ def test_package_summary_is_deterministic_and_re_readable(tmp_path) -> None:
     # It is an honest evidence-tier survey -- certified-numeric is level 2, not proof.
     assert "certified-numeric" in written
     assert "measured-only" in written
+    assert "reachability handoffs" in written
+    assert "non-discharging handoff artifacts" in written
     assert "worst certified margin" in written
     assert "Neither level is a proof or external certificate" in written
     assert "proved" not in written
