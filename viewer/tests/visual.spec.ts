@@ -1706,6 +1706,23 @@ for (const viewport of [
     );
     // The honesty note (no stub attempts/records/claims discharge) rides along.
     await expect(stubsSection).toContainText(/discharge/i);
+
+    // The backend categories overview (FE-034) lists each category once with its
+    // summary and consumes/produces, every category non-discharging.
+    const categories = stubsSection.locator(".verif-adapter-category");
+    expect(await categories.count()).toBeGreaterThan(0);
+    await expect(
+      stubsSection.locator(".verif-adapter-category__name", { hasText: "reachability" }),
+    ).toBeVisible();
+    await expect(
+      stubsSection.locator(".verif-adapter-category__io-label", { hasText: /consumes/i }).first(),
+    ).toBeVisible();
+    await expect(
+      stubsSection.locator(".verif-adapter-category__io-label", { hasText: /produces/i }).first(),
+    ).toBeVisible();
+    await expect(categories.first().locator(".verif-adapter-category__discharges")).toHaveText(
+      "discharges: false",
+    );
     await page.screenshot({
       path: testInfo.outputPath(`${viewport.name}-verification-adapter-stubs.png`),
     });

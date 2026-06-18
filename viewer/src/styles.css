@@ -1227,6 +1227,70 @@ select {
   line-height: 1.45;
 }
 
+/* Backend categories overview (FE-034): each category once, with its summary and
+   consumes/produces — descriptors only, none discharging. */
+.verif-adapter-categories {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.verif-adapter-categories__list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.verif-adapter-category {
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-left: 2px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost);
+}
+
+.verif-adapter-category__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.verif-adapter-category__name {
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.verif-adapter-category__discharges {
+  color: var(--required);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+}
+
+.verif-adapter-category__summary {
+  margin: 4px 0 0;
+  color: var(--text-secondary, var(--text-muted));
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.verif-adapter-category__io {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.verif-adapter-category__io-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* The adapter-stub obligation heading jumps to the obligation's card, styled
    like the other jump links but with its own class so global jump counts that
    target measured-status links are unaffected. */

@@ -9,6 +9,7 @@
 import katex from "katex";
 
 import type {
+  AdapterCategory,
   AdapterStub,
   AdapterStubs,
   IrAssumption,
@@ -459,11 +460,57 @@ export class VerificationPanel {
   // have to handle. Every entry is labeled discharges: false — a stub is a
   // descriptor, never a discharge, and every obligation stays external-required.
   // Renders only what the stubs component exports.
+  // The backend categories overview (FE-034): each external category that could
+  // consume an obligation, with its summary and what it consumes / produces,
+  // read straight from the stubs component. Every category is a non-discharging
+  // handoff descriptor — it describes a backend role, never a result.
+  private renderAdapterCategories(categories: AdapterCategory[]): HTMLElement {
+    const wrap = el("div", "verif-adapter-categories");
+    wrap.append(
+      el(
+        "p",
+        "verif-meta",
+        "Backend categories that could consume these obligations — descriptors only, none discharging.",
+      ),
+    );
+    const list = el("ul", "verif-adapter-categories__list");
+    categories.forEach((category) => {
+      const item = el("li", "verif-adapter-category");
+      const head = el("div", "verif-adapter-category__head");
+      head.append(el("span", "verif-adapter-category__name", category.category));
+      head.append(el("span", "verif-adapter-category__discharges", "discharges: false"));
+      item.append(head);
+      if (category.summary) {
+        item.append(el("p", "verif-adapter-category__summary", category.summary));
+      }
+      const io = (label: string, text: string): void => {
+        if (!text) {
+          return;
+        }
+        const row = el("p", "verif-adapter-category__io");
+        row.append(el("span", "verif-adapter-category__io-label", label));
+        row.append(el("span", "verif-adapter-category__io-text", text));
+        item.append(row);
+      };
+      io("consumes ", category.consumes);
+      io("produces ", category.produces);
+      list.append(item);
+    });
+    wrap.append(list);
+    return wrap;
+  }
+
   private renderAdapterStubs(problem: VerificationProblem, stubs: AdapterStubs): HTMLElement {
     const node = section("Adapter stubs", "verifAdapterStubs");
     // The backend's own honesty note, verbatim.
     if (stubs.note) {
       node.append(el("p", "verif-meta", stubs.note));
+    }
+
+    // The backend categories overview: each category once, with its summary and
+    // what it consumes / produces, before the per-obligation stub list.
+    if (stubs.categories.length > 0) {
+      node.append(this.renderAdapterCategories(stubs.categories));
     }
 
     const obligationName = new Map(problem.obligations.map((o) => [o.id, o.name]));
