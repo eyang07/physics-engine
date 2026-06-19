@@ -302,20 +302,7 @@ inertia, Euler's equations, chaotic and integrable many-body motion, and normal
 modes. Builds on `engine/mechanics/` (lagrangian, hamiltonian, symmetries) and the
 trajectory/manifest export._
 
-1. **BE-083: Small-oscillation normal-mode analysis and coupled-oscillator system**
-   - Goal: Add a reusable small-oscillation helper that, given a Lagrangian system
-     and an equilibrium, forms the mass and stiffness matrices and returns normal-mode
-     frequencies and mode shapes (generalized eigenproblem), and add a coupled-
-     oscillator chain that exports its mode shapes and frequencies for mode animation.
-   - Scope: `engine/mechanics/` (new small-oscillation helper, e.g.
-     `small_oscillations.py`), `systems/coupled_oscillators.py`,
-     `scripts/generate_coupled_oscillators.py`, `scripts/example_specs.py`, `tests/`.
-   - Acceptance: the helper recovers known frequencies/shapes for a simple coupled
-     pair and an N-mass chain; the manifest carries mode shapes and frequencies; a
-     mode superposition rollout conserves energy within tolerance (`measured`);
-     focused tests pass and generation is clean.
-
-2. **BE-084: Rigid-body orientation and angular-velocity kinematics**
+1. **BE-084: Rigid-body orientation and angular-velocity kinematics**
    - Goal: Add a rigid-body kinematics foundation: SO(3) rotation matrices,
      conversions among rotation matrix / unit quaternion / Euler angles, and body-frame
      vs. space-frame angular velocity, all symbolic where useful and numeric where
@@ -326,7 +313,7 @@ trajectory/manifest export._
      relations match for sample motions; focused tests pass. No system or export
      change yet.
 
-3. **BE-085: Inertia tensor value object and principal-axis decomposition**
+2. **BE-085: Inertia tensor value object and principal-axis decomposition**
    - Goal: Add a frozen inertia-tensor value object (validated symmetric positive
      definite) with principal-moment / principal-axis decomposition and constructors
      for standard shapes (rod, disk, sphere, box).
@@ -335,7 +322,7 @@ trajectory/manifest export._
      reproduces known moments for standard shapes; eigen-axes are orthonormal;
      focused tests pass.
 
-4. **BE-086: Euler's rigid-body equations (torque-free and torqued)**
+3. **BE-086: Euler's rigid-body equations (torque-free and torqued)**
    - Goal: Implement Euler's equations for rigid-body rotation in the body frame from
      an inertia tensor and an applied torque, integrable through the existing numerics,
      with torque-free conservation of kinetic energy and angular-momentum magnitude.
@@ -345,7 +332,7 @@ trajectory/manifest export._
      tolerance (`measured`); a symmetric body reproduces steady precession; focused
      tests pass.
 
-5. **BE-087: Free asymmetric top with polhode / energy-ellipsoid export**
+4. **BE-087: Free asymmetric top with polhode / energy-ellipsoid export**
    - Goal: Add a torque-free asymmetric rigid-body system that demonstrates the
      intermediate-axis (tennis-racket) instability and exports the angular-momentum
      sphere, the kinetic-energy ellipsoid, and the polhode curve traced on the body.
@@ -357,7 +344,7 @@ trajectory/manifest export._
      (`measured`); the manifest carries the polhode/ellipsoid/sphere geometry with a
      renderer hint; focused tests pass and generation is clean.
 
-6. **BE-088: Add the heavy symmetric top (gyroscope) system**
+5. **BE-088: Add the heavy symmetric top (gyroscope) system**
    - Goal: Add the heavy symmetric top under gravity in Euler angles, with its two
      conserved angular momenta and energy, exhibiting precession and nutation.
    - Scope: `systems/symmetric_top.py`, `scripts/generate_symmetric_top.py`,
@@ -367,7 +354,7 @@ trajectory/manifest export._
      manifest exposes the conserved quantities and the effective potential in the
      nutation angle; focused tests pass and generation is clean.
 
-7. **BE-089: Orientation/attitude trajectory export schema and renderer hints**
+6. **BE-089: Orientation/attitude trajectory export schema and renderer hints**
    - Goal: Extend the trajectory/manifest contract to carry an orientation series
      (unit quaternion) and a body-frame triad alongside the usual state, with a
      `rigid-body` renderer hint, so a rotating body — not just a point — can be
@@ -386,7 +373,7 @@ phenomena. Builds on `engine/dynamics/media.py`, `ray_bundle.py`, `ray_diagnosti
 and `variable_speed_wavefront`, and gives the viewer genuinely new visual primitives
 (scalar fields, vector glyphs, field lines, mode shapes, wavefront surfaces)._
 
-8. **BE-090: Scalar and vector field abstraction with differential operators**
+7. **BE-090: Scalar and vector field abstraction with differential operators**
     - Goal: Add a field abstraction — a value object wrapping a symbolic scalar or
       vector field over spatial coordinates and parameters — with gradient, divergence,
       curl, and Laplacian operators and deterministic sampling to grids.
@@ -396,7 +383,7 @@ and `variable_speed_wavefront`, and gives the viewer genuinely new visual primit
       gradient is zero, divergence of a curl is zero, Laplacian of a known harmonic
       function); grid sampling is deterministic; focused tests pass.
 
-9. **BE-091: Field grid and field-line export schema with renderer hints**
+8. **BE-091: Field grid and field-line export schema with renderer hints**
     - Goal: Define deterministic export for scalar-field grids (heatmap/contour),
       vector-field grids (glyph/quiver), and field-line polylines, with manifest
       renderer hints (`scalar-field`, `vector-field`, `field-lines`).
@@ -406,7 +393,7 @@ and `variable_speed_wavefront`, and gives the viewer genuinely new visual primit
       manifest declares the field channels and renderer hints; the schema is
       documented; focused tests pass.
 
-10. **BE-092: Field-line and streamline integration**
+9. **BE-092: Field-line and streamline integration**
     - Goal: Integrate field lines of a vector field (and streamlines of a flow) using
       the existing integrators, with a documented seeding strategy, producing the
       polylines consumed by BE-091.
@@ -416,7 +403,7 @@ and `variable_speed_wavefront`, and gives the viewer genuinely new visual primit
       streamlines to tolerance; seeding is deterministic and documented; integration
       terminates cleanly at domain edges/singularities; focused tests pass.
 
-11. **BE-093: Electrostatic and magnetostatic field system**
+10. **BE-093: Electrostatic and magnetostatic field system**
     - Goal: Add a fields system for point-charge and dipole electric fields and
       current-loop / magnetic-dipole fields, exporting equipotentials and field lines.
     - Scope: `systems/electromagnetic_field.py`,
@@ -427,7 +414,7 @@ and `variable_speed_wavefront`, and gives the viewer genuinely new visual primit
       scalar potential grid and field lines with renderer hints; focused tests pass and
       generation is clean.
 
-12. **BE-094: Add the vibrating-string wave system (normal modes and d'Alembert)**
+11. **BE-094: Add the vibrating-string wave system (normal modes and d'Alembert)**
     - Goal: Add a 1D vibrating string with fixed/free boundary conditions, modal
       decomposition, and standing/traveling-wave time evolution exported as an animated
       displacement field.
@@ -438,7 +425,7 @@ and `variable_speed_wavefront`, and gives the viewer genuinely new visual primit
       tolerance (`measured`); the manifest exports the displacement series and mode
       data with renderer hints; focused tests pass and generation is clean.
 
-13. **BE-095: Add the 2D membrane wave system (rectangular and circular modes)**
+12. **BE-095: Add the 2D membrane wave system (rectangular and circular modes)**
     - Goal: Add membrane normal modes — rectangular sine modes and circular (Bessel)
       drum modes — exporting mode-shape surfaces and time-animated superpositions.
     - Scope: `systems/membrane.py`, `scripts/generate_membrane.py`,
@@ -448,7 +435,7 @@ and `variable_speed_wavefront`, and gives the viewer genuinely new visual primit
       export deterministically as scalar-field grids with renderer hints; focused tests
       pass and generation is clean.
 
-14. **BE-096: Dispersion and wave-packet propagation**
+13. **BE-096: Dispersion and wave-packet propagation**
     - Goal: Add 1D dispersive wave propagation distinguishing phase and group
       velocity, with Gaussian wave-packet evolution, exporting amplitude/intensity over
       space and time.
@@ -459,7 +446,7 @@ and `variable_speed_wavefront`, and gives the viewer genuinely new visual primit
       the amplitude field with renderer hints; focused tests pass and generation is
       clean.
 
-15. **BE-097: 2D wavefronts and intensity from heterogeneous media**
+14. **BE-097: 2D wavefronts and intensity from heterogeneous media**
     - Goal: Extend the existing media / `variable_speed_wavefront` work to export full
       2D wavefront surfaces and intensity from a heterogeneous scalar-speed field,
       reusing the ray bundle and the BE-091 grid export.
@@ -471,7 +458,7 @@ and `variable_speed_wavefront`, and gives the viewer genuinely new visual primit
       existing caustic-proximity diagnostic; the manifest exports the wavefront/
       intensity grids with renderer hints; focused tests pass and generation is clean.
 
-16. **BE-098: Vector-calculus flux diagnostics for fields**
+15. **BE-098: Vector-calculus flux diagnostics for fields**
     - Goal: Add measured field diagnostics — divergence, curl, and surface/line flux —
       that numerically check Gauss/Stokes relations on exported fields, labeled
       honestly as measured evidence.
@@ -488,7 +475,7 @@ spacetimes, curvature, parallel transport, and orbital structure. Generalizes
 `systems/sphere_geodesic.py`, and gives the viewer curved-space trajectories and
 embedding diagrams._
 
-17. **BE-099: General Riemannian metric module**
+16. **BE-099: General Riemannian metric module**
     - Goal: Generalize the metric helper into a reusable module: a metric-tensor value
       object over arbitrary coordinates, with Christoffel symbols, the geodesic
       equation, and symbolic Riemann / Ricci / scalar curvature — replacing the two
@@ -499,7 +486,7 @@ embedding diagrams._
       unit 2-sphere is the known constant; focused tests pass with no regression in
       existing metric tests.
 
-18. **BE-100: Geodesics on surfaces of revolution**
+17. **BE-100: Geodesics on surfaces of revolution**
     - Goal: Add geodesics on general surfaces of revolution (torus, paraboloid, cone,
       hyperboloid) via the BE-099 module, with the Clairaut conserved quantity.
     - Scope: `systems/surface_geodesic.py` (parameterized family),
@@ -508,7 +495,7 @@ embedding diagrams._
       conserved within tolerance (`measured`); great circles are recovered on the
       sphere; focused tests pass and generation is clean.
 
-19. **BE-101: Surface-embedding and geodesic export schema with renderer hints**
+18. **BE-101: Surface-embedding and geodesic export schema with renderer hints**
     - Goal: Extend the export contract to carry a surface mesh in 3D embedding
       coordinates, the geodesic polyline in embedded coordinates, and a curvature
       scalar field over the surface, with a `surface-geodesic` renderer hint.
@@ -519,7 +506,7 @@ embedding diagrams._
       renderer hint; the schema is documented; focused tests pass and generation is
       clean.
 
-20. **BE-102: Effective-potential and orbit classification for central-force and GR orbits**
+19. **BE-102: Effective-potential and orbit classification for central-force and GR orbits**
     - Goal: Compute and export effective potentials, turning points, and bound/
       unbound/critical orbit classification for Kepler and Schwarzschild orbits, reusing
       the manifest effective-potential field.
@@ -530,7 +517,7 @@ embedding diagrams._
       effective potential and turning points; focused tests pass and generation is
       clean.
 
-21. **BE-103: Full Schwarzschild geodesics (timelike and null)**
+20. **BE-103: Full Schwarzschild geodesics (timelike and null)**
     - Goal: Generalize beyond the equatorial special case to timelike and null
       Schwarzschild geodesics, exporting perihelion precession, the photon sphere, and
       light bending, with the GR effective potential.
@@ -541,7 +528,7 @@ embedding diagrams._
       angular momentum stay within tolerance (`measured`); the manifest exposes the
       orbit and effective potential; focused tests pass and generation is clean.
 
-22. **BE-104: Parallel transport and holonomy on curved surfaces**
+21. **BE-104: Parallel transport and holonomy on curved surfaces**
     - Goal: Add parallel transport of a vector along a curve on a curved surface and
       compute the holonomy angle around a closed loop, exporting the transported frame
       for visualization.
@@ -552,7 +539,7 @@ embedding diagrams._
       angle to tolerance; transport on flat space is trivial; the transported frame is
       exported along the curve; focused tests pass and generation is clean.
 
-23. **BE-105: Curvature scalar fields and a Gauss–Bonnet diagnostic**
+22. **BE-105: Curvature scalar fields and a Gauss–Bonnet diagnostic**
     - Goal: Export Gaussian curvature over surfaces of revolution and curvature scalars
       (Ricci / Kretschmann) for spacetimes as scalar fields, and add a measured
       Gauss–Bonnet check relating integrated curvature to topology.
@@ -563,7 +550,7 @@ embedding diagrams._
       `measured`; curvature fields export deterministically; focused tests pass and
       generation is clean.
 
-24. **BE-106: Add a second curved background (wormhole or FLRW)**
+23. **BE-106: Add a second curved background (wormhole or FLRW)**
     - Goal: Add one additional fixed-background spacetime — an Ellis-wormhole
       embedding or an FLRW expansion slice — exercising the general BE-099 module and
       kept honest as a fixed background (no dynamical gravity).
@@ -581,7 +568,7 @@ for continuity. They are **deprioritized** while the backend focuses on the phys
 directions; pick them up only if the physics queue is blocked or on explicit
 request._
 
-25. **BE-079: Cross-check reachability handoff coverage against certified coverage**
+24. **BE-079: Cross-check reachability handoff coverage against certified coverage**
     - Goal: Ensure the reachability handoff inventory stays aligned with the
       certified-status coverage report: every handoff-backed obligation is a real
       certified-numeric obligation, and missing handoffs are reported rather than
@@ -592,7 +579,7 @@ request._
       reachability handoffs; it rejects a handoff for a non-certified obligation; no
       report claims proof or external discharge; focused tests pass.
 
-26. **BE-080: Add a reachability handoff dependency index**
+25. **BE-080: Add a reachability handoff dependency index**
     - Goal: Make each package's reachability handoff prerequisites inspectable
       without opening every artifact, by publishing a deterministic dependency
       index that maps handoffs to obligation ids, enclosure status ids, assumption

@@ -171,6 +171,7 @@ surfaces remain future work.
 - Charged particle in a uniform magnetic field
 - Uniform gravitational field
 - Ideal spring
+- Coupled oscillators
 - Kepler problem
 - Bead on a rotating hoop
 - Double pendulum
@@ -198,7 +199,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `625 passed`.
+Latest known result: `642 passed`.
 
 Use focused tests while iterating:
 

@@ -22,9 +22,11 @@ from engine.export.manifest import (
     StateVar,
     SystemSpec,
 )
+from engine.mechanics import normal_modes
 from engine.mechanics.symmetries import InfinitesimalSymmetry
 from systems.bead_on_hoop import build_system as build_bead_on_hoop
 from systems.charged_particle import build_uniform_magnetic_field_system
+from systems.coupled_oscillators import build_system as build_coupled_oscillators
 from systems.double_pendulum import build_system as build_double_pendulum
 from systems.henon_heiles import build_system as build_henon_heiles
 from systems.ideal_spring import build_system as build_ideal_spring
@@ -61,6 +63,22 @@ def _kepler_effective_potential(system):
     mu = next(symbol for symbol in system.lagrangian.free_symbols if symbol.name == "mu")
     ell = sp.Symbol("ell")
     return ell**2 / (2 * m * r**2) - mu * m / r
+
+
+def _coupled_oscillator_modes(system):
+    substitutions = {
+        symbol: 1.0
+        for symbol in system.lagrangian.free_symbols
+        if symbol.name in {"m", "k"}
+    }
+    modes = normal_modes(
+        system,
+        {coordinate: 0.0 for coordinate in system.q},
+        substitutions=substitutions,
+    )
+    payload = modes.to_dict()
+    payload["method"] = "small-oscillation-generalized-eigenproblem"
+    return payload
 
 
 LENSES: tuple[Lens, ...] = (
@@ -149,6 +167,14 @@ LENSES: tuple[Lens, ...] = (
         kind="potential-energy",
         description="Quadratic spring potential with the conserved total energy level.",
         projections=("line",),
+        conserved=("H",),
+    ),
+    Lens(
+        id="coupledOscillatorModes",
+        title="Normal Modes",
+        kind="normal-modes",
+        description="Mode shapes and superposed motion for a fixed-end oscillator chain.",
+        projections=("chain",),
         conserved=("H",),
     ),
     Lens(
@@ -457,6 +483,48 @@ IDEAL_SPRING = SystemSpec(
             data_path="/data/ideal_spring_k_2.json",
         ),
     ),
+)
+
+
+COUPLED_OSCILLATORS = SystemSpec(
+    id="coupled-oscillators",
+    title="Coupled Oscillators",
+    category="Oscillators",
+    description=(
+        "A fixed-end chain of four equal masses whose small oscillations split "
+        "into normal modes."
+    ),
+    build=build_coupled_oscillators,
+    parameters=(
+        Parameter("m", "m", 1.0, 0.2, 3.0),
+        Parameter("k", "k", 1.0, 0.2, 5.0),
+        Parameter("x1_0", "x_{1,0}", 0.34, -2.0, 2.0, role="initial"),
+        Parameter("x2_0", "x_{2,0}", 0.49, -2.0, 2.0, role="initial"),
+        Parameter("x3_0", "x_{3,0}", 0.06, -2.0, 2.0, role="initial"),
+        Parameter("x4_0", "x_{4,0}", -0.39, -2.0, 2.0, role="initial"),
+        Parameter("x1_dot0", r"\dot{x}_{1,0}", 0.0, -2.0, 2.0, role="initial"),
+        Parameter("x2_dot0", r"\dot{x}_{2,0}", 0.0, -2.0, 2.0, role="initial"),
+        Parameter("x3_dot0", r"\dot{x}_{3,0}", 0.0, -2.0, 2.0, role="initial"),
+        Parameter("x4_dot0", r"\dot{x}_{4,0}", 0.0, -2.0, 2.0, role="initial"),
+    ),
+    state=(
+        StateVar("x1", "x_1", "coordinate"),
+        StateVar("x2", "x_2", "coordinate"),
+        StateVar("x3", "x_3", "coordinate"),
+        StateVar("x4", "x_4", "coordinate"),
+        StateVar("x1_dot", r"\dot{x}_1", "velocity"),
+        StateVar("x2_dot", r"\dot{x}_2", "velocity"),
+        StateVar("x3_dot", r"\dot{x}_3", "velocity"),
+        StateVar("x4_dot", r"\dot{x}_4", "velocity"),
+    ),
+    projections={
+        "chain": ("x1", "x2", "x3", "x4"),
+        "firstMassPhase": ("x1", "x1_dot"),
+    },
+    conserved=(Conserved("H", "H", "time translation", generator=_time_translation),),
+    lenses=("coupledOscillatorModes",),
+    data_path="/data/coupled_oscillators.json",
+    normal_modes=_coupled_oscillator_modes,
 )
 
 
@@ -882,6 +950,7 @@ SPECS: tuple[SystemSpec, ...] = (
     CHARGED_PARTICLE,
     UNIFORM_GRAVITY,
     IDEAL_SPRING,
+    COUPLED_OSCILLATORS,
     KEPLER,
     BEAD_ON_HOOP,
     DOUBLE_PENDULUM,

@@ -6,6 +6,7 @@ from engine.export.manifest import write_manifest
 from scripts.example_specs import LENSES, SPECS
 from scripts.generate_bead_on_hoop import write_bead_on_hoop_trajectory
 from scripts.generate_charged_particle import write_charged_particle_trajectory
+from scripts.generate_coupled_oscillators import write_coupled_oscillator_trajectory
 from scripts.generate_double_pendulum import (
     write_double_pendulum_trajectory,
     write_double_pendulum_variant_trajectories,
@@ -51,6 +52,10 @@ def main() -> None:
     write_ideal_spring_variant_trajectories(
         Path("data/generated"),
         viewer_output_dir=Path("viewer/public/data"),
+    )
+    write_coupled_oscillator_trajectory(
+        Path("data/generated/coupled_oscillators.json"),
+        viewer_output=Path("viewer/public/data/coupled_oscillators.json"),
     )
     write_kepler_trajectory(
         Path("data/generated/kepler_problem.json"),

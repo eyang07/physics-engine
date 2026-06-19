@@ -4,6 +4,11 @@ from engine.mechanics.coordinates import CoordinateChart, CotangentBundleChart, 
 from engine.mechanics.hamiltonian import HamiltonianSystem, legendre_transform
 from engine.mechanics.lagrangian import LagrangianSystem
 from engine.mechanics.poisson import is_conserved, poisson_bracket, time_evolution
+from engine.mechanics.small_oscillations import (
+    NormalModeResult,
+    mass_and_stiffness_matrices,
+    normal_modes,
+)
 from engine.mechanics.symplectic import (
     canonical_symplectic_matrix,
     hamiltonian_vector_field,
@@ -16,6 +21,7 @@ __all__ = [
     "CotangentBundleChart",
     "HamiltonianSystem",
     "LagrangianSystem",
+    "NormalModeResult",
     "TangentBundleChart",
     "canonical_symplectic_matrix",
     "hamiltonian_vector_field",
@@ -23,6 +29,8 @@ __all__ = [
     "is_conserved",
     "legendre_transform",
     "liouville_divergence",
+    "mass_and_stiffness_matrices",
+    "normal_modes",
     "poisson_bracket",
     "time_evolution",
 ]

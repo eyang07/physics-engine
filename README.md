@@ -74,6 +74,7 @@ Registered viewer examples:
 - Charged particle in a uniform magnetic field
 - Uniform gravitational field
 - Ideal spring, including precomputed stiffness variants
+- Coupled oscillators with normal-mode metadata
 - Kepler problem
 - Bead on a rotating hoop
 - Double pendulum, including precomputed parameter variants
