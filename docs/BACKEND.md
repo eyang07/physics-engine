@@ -11,6 +11,8 @@ artifacts.
   - Euler-Lagrange equations, Legendre transforms, energy, Noether charges,
     Poisson brackets, symplectic utilities, constraints, and coordinate
     transforms.
+  - Rigid-body orientation helpers: SO(3) matrices, unit quaternions, ZYX Euler
+    angles, and body-frame / space-frame angular-velocity conversions.
 - General dynamics:
   - First-order systems `dx/dt = f(t, x; params)`.
   - Symbolic Jacobians, divergence, fixed points, linearization, and numerical
@@ -199,7 +201,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `642 passed`.
+Latest known result: `649 passed`.
 
 Use focused tests while iterating:
 
