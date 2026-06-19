@@ -13,6 +13,8 @@ artifacts.
     transforms.
   - Rigid-body orientation helpers: SO(3) matrices, unit quaternions, ZYX Euler
     angles, and body-frame / space-frame angular-velocity conversions.
+  - Inertia tensor value object with principal-axis decomposition and standard
+    shape constructors.
 - General dynamics:
   - First-order systems `dx/dt = f(t, x; params)`.
   - Symbolic Jacobians, divergence, fixed points, linearization, and numerical
@@ -201,7 +203,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `649 passed`.
+Latest known result: `654 passed`.
 
 Use focused tests while iterating:
 

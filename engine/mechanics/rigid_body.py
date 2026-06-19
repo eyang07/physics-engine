@@ -1,10 +1,109 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import math
 from typing import Sequence
 
 import numpy as np
 import sympy as sp
+
+
+@dataclass(frozen=True)
+class InertiaTensor:
+    """Symmetric positive-definite rigid-body inertia tensor."""
+
+    matrix: np.ndarray
+
+    def __post_init__(self) -> None:
+        matrix = np.asarray(self.matrix, dtype=float)
+        if matrix.shape != (3, 3):
+            raise ValueError("inertia tensor matrix must have shape (3, 3)")
+        if not np.all(np.isfinite(matrix)):
+            raise ValueError("inertia tensor matrix must contain finite values")
+        if not np.allclose(matrix, matrix.T, atol=1e-12, rtol=1e-12):
+            raise ValueError("inertia tensor matrix must be symmetric")
+        eigenvalues = np.linalg.eigvalsh(matrix)
+        if np.any(eigenvalues <= 0.0):
+            raise ValueError("inertia tensor matrix must be positive definite")
+        stored = matrix.copy()
+        stored.setflags(write=False)
+        object.__setattr__(self, "matrix", stored)
+
+    @classmethod
+    def diagonal(cls, moments: Sequence[float]) -> "InertiaTensor":
+        values = np.asarray(moments, dtype=float)
+        if values.shape != (3,):
+            raise ValueError("moments must have shape (3,)")
+        return cls(np.diag(values))
+
+    @classmethod
+    def rod(
+        cls,
+        *,
+        mass: float,
+        length: float,
+        radius: float,
+        axis: str = "x",
+    ) -> "InertiaTensor":
+        """Solid cylindrical rod about its center of mass."""
+
+        _require_positive(mass, "mass")
+        _require_positive(length, "length")
+        _require_positive(radius, "radius")
+        axial = 0.5 * mass * radius**2
+        transverse = mass * (3.0 * radius**2 + length**2) / 12.0
+        return cls.diagonal(_axis_moments(axis, axial, transverse, transverse))
+
+    @classmethod
+    def disk(cls, *, mass: float, radius: float, axis: str = "z") -> "InertiaTensor":
+        """Thin solid disk about its center of mass."""
+
+        _require_positive(mass, "mass")
+        _require_positive(radius, "radius")
+        axial = 0.5 * mass * radius**2
+        in_plane = 0.25 * mass * radius**2
+        return cls.diagonal(_axis_moments(axis, axial, in_plane, in_plane))
+
+    @classmethod
+    def sphere(cls, *, mass: float, radius: float) -> "InertiaTensor":
+        _require_positive(mass, "mass")
+        _require_positive(radius, "radius")
+        moment = 0.4 * mass * radius**2
+        return cls.diagonal((moment, moment, moment))
+
+    @classmethod
+    def box(
+        cls,
+        *,
+        mass: float,
+        width: float,
+        depth: float,
+        height: float,
+    ) -> "InertiaTensor":
+        _require_positive(mass, "mass")
+        _require_positive(width, "width")
+        _require_positive(depth, "depth")
+        _require_positive(height, "height")
+        return cls.diagonal(
+            (
+                mass * (depth**2 + height**2) / 12.0,
+                mass * (width**2 + height**2) / 12.0,
+                mass * (width**2 + depth**2) / 12.0,
+            )
+        )
+
+    def principal_decomposition(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return principal moments and principal axes.
+
+        The axes are the columns of the returned matrix.
+        """
+
+        moments, axes = np.linalg.eigh(self.matrix)
+        return moments.astype(float), axes.astype(float)
+
+    @property
+    def inverse(self) -> np.ndarray:
+        return np.linalg.inv(self.matrix)
 
 
 def normalize_quaternion(quaternion: Sequence[float]) -> np.ndarray:
@@ -221,3 +320,23 @@ def _vector3(vector: Sequence[float], label: str) -> np.ndarray:
     if not np.all(np.isfinite(array)):
         raise ValueError(f"{label} must contain finite values")
     return array
+
+
+def _require_positive(value: float, label: str) -> None:
+    if not np.isfinite(value) or value <= 0.0:
+        raise ValueError(f"{label} must be positive and finite")
+
+
+def _axis_moments(
+    axis: str,
+    axial: float,
+    first_transverse: float,
+    second_transverse: float,
+) -> tuple[float, float, float]:
+    if axis == "x":
+        return axial, first_transverse, second_transverse
+    if axis == "y":
+        return first_transverse, axial, second_transverse
+    if axis == "z":
+        return first_transverse, second_transverse, axial
+    raise ValueError("axis must be one of 'x', 'y', or 'z'")

@@ -5,6 +5,7 @@ from engine.mechanics.hamiltonian import HamiltonianSystem, legendre_transform
 from engine.mechanics.lagrangian import LagrangianSystem
 from engine.mechanics.poisson import is_conserved, poisson_bracket, time_evolution
 from engine.mechanics.rigid_body import (
+    InertiaTensor,
     body_angular_velocity_from_rotation,
     body_to_space_angular_velocity,
     euler_angles_to_rotation_matrix,
@@ -33,6 +34,7 @@ __all__ = [
     "CoordinateChart",
     "CotangentBundleChart",
     "HamiltonianSystem",
+    "InertiaTensor",
     "LagrangianSystem",
     "NormalModeResult",
     "TangentBundleChart",
