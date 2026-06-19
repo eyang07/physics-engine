@@ -15,6 +15,8 @@ artifacts.
     angles, and body-frame / space-frame angular-velocity conversions.
   - Inertia tensor value object with principal-axis decomposition and standard
     shape constructors.
+  - Euler rigid-body equations in the body frame with constant/callable torque
+    inputs and measured rotational-energy / angular-momentum diagnostics.
 - General dynamics:
   - First-order systems `dx/dt = f(t, x; params)`.
   - Symbolic Jacobians, divergence, fixed points, linearization, and numerical
@@ -203,7 +205,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `654 passed`.
+Latest known result: `659 passed`.
 
 Use focused tests while iterating:
 

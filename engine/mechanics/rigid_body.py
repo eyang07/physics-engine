@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 import math
 from typing import Sequence
 
 import numpy as np
 import sympy as sp
+
+
+TorqueInput = Sequence[float] | Callable[[float, np.ndarray], Sequence[float]]
 
 
 @dataclass(frozen=True)
@@ -104,6 +108,55 @@ class InertiaTensor:
     @property
     def inverse(self) -> np.ndarray:
         return np.linalg.inv(self.matrix)
+
+
+def body_angular_momentum(
+    inertia: InertiaTensor,
+    angular_velocity: Sequence[float],
+) -> np.ndarray:
+    """Return body-frame angular momentum ``L = I omega``."""
+
+    return inertia.matrix @ _vector3(angular_velocity, "angular_velocity")
+
+
+def rotational_kinetic_energy(
+    inertia: InertiaTensor,
+    angular_velocity: Sequence[float],
+) -> float:
+    """Return rotational kinetic energy in the body frame."""
+
+    omega = _vector3(angular_velocity, "angular_velocity")
+    return float(0.5 * omega @ inertia.matrix @ omega)
+
+
+def angular_momentum_magnitude(
+    inertia: InertiaTensor,
+    angular_velocity: Sequence[float],
+) -> float:
+    return float(np.linalg.norm(body_angular_momentum(inertia, angular_velocity)))
+
+
+def euler_equations_rhs(
+    inertia: InertiaTensor,
+    torque: TorqueInput | None = None,
+) -> Callable[[float, Sequence[float]], np.ndarray]:
+    """Return ``d omega / dt`` for Euler's rigid-body equations.
+
+    The returned function has the same ``(t, state)`` signature as the existing
+    numerical integrators. Any conservation observed from an integration is
+    measured numerical evidence, not a certificate.
+    """
+
+    torque_function = _torque_function(torque)
+    inverse = inertia.inverse
+    matrix = inertia.matrix
+
+    def rhs(t: float, angular_velocity: Sequence[float]) -> np.ndarray:
+        omega = _vector3(angular_velocity, "angular_velocity")
+        applied_torque = torque_function(float(t), omega)
+        return inverse @ (applied_torque - np.cross(omega, matrix @ omega))
+
+    return rhs
 
 
 def normalize_quaternion(quaternion: Sequence[float]) -> np.ndarray:
@@ -325,6 +378,29 @@ def _vector3(vector: Sequence[float], label: str) -> np.ndarray:
 def _require_positive(value: float, label: str) -> None:
     if not np.isfinite(value) or value <= 0.0:
         raise ValueError(f"{label} must be positive and finite")
+
+
+def _torque_function(
+    torque: TorqueInput | None,
+) -> Callable[[float, np.ndarray], np.ndarray]:
+    if torque is None:
+
+        def zero_torque(_t: float, _angular_velocity: np.ndarray) -> np.ndarray:
+            return np.zeros(3, dtype=float)
+
+        return zero_torque
+    if callable(torque):
+
+        def evaluated_torque(t: float, angular_velocity: np.ndarray) -> np.ndarray:
+            return _vector3(torque(t, angular_velocity.copy()), "torque")
+
+        return evaluated_torque
+    constant = _vector3(torque, "torque")
+
+    def constant_torque(_t: float, _angular_velocity: np.ndarray) -> np.ndarray:
+        return constant
+
+    return constant_torque
 
 
 def _axis_moments(
