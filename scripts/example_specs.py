@@ -940,6 +940,11 @@ FREE_RIGID_BODY = SystemSpec(
     lenses=("freeRigidBodyPolhode",),
     data_path="/data/free_rigid_body.json",
     geometry=_free_rigid_body_geometry,
+    orientation={
+        "rendererHint": "rigid-body",
+        "convention": "quaternion-wxyz",
+        "source": "trajectory.orientation",
+    },
     system_kind="first-order-flow",
 )
 
@@ -1000,6 +1005,11 @@ SYMMETRIC_TOP = SystemSpec(
     ),
     lenses=("symmetricTopAxis", "symmetricTopNutationPhase", "symmetricTopPotential"),
     data_path="/data/symmetric_top.json",
+    orientation={
+        "rendererHint": "rigid-body",
+        "convention": "quaternion-wxyz",
+        "source": "trajectory.orientation",
+    },
 )
 
 

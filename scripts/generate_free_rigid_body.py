@@ -10,8 +10,9 @@ from engine.export import Trajectory
 from engine.mechanics import (
     InertiaTensor,
     angular_momentum_magnitude,
+    attitude_euler_rhs,
     body_angular_momentum,
-    euler_equations_rhs,
+    orientation_series,
     rotational_kinetic_energy,
 )
 from engine.numerics import integrate_adaptive
@@ -79,6 +80,7 @@ def free_rigid_body_renderer_hints() -> dict[str, object]:
         "kind": "rigid-body-polhode",
         "geometry": "rigidBodyGeometry",
         "state": "angularVelocity",
+        "orientation": "trajectory.orientation",
         "invariantRigor": "measured",
     }
 
@@ -92,15 +94,20 @@ def generate_free_rigid_body_trajectory(
 ) -> Trajectory:
     inertia = InertiaTensor.diagonal(moments)
     initial = np.asarray(initial_omega, dtype=float)
-    time, states = integrate_adaptive(
-        euler_equations_rhs(inertia),
-        initial_state=initial,
+    # Integrate attitude (body quaternion) coupled to Euler's equations so the
+    # exported orientation is genuinely integrated, not reconstructed.
+    initial_attitude = np.array([1.0, 0.0, 0.0, 0.0], dtype=float)
+    time, attitude_states = integrate_adaptive(
+        attitude_euler_rhs(inertia),
+        initial_state=np.concatenate([initial_attitude, initial]),
         t_span=t_span,
         sample_dt=sample_dt,
         rtol=1e-11,
         atol=1e-13,
         max_step=sample_dt,
     )
+    quaternions = attitude_states[:, :4]
+    states = attitude_states[:, 4:]
     physical_parameters = {
         f"I{index}": float(moment)
         for index, moment in enumerate(np.asarray(moments, dtype=float), start=1)
@@ -120,6 +127,7 @@ def generate_free_rigid_body_trajectory(
         state_names=STATE_NAMES,
         metadata=metadata,
         series=series,
+        orientation=orientation_series(quaternions),
     )
 
 

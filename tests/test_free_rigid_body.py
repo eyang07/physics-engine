@@ -10,6 +10,7 @@ from engine.mechanics import (
     InertiaTensor,
     angular_momentum_magnitude,
     euler_equations_rhs,
+    quaternion_to_rotation_matrix,
     rotational_kinetic_energy,
 )
 from engine.numerics import integrate_adaptive
@@ -109,6 +110,35 @@ def test_manifest_entry_carries_rigid_body_geometry_contract() -> None:
     assert entry["geometry"]["rendererHint"] == "rigid-body-polhode"
     assert entry["geometry"]["polhode"]["source"] == "trajectory.metadata.rigidBodyGeometry.polhode"
     assert entry["lenses"] == ["freeRigidBodyPolhode"]
+    assert entry["orientation"]["rendererHint"] == "rigid-body"
+    assert entry["orientation"]["convention"] == "quaternion-wxyz"
+    assert entry["orientation"]["source"] == "trajectory.orientation"
+
+
+def test_generated_free_rigid_body_exports_integrated_orientation() -> None:
+    trajectory = generate_free_rigid_body_trajectory(t_span=(0.0, 6.0), sample_dt=0.02)
+
+    # The exported state stays the angular velocity; orientation is separate.
+    assert trajectory.state_names == ("omega_1", "omega_2", "omega_3")
+    orientation = trajectory.orientation
+    assert orientation is not None
+    assert orientation["convention"] == "quaternion-wxyz"
+    quaternions = np.asarray(orientation["quaternion"], dtype=float)
+    assert quaternions.shape == (trajectory.states.shape[0], 4)
+    assert np.allclose(np.linalg.norm(quaternions, axis=1), 1.0)
+
+    # Torque-free: space-frame angular momentum R(t) I omega(t) is constant.
+    inertia = InertiaTensor.diagonal(DEFAULT_MOMENTS)
+    space_momentum = np.array(
+        [
+            quaternion_to_rotation_matrix(q) @ (inertia.matrix @ w)
+            for q, w in zip(quaternions, trajectory.states)
+        ]
+    )
+    drift = float(np.max(np.linalg.norm(space_momentum - space_momentum[0], axis=1)))
+    assert drift < 1e-9
+
+    assert "orientation" in trajectory.to_dict()
 
 
 def test_free_rigid_body_writer_outputs_json(tmp_path: Path) -> None:

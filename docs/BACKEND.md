@@ -56,6 +56,12 @@ artifacts.
     precomputed variants.
   - Optional backend-owned geometry metadata in manifest entries and trajectory
     metadata for renderer-specific structures such as rigid-body polhodes.
+  - Optional rigid-body orientation channel: a trajectory carries a per-sample
+    unit-quaternion series (`(w, x, y, z)`, sign-aligned for continuity) and the
+    body-frame triad in space coordinates under `trajectory.orientation`, and the
+    manifest entry declares it with a `rigid-body` renderer hint. The free
+    asymmetric top integrates attitude coupled to Euler's equations; the heavy
+    symmetric top derives it from its Euler angles.
 - Safety and verification:
   - Safe/unsafe sublevel sets and measured trajectory safety reports.
   - Event-based unsafe-set entry detection

@@ -159,6 +159,102 @@ def euler_equations_rhs(
     return rhs
 
 
+def quaternion_multiply(a: Sequence[float], b: Sequence[float]) -> np.ndarray:
+    """Return the Hamilton product ``a ⊗ b`` of two ``(w, x, y, z)`` quaternions."""
+
+    aw, ax, ay, az = _quaternion(a, "a")
+    bw, bx, by, bz = _quaternion(b, "b")
+    return np.array(
+        [
+            aw * bw - ax * bx - ay * by - az * bz,
+            aw * bx + ax * bw + ay * bz - az * by,
+            aw * by - ax * bz + ay * bw + az * bx,
+            aw * bz + ax * by - ay * bx + az * bw,
+        ],
+        dtype=float,
+    )
+
+
+def quaternion_derivative(
+    quaternion: Sequence[float],
+    body_angular_velocity: Sequence[float],
+) -> np.ndarray:
+    """Return ``dq/dt = 1/2 q ⊗ (0, omega_body)`` for body-frame angular velocity."""
+
+    q = _quaternion(quaternion, "quaternion")
+    omega = _vector3(body_angular_velocity, "body_angular_velocity")
+    pure = np.array([0.0, omega[0], omega[1], omega[2]], dtype=float)
+    return 0.5 * quaternion_multiply(q, pure)
+
+
+def attitude_euler_rhs(
+    inertia: InertiaTensor,
+    torque: TorqueInput | None = None,
+) -> Callable[[float, Sequence[float]], np.ndarray]:
+    """Return ``d/dt[q, omega]`` for coupled attitude and Euler dynamics.
+
+    The integration state is ``[qw, qx, qy, qz, omega_1, omega_2, omega_3]``: a
+    body-frame quaternion driven by the body angular velocity, which itself
+    evolves under Euler's equations. The quaternion is renormalised when sampled.
+    """
+
+    omega_rhs = euler_equations_rhs(inertia, torque)
+
+    def rhs(t: float, state: Sequence[float]) -> np.ndarray:
+        values = np.asarray(state, dtype=float)
+        if values.shape != (7,):
+            raise ValueError("attitude state must have shape (7,)")
+        quaternion = values[:4]
+        omega = values[4:]
+        dq = quaternion_derivative(quaternion, omega)
+        domega = omega_rhs(float(t), omega)
+        return np.concatenate([dq, domega])
+
+    return rhs
+
+
+def orientation_series(
+    quaternions: Sequence[Sequence[float]],
+    *,
+    rigor: str = "measured",
+) -> dict[str, object]:
+    """Return an export payload of unit quaternions and the body-frame triad.
+
+    Each quaternion is renormalised and sign-aligned to its predecessor (``q``
+    and ``-q`` are the same rotation) so the series is continuous for rendering.
+    ``bodyAxes`` holds the body axes expressed in the space frame — the columns
+    of each rotation matrix.
+    """
+
+    raw = np.asarray(quaternions, dtype=float)
+    if raw.ndim != 2 or raw.shape[1] != 4:
+        raise ValueError("quaternions must have shape (sample, 4)")
+
+    aligned: list[np.ndarray] = []
+    previous: np.ndarray | None = None
+    axes: list[list[np.ndarray]] = [[], [], []]
+    for row in raw:
+        unit = normalize_quaternion(row)
+        if previous is not None and float(np.dot(unit, previous)) < 0.0:
+            unit = -unit
+        previous = unit
+        aligned.append(unit)
+        rotation = quaternion_to_rotation_matrix(unit)
+        for index in range(3):
+            axes[index].append(rotation[:, index])
+
+    return {
+        "convention": "quaternion-wxyz",
+        "rigor": rigor,
+        "quaternion": [vector.tolist() for vector in aligned],
+        "bodyAxes": {
+            "e1": [vector.tolist() for vector in axes[0]],
+            "e2": [vector.tolist() for vector in axes[1]],
+            "e3": [vector.tolist() for vector in axes[2]],
+        },
+    }
+
+
 def normalize_quaternion(quaternion: Sequence[float]) -> np.ndarray:
     """Return a unit quaternion in ``(w, x, y, z)`` order."""
 
@@ -370,6 +466,15 @@ def _vector3(vector: Sequence[float], label: str) -> np.ndarray:
     array = np.asarray(vector, dtype=float)
     if array.shape != (3,):
         raise ValueError(f"{label} must have shape (3,)")
+    if not np.all(np.isfinite(array)):
+        raise ValueError(f"{label} must contain finite values")
+    return array
+
+
+def _quaternion(quaternion: Sequence[float], label: str) -> np.ndarray:
+    array = np.asarray(quaternion, dtype=float)
+    if array.shape != (4,):
+        raise ValueError(f"{label} must have shape (4,)")
     if not np.all(np.isfinite(array)):
         raise ValueError(f"{label} must contain finite values")
     return array

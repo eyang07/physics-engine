@@ -7,6 +7,7 @@ from typing import Sequence
 import numpy as np
 
 from engine.export import Trajectory
+from engine.mechanics import orientation_series, rotation_matrix_to_quaternion
 from scripts.example_specs import SYMMETRIC_TOP
 from scripts.generation import (
     generate_lagrangian_trajectory,
@@ -44,14 +45,44 @@ STATE_NAMES = [
 ]
 
 
+def _zxz_rotation(theta: float, phi: float, psi: float) -> np.ndarray:
+    """Return the z-x-z Euler rotation ``Rz(phi) Rx(theta) Rz(psi)``."""
+
+    cphi, sphi = np.cos(phi), np.sin(phi)
+    cth, sth = np.cos(theta), np.sin(theta)
+    cpsi, spsi = np.cos(psi), np.sin(psi)
+    rz_phi = np.array([[cphi, -sphi, 0.0], [sphi, cphi, 0.0], [0.0, 0.0, 1.0]])
+    rx_theta = np.array([[1.0, 0.0, 0.0], [0.0, cth, -sth], [0.0, sth, cth]])
+    rz_psi = np.array([[cpsi, -spsi, 0.0], [spsi, cpsi, 0.0], [0.0, 0.0, 1.0]])
+    return rz_phi @ rx_theta @ rz_psi
+
+
+def symmetric_top_quaternions(
+    theta: np.ndarray, phi: np.ndarray, psi: np.ndarray
+) -> np.ndarray:
+    """Return the per-sample body quaternion from the z-x-z Euler angles."""
+
+    return np.array(
+        [
+            rotation_matrix_to_quaternion(_zxz_rotation(t, p, s))
+            for t, p, s in zip(theta, phi, psi)
+        ],
+        dtype=float,
+    )
+
+
 def embed_symmetry_axis(ell: float, theta: np.ndarray, phi: np.ndarray) -> np.ndarray:
-    """Return the figure-axis tip on the sphere of radius ``ell``."""
+    """Return the figure-axis (body 3-axis) tip on the sphere of radius ``ell``.
+
+    Matches the third column of the z-x-z rotation so the embedded tip and the
+    exported orientation agree: ``e3 = (sinθ sinφ, -sinθ cosφ, cosθ)``.
+    """
 
     radial = ell * np.sin(theta)
     return np.column_stack(
         [
-            radial * np.cos(phi),
             radial * np.sin(phi),
+            -radial * np.cos(phi),
             ell * np.cos(theta),
         ]
     )
@@ -171,12 +202,19 @@ def generate_symmetric_top_trajectory(
             energy_series=trajectory.series["H"],
         )
     ]
+    metadata.setdefault("rendererHints", {})["orientation"] = "trajectory.orientation"
+    quaternions = symmetric_top_quaternions(
+        trajectory.states[:, 0],
+        trajectory.states[:, 1],
+        trajectory.states[:, 2],
+    )
     return Trajectory.from_arrays(
         time=trajectory.time,
         states=trajectory.states,
         state_names=trajectory.state_names,
         metadata=metadata,
         series=trajectory.series,
+        orientation=orientation_series(quaternions),
     )
 
 

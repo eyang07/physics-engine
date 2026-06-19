@@ -5,10 +5,15 @@ import pytest
 import sympy as sp
 
 from engine.mechanics import (
+    InertiaTensor,
+    attitude_euler_rhs,
     body_angular_velocity_from_rotation,
     body_to_space_angular_velocity,
     euler_angles_to_rotation_matrix,
     normalize_quaternion,
+    orientation_series,
+    quaternion_derivative,
+    quaternion_multiply,
     quaternion_to_rotation_matrix,
     rotation_matrix_to_euler_angles,
     rotation_matrix_to_quaternion,
@@ -17,6 +22,7 @@ from engine.mechanics import (
     space_to_body_angular_velocity,
     vee_skew,
 )
+from engine.numerics import integrate_adaptive
 
 
 def test_quaternion_matrix_round_trip_preserves_rotation() -> None:
@@ -91,3 +97,65 @@ def test_vee_rejects_non_skew_matrix() -> None:
     assert np.allclose(vee_skew(skew_symmetric([1.0, 2.0, 3.0])), [1.0, 2.0, 3.0])
     with pytest.raises(ValueError, match="not skew"):
         vee_skew(np.eye(3))
+
+
+def test_quaternion_multiply_identity_and_known_product() -> None:
+    identity = [1.0, 0.0, 0.0, 0.0]
+    q = normalize_quaternion([0.5, 0.5, -0.5, 0.5])
+    assert np.allclose(quaternion_multiply(identity, q), q)
+    # i ⊗ j = k in (w, x, y, z) convention.
+    assert np.allclose(
+        quaternion_multiply([0, 1, 0, 0], [0, 0, 1, 0]), [0, 0, 0, 1]
+    )
+
+
+def test_quaternion_derivative_inverts_to_body_angular_velocity() -> None:
+    # dq = 1/2 q ⊗ (0, omega), so 2 conj(q) ⊗ dq recovers the pure quaternion
+    # (0, omega) exactly for a unit quaternion.
+    q = normalize_quaternion([0.9, 0.1, -0.2, 0.3])
+    omega = np.array([0.4, -0.7, 1.1])
+    dq = quaternion_derivative(q, omega)
+    conjugate = q * np.array([1.0, -1.0, -1.0, -1.0])
+    recovered = 2.0 * quaternion_multiply(conjugate, dq)
+    assert np.isclose(recovered[0], 0.0, atol=1e-12)
+    assert np.allclose(recovered[1:], omega, atol=1e-12)
+
+
+def test_attitude_euler_rollout_conserves_space_angular_momentum() -> None:
+    inertia = InertiaTensor.diagonal((1.0, 2.0, 3.2))
+    initial = np.array([1.0, 0.0, 0.0, 0.0, 0.05, 1.0, 0.05])
+    _time, states = integrate_adaptive(
+        attitude_euler_rhs(inertia),
+        initial_state=initial,
+        t_span=(0.0, 5.0),
+        sample_dt=0.05,
+        rtol=1e-11,
+        atol=1e-13,
+        max_step=0.05,
+    )
+    quaternions = states[:, :4]
+    omega = states[:, 4:]
+    # Torque-free: angular momentum is constant in the space frame.
+    space_momentum = np.array(
+        [quaternion_to_rotation_matrix(q) @ (inertia.matrix @ w) for q, w in zip(quaternions, omega)]
+    )
+    drift = float(np.max(np.linalg.norm(space_momentum - space_momentum[0], axis=1)))
+    assert drift < 1e-9
+
+
+def test_orientation_series_is_unit_and_sign_continuous() -> None:
+    # A sequence including a sign flip should be re-aligned to stay continuous.
+    base = normalize_quaternion([0.9, 0.1, -0.2, 0.3])
+    payload = orientation_series([base, -base, base])
+    quaternions = np.asarray(payload["quaternion"])
+    assert payload["convention"] == "quaternion-wxyz"
+    assert payload["rigor"] == "measured"
+    assert np.allclose(np.linalg.norm(quaternions, axis=1), 1.0)
+    # No sign flip between consecutive samples after alignment.
+    assert np.all(np.sum(quaternions[:-1] * quaternions[1:], axis=1) > 0.0)
+    # Body axes are the orthonormal columns of the rotation matrix.
+    e1 = np.asarray(payload["bodyAxes"]["e1"])
+    e2 = np.asarray(payload["bodyAxes"]["e2"])
+    e3 = np.asarray(payload["bodyAxes"]["e3"])
+    assert np.allclose(np.sum(e1 * e2, axis=1), 0.0, atol=1e-12)
+    assert np.allclose(np.cross(e1, e2) - e3, 0.0, atol=1e-12)

@@ -18,6 +18,11 @@ class Trajectory:
     # quantities, momenta). The viewer displays these directly instead of
     # recomputing physics, so the Python/TS boundary stays clean.
     series: dict[str, Sequence[float]] | None = None
+    # Optional per-sample rigid-body attitude: a unit-quaternion series plus the
+    # body-frame triad expressed in space coordinates (see
+    # ``engine.mechanics.orientation_series``). Carried alongside the state so a
+    # rotating body — not just a point — can be rendered.
+    orientation: dict[str, Any] | None = None
 
     @classmethod
     def from_arrays(
@@ -27,6 +32,7 @@ class Trajectory:
         state_names: Sequence[str],
         metadata: dict[str, Any] | None = None,
         series: dict[str, Sequence[float]] | None = None,
+        orientation: dict[str, Any] | None = None,
     ) -> "Trajectory":
         return cls(
             np.asarray(time, dtype=float),
@@ -34,6 +40,7 @@ class Trajectory:
             tuple(state_names),
             metadata,
             series,
+            orientation,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -49,6 +56,8 @@ class Trajectory:
                 name: np.asarray(values, dtype=float).tolist()
                 for name, values in self.series.items()
             }
+        if self.orientation is not None:
+            payload["orientation"] = self.orientation
         return payload
 
     def write_json(self, path: str | Path) -> None:

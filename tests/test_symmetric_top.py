@@ -72,6 +72,29 @@ def test_generated_top_exports_effective_potential_plot() -> None:
     assert potential[0] > potential[len(potential) // 2]
 
 
+def test_generated_top_exports_orientation_matching_its_axis_embedding() -> None:
+    trajectory = generate_symmetric_top_trajectory(t_span=(0.0, 4.0))
+    orientation = trajectory.orientation
+    assert orientation is not None
+    assert orientation["convention"] == "quaternion-wxyz"
+    quaternions = np.asarray(orientation["quaternion"], dtype=float)
+    assert quaternions.shape == (trajectory.states.shape[0], 4)
+    assert np.allclose(np.linalg.norm(quaternions, axis=1), 1.0)
+
+    # The exported body 3-axis matches the symmetry-axis embedding (radius ell).
+    e3 = np.asarray(orientation["bodyAxes"]["e3"], dtype=float)
+    embedding = trajectory.states[:, 6:9] / 0.5
+    assert np.allclose(e3, embedding, atol=1e-9)
+    assert "orientation" in trajectory.to_dict()
+
+
+def test_symmetric_top_manifest_declares_orientation_channel() -> None:
+    entry = system_entry(SYMMETRIC_TOP)
+    assert entry["orientation"]["rendererHint"] == "rigid-body"
+    assert entry["orientation"]["convention"] == "quaternion-wxyz"
+    assert entry["orientation"]["source"] == "trajectory.orientation"
+
+
 def test_manifest_entry_exposes_conserved_momenta_and_effective_potential() -> None:
     entry = system_entry(SYMMETRIC_TOP)
     conserved_names = {item["name"] for item in entry["conserved"]}
