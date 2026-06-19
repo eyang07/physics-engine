@@ -11,6 +11,7 @@ from scripts.generate_double_pendulum import (
     write_double_pendulum_trajectory,
     write_double_pendulum_variant_trajectories,
 )
+from scripts.generate_free_rigid_body import write_free_rigid_body_trajectory
 from scripts.generate_henon_heiles import write_henon_heiles_trajectory
 from scripts.generate_ideal_spring import (
     write_ideal_spring_trajectory,
@@ -80,6 +81,10 @@ def main() -> None:
     write_n_body_variant_trajectories(
         Path("data/generated"),
         viewer_output_dir=Path("viewer/public/data"),
+    )
+    write_free_rigid_body_trajectory(
+        Path("data/generated/free_rigid_body.json"),
+        viewer_output=Path("viewer/public/data/free_rigid_body.json"),
     )
     write_lorenz_trajectory(
         Path("data/generated/lorenz_attractor.json"),

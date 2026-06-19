@@ -17,6 +17,7 @@ from scripts import example_specs
 from scripts.generate_bead_on_hoop import generate_bead_on_hoop_trajectory
 from scripts.generate_charged_particle import generate_charged_particle_trajectory
 from scripts.generate_double_pendulum import generate_double_pendulum_trajectory
+from scripts.generate_free_rigid_body import generate_free_rigid_body_trajectory
 from scripts.generate_henon_heiles import generate_henon_heiles_trajectory
 from scripts.generate_ideal_spring import generate_ideal_spring_trajectory
 from scripts.generate_kepler_problem import generate_kepler_trajectory
@@ -38,6 +39,10 @@ CASES = {
         generate_double_pendulum_trajectory,
     ),
     "n-body-gravity": (example_specs.N_BODY_GRAVITY, generate_n_body_trajectory),
+    "free-rigid-body": (
+        example_specs.FREE_RIGID_BODY,
+        generate_free_rigid_body_trajectory,
+    ),
     "henon-heiles": (example_specs.HENON_HEILES, generate_henon_heiles_trajectory),
 }
 

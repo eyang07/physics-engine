@@ -28,6 +28,11 @@ from systems.bead_on_hoop import build_system as build_bead_on_hoop
 from systems.charged_particle import build_uniform_magnetic_field_system
 from systems.coupled_oscillators import build_system as build_coupled_oscillators
 from systems.double_pendulum import build_system as build_double_pendulum
+from systems.free_rigid_body import (
+    angular_momentum_magnitude as free_rigid_body_angular_momentum_magnitude,
+    build_system as build_free_rigid_body,
+    rotational_energy as free_rigid_body_rotational_energy,
+)
 from systems.henon_heiles import build_system as build_henon_heiles
 from systems.ideal_spring import build_system as build_ideal_spring
 from systems.kepler_problem import build_system as build_kepler
@@ -249,6 +254,17 @@ LENSES: tuple[Lens, ...] = (
         description="Per-body orbit trails in the center-of-mass frame.",
         projections=("body1Orbit", "body2Orbit", "body3Orbit"),
         conserved=("H", "P_x", "P_y", "L_z"),
+    ),
+    Lens(
+        id="freeRigidBodyPolhode",
+        title="Polhode Geometry",
+        kind="rigid-body-polhode",
+        description=(
+            "Torque-free asymmetric-top motion on the angular-momentum sphere "
+            "and kinetic-energy ellipsoid."
+        ),
+        projections=("angularVelocity",),
+        conserved=("H", "L"),
     ),
     Lens(
         id="lorenzAttractor",
@@ -820,6 +836,85 @@ N_BODY_GRAVITY = SystemSpec(
 )
 
 
+_FREE_RIGID_BODY_PARAMETERS = {
+    "I1": 1.0,
+    "I2": 2.0,
+    "I3": 3.2,
+    "omega_1_0": 0.02,
+    "omega_2_0": 1.0,
+    "omega_3_0": 0.02,
+}
+
+
+def _free_rigid_body_geometry(system):
+    moments = [
+        _FREE_RIGID_BODY_PARAMETERS["I1"],
+        _FREE_RIGID_BODY_PARAMETERS["I2"],
+        _FREE_RIGID_BODY_PARAMETERS["I3"],
+    ]
+    omega = [
+        _FREE_RIGID_BODY_PARAMETERS["omega_1_0"],
+        _FREE_RIGID_BODY_PARAMETERS["omega_2_0"],
+        _FREE_RIGID_BODY_PARAMETERS["omega_3_0"],
+    ]
+    energy = 0.5 * sum(moment * value**2 for moment, value in zip(moments, omega, strict=True))
+    momentum_radius = sum(
+        (moment * value) ** 2 for moment, value in zip(moments, omega, strict=True)
+    ) ** 0.5
+    return {
+        "kind": "rigid-body-polhode",
+        "rendererHint": "rigid-body-polhode",
+        "principalMoments": moments,
+        "defaultInitialAngularVelocity": omega,
+        "angularMomentumSphere": {
+            "space": "body-angular-momentum",
+            "radius": momentum_radius,
+        },
+        "energyEllipsoid": {
+            "space": "body-angular-momentum",
+            "semiAxes": [(2.0 * energy * moment) ** 0.5 for moment in moments],
+        },
+        "polhode": {
+            "space": "body-angular-velocity",
+            "source": "trajectory.metadata.rigidBodyGeometry.polhode",
+        },
+    }
+
+
+FREE_RIGID_BODY = SystemSpec(
+    id="free-rigid-body",
+    title="Free Asymmetric Top",
+    category="Rigid Body Mechanics",
+    description=(
+        "Torque-free rigid-body rotation in principal axes, showing the "
+        "intermediate-axis instability and the polhode curve."
+    ),
+    build=build_free_rigid_body,
+    parameters=(
+        Parameter("I1", "I_1", _FREE_RIGID_BODY_PARAMETERS["I1"], 0.2, 5.0),
+        Parameter("I2", "I_2", _FREE_RIGID_BODY_PARAMETERS["I2"], 0.2, 5.0),
+        Parameter("I3", "I_3", _FREE_RIGID_BODY_PARAMETERS["I3"], 0.2, 5.0),
+        Parameter("omega_1_0", r"\omega_{1,0}", _FREE_RIGID_BODY_PARAMETERS["omega_1_0"], -2.0, 2.0, role="initial"),
+        Parameter("omega_2_0", r"\omega_{2,0}", _FREE_RIGID_BODY_PARAMETERS["omega_2_0"], -2.0, 2.0, role="initial"),
+        Parameter("omega_3_0", r"\omega_{3,0}", _FREE_RIGID_BODY_PARAMETERS["omega_3_0"], -2.0, 2.0, role="initial"),
+    ),
+    state=(
+        StateVar("omega_1", r"\omega_1", "velocity"),
+        StateVar("omega_2", r"\omega_2", "velocity"),
+        StateVar("omega_3", r"\omega_3", "velocity"),
+    ),
+    projections={"angularVelocity": ("omega_1", "omega_2", "omega_3")},
+    conserved=(
+        Conserved("H", "H", "time translation", expression=free_rigid_body_rotational_energy),
+        Conserved("L", r"\lVert L\rVert", "space-rotation symmetry", expression=free_rigid_body_angular_momentum_magnitude),
+    ),
+    lenses=("freeRigidBodyPolhode",),
+    data_path="/data/free_rigid_body.json",
+    geometry=_free_rigid_body_geometry,
+    system_kind="first-order-flow",
+)
+
+
 LORENZ = SystemSpec(
     id="lorenz-attractor",
     title="Lorenz Attractor",
@@ -955,6 +1050,7 @@ SPECS: tuple[SystemSpec, ...] = (
     BEAD_ON_HOOP,
     DOUBLE_PENDULUM,
     N_BODY_GRAVITY,
+    FREE_RIGID_BODY,
     LORENZ,
     HENON_HEILES,
     VARIABLE_SPEED_WAVEFRONT,

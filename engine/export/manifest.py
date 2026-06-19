@@ -183,6 +183,7 @@ class SystemSpec:
     data_path: str
     effective_potentials: tuple[EffectivePotential, ...] = ()
     normal_modes: Callable[[Any], Mapping[str, Any]] | None = None
+    geometry: Callable[[Any], Mapping[str, Any]] | None = None
     system_kind: str = "mechanics"
     variants: tuple[ParameterVariant, ...] = ()
     verification_problems: tuple[str, ...] = ()
@@ -465,6 +466,8 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
     }
     if spec.normal_modes is not None:
         entry["normalModes"] = dict(spec.normal_modes(system))
+    if spec.geometry is not None:
+        entry["geometry"] = dict(spec.geometry(system))
     if spec.variants:
         entry["variants"] = [variant.to_dict() for variant in spec.variants]
     if spec.verification_problems:
@@ -523,6 +526,8 @@ def first_order_system_entry(spec: SystemSpec, system: FirstOrderSystem) -> dict
     }
     if spec.normal_modes is not None:
         entry["normalModes"] = dict(spec.normal_modes(system))
+    if spec.geometry is not None:
+        entry["geometry"] = dict(spec.geometry(system))
     if spec.variants:
         entry["variants"] = [variant.to_dict() for variant in spec.variants]
     if spec.verification_problems:

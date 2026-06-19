@@ -17,6 +17,9 @@ artifacts.
     shape constructors.
   - Euler rigid-body equations in the body frame with constant/callable torque
     inputs and measured rotational-energy / angular-momentum diagnostics.
+  - Free asymmetric-top example with measured intermediate-axis instability,
+    angular-momentum sphere, kinetic-energy ellipsoid, and sampled polhode
+    geometry exported from Python.
 - General dynamics:
   - First-order systems `dx/dt = f(t, x; params)`.
   - Symbolic Jacobians, divergence, fixed points, linearization, and numerical
@@ -48,6 +51,8 @@ artifacts.
   - Manifest registry with parameters, state schema, projections, conserved
     quantities, effective potentials, renderer hints, diagnostics, lenses, and
     precomputed variants.
+  - Optional backend-owned geometry metadata in manifest entries and trajectory
+    metadata for renderer-specific structures such as rigid-body polhodes.
 - Safety and verification:
   - Safe/unsafe sublevel sets and measured trajectory safety reports.
   - Event-based unsafe-set entry detection
