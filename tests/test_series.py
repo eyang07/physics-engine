@@ -24,6 +24,7 @@ from scripts.generate_kepler_problem import generate_kepler_trajectory
 from scripts.generate_n_body_gravity import generate_n_body_trajectory
 from scripts.generate_pendulum import generate_pendulum_trajectory
 from scripts.generate_sphere_geodesic import generate_sphere_geodesic_trajectory
+from scripts.generate_symmetric_top import generate_symmetric_top_trajectory
 from scripts.generate_uniform_gravity import generate_uniform_gravity_trajectory
 
 CASES = {
@@ -42,6 +43,10 @@ CASES = {
     "free-rigid-body": (
         example_specs.FREE_RIGID_BODY,
         generate_free_rigid_body_trajectory,
+    ),
+    "symmetric-top": (
+        example_specs.SYMMETRIC_TOP,
+        generate_symmetric_top_trajectory,
     ),
     "henon-heiles": (example_specs.HENON_HEILES, generate_henon_heiles_trajectory),
 }

@@ -46,6 +46,10 @@ from systems.n_body_gravity import (
 )
 from systems.pendulum import build_system as build_pendulum
 from systems.sphere_geodesic import build_system as build_sphere_geodesic
+from systems.symmetric_top import (
+    build_system as build_symmetric_top,
+    effective_potential as symmetric_top_effective_potential,
+)
 from systems.uniform_gravity import build_system as build_uniform_gravity
 from systems.variable_speed_wavefront import build_system as build_variable_speed_wavefront
 
@@ -265,6 +269,31 @@ LENSES: tuple[Lens, ...] = (
         ),
         projections=("angularVelocity",),
         conserved=("H", "L"),
+    ),
+    Lens(
+        id="symmetricTopAxis",
+        title="Precessing Axis",
+        kind="configuration-space",
+        description="The heavy top's symmetry axis tracing precession and nutation on the sphere.",
+        projections=("embedding3d",),
+        conserved=("H", "p_phi", "p_psi"),
+    ),
+    Lens(
+        id="symmetricTopNutationPhase",
+        title="Nutation Phase",
+        kind="configuration-phase",
+        description="The nutation angle and its rate after reducing the cyclic precession and spin.",
+        projections=("nutationPhase",),
+        conserved=("H", "p_phi", "p_psi"),
+    ),
+    Lens(
+        id="symmetricTopPotential",
+        title="Effective Potential",
+        kind="effective-potential",
+        description="The nutation-angle effective potential after fixing the precession and spin momenta.",
+        projections=("nutationPhase",),
+        conserved=("H", "p_phi", "p_psi"),
+        effective_potentials=("symmetric_top_theta",),
     ),
     Lens(
         id="lorenzAttractor",
@@ -915,6 +944,65 @@ FREE_RIGID_BODY = SystemSpec(
 )
 
 
+SYMMETRIC_TOP = SystemSpec(
+    id="symmetric-top",
+    title="Heavy Symmetric Top",
+    category="Rigid Body Mechanics",
+    description=(
+        "A spinning gyroscope under gravity, precessing and nutating with two "
+        "conserved angular momenta from its cyclic precession and spin angles."
+    ),
+    build=build_symmetric_top,
+    parameters=(
+        Parameter("I1", "I_1", 1.0, 0.2, 5.0),
+        Parameter("I3", "I_3", 0.5, 0.2, 5.0),
+        Parameter("M", "M", 1.0, 0.2, 3.0),
+        Parameter("g", "g", 9.81, 1.0, 20.0),
+        Parameter("ell", r"\ell", 0.5, 0.1, 2.0),
+        Parameter("theta0", r"\theta_0", 0.4, 0.05, 3.09, role="initial"),
+        Parameter("phi0", r"\phi_0", 0.0, -3.14, 3.14, role="initial"),
+        Parameter("psi0", r"\psi_0", 0.0, -3.14, 3.14, role="initial"),
+        Parameter("theta_dot0", r"\dot{\theta}_0", 0.0, -3.0, 3.0, role="initial"),
+        Parameter("phi_dot0", r"\dot{\phi}_0", 0.0, -3.0, 3.0, role="initial"),
+        Parameter("psi_dot0", r"\dot{\psi}_0", 10.0, -25.0, 25.0, role="initial"),
+    ),
+    state=(
+        StateVar("theta", r"\theta", "coordinate"),
+        StateVar("phi", r"\phi", "coordinate"),
+        StateVar("psi", r"\psi", "coordinate"),
+        StateVar("theta_dot", r"\dot{\theta}", "velocity"),
+        StateVar("phi_dot", r"\dot{\phi}", "velocity"),
+        StateVar("psi_dot", r"\dot{\psi}", "velocity"),
+        StateVar("x", "x", "embedding"),
+        StateVar("y", "y", "embedding"),
+        StateVar("z", "z", "embedding"),
+    ),
+    projections={
+        "embedding3d": ("x", "y", "z"),
+        "nutationPhase": ("theta", "theta_dot"),
+    },
+    conserved=(
+        Conserved("H", "H", "time translation", generator=_time_translation),
+        Conserved("p_phi", r"p_{\phi}", "precession about the vertical",
+                  generator=_cyclic_coordinate("phi")),
+        Conserved("p_psi", r"p_{\psi}", "spin about the symmetry axis",
+                  generator=_cyclic_coordinate("psi")),
+    ),
+    effective_potentials=(
+        EffectivePotential(
+            name="symmetric_top_theta",
+            coordinate="theta",
+            latex=r"V_{\mathrm{eff}}",
+            conserved="p_phi",
+            conserved_latex=r"p_{\phi}",
+            expression=symmetric_top_effective_potential,
+        ),
+    ),
+    lenses=("symmetricTopAxis", "symmetricTopNutationPhase", "symmetricTopPotential"),
+    data_path="/data/symmetric_top.json",
+)
+
+
 LORENZ = SystemSpec(
     id="lorenz-attractor",
     title="Lorenz Attractor",
@@ -1051,6 +1139,7 @@ SPECS: tuple[SystemSpec, ...] = (
     DOUBLE_PENDULUM,
     N_BODY_GRAVITY,
     FREE_RIGID_BODY,
+    SYMMETRIC_TOP,
     LORENZ,
     HENON_HEILES,
     VARIABLE_SPEED_WAVEFRONT,

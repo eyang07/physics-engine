@@ -20,6 +20,9 @@ artifacts.
   - Free asymmetric-top example with measured intermediate-axis instability,
     angular-momentum sphere, kinetic-energy ellipsoid, and sampled polhode
     geometry exported from Python.
+  - Heavy symmetric top (gyroscope) in Euler angles with cyclic precession and
+    spin: conserved energy and two angular momenta (`p_phi`, `p_psi`), the
+    nutation-angle effective potential, and measured precession/nutation motion.
 - General dynamics:
   - First-order systems `dx/dt = f(t, x; params)`.
   - Symbolic Jacobians, divergence, fixed points, linearization, and numerical

@@ -25,6 +25,7 @@ from scripts.generate_n_body_gravity import (
 )
 from scripts.generate_pendulum import write_pendulum_trajectory
 from scripts.generate_sphere_geodesic import write_sphere_geodesic_trajectory
+from scripts.generate_symmetric_top import write_symmetric_top_trajectory
 from scripts.generate_uniform_gravity import write_uniform_gravity_trajectory
 from scripts.generate_variable_speed_wavefront import write_variable_speed_wavefront
 
@@ -85,6 +86,10 @@ def main() -> None:
     write_free_rigid_body_trajectory(
         Path("data/generated/free_rigid_body.json"),
         viewer_output=Path("viewer/public/data/free_rigid_body.json"),
+    )
+    write_symmetric_top_trajectory(
+        Path("data/generated/symmetric_top.json"),
+        viewer_output=Path("viewer/public/data/symmetric_top.json"),
     )
     write_lorenz_trajectory(
         Path("data/generated/lorenz_attractor.json"),
