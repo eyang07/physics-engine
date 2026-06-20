@@ -48,6 +48,9 @@ artifacts.
   - Surface-of-revolution geodesic systems (sphere, torus, paraboloid, cone,
     hyperboloid) generated from reusable metric geometry, with measured
     invariant residuals for rollout diagnostics.
+  - Effective-potential orbit helpers for Kepler and fixed-background
+    Schwarzschild regimes: Python computes potential samples, analytic turning
+    points, and qualitative orbit classification for renderer consumption.
 - Diagnostics:
   - Invariant residuals.
   - Poincare sections.
@@ -80,6 +83,10 @@ artifacts.
     channels (name/kind/rendererHint/source). Sampled values are exact
     evaluations of the symbolic field (`evaluation: symbolic-exact`), not measured
     evidence.
+  - Effective-potential manifest entries may declare `plotSource`,
+    `turningPointsSource`, and `classificationSource` when a generator exports
+    the corresponding backend-owned payload. The Kepler example uses this for
+    radial turning points and bound/unbound/critical classification.
   - Static-field manifest entries (`systemKind: "static-field"`): systems whose
     payload is a time-independent field export, not a Lagrangian or first-order
     flow, intentionally omit `physics`, `derivation`, and `dynamics`. They expose

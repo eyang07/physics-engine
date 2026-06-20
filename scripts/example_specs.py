@@ -742,6 +742,11 @@ KEPLER = SystemSpec(
             conserved="ell",
             conserved_latex=r"\ell",
             expression=_kepler_effective_potential,
+            plot_source="trajectory.metadata.potentialPlots[name=kepler_radial]",
+            turning_points_source=(
+                "trajectory.metadata.potentialPlots[name=kepler_radial].turningPoints"
+            ),
+            classification_source="trajectory.metadata.orbitClassification",
         ),
     ),
 )

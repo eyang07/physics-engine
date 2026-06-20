@@ -6,9 +6,14 @@ from typing import Sequence
 
 import numpy as np
 
+from engine.dynamics import classify_kepler_orbit, kepler_effective_potential_values
 from engine.export import Trajectory
 from scripts.example_specs import KEPLER
-from scripts.generation import generate_lagrangian_trajectory, write_trajectory_outputs
+from scripts.generation import (
+    generate_lagrangian_trajectory,
+    potential_plot_metadata,
+    write_trajectory_outputs,
+)
 from systems.kepler_problem import build_system
 
 
@@ -62,6 +67,56 @@ def kepler_renderer_hints(states: np.ndarray) -> dict[str, object]:
     }
 
 
+def kepler_effective_potential_plot(
+    *,
+    trajectory: Trajectory,
+    mass: float,
+    gravitational_parameter: float,
+) -> tuple[dict[str, object], dict[str, object]]:
+    if trajectory.series is None or "H" not in trajectory.series or "ell" not in trajectory.series:
+        raise ValueError("Kepler trajectory must carry H and ell series")
+    energy = float(np.mean(np.asarray(trajectory.series["H"], dtype=float)))
+    angular_momentum = float(np.mean(np.asarray(trajectory.series["ell"], dtype=float)))
+    classification = classify_kepler_orbit(
+        mass=mass,
+        gravitational_parameter=gravitational_parameter,
+        energy=energy,
+        angular_momentum=angular_momentum,
+    )
+    r_values = trajectory.states[:, 0]
+    positive_turning_points = list(classification.turning_points)
+    r_min_candidates = [float(np.min(r_values)) * 0.75, *(0.8 * r for r in positive_turning_points)]
+    r_max_candidates = [float(np.max(r_values)) * 1.25, *(1.2 * r for r in positive_turning_points)]
+    r_min = max(0.04, min(r_min_candidates))
+    r_max = max(r_max_candidates)
+    coordinate_values = np.linspace(r_min, r_max, 320)
+    potential_values = kepler_effective_potential_values(
+        coordinate_values,
+        mass=mass,
+        gravitational_parameter=gravitational_parameter,
+        angular_momentum=angular_momentum,
+    )
+    plot = potential_plot_metadata(
+        name="kepler_radial",
+        coordinate="r",
+        coordinate_latex="r",
+        coordinate_values=coordinate_values,
+        potential_values=potential_values,
+        energy_series=trajectory.series["H"],
+        potential_latex=r"V_{\mathrm{eff}}",
+    )
+    plot.update(
+        {
+            "rendererHint": "effective-potential",
+            "angularMomentum": angular_momentum,
+            "turningPoints": positive_turning_points,
+            "classification": classification.classification,
+            "evaluation": classification.evaluation,
+        }
+    )
+    return plot, classification.to_dict()
+
+
 def generate_kepler_trajectory(
     *,
     mass: float = 1.0,
@@ -94,6 +149,13 @@ def generate_kepler_trajectory(
     )
     metadata = dict(trajectory.metadata or {})
     metadata["rendererHints"] = kepler_renderer_hints(trajectory.states)
+    potential_plot, orbit_classification = kepler_effective_potential_plot(
+        trajectory=trajectory,
+        mass=mass,
+        gravitational_parameter=gravitational_parameter,
+    )
+    metadata["potentialPlots"] = [potential_plot]
+    metadata["orbitClassification"] = orbit_classification
     return Trajectory.from_arrays(
         time=trajectory.time,
         states=trajectory.states,
