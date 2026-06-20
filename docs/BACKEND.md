@@ -48,6 +48,9 @@ artifacts.
   - Surface-of-revolution geodesic systems (sphere, torus, paraboloid, cone,
     hyperboloid) generated from reusable metric geometry, with measured
     invariant residuals for rollout diagnostics.
+  - Parallel transport on sampled metric curves, with 2D holonomy-angle support;
+    surface-geodesic exports include a measured transported-frame payload along
+    the generated curve.
   - Effective-potential orbit helpers for Kepler and fixed-background
     Schwarzschild regimes: Python computes potential samples, analytic turning
     points, and qualitative orbit classification for renderer consumption.
@@ -74,6 +77,9 @@ artifacts.
     `metadata.surfaceGeometry`; mesh and curvature samples are deterministic
     symbolic evaluations, while rollout invariant residuals remain
     `rigor="measured"`.
+    `geometry.parallelTransport.source` points to
+    `metadata.parallelTransport`, a measured sampled frame transport along the
+    exported curve.
   - Optional rigid-body orientation channel: a trajectory carries a per-sample
     unit-quaternion series (`(w, x, y, z)`, sign-aligned for continuity) and the
     body-frame triad in space coordinates under `trajectory.orientation`, and the

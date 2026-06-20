@@ -26,6 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
+import numpy as np
 import sympy as sp
 
 from engine.dynamics.first_order import FirstOrderSystem
@@ -230,6 +231,111 @@ class MetricGeometry:
             inverse_metric=self.inverse_metric(),
             parameters=tuple(self.parameters or ()),
         )
+
+    def parallel_transport(
+        self,
+        parameter: Sequence[float],
+        curve: Sequence[Sequence[float]],
+        initial_vector: Sequence[float],
+        *,
+        parameter_values: dict[str, float] | None = None,
+    ) -> np.ndarray:
+        """Numerically parallel-transport a vector along a sampled curve.
+
+        The returned array has shape ``(sample, dimension)`` and stores vector
+        components in the coordinate basis. This is a sampled ODE integration
+        along the supplied curve, not a symbolic certificate.
+        """
+
+        samples = np.asarray(parameter, dtype=float)
+        curve_array = np.asarray(curve, dtype=float)
+        vector = np.asarray(initial_vector, dtype=float)
+        if samples.ndim != 1:
+            raise ValueError("parameter samples must be one-dimensional")
+        if curve_array.shape != (len(samples), self.dimension):
+            raise ValueError("curve must have shape (sample, dimension)")
+        if vector.shape != (self.dimension,):
+            raise ValueError("initial_vector must match the metric dimension")
+        if len(samples) < 2:
+            raise ValueError("parallel transport needs at least two curve samples")
+        if np.any(np.diff(samples) <= 0.0):
+            raise ValueError("parameter samples must be strictly increasing")
+
+        gamma = self.christoffel_symbols()
+        gamma_values = [
+            gamma[k, i, j]
+            for k in range(self.dimension)
+            for i in range(self.dimension)
+            for j in range(self.dimension)
+        ]
+        gamma_func = sp.lambdify(
+            (*self.coordinates, *(self.parameters or ())),
+            gamma_values,
+            modules="numpy",
+        )
+        parameter_args = [
+            float((parameter_values or {})[symbol.name])
+            for symbol in (self.parameters or ())
+        ]
+
+        def connection_at(point: np.ndarray) -> np.ndarray:
+            values = gamma_func(*point, *parameter_args)
+            return np.asarray(values, dtype=float).reshape(
+                self.dimension,
+                self.dimension,
+                self.dimension,
+            )
+
+        def rhs(point: np.ndarray, tangent: np.ndarray, transported: np.ndarray) -> np.ndarray:
+            connection = connection_at(point)
+            return -np.einsum("kij,i,j->k", connection, tangent, transported)
+
+        transported = np.zeros_like(curve_array)
+        transported[0] = vector
+        for index in range(len(samples) - 1):
+            ds = float(samples[index + 1] - samples[index])
+            q0 = curve_array[index]
+            q1 = curve_array[index + 1]
+            tangent = (q1 - q0) / ds
+            midpoint = 0.5 * (q0 + q1)
+            current = transported[index]
+            k1 = rhs(q0, tangent, current)
+            k2 = rhs(midpoint, tangent, current + 0.5 * ds * k1)
+            k3 = rhs(midpoint, tangent, current + 0.5 * ds * k2)
+            k4 = rhs(q1, tangent, current + ds * k3)
+            transported[index + 1] = current + ds * (k1 + 2 * k2 + 2 * k3 + k4) / 6.0
+        return transported
+
+    def oriented_angle_2d(
+        self,
+        point: Sequence[float],
+        initial_vector: Sequence[float],
+        final_vector: Sequence[float],
+        *,
+        parameter_values: dict[str, float] | None = None,
+    ) -> float:
+        """Oriented angle from ``initial_vector`` to ``final_vector`` in 2D."""
+
+        if self.dimension != 2:
+            raise ValueError("oriented angles require a two-dimensional metric")
+        point_array = np.asarray(point, dtype=float)
+        initial = np.asarray(initial_vector, dtype=float)
+        final = np.asarray(final_vector, dtype=float)
+        if point_array.shape != (2,) or initial.shape != (2,) or final.shape != (2,):
+            raise ValueError("point and vectors must be two-dimensional")
+        metric_func = sp.lambdify(
+            (*self.coordinates, *(self.parameters or ())),
+            list(self.metric),
+            modules="numpy",
+        )
+        parameter_args = [
+            float((parameter_values or {})[symbol.name])
+            for symbol in (self.parameters or ())
+        ]
+        metric = np.asarray(metric_func(*point_array, *parameter_args), dtype=float).reshape(2, 2)
+        inner = float(initial @ metric @ final)
+        area = float(np.sqrt(abs(np.linalg.det(metric))) * (initial[0] * final[1] - initial[1] * final[0]))
+        return float(np.arctan2(area, inner))
 
 
 def schwarzschild_equatorial_metric(

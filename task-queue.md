@@ -313,18 +313,7 @@ spacetimes, curvature, parallel transport, and orbital structure. Generalizes
 `systems/sphere_geodesic.py`, and gives the viewer curved-space trajectories and
 embedding diagrams._
 
-1. **BE-104: Parallel transport and holonomy on curved surfaces**
-    - Goal: Add parallel transport of a vector along a curve on a curved surface and
-      compute the holonomy angle around a closed loop, exporting the transported frame
-      for visualization.
-    - Scope: `engine/dynamics/metric.py` (or `engine/geometry/`),
-      `systems/sphere_geodesic.py` or the surface-geodesic system, generators, and
-      `tests/`.
-    - Acceptance: the holonomy angle around a spherical cap matches the enclosed solid
-      angle to tolerance; transport on flat space is trivial; the transported frame is
-      exported along the curve; focused tests pass and generation is clean.
-
-2. **BE-105: Curvature scalar fields and a Gauss–Bonnet diagnostic**
+1. **BE-105: Curvature scalar fields and a Gauss–Bonnet diagnostic**
     - Goal: Export Gaussian curvature over surfaces of revolution and curvature scalars
       (Ricci / Kretschmann) for spacetimes as scalar fields, and add a measured
       Gauss–Bonnet check relating integrated curvature to topology.
@@ -335,7 +324,7 @@ embedding diagrams._
       `measured`; curvature fields export deterministically; focused tests pass and
       generation is clean.
 
-3. **BE-106: Add a second curved background (wormhole or FLRW)**
+2. **BE-106: Add a second curved background (wormhole or FLRW)**
     - Goal: Add one additional fixed-background spacetime — an Ellis-wormhole
       embedding or an FLRW expansion slice — exercising the general BE-099 module and
       kept honest as a fixed background (no dynamical gravity).
@@ -353,7 +342,7 @@ for continuity. They are **deprioritized** while the backend focuses on the phys
 directions; pick them up only if the physics queue is blocked or on explicit
 request._
 
-4. **BE-079: Cross-check reachability handoff coverage against certified coverage**
+3. **BE-079: Cross-check reachability handoff coverage against certified coverage**
     - Goal: Ensure the reachability handoff inventory stays aligned with the
       certified-status coverage report: every handoff-backed obligation is a real
       certified-numeric obligation, and missing handoffs are reported rather than
@@ -364,7 +353,7 @@ request._
       reachability handoffs; it rejects a handoff for a non-certified obligation; no
       report claims proof or external discharge; focused tests pass.
 
-5. **BE-080: Add a reachability handoff dependency index**
+4. **BE-080: Add a reachability handoff dependency index**
     - Goal: Make each package's reachability handoff prerequisites inspectable
       without opening every artifact, by publishing a deterministic dependency
       index that maps handoffs to obligation ids, enclosure status ids, assumption

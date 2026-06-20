@@ -139,6 +139,10 @@ def _surface_geodesic_geometry(system):
             "kind": "scalar-field",
             "source": "trajectory.metadata.surfaceGeometry.curvature",
         },
+        "parallelTransport": {
+            "kind": "parallel-transport-frame",
+            "source": "trajectory.metadata.parallelTransport",
+        },
     }
 
 

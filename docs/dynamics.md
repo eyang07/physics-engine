@@ -18,6 +18,9 @@ diagnostics, and safety/certificate candidates.
 - Metric geometry helpers derive Christoffel symbols, geodesic equations,
   symbolic Riemann/Ricci/scalar curvature, and cogeodesic media for
   fixed-background examples.
+- Metric geometry also supports numerical parallel transport along sampled
+  curves and oriented 2D holonomy angles; sampled transport exports are
+  measured diagnostics.
 - Surface-of-revolution geodesic helpers build sphere, torus, paraboloid,
   cone, and hyperboloid metrics from symbolic profiles; rollout diagnostics
   label energy and Clairaut conservation residuals as measured evidence.

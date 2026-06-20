@@ -216,6 +216,63 @@ def _surface_geometry_payload(
     }
 
 
+def _embedded_tangent_vectors(
+    surface: SurfaceOfRevolution,
+    states: np.ndarray,
+    vectors: np.ndarray,
+) -> np.ndarray:
+    tangent_expressions = surface.embedding_tangent_expressions()
+    tangent_functions = [
+        sp.lambdify(surface.coordinates, expressions, modules="numpy")
+        for expressions in tangent_expressions
+    ]
+    basis = [
+        np.column_stack(
+            [
+                np.broadcast_to(
+                    np.asarray(component, dtype=float),
+                    (states.shape[0],),
+                )
+                for component in function(states[:, 0], states[:, 1])
+            ]
+        )
+        for function in tangent_functions
+    ]
+    return vectors[:, [0]] * basis[0] + vectors[:, [1]] * basis[1]
+
+
+def _parallel_transport_payload(
+    surface: SurfaceOfRevolution,
+    time: np.ndarray,
+    intrinsic_states: np.ndarray,
+) -> dict[str, object]:
+    curve = intrinsic_states[:, :2]
+    metric_function = sp.lambdify(
+        surface.coordinates,
+        list(surface.first_fundamental_form()),
+        modules="numpy",
+    )
+    initial_metric = np.asarray(metric_function(*curve[0]), dtype=float).reshape(2, 2)
+    initial_vector = np.array([1.0 / np.sqrt(initial_metric[0, 0]), 0.0])
+    transported = surface.metric_geometry().parallel_transport(
+        time,
+        curve,
+        initial_vector,
+    )
+    embedded = _embedded_tangent_vectors(surface, intrinsic_states, transported)
+    return {
+        "kind": "parallel-transport-frame",
+        "rendererHint": "parallel-transport",
+        "coordinates": ["u", "phi"],
+        "parameter": time.astype(float).tolist(),
+        "initialVector": initial_vector.astype(float).tolist(),
+        "vectors": transported.astype(float).tolist(),
+        "embeddedVectors": embedded.astype(float).tolist(),
+        "evaluation": "measured-trajectory-parallel-transport",
+        "rigor": "measured",
+    }
+
+
 def generate_surface_geodesic_trajectory(
     *,
     family: SurfaceFamily = "torus",
@@ -244,6 +301,7 @@ def generate_surface_geodesic_trajectory(
         "parameters": parameters,
         "rendererHints": _renderer_hints(surface, positions),
         "surfaceGeometry": _surface_geometry_payload(surface, positions),
+        "parallelTransport": _parallel_transport_payload(surface, time, intrinsic_states),
         "invariantResiduals": invariant_residual_records(series),
     }
     return Trajectory.from_arrays(

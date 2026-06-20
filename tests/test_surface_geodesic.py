@@ -132,6 +132,9 @@ def test_surface_geodesic_manifest_declares_surface_channels() -> None:
     assert entry["geometry"]["curvature"]["source"] == (
         "trajectory.metadata.surfaceGeometry.curvature"
     )
+    assert entry["geometry"]["parallelTransport"]["source"] == (
+        "trajectory.metadata.parallelTransport"
+    )
     assert entry["fields"] == [
         {
             "name": "gaussianCurvature",

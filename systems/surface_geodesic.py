@@ -79,6 +79,13 @@ class SurfaceOfRevolution:
             self.profile_height,
         )
 
+    def embedding_tangent_expressions(self) -> tuple[tuple[sp.Expr, sp.Expr, sp.Expr], ...]:
+        embedding = self.embedding_expressions()
+        return tuple(
+            tuple(sp.simplify(sp.diff(component, coordinate)) for component in embedding)
+            for coordinate in self.coordinates
+        )
+
     def clairaut_quantity(self) -> sp.Expr:
         """Cyclic azimuthal momentum ``rho(u)^2 phi_dot``."""
 
