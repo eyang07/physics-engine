@@ -27,6 +27,7 @@ from scripts.generate_n_body_gravity import (
 )
 from scripts.generate_pendulum import write_pendulum_trajectory
 from scripts.generate_sphere_geodesic import write_sphere_geodesic_trajectory
+from scripts.generate_surface_geodesic import write_surface_geodesic_trajectory
 from scripts.generate_symmetric_top import write_symmetric_top_trajectory
 from scripts.generate_uniform_gravity import write_uniform_gravity_trajectory
 from scripts.generate_variable_speed_wavefront import write_variable_speed_wavefront
@@ -42,6 +43,10 @@ def main() -> None:
     write_sphere_geodesic_trajectory(
         Path("data/generated/sphere_geodesic.json"),
         viewer_output=Path("viewer/public/data/sphere_geodesic.json"),
+    )
+    write_surface_geodesic_trajectory(
+        Path("data/generated/surface_geodesic.json"),
+        viewer_output=Path("viewer/public/data/surface_geodesic.json"),
     )
     write_charged_particle_trajectory(
         Path("data/generated/charged_particle.json"),

@@ -18,6 +18,9 @@ diagnostics, and safety/certificate candidates.
 - Metric geometry helpers derive Christoffel symbols, geodesic equations,
   symbolic Riemann/Ricci/scalar curvature, and cogeodesic media for
   fixed-background examples.
+- Surface-of-revolution geodesic helpers build sphere, torus, paraboloid,
+  cone, and hyperboloid metrics from symbolic profiles; rollout diagnostics
+  label energy and Clairaut conservation residuals as measured evidence.
 - Safety helpers represent safe/unsafe sets, candidate Lyapunov/barrier
   functions, proof obligations, and measured sampled checks.
 - `engine.verification` serializes proof obligations into a backend-agnostic IR.

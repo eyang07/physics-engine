@@ -45,6 +45,9 @@ artifacts.
   - Parameterized scalar-speed, refractive-index, and inverse-metric media.
   - Metric geometry helpers for fixed-background geodesics, including symbolic
     Christoffel, Riemann, Ricci, and scalar-curvature calculations.
+  - Surface-of-revolution geodesic systems (sphere, torus, paraboloid, cone,
+    hyperboloid) generated from reusable metric geometry, with measured
+    invariant residuals for rollout diagnostics.
 - Diagnostics:
   - Invariant residuals.
   - Poincare sections.

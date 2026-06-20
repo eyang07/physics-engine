@@ -49,6 +49,7 @@ from systems.n_body_gravity import (
 )
 from systems.pendulum import build_system as build_pendulum
 from systems.sphere_geodesic import build_system as build_sphere_geodesic
+from systems.surface_geodesic import build_system as build_surface_geodesic
 from systems.symmetric_top import (
     build_system as build_symmetric_top,
     effective_potential as symmetric_top_effective_potential,
@@ -95,6 +96,32 @@ def _coupled_oscillator_modes(system):
     return payload
 
 
+def _first_order_state(system, name: str):
+    return next(symbol for symbol in system.state if symbol.name == name)
+
+
+def _first_order_parameter(system, name: str):
+    return next(symbol for symbol in system.parameters if symbol.name == name)
+
+
+def _surface_geodesic_energy(system):
+    u = _first_order_state(system, "u")
+    u_dot = _first_order_state(system, "u_dot")
+    phi_dot = _first_order_state(system, "phi_dot")
+    major = _first_order_parameter(system, "R_major")
+    minor = _first_order_parameter(system, "r_minor")
+    rho = major + minor * sp.cos(u)
+    return sp.simplify((minor**2 * u_dot**2 + rho**2 * phi_dot**2) / 2)
+
+
+def _surface_geodesic_clairaut(system):
+    u = _first_order_state(system, "u")
+    phi_dot = _first_order_state(system, "phi_dot")
+    major = _first_order_parameter(system, "R_major")
+    minor = _first_order_parameter(system, "r_minor")
+    return sp.simplify((major + minor * sp.cos(u)) ** 2 * phi_dot)
+
+
 LENSES: tuple[Lens, ...] = (
     Lens(
         id="pendulumMotionPhase",
@@ -126,6 +153,14 @@ LENSES: tuple[Lens, ...] = (
         description="Geodesic motion embedded in three-dimensional space.",
         projections=("embedding3d",),
         conserved=("H", "p_phi"),
+    ),
+    Lens(
+        id="surfaceGeodesic",
+        title="Surface Geodesic",
+        kind="configuration-space",
+        description="Geodesic motion on an embedded surface of revolution.",
+        projections=("embedding3d",),
+        conserved=("H", "clairaut"),
     ),
     Lens(
         id="chargedParticle",
@@ -428,6 +463,45 @@ SPHERE_GEODESIC = SystemSpec(
     ),
     lenses=("sphereGeodesic",),
     data_path="/data/sphere_geodesic.json",
+)
+
+
+SURFACE_GEODESIC = SystemSpec(
+    id="surface-geodesic",
+    title="Geodesic on a Surface of Revolution",
+    category="Differential Geometry",
+    description="Free motion on a torus generated from a reusable surface-of-revolution metric.",
+    build=build_surface_geodesic,
+    parameters=(
+        Parameter("R_major", "R", 2.0, 1.2, 3.0),
+        Parameter("r_minor", "r", 0.7, 0.2, 1.0),
+        Parameter("u0", "u_0", 0.72, -3.14, 3.14, role="initial"),
+        Parameter("phi0", r"\phi_0", 0.0, -3.14, 3.14, role="initial"),
+        Parameter("u_dot0", r"\dot{u}_0", 0.38, -2.0, 2.0, role="initial"),
+        Parameter("phi_dot0", r"\dot{\phi}_0", 0.92, -2.0, 2.0, role="initial"),
+    ),
+    state=(
+        StateVar("u", "u", "coordinate"),
+        StateVar("phi", r"\phi", "coordinate"),
+        StateVar("u_dot", r"\dot{u}", "velocity"),
+        StateVar("phi_dot", r"\dot{\phi}", "velocity"),
+        StateVar("x", "x", "embedding"),
+        StateVar("y", "y", "embedding"),
+        StateVar("z", "z", "embedding"),
+    ),
+    projections={"embedding3d": ("x", "y", "z")},
+    conserved=(
+        Conserved("H", "H", "geodesic kinetic energy", expression=_surface_geodesic_energy),
+        Conserved(
+            "clairaut",
+            "C",
+            "azimuthal rotation / Clairaut momentum",
+            expression=_surface_geodesic_clairaut,
+        ),
+    ),
+    lenses=("surfaceGeodesic",),
+    data_path="/data/surface_geodesic.json",
+    system_kind="surface-geodesic",
 )
 
 
@@ -1377,6 +1451,7 @@ VARIABLE_SPEED_WAVEFRONT = SystemSpec(
 SPECS: tuple[SystemSpec, ...] = (
     PENDULUM,
     SPHERE_GEODESIC,
+    SURFACE_GEODESIC,
     CHARGED_PARTICLE,
     UNIFORM_GRAVITY,
     IDEAL_SPRING,
