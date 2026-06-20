@@ -53,28 +53,24 @@ cross-links, no Systems-side safety overlay)._
 
 ### Foundation — shared rendering vocabulary (do first)
 
-_FE-037 and FE-038 are complete. FE-037 is the renderer-hint registry with a
-graceful fallback (new backend lenses route to a placeholder instead of a blank
-stage; existing systems render unchanged). FE-038 added the shared scalar→color
-scale (`scalarScale` in `viewer/src/design/colormaps.ts`) and the reusable
-on-stage `scalar-legend` overlay (`viewer/src/scalarLegend.ts`) — a colormap ramp
-keyed by qualitative, decimal-free endpoints; the potential-contour lens is its
-first consumer. FE-039 below continues the foundation, and FE-044 / FE-048 /
-FE-050 reuse the scalar legend for their scalar fields._
-
-1. **FE-039: Add a reusable animated field-surface / mesh primitive**
-   - Goal: Add one three.js primitive that renders a time-animated height/displacement
-     surface or a colored mesh from an exported grid, reused by the wave, membrane,
-     wavefront, and curved-surface lenses rather than re-built per family.
-   - Scope: `viewer/src/threeScene.ts` (or a new surface module), `viewer/src/
-     playback.ts` for time binding, and the viewer visual test.
-   - Acceptance: the primitive animates a sample displacement grid and colors a
-     sample static mesh; playback loops consistently with the existing controls;
-     `npm run build` and the visual test pass.
+_The foundation block (FE-037, FE-038, FE-039) is complete. FE-037 is the
+renderer-hint registry with a graceful fallback (new backend lenses route to a
+placeholder instead of a blank stage; existing systems render unchanged). FE-038
+added the shared scalar→color scale (`scalarScale` in
+`viewer/src/design/colormaps.ts`) and the reusable on-stage `scalar-legend`
+overlay (`viewer/src/scalarLegend.ts`) — a colormap ramp keyed by qualitative,
+decimal-free endpoints; the potential-contour lens is its first consumer. FE-039
+added the shared field-surface primitive (`viewer/src/fieldSurface.ts`,
+`FieldSurface`): a scalar grid lifted into a colored height surface, plus a
+frame-driven `update(elapsed)` displacement-animation path; the Hénon–Heiles
+potential surface is its first (static-mesh) consumer. The family lenses below
+build on these — FE-044 / FE-048 / FE-050 reuse the scalar legend, and FE-046 /
+FE-047 / FE-048 / FE-049 reuse the field surface (its animated path binds their
+exported displacement grids)._
 
 ### Direction A — Rigid-body & many-body rendering
 
-2. **FE-040: Attitude playback for rotating rigid bodies**
+1. **FE-040: Attitude playback for rotating rigid bodies**
    - Goal: Drive a rotating three.js body from the exported orientation (quaternion)
      series and body-frame triad, so rigid-body systems show a body that spins, not
      a point that moves.
@@ -86,7 +82,7 @@ FE-050 reuse the scalar legend for their scalar fields._
      visual test pass.
    - Depends on: BE-089 (orientation/attitude export schema), BE-087/BE-088.
 
-3. **FE-041: Polhode / momentum-sphere ∩ energy-ellipsoid lens**
+2. **FE-041: Polhode / momentum-sphere ∩ energy-ellipsoid lens**
    - Goal: Render the free asymmetric top's angular-momentum sphere, kinetic-energy
      ellipsoid, and the polhode curve traced on the body, making the intermediate-axis
      instability legible.
@@ -98,7 +94,7 @@ FE-050 reuse the scalar legend for their scalar fields._
      and the visual test pass.
    - Depends on: BE-087 (polhode / energy-ellipsoid export).
 
-4. **FE-042: N-body orbit trails with center-of-mass framing**
+3. **FE-042: N-body orbit trails with center-of-mass framing**
    - Goal: Render N-body systems as per-body orbit trails in 3D, framed on the
      center of mass, with per-body color and a legend.
    - Scope: `viewer/src/threeScene.ts` (orbit-trail scene), renderer-hint framing in
@@ -108,7 +104,7 @@ FE-050 reuse the scalar legend for their scalar fields._
      visual test pass.
    - Depends on: BE-082 (N-body system + export).
 
-5. **FE-043: Normal-mode lens with mode selector and superposition scrub**
+4. **FE-043: Normal-mode lens with mode selector and superposition scrub**
    - Goal: Add a lens that animates each exported normal-mode shape, with a mode
      selector and a control to scrub a superposition, for the coupled-oscillator
      (and small-oscillation) systems.
@@ -122,7 +118,7 @@ FE-050 reuse the scalar legend for their scalar fields._
 
 ### Direction B — Field & wave rendering
 
-6. **FE-044: Scalar-field lens (heatmap / contour)**
+5. **FE-044: Scalar-field lens (heatmap / contour)**
    - Goal: Render an exported scalar-field grid as a heatmap/contour using the
      FE-038 color+legend layer, for potentials and other scalar fields.
    - Scope: a scalar-field lens in `viewer/src/`, `viewer/src/data/manifest.ts` for
@@ -133,7 +129,7 @@ FE-050 reuse the scalar legend for their scalar fields._
    - Depends on: BE-091 (field grid export); consumes BE-093 potentials, reusable for
      BE-105 curvature.
 
-7. **FE-045: Vector-field lens (glyphs + field lines)**
+6. **FE-045: Vector-field lens (glyphs + field lines)**
    - Goal: Render an exported vector-field grid as glyphs/quiver with magnitude→color,
      and draw the exported field-line / streamline polylines.
    - Scope: a vector-field lens in `viewer/src/`, `viewer/src/data/manifest.ts` /
@@ -143,7 +139,7 @@ FE-050 reuse the scalar legend for their scalar fields._
      to the shared color legend; `npm run build` and the visual test pass.
    - Depends on: BE-091 (vector-field + field-line export), BE-092, BE-093.
 
-8. **FE-046: 1D wave displacement animation (string and wave packet)**
+7. **FE-046: 1D wave displacement animation (string and wave packet)**
     - Goal: Animate the exported 1D displacement/amplitude field for the vibrating
       string and the dispersive wave packet, including a standing/traveling toggle
       where the data supports it.
@@ -155,7 +151,7 @@ FE-050 reuse the scalar legend for their scalar fields._
       pass.
     - Depends on: BE-094 (string), BE-096 (wave packet).
 
-9. **FE-047: 2D membrane mode surfaces with mode selector**
+8. **FE-047: 2D membrane mode surfaces with mode selector**
     - Goal: Render rectangular and circular membrane modes as animated displacement
       surfaces (reusing FE-039), with a mode selector and superposition.
     - Scope: a membrane lens, `viewer/src/structurePanel.ts` for the mode selector,
@@ -164,7 +160,7 @@ FE-050 reuse the scalar legend for their scalar fields._
       mode selector switches shapes; `npm run build` and the visual test pass.
     - Depends on: BE-095 (membrane modes export).
 
-10. **FE-048: 2D wavefront / intensity surface lens**
+9. **FE-048: 2D wavefront / intensity surface lens**
     - Goal: Render the exported 2D wavefront surfaces and intensity field from the
       heterogeneous-media work, reusing the wavefront/ray bundle path and the FE-038
       color layer for intensity.
@@ -178,7 +174,7 @@ FE-050 reuse the scalar legend for their scalar fields._
 
 ### Direction C — Curved-geometry rendering
 
-11. **FE-049: Surface-embedding mesh with geodesic drawn on the surface**
+10. **FE-049: Surface-embedding mesh with geodesic drawn on the surface**
     - Goal: Render an exported surface-of-revolution embedding mesh with the geodesic
       polyline drawn on the surface in embedded coordinates.
     - Scope: a surface-geodesic lens in `viewer/src/threeScene.ts`, `viewer/src/data/
@@ -189,7 +185,7 @@ FE-050 reuse the scalar legend for their scalar fields._
       test pass.
     - Depends on: BE-100 (surface geodesics), BE-101 (embedding export schema).
 
-12. **FE-050: Curvature coloring on the surface mesh**
+11. **FE-050: Curvature coloring on the surface mesh**
     - Goal: Color the surface-embedding mesh by the exported curvature scalar field
       using the FE-038 color+legend layer, making curvature visible.
     - Scope: the surface-geodesic lens, `viewer/src/data/manifest.ts` for the
@@ -199,7 +195,7 @@ FE-050 reuse the scalar legend for their scalar fields._
       visual test pass.
     - Depends on: BE-105 (curvature scalar-field export); reuses FE-049.
 
-13. **FE-051: Parallel-transport frame animation (holonomy)**
+12. **FE-051: Parallel-transport frame animation (holonomy)**
     - Goal: Animate the exported transported frame along a curve / closed loop on a
       curved surface, making the holonomy angle legible.
     - Scope: the surface-geodesic lens, `viewer/src/playback.ts`, `viewer/src/data/
@@ -209,7 +205,7 @@ FE-050 reuse the scalar legend for their scalar fields._
       `npm run build` and the visual test pass.
     - Depends on: BE-104 (parallel transport / holonomy export).
 
-14. **FE-052: Effective-potential and orbit lens for Kepler / Schwarzschild**
+13. **FE-052: Effective-potential and orbit lens for Kepler / Schwarzschild**
     - Goal: Render the exported effective potential with turning points alongside the
       orbit, surfacing bound/unbound/precessing classification for central-force and
       GR orbits.
@@ -227,7 +223,7 @@ _These two verification-view tasks predate the direction change and are kept for
 continuity. They are **deprioritized** while the frontend follows the physics
 directions; pick them up only on explicit request._
 
-15. **FE-035: Draw the certified enclosure box on the phase-plane stage**
+14. **FE-035: Draw the certified enclosure box on the phase-plane stage**
     - Goal: An obligation's certified-numeric enclosure (FE-032) records the box it
       is sound over in state-variable coordinates, but the stage never shows where
       on the phase plane that box lies. Draw a read-only certified-box overlay on
@@ -243,7 +239,7 @@ directions; pick them up only on explicit request._
       rollout/region rendering is otherwise unchanged; nothing reads as proved;
       `npm run build` and the visual test pass.
 
-16. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
+15. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
     - Goal: The catalog lists every package's region/obligation/candidate counts
       and Tier/regime, but not how many of its obligations reach level 2. Once the
       discovery index carries a per-package certified-numeric count, surface it as

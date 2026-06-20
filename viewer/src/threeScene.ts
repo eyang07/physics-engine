@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { viridis } from "./design/colormaps";
 import { theme } from "./design/theme";
+import { FieldSurface } from "./fieldSurface";
 import { FlowField } from "./flow";
 import {
   rendererHints,
@@ -759,103 +761,21 @@ function henonPoint(state: number[], data: Trajectory, hints: RendererHints): TH
 }
 
 function makeHenonSurface(data: Trajectory, hints: RendererHints): THREE.Group {
-  const group = new THREE.Group();
   const surface = potentialSurfaceMetadata(data);
   if (!surface) {
-    return group;
+    return new THREE.Group();
   }
-  const transform = henonSurfaceTransform(hints);
-
-  const geometry = new THREE.BufferGeometry();
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const indices: number[] = [];
-  const color = new THREE.Color();
-  const flatValues = surface.values.flat().filter(Number.isFinite);
-  const minValue = Math.min(...flatValues);
-  const maxValue = Math.max(...flatValues);
-  const span = Math.max(1e-6, maxValue - minValue);
-
-  surface.yValues.forEach((y, row) => {
-    surface.xValues.forEach((x, col) => {
-      const value = surface.values[row][col];
-      positions.push(
-        x * transform.scale[0] + transform.offset[0],
-        value * transform.scale[1] + transform.offset[1],
-        y * transform.scale[2] + transform.offset[2],
-      );
-      const normalized = (value - minValue) / span;
-      color.setHSL(0.54 - normalized * 0.37, 0.5, 0.46 + normalized * 0.12);
-      colors.push(color.r, color.g, color.b);
-    });
+  // The potential surface is the static-mesh consumer of the shared field
+  // primitive (FE-039): a scalar grid lifted into a height surface and tinted
+  // through the shared viridis scale, with faint reference grid lines.
+  const fieldSurface = new FieldSurface({
+    grid: { xValues: surface.xValues, yValues: surface.yValues, values: surface.values },
+    transform: henonSurfaceTransform(hints),
+    colormap: viridis,
+    gridLines: true,
+    opacity: 0.5,
   });
-
-  const columns = surface.xValues.length;
-  for (let row = 0; row < surface.yValues.length - 1; row += 1) {
-    for (let col = 0; col < surface.xValues.length - 1; col += 1) {
-      const a = row * columns + col;
-      const b = row * columns + col + 1;
-      const c = (row + 1) * columns + col + 1;
-      const d = (row + 1) * columns + col;
-      indices.push(a, b, d, b, c, d);
-    }
-  }
-
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-
-  group.add(
-    new THREE.Mesh(
-      geometry,
-      new THREE.MeshStandardMaterial({
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.5,
-        roughness: 0.78,
-        metalness: 0.03,
-        side: THREE.DoubleSide,
-      }),
-    ),
-  );
-
-  const rowStep = Math.max(1, Math.floor(surface.yValues.length / 10));
-  const colStep = Math.max(1, Math.floor(surface.xValues.length / 10));
-  for (let row = 0; row < surface.yValues.length; row += rowStep) {
-    group.add(
-      lineFromPoints(
-        surface.xValues.map(
-          (x, col) =>
-            new THREE.Vector3(
-              x * transform.scale[0] + transform.offset[0],
-              surface.values[row][col] * transform.scale[1] + transform.offset[1] + 0.01,
-              surface.yValues[row] * transform.scale[2] + transform.offset[2],
-            ),
-        ),
-        new THREE.Color(theme.textFaint),
-        0.12,
-      ),
-    );
-  }
-  for (let col = 0; col < surface.xValues.length; col += colStep) {
-    group.add(
-      lineFromPoints(
-        surface.yValues.map(
-          (y, row) =>
-            new THREE.Vector3(
-              surface.xValues[col] * transform.scale[0] + transform.offset[0],
-              surface.values[row][col] * transform.scale[1] + transform.offset[1] + 0.01,
-              y * transform.scale[2] + transform.offset[2],
-            ),
-        ),
-        new THREE.Color(theme.textFaint),
-        0.12,
-      ),
-    );
-  }
-
-  return group;
+  return fieldSurface.object;
 }
 
 function makeHenonHeilesGroup(data: Trajectory, hints: RendererHints): THREE.Group {
