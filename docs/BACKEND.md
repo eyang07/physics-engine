@@ -62,6 +62,13 @@ artifacts.
     manifest entry declares it with a `rigid-body` renderer hint. The free
     asymmetric top integrates attitude coupled to Euler's equations; the heavy
     symmetric top derives it from its Euler angles.
+  - Field export schema (`engine/export/field_export.py`): deterministic
+    `scalar-field` grids (axes + exact sampled values), `vector-field` grids
+    (per-node components + magnitude), and `field-lines` polyline payloads, each
+    carrying its renderer hint. Manifest entries can declare their `fields`
+    channels (name/kind/rendererHint/source). Sampled values are exact
+    evaluations of the symbolic field (`evaluation: symbolic-exact`), not measured
+    evidence.
 - Safety and verification:
   - Safe/unsafe sublevel sets and measured trajectory safety reports.
   - Event-based unsafe-set entry detection

@@ -11,6 +11,14 @@ from engine.export.manifest import (
     system_entry,
     write_manifest,
 )
+from engine.export.field_export import (
+    FIELD_LINES_HINT,
+    SCALAR_FIELD_HINT,
+    VECTOR_FIELD_HINT,
+    field_lines,
+    scalar_field_grid,
+    vector_field_grid,
+)
 from engine.export.trajectory import Trajectory
 from engine.export.verification_contract import (
     validate_viewer_verification_export,
@@ -65,7 +73,10 @@ __all__ = [
     "COMPONENT_TRAJECTORY",
     "Conserved",
     "EffectivePotential",
+    "FIELD_LINES_HINT",
     "Lens",
+    "SCALAR_FIELD_HINT",
+    "VECTOR_FIELD_HINT",
     "PACKAGE_COMPONENT_KINDS",
     "PACKAGE_INDEX_FILENAME",
     "PACKAGE_INDEX_SCHEMA_VERSION",
@@ -91,6 +102,9 @@ __all__ = [
     "build_manifest",
     "build_package_index",
     "build_package_manifest",
+    "field_lines",
+    "scalar_field_grid",
+    "vector_field_grid",
     "read_package",
     "read_package_index",
     "read_package_summaries",
