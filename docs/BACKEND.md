@@ -69,6 +69,13 @@ artifacts.
     channels (name/kind/rendererHint/source). Sampled values are exact
     evaluations of the symbolic field (`evaluation: symbolic-exact`), not measured
     evidence.
+  - Static-field manifest entries (`systemKind: "static-field"`): systems whose
+    payload is a time-independent field export, not a Lagrangian or first-order
+    flow, intentionally omit `physics`, `derivation`, and `dynamics`. They expose
+    backend-owned field channels through `fields` plus an optional `fieldModel`
+    source summary. The electromagnetic field example uses this path for an
+    electric-dipole scalar potential, electric/magnetic vector grids, and
+    integrated field-line payloads.
   - Field-line / streamline integration (`engine/fields/field_lines.py`): integral
     curves of a vector field's direction (`dx/ds = V/|V|`, unit arc length) via the
     shared RK4 step, with deterministic segment seeding, optional forward+backward
@@ -210,6 +217,7 @@ surfaces remain future work.
 - N-body gravity
 - Lorenz attractor
 - Hénon-Heiles system
+- Electromagnetic static field
 - Variable-speed wavefront propagation
 
 Backend-only examples include controlled pendulum and controlled spring
@@ -231,7 +239,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `659 passed`.
+Latest known result: `731 passed`.
 
 Use focused tests while iterating:
 

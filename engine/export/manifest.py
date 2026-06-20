@@ -397,6 +397,8 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
     """Build one manifest entry, deriving the symbolic physics from the engine."""
 
     system = spec.build()
+    if spec.system_kind == "static-field":
+        return static_field_system_entry(spec, system)
     if isinstance(system, FirstOrderSystem):
         return first_order_system_entry(spec, system)
     if isinstance(system, CotangentHamiltonianSystem):
@@ -478,6 +480,32 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
         entry["variants"] = [variant.to_dict() for variant in spec.variants]
     if spec.verification_problems:
         entry["verificationProblems"] = list(spec.verification_problems)
+    return entry
+
+
+def static_field_system_entry(spec: SystemSpec, system: Any) -> dict[str, Any]:
+    """Build a manifest entry for fields with no time-evolution model."""
+
+    entry = {
+        "id": spec.id,
+        "title": spec.title,
+        "category": spec.category,
+        "description": spec.description,
+        "dataPath": spec.data_path,
+        "systemKind": spec.system_kind,
+        "parameters": [parameter.to_dict() for parameter in spec.parameters],
+        "state": [variable.to_dict() for variable in spec.state],
+        "projections": {name: list(group) for name, group in spec.projections.items()},
+        "conserved": [],
+        "effectivePotentials": [],
+        "lenses": list(spec.lenses),
+        "fields": [dict(channel) for channel in spec.fields],
+    }
+    metadata = getattr(system, "manifest_metadata", None)
+    if callable(metadata):
+        entry["fieldModel"] = dict(metadata())
+    if spec.variants:
+        entry["variants"] = [variant.to_dict() for variant in spec.variants]
     return entry
 
 

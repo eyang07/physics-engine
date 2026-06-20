@@ -22,12 +22,14 @@ from engine.export.manifest import (
     StateVar,
     SystemSpec,
 )
+from engine.export.field_export import FIELD_LINES_HINT, SCALAR_FIELD_HINT, VECTOR_FIELD_HINT
 from engine.mechanics import normal_modes
 from engine.mechanics.symmetries import InfinitesimalSymmetry
 from systems.bead_on_hoop import build_system as build_bead_on_hoop
 from systems.charged_particle import build_uniform_magnetic_field_system
 from systems.coupled_oscillators import build_system as build_coupled_oscillators
 from systems.double_pendulum import build_system as build_double_pendulum
+from systems.electromagnetic_field import build_system as build_electromagnetic_field
 from systems.free_rigid_body import (
     angular_momentum_magnitude as free_rigid_body_angular_momentum_magnitude,
     build_system as build_free_rigid_body,
@@ -340,6 +342,12 @@ LENSES: tuple[Lens, ...] = (
         kind="ray-bundle",
         description="Bicharacteristic rays bending through a variable-speed medium.",
         projections=("rayPlane",),
+    ),
+    Lens(
+        id="electromagneticField",
+        title="Electromagnetic Fields",
+        kind="static-fields",
+        description="Static electric and magnetic field grids plus integrated field lines.",
     ),
 )
 
@@ -1112,6 +1120,65 @@ HENON_HEILES = SystemSpec(
 )
 
 
+ELECTROMAGNETIC_FIELD = SystemSpec(
+    id="electromagnetic-field",
+    title="Electromagnetic Field",
+    category="Fields",
+    description=(
+        "A static field export with electric dipole equipotentials, Coulomb field "
+        "lines, and a magnetic-dipole cross-section."
+    ),
+    build=build_electromagnetic_field,
+    parameters=(
+        Parameter("q", "q", 1.0, 0.2, 3.0),
+        Parameter("d", "d", 1.4, 0.5, 2.2),
+        Parameter("epsilon0", r"\epsilon_0", 1.0, 0.5, 2.0),
+        Parameter("m_dipole", "m", 1.0, 0.2, 3.0),
+        Parameter("mu0", r"\mu_0", 1.0, 0.5, 2.0),
+        Parameter("I", "I", 1.0, 0.2, 3.0),
+        Parameter("a", "a", 0.7, 0.2, 1.5),
+    ),
+    state=(),
+    projections={},
+    conserved=(),
+    lenses=("electromagneticField",),
+    data_path="/data/electromagnetic_field.json",
+    fields=(
+        {
+            "name": "electricPotential",
+            "kind": SCALAR_FIELD_HINT,
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.electricPotential",
+        },
+        {
+            "name": "electricField",
+            "kind": VECTOR_FIELD_HINT,
+            "rendererHint": VECTOR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.electricField",
+        },
+        {
+            "name": "electricFieldLines",
+            "kind": FIELD_LINES_HINT,
+            "rendererHint": FIELD_LINES_HINT,
+            "source": "trajectory.metadata.fields.electricFieldLines",
+        },
+        {
+            "name": "magneticField",
+            "kind": VECTOR_FIELD_HINT,
+            "rendererHint": VECTOR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.magneticField",
+        },
+        {
+            "name": "magneticFieldLines",
+            "kind": FIELD_LINES_HINT,
+            "rendererHint": FIELD_LINES_HINT,
+            "source": "trajectory.metadata.fields.magneticFieldLines",
+        },
+    ),
+    system_kind="static-field",
+)
+
+
 VARIABLE_SPEED_WAVEFRONT = SystemSpec(
     id="variable-speed-wavefront",
     title="Variable-Speed Wavefront",
@@ -1152,5 +1219,6 @@ SPECS: tuple[SystemSpec, ...] = (
     SYMMETRIC_TOP,
     LORENZ,
     HENON_HEILES,
+    ELECTROMAGNETIC_FIELD,
     VARIABLE_SPEED_WAVEFRONT,
 )

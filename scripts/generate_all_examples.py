@@ -11,6 +11,7 @@ from scripts.generate_double_pendulum import (
     write_double_pendulum_trajectory,
     write_double_pendulum_variant_trajectories,
 )
+from scripts.generate_electromagnetic_field import write_electromagnetic_field
 from scripts.generate_free_rigid_body import write_free_rigid_body_trajectory
 from scripts.generate_henon_heiles import write_henon_heiles_trajectory
 from scripts.generate_ideal_spring import (
@@ -102,6 +103,10 @@ def main() -> None:
     write_henon_heiles_trajectory(
         Path("data/generated/henon_heiles.json"),
         viewer_output=Path("viewer/public/data/henon_heiles.json"),
+    )
+    write_electromagnetic_field(
+        Path("data/generated/electromagnetic_field.json"),
+        viewer_output=Path("viewer/public/data/electromagnetic_field.json"),
     )
     write_variable_speed_wavefront(
         Path("data/generated/variable_speed_wavefront.json"),
