@@ -19,6 +19,16 @@ def _zero_array(dimension: int) -> sp.ImmutableDenseNDimArray:
     )
 
 
+def _zero_riemann_array(dimension: int) -> sp.ImmutableDenseNDimArray:
+    return sp.ImmutableDenseNDimArray(
+        [[[[0] * dimension] * dimension] * dimension] * dimension
+    )
+
+
+def _trig_zero(expression: sp.Expr) -> bool:
+    return sp.simplify(sp.expand_trig(expression)) == 0
+
+
 def test_flat_polar_christoffel_symbols() -> None:
     r, theta = sp.symbols("r theta", positive=True)
     polar = MetricGeometry(coordinates=(r, theta), metric=sp.diag(1, r**2))
@@ -120,6 +130,44 @@ def test_schwarzschild_christoffel_reference_values() -> None:
     }
     for index, value in expected.items():
         assert sp.simplify(gamma[index] - value) == 0
+
+
+def test_flat_metric_curvature_vanishes() -> None:
+    x, y = sp.symbols("x y", real=True)
+    flat = MetricGeometry(coordinates=(x, y), metric=sp.eye(2))
+
+    assert flat.riemann_tensor() == _zero_riemann_array(2)
+    assert flat.ricci_tensor() == sp.zeros(2, 2)
+    assert flat.scalar_curvature() == 0
+
+
+def test_two_sphere_curvature_matches_constant_reference() -> None:
+    sphere = two_sphere_metric()
+    theta, _phi = sphere.coordinates
+    (radius,) = sphere.parameters
+    riemann = sphere.riemann_tensor()
+    ricci = sphere.ricci_tensor()
+
+    assert _trig_zero(riemann[0, 1, 0, 1] - sp.sin(theta) ** 2)
+    assert _trig_zero(riemann[1, 0, 1, 0] - 1)
+    assert _trig_zero(ricci[0, 0] - 1)
+    assert _trig_zero(ricci[1, 1] - sp.sin(theta) ** 2)
+    assert _trig_zero(sphere.scalar_curvature() - 2 / radius**2)
+
+
+def test_schwarzschild_equatorial_curvature_matches_reference() -> None:
+    geometry = schwarzschild_equatorial_metric()
+    _t, r, _phi = geometry.coordinates
+    (rs,) = geometry.parameters
+    riemann = geometry.riemann_tensor()
+    ricci = geometry.ricci_tensor()
+
+    assert sp.simplify(riemann[0, 1, 0, 1] - rs / (r**2 * (r - rs))) == 0
+    assert sp.simplify(riemann[1, 2, 1, 2] + rs / (2 * r)) == 0
+    assert sp.simplify(ricci[0, 0] - rs * (-r + rs) / (2 * r**4)) == 0
+    assert sp.simplify(ricci[1, 1] - rs / (2 * r**2 * (r - rs))) == 0
+    assert sp.simplify(ricci[2, 2] + rs / r) == 0
+    assert sp.simplify(geometry.scalar_curvature()) == 0
 
 
 def test_schwarzschild_cogeodesic_hamiltonian() -> None:

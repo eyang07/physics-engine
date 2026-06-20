@@ -15,8 +15,9 @@ diagnostics, and safety/certificate candidates.
 - Cotangent Hamiltonian systems support ray/geodesic-style flow.
 - Parameterized media models cover scalar speed, refractive index, and inverse
   metric descriptions.
-- Metric geometry helpers derive Christoffel symbols, geodesic equations, and
-  cogeodesic media for fixed-background examples.
+- Metric geometry helpers derive Christoffel symbols, geodesic equations,
+  symbolic Riemann/Ricci/scalar curvature, and cogeodesic media for
+  fixed-background examples.
 - Safety helpers represent safe/unsafe sets, candidate Lyapunov/barrier
   functions, proof obligations, and measured sampled checks.
 - `engine.verification` serializes proof obligations into a backend-agnostic IR.

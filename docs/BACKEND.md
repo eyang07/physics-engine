@@ -43,7 +43,8 @@ artifacts.
   - Cotangent Hamiltonian systems.
   - Ray-bundle integration/export.
   - Parameterized scalar-speed, refractive-index, and inverse-metric media.
-  - Metric geometry helpers for fixed-background geodesics.
+  - Metric geometry helpers for fixed-background geodesics, including symbolic
+    Christoffel, Riemann, Ricci, and scalar-curvature calculations.
 - Diagnostics:
   - Invariant residuals.
   - Poincare sections.

@@ -8,6 +8,8 @@ derives:
   ``Gamma^k_ij = g^kl (d_i g_jl + d_j g_il - d_l g_ij) / 2``;
 - the geodesic equation as a first-order system in ``(q, q_dot)`` with
   ``qddot^k = -Gamma^k_ij qdot^i qdot^j``;
+- symbolic curvature tensors: Riemann ``R^rho_{sigma mu nu}``, Ricci
+  ``R_sigma_nu``, and scalar curvature ``R``;
 - the cogeodesic Hamiltonian flow on the cotangent side, via
   :class:`~engine.dynamics.media.InverseMetricMedium`, to which the existing
   ray-bundle and ray-diagnostics utilities apply directly;
@@ -140,6 +142,65 @@ class MetricGeometry:
                 -sum(gamma[k, i, j] * v[i] * v[j] for i in range(n) for j in range(n))
             )
             for k in range(n)
+        )
+
+    def riemann_tensor(self) -> sp.ImmutableDenseNDimArray:
+        """Riemann tensor indexed ``[rho, sigma, mu, nu]``.
+
+        The convention is
+        ``R^rho_{sigma mu nu} = d_mu Gamma^rho_{nu sigma}
+        - d_nu Gamma^rho_{mu sigma}
+        + Gamma^rho_{mu lambda} Gamma^lambda_{nu sigma}
+        - Gamma^rho_{nu lambda} Gamma^lambda_{mu sigma}``.
+        """
+
+        n = self.dimension
+        q = self.coordinates
+        gamma = self.christoffel_symbols()
+        values = [
+            [
+                [
+                    [
+                        _trig_simplify(
+                            sp.diff(gamma[rho, nu, sigma], q[mu])
+                            - sp.diff(gamma[rho, mu, sigma], q[nu])
+                            + sum(
+                                gamma[rho, mu, lam] * gamma[lam, nu, sigma]
+                                - gamma[rho, nu, lam] * gamma[lam, mu, sigma]
+                                for lam in range(n)
+                            )
+                        )
+                        for nu in range(n)
+                    ]
+                    for mu in range(n)
+                ]
+                for sigma in range(n)
+            ]
+            for rho in range(n)
+        ]
+        return sp.ImmutableDenseNDimArray(values)
+
+    def ricci_tensor(self) -> sp.Matrix:
+        """Ricci tensor ``R_sigma_nu = R^rho_{sigma rho nu}``."""
+
+        n = self.dimension
+        riemann = self.riemann_tensor()
+        return sp.Matrix(
+            n,
+            n,
+            lambda sigma, nu: _trig_simplify(
+                sum(riemann[rho, sigma, rho, nu] for rho in range(n))
+            ),
+        )
+
+    def scalar_curvature(self) -> sp.Expr:
+        """Scalar curvature ``g^ij R_ij``."""
+
+        n = self.dimension
+        ricci = self.ricci_tensor()
+        inverse = self.inverse_metric()
+        return _trig_simplify(
+            sum(inverse[i, j] * ricci[i, j] for i in range(n) for j in range(n))
         )
 
     def geodesic_system(self) -> FirstOrderSystem:
