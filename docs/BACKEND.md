@@ -69,6 +69,11 @@ artifacts.
     channels (name/kind/rendererHint/source). Sampled values are exact
     evaluations of the symbolic field (`evaluation: symbolic-exact`), not measured
     evidence.
+  - Field-line / streamline integration (`engine/fields/field_lines.py`): integral
+    curves of a vector field's direction (`dx/ds = V/|V|`, unit arc length) via the
+    shared RK4 step, with deterministic segment seeding, optional forward+backward
+    tracing, and clean termination on the domain box, stagnation points, or listed
+    singularities. Produces the polylines the `field-lines` export carries.
 - Safety and verification:
   - Safe/unsafe sublevel sets and measured trajectory safety reports.
   - Event-based unsafe-set entry detection
