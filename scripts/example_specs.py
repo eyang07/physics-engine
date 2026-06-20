@@ -50,6 +50,7 @@ from systems.n_body_gravity import (
 from systems.pendulum import build_system as build_pendulum
 from systems.sphere_geodesic import build_system as build_sphere_geodesic
 from systems.surface_geodesic import build_system as build_surface_geodesic
+from systems.schwarzschild import build_system as build_schwarzschild
 from systems.symmetric_top import (
     build_system as build_symmetric_top,
     effective_potential as symmetric_top_effective_potential,
@@ -139,6 +140,34 @@ def _surface_geodesic_geometry(system):
             "source": "trajectory.metadata.surfaceGeometry.curvature",
         },
     }
+
+
+def _schwarzschild_state(system, name: str):
+    return next(symbol for symbol in system.state if symbol.name == name)
+
+
+def _schwarzschild_parameter(system, name: str):
+    return next(symbol for symbol in system.parameters if symbol.name == name)
+
+
+def _schwarzschild_energy(system):
+    r = _schwarzschild_state(system, "r")
+    t_dot = _schwarzschild_state(system, "t_dot")
+    rs = _schwarzschild_parameter(system, "r_s")
+    return sp.simplify((1 - rs / r) * t_dot)
+
+
+def _schwarzschild_angular_momentum(system):
+    r = _schwarzschild_state(system, "r")
+    phi_dot = _schwarzschild_state(system, "phi_dot")
+    return sp.simplify(r**2 * phi_dot)
+
+
+def _schwarzschild_effective_potential(system):
+    r = _schwarzschild_state(system, "r")
+    rs = _schwarzschild_parameter(system, "r_s")
+    ell = sp.Symbol("L")
+    return sp.simplify((1 - rs / r) * (1 + ell**2 / r**2))
 
 
 LENSES: tuple[Lens, ...] = (
@@ -269,6 +298,23 @@ LENSES: tuple[Lens, ...] = (
         description="Radial motion after reducing the central-force orbit.",
         projections=("phase",),
         conserved=("H", "ell"),
+    ),
+    Lens(
+        id="schwarzschildOrbit",
+        title="Relativistic Orbit",
+        kind="configuration-space",
+        description="Timelike or null geodesic in the equatorial Schwarzschild plane.",
+        projections=("orbitPlane",),
+        conserved=("E", "L"),
+    ),
+    Lens(
+        id="schwarzschildEffectivePotential",
+        title="GR Effective Potential",
+        kind="effective-potential",
+        description="Schwarzschild radial reduction with turning points and orbit class.",
+        projections=("phase",),
+        conserved=("E", "L"),
+        effective_potentials=("schwarzschild_radial",),
     ),
     Lens(
         id="beadHoop",
@@ -749,6 +795,59 @@ KEPLER = SystemSpec(
             classification_source="trajectory.metadata.orbitClassification",
         ),
     ),
+)
+
+
+SCHWARZSCHILD = SystemSpec(
+    id="schwarzschild",
+    title="Schwarzschild Geodesic",
+    category="Relativity",
+    description="Timelike and null geodesics in a fixed Schwarzschild background.",
+    build=build_schwarzschild,
+    parameters=(
+        Parameter("r_s", "r_s", 2.0, 0.5, 4.0),
+        Parameter("semi_latus_rectum", "p", 40.0, 20.0, 120.0, role="initial"),
+        Parameter("eccentricity", "e", 0.1, 0.0, 0.5, role="initial"),
+        Parameter("impact_parameter", "b", 30.0, 8.0, 80.0, role="initial"),
+    ),
+    state=(
+        StateVar("t", "t", "coordinate"),
+        StateVar("r", "r", "coordinate"),
+        StateVar("phi", r"\phi", "coordinate"),
+        StateVar("t_dot", r"\dot{t}", "velocity"),
+        StateVar("r_dot", r"\dot{r}", "velocity"),
+        StateVar("phi_dot", r"\dot{\phi}", "velocity"),
+        StateVar("x", "x", "embedding"),
+        StateVar("y", "y", "embedding"),
+    ),
+    projections={"orbitPlane": ("x", "y"), "phase": ("r", "r_dot")},
+    conserved=(
+        Conserved("E", "E", "stationarity / time translation", expression=_schwarzschild_energy),
+        Conserved(
+            "L",
+            "L",
+            "axial rotation",
+            expression=_schwarzschild_angular_momentum,
+        ),
+    ),
+    lenses=("schwarzschildOrbit", "schwarzschildEffectivePotential"),
+    data_path="/data/schwarzschild.json",
+    effective_potentials=(
+        EffectivePotential(
+            name="schwarzschild_radial",
+            coordinate="r",
+            latex=r"V_{\mathrm{eff}}^2",
+            conserved="L",
+            conserved_latex="L",
+            expression=_schwarzschild_effective_potential,
+            plot_source="trajectory.metadata.potentialPlots[name=schwarzschild_radial]",
+            turning_points_source=(
+                "trajectory.metadata.potentialPlots[name=schwarzschild_radial].turningPoints"
+            ),
+            classification_source="trajectory.metadata.orbitClassification",
+        ),
+    ),
+    system_kind="schwarzschild-geodesic",
 )
 
 
@@ -1490,6 +1589,7 @@ SPECS: tuple[SystemSpec, ...] = (
     IDEAL_SPRING,
     COUPLED_OSCILLATORS,
     KEPLER,
+    SCHWARZSCHILD,
     BEAD_ON_HOOP,
     DOUBLE_PENDULUM,
     N_BODY_GRAVITY,

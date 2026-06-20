@@ -25,6 +25,9 @@ diagnostics, and safety/certificate candidates.
   turning points, and qualitative Kepler / fixed-background Schwarzschild orbit
   classes for export; these are backend-computed renderer payloads, not viewer
   physics.
+- Schwarzschild geodesic generation uses the metric geodesic flow for timelike
+  and null equatorial orbits, with measured conservation residuals and
+  backend-computed precession / light-bending diagnostics.
 - Safety helpers represent safe/unsafe sets, candidate Lyapunov/barrier
   functions, proof obligations, and measured sampled checks.
 - `engine.verification` serializes proof obligations into a backend-agnostic IR.

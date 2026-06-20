@@ -51,6 +51,10 @@ artifacts.
   - Effective-potential orbit helpers for Kepler and fixed-background
     Schwarzschild regimes: Python computes potential samples, analytic turning
     points, and qualitative orbit classification for renderer consumption.
+  - Schwarzschild geodesic generator for equatorial timelike and null geodesics,
+    exporting measured conserved-energy/angular-momentum residuals, perihelion
+    precession for the bound timelike preset, photon-sphere/light-bending
+    diagnostics for the null preset, and the GR effective potential.
 - Diagnostics:
   - Invariant residuals.
   - Poincare sections.
@@ -248,6 +252,7 @@ surfaces remain future work.
 - Ideal spring
 - Coupled oscillators
 - Kepler problem
+- Schwarzschild geodesic
 - Bead on a rotating hoop
 - Double pendulum
 - N-body gravity

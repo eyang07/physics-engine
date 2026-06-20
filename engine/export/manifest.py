@@ -555,6 +555,18 @@ def first_order_system_entry(spec: SystemSpec, system: FirstOrderSystem) -> dict
             )
             item["expression_latex"] = latex(rendered_expression)
         conserved.append(item)
+    effective_potentials = [
+        {
+            "name": potential.name,
+            "coordinate": potential.coordinate,
+            "latex": potential.latex,
+            "conserved": potential.conserved,
+            "conserved_latex": potential.conserved_latex,
+            "expression_latex": latex(sp.simplify(potential.expression_for(system))),
+            **potential.sources_payload(),
+        }
+        for potential in spec.effective_potentials
+    ]
 
     entry = {
         "id": spec.id,
@@ -567,7 +579,7 @@ def first_order_system_entry(spec: SystemSpec, system: FirstOrderSystem) -> dict
         "state": [variable.to_dict() for variable in spec.state],
         "projections": {name: list(group) for name, group in spec.projections.items()},
         "conserved": conserved,
-        "effectivePotentials": [],
+        "effectivePotentials": effective_potentials,
         "lenses": list(spec.lenses),
         "dynamics": {
             "vector_field": vector_field,

@@ -26,6 +26,7 @@ from scripts.generate_n_body_gravity import (
     write_n_body_variant_trajectories,
 )
 from scripts.generate_pendulum import write_pendulum_trajectory
+from scripts.generate_schwarzschild import write_schwarzschild_trajectory
 from scripts.generate_sphere_geodesic import write_sphere_geodesic_trajectory
 from scripts.generate_surface_geodesic import write_surface_geodesic_trajectory
 from scripts.generate_symmetric_top import write_symmetric_top_trajectory
@@ -71,6 +72,10 @@ def main() -> None:
     write_kepler_trajectory(
         Path("data/generated/kepler_problem.json"),
         viewer_output=Path("viewer/public/data/kepler_problem.json"),
+    )
+    write_schwarzschild_trajectory(
+        Path("data/generated/schwarzschild.json"),
+        viewer_output=Path("viewer/public/data/schwarzschild.json"),
     )
     write_bead_on_hoop_trajectory(
         Path("data/generated/bead_on_hoop.json"),
