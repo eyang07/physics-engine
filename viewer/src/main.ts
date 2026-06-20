@@ -23,6 +23,7 @@ import { drawWavefrontScene } from "./wavefrontCanvas";
 import { drawPoincareSectionScene } from "./poincareSectionCanvas";
 import { VerificationPanel } from "./verificationPanel";
 import { VerificationStage } from "./verificationStage";
+import { resolveRendererSurface } from "./rendererRegistry";
 import {
   loadVerificationAdapterStubs,
   loadVerificationIndex,
@@ -51,23 +52,6 @@ type CanvasMode =
   | "henonHeilesPotential"
   | "henonHeilesPoincare"
   | "variableSpeedWavefront";
-
-const CANVAS_MODE_IDS = new Set<string>([
-  "pendulumMotionPhase",
-  "effectivePotential",
-  "pendulumPotential",
-  "uniformGravityVerticalPhase",
-  "uniformGravityPotential",
-  "idealSpringPhase",
-  "idealSpringPotential",
-  "keplerRadialPhase",
-  "beadHoopPhase",
-  "beadHoopPotential",
-  "henonHeilesPhase",
-  "henonHeilesPotential",
-  "henonHeilesPoincare",
-  "variableSpeedWavefront",
-]);
 
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -196,11 +180,17 @@ systemSelect.addEventListener("change", () => {
 });
 
 function isCanvasMode(id: string): id is CanvasMode {
-  return CANVAS_MODE_IDS.has(id);
+  return resolveRendererSurface(id) === "2d";
 }
 
 function isThreeMode(id: string): id is ThreeMode {
-  return !isCanvasMode(id);
+  return resolveRendererSurface(id) === "3d";
+}
+
+// A lens whose primitive does not exist yet (a new backend hint the viewer can't
+// draw): routed to a graceful placeholder on the 2D stage, never a blank scene.
+function isFallbackMode(id: string): boolean {
+  return resolveRendererSurface(id) === "fallback";
 }
 
 function lensFor(id: string): ManifestLens {
@@ -502,11 +492,12 @@ function applyVisualization() {
     return;
   }
 
-  if (isCanvasMode(selectedVisualization.id)) {
-    setCanvasMode("2d");
-  } else if (isThreeMode(selectedVisualization.id)) {
+  if (isThreeMode(selectedVisualization.id)) {
     setCanvasMode("3d");
     threeScene.setVisualization(selectedVisualization.id, trajectory);
+  } else {
+    // Both the 2D lenses and the fallback placeholder draw on the 2D canvas.
+    setCanvasMode("2d");
   }
 }
 
@@ -552,7 +543,9 @@ async function loadAndRender() {
 }
 
 function resize2dCanvas() {
-  if (!selectedVisualization || !isCanvasMode(selectedVisualization.id)) {
+  // Size the 2D canvas for both the canvas lenses and the fallback placeholder
+  // (anything that is not a Three.js scene).
+  if (!selectedVisualization || isThreeMode(selectedVisualization.id)) {
     return;
   }
   const pixelRatio = window.devicePixelRatio || 1;
@@ -568,6 +561,22 @@ window.addEventListener("resize", () => {
   threeScene.resize();
   verificationStage.resize();
 });
+
+// A graceful placeholder for a lens whose viewer primitive does not exist yet:
+// the backend already exports the data, the rendering primitive is on the way.
+// Drawn instead of a blank stage so the new physics systems read honestly.
+function drawFallbackStage(title: string, width: number, height: number) {
+  drawStageBackground(ctx, width, height);
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.fillStyle = theme.textPrimary;
+  ctx.font = '18px "IBM Plex Sans", system-ui, sans-serif';
+  ctx.fillText(title, width / 2, height / 2 - 10);
+  ctx.fillStyle = theme.textMuted;
+  ctx.font = '14px "IBM Plex Sans", system-ui, sans-serif';
+  ctx.fillText("Visualization coming soon", width / 2, height / 2 + 16);
+  ctx.restore();
+}
 
 function render(now: number) {
   // The stage only renders inside the Systems domain; the Verification domain is
@@ -592,7 +601,10 @@ function render(now: number) {
   // Loop continuously: wrap the elapsed time so a finished run restarts instead
   // of dead-ending at the final sample.
   const current = sampleTrajectory(trajectory, duration > 0 ? time % duration : time);
-  if (selectedVisualization.id === "pendulumMotionPhase") {
+  if (isFallbackMode(selectedVisualization.id)) {
+    resize2dCanvas();
+    drawFallbackStage(selectedVisualization.title, canvas.clientWidth, canvas.clientHeight);
+  } else if (selectedVisualization.id === "pendulumMotionPhase") {
     resize2dCanvas();
     drawPendulumScene(ctx, trajectory, pendulumBounds, current, canvas.clientWidth, canvas.clientHeight);
   } else if (selectedVisualization.id === "effectivePotential") {
