@@ -76,6 +76,13 @@ artifacts.
     source summary. The electromagnetic field example uses this path for an
     electric-dipole scalar potential, electric/magnetic vector grids, and
     integrated field-line payloads.
+  - Field-evolution manifest entries (`systemKind: "field-evolution"`): analytic
+    continuum examples whose primary payload is a sampled field over space and
+    time. They intentionally omit particle-dynamics derivations and instead
+    declare renderer-owned channels such as `scalar-field-series` with
+    `rendererHint: "scalar-field"`. The vibrating-string example exports fixed-end
+    normal-mode displacement and a d'Alembert traveling Gaussian packet, plus
+    measured energy residual metadata.
   - Field-line / streamline integration (`engine/fields/field_lines.py`): integral
     curves of a vector field's direction (`dx/ds = V/|V|`, unit arc length) via the
     shared RK4 step, with deterministic segment seeding, optional forward+backward
@@ -218,6 +225,7 @@ surfaces remain future work.
 - Lorenz attractor
 - Hénon-Heiles system
 - Electromagnetic static field
+- Vibrating string
 - Variable-speed wavefront propagation
 
 Backend-only examples include controlled pendulum and controlled spring
@@ -239,7 +247,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `731 passed`.
+Latest known result: `747 passed`.
 
 Use focused tests while iterating:
 

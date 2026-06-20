@@ -54,6 +54,7 @@ from systems.symmetric_top import (
 )
 from systems.uniform_gravity import build_system as build_uniform_gravity
 from systems.variable_speed_wavefront import build_system as build_variable_speed_wavefront
+from systems.vibrating_string import build_system as build_vibrating_string
 
 
 def _time_translation(system):
@@ -348,6 +349,12 @@ LENSES: tuple[Lens, ...] = (
         title="Electromagnetic Fields",
         kind="static-fields",
         description="Static electric and magnetic field grids plus integrated field lines.",
+    ),
+    Lens(
+        id="vibratingString",
+        title="Vibrating String",
+        kind="field-evolution",
+        description="Analytic string displacement fields from normal modes and d'Alembert propagation.",
     ),
 )
 
@@ -1179,6 +1186,48 @@ ELECTROMAGNETIC_FIELD = SystemSpec(
 )
 
 
+def _vibrating_string_modes(system):
+    return system.normal_modes(4, parameters={"L": 1.0, "c": 1.0, "rho": 1.0})
+
+
+VIBRATING_STRING = SystemSpec(
+    id="vibrating-string",
+    title="Vibrating String",
+    category="Wave Propagation",
+    description=(
+        "A one-dimensional string with fixed ends, exported as analytic modal "
+        "and traveling-wave displacement fields."
+    ),
+    build=build_vibrating_string,
+    parameters=(
+        Parameter("L", "L", 1.0, 0.5, 3.0),
+        Parameter("c", "c", 1.0, 0.5, 3.0),
+        Parameter("rho", r"\rho", 1.0, 0.2, 3.0),
+    ),
+    state=(),
+    projections={},
+    conserved=(),
+    lenses=("vibratingString",),
+    data_path="/data/vibrating_string.json",
+    normal_modes=_vibrating_string_modes,
+    fields=(
+        {
+            "name": "standingDisplacement",
+            "kind": "scalar-field-series",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.standingDisplacement",
+        },
+        {
+            "name": "travelingDisplacement",
+            "kind": "scalar-field-series",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.travelingDisplacement",
+        },
+    ),
+    system_kind="field-evolution",
+)
+
+
 VARIABLE_SPEED_WAVEFRONT = SystemSpec(
     id="variable-speed-wavefront",
     title="Variable-Speed Wavefront",
@@ -1220,5 +1269,6 @@ SPECS: tuple[SystemSpec, ...] = (
     LORENZ,
     HENON_HEILES,
     ELECTROMAGNETIC_FIELD,
+    VIBRATING_STRING,
     VARIABLE_SPEED_WAVEFRONT,
 )

@@ -149,10 +149,9 @@ def test_state_schema_matches_system(spec) -> None:
     """The coordinate/velocity prefix of the state must match the system's q, qdot."""
 
     system = spec.build()
-    if spec.system_kind == "static-field":
+    if spec.system_kind in {"static-field", "field-evolution"}:
         assert spec.state == ()
-        assert hasattr(system, "electric_field")
-        assert hasattr(system, "magnetic_field")
+        assert spec.fields
         return
 
     coordinates = [variable.name for variable in spec.state if variable.kind == "coordinate"]
@@ -196,6 +195,20 @@ def test_physical_parameters_appear_in_lagrangian(spec) -> None:
             for symbol in field.parameters
         }
         field_parameters.update(symbol.name for symbol in system.current_loop_axis_b.free_symbols)
+        for parameter in spec.parameters:
+            if parameter.role == "physical":
+                assert parameter.name in field_parameters
+        return
+    if spec.system_kind == "field-evolution":
+        expressions = (
+            system.length,
+            system.wave_speed,
+            system.density,
+            system.tension,
+        )
+        field_parameters = {
+            symbol.name for expression in expressions for symbol in expression.free_symbols
+        }
         for parameter in spec.parameters:
             if parameter.role == "physical":
                 assert parameter.name in field_parameters
@@ -373,6 +386,14 @@ def test_entry_carries_symbolic_physics(spec) -> None:
         assert entry["lenses"], "every system needs at least one visualization lens"
         assert entry["dataPath"].startswith("/data/")
         return
+    if entry.get("systemKind") == "field-evolution":
+        assert "physics" not in entry
+        assert "dynamics" not in entry
+        assert entry["fields"] and all(channel["source"] for channel in entry["fields"])
+        assert entry["normalModes"]["method"] == "analytic-string-boundary-eigenmodes"
+        assert entry["lenses"], "every system needs at least one visualization lens"
+        assert entry["dataPath"].startswith("/data/")
+        return
 
     if entry.get("dynamics"):
         dynamics = entry["dynamics"]
@@ -417,7 +438,7 @@ def test_effective_potentials_render_when_declared(spec) -> None:
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
 def test_entry_carries_structured_derivation(spec) -> None:
     entry = system_entry(spec)
-    if entry.get("systemKind") == "static-field":
+    if entry.get("systemKind") in {"static-field", "field-evolution"}:
         assert "derivation" not in entry
         assert "physics" not in entry
         assert "dynamics" not in entry

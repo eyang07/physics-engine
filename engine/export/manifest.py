@@ -397,8 +397,8 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
     """Build one manifest entry, deriving the symbolic physics from the engine."""
 
     system = spec.build()
-    if spec.system_kind == "static-field":
-        return static_field_system_entry(spec, system)
+    if spec.system_kind in {"static-field", "field-evolution"}:
+        return field_system_entry(spec, system)
     if isinstance(system, FirstOrderSystem):
         return first_order_system_entry(spec, system)
     if isinstance(system, CotangentHamiltonianSystem):
@@ -483,8 +483,8 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
     return entry
 
 
-def static_field_system_entry(spec: SystemSpec, system: Any) -> dict[str, Any]:
-    """Build a manifest entry for fields with no time-evolution model."""
+def field_system_entry(spec: SystemSpec, system: Any) -> dict[str, Any]:
+    """Build a manifest entry for field payloads outside particle dynamics."""
 
     entry = {
         "id": spec.id,
@@ -504,6 +504,8 @@ def static_field_system_entry(spec: SystemSpec, system: Any) -> dict[str, Any]:
     metadata = getattr(system, "manifest_metadata", None)
     if callable(metadata):
         entry["fieldModel"] = dict(metadata())
+    if spec.normal_modes is not None:
+        entry["normalModes"] = dict(spec.normal_modes(system))
     if spec.variants:
         entry["variants"] = [variant.to_dict() for variant in spec.variants]
     return entry
