@@ -93,6 +93,9 @@ class VibratingStringSystem:
             "coordinate": "x",
         }
 
+    def parameter_expressions(self) -> tuple[sp.Expr, ...]:
+        return (self.length, self.wave_speed, self.density, self.tension)
+
 
 def _substitutions_for(
     expressions: Sequence[sp.Expr],

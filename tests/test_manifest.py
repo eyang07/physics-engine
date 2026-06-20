@@ -200,12 +200,7 @@ def test_physical_parameters_appear_in_lagrangian(spec) -> None:
                 assert parameter.name in field_parameters
         return
     if spec.system_kind == "field-evolution":
-        expressions = (
-            system.length,
-            system.wave_speed,
-            system.density,
-            system.tension,
-        )
+        expressions = system.parameter_expressions()
         field_parameters = {
             symbol.name for expression in expressions for symbol in expression.free_symbols
         }
@@ -390,7 +385,7 @@ def test_entry_carries_symbolic_physics(spec) -> None:
         assert "physics" not in entry
         assert "dynamics" not in entry
         assert entry["fields"] and all(channel["source"] for channel in entry["fields"])
-        assert entry["normalModes"]["method"] == "analytic-string-boundary-eigenmodes"
+        assert entry["normalModes"]["method"].startswith("analytic-")
         assert entry["lenses"], "every system needs at least one visualization lens"
         assert entry["dataPath"].startswith("/data/")
         return

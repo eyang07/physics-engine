@@ -39,6 +39,7 @@ from systems.henon_heiles import build_system as build_henon_heiles
 from systems.ideal_spring import build_system as build_ideal_spring
 from systems.kepler_problem import build_system as build_kepler
 from systems.lorenz_attractor import build_system as build_lorenz
+from systems.membrane import build_system as build_membrane
 from systems.n_body_gravity import (
     build_system as build_n_body_gravity,
     total_angular_momentum_z,
@@ -355,6 +356,12 @@ LENSES: tuple[Lens, ...] = (
         title="Vibrating String",
         kind="field-evolution",
         description="Analytic string displacement fields from normal modes and d'Alembert propagation.",
+    ),
+    Lens(
+        id="membraneModes",
+        title="Membrane Modes",
+        kind="field-evolution",
+        description="Rectangular and circular membrane mode surfaces and modal superpositions.",
     ),
 )
 
@@ -1228,6 +1235,61 @@ VIBRATING_STRING = SystemSpec(
 )
 
 
+def _membrane_modes(system):
+    return system.normal_modes(parameters={"Lx": 1.4, "Ly": 1.0, "R": 1.0, "c": 1.0})
+
+
+MEMBRANE = SystemSpec(
+    id="membrane",
+    title="Membrane Modes",
+    category="Wave Propagation",
+    description=(
+        "Two-dimensional membrane normal modes: rectangular sine modes and "
+        "circular Bessel drum modes."
+    ),
+    build=build_membrane,
+    parameters=(
+        Parameter("Lx", "L_x", 1.4, 0.5, 3.0),
+        Parameter("Ly", "L_y", 1.0, 0.5, 3.0),
+        Parameter("R", "R", 1.0, 0.4, 2.0),
+        Parameter("c", "c", 1.0, 0.5, 3.0),
+    ),
+    state=(),
+    projections={},
+    conserved=(),
+    lenses=("membraneModes",),
+    data_path="/data/membrane.json",
+    normal_modes=_membrane_modes,
+    fields=(
+        {
+            "name": "rectangularMode11",
+            "kind": SCALAR_FIELD_HINT,
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.rectangularMode11",
+        },
+        {
+            "name": "circularMode01",
+            "kind": SCALAR_FIELD_HINT,
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.circularMode01",
+        },
+        {
+            "name": "rectangularDisplacement",
+            "kind": "scalar-field-series",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.rectangularDisplacement",
+        },
+        {
+            "name": "circularDisplacement",
+            "kind": "scalar-field-series",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.circularDisplacement",
+        },
+    ),
+    system_kind="field-evolution",
+)
+
+
 VARIABLE_SPEED_WAVEFRONT = SystemSpec(
     id="variable-speed-wavefront",
     title="Variable-Speed Wavefront",
@@ -1270,5 +1332,6 @@ SPECS: tuple[SystemSpec, ...] = (
     HENON_HEILES,
     ELECTROMAGNETIC_FIELD,
     VIBRATING_STRING,
+    MEMBRANE,
     VARIABLE_SPEED_WAVEFRONT,
 )

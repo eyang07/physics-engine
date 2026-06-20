@@ -20,6 +20,7 @@ from scripts.generate_ideal_spring import (
 )
 from scripts.generate_kepler_problem import write_kepler_trajectory
 from scripts.generate_lorenz_attractor import write_lorenz_trajectory, write_lorenz_variant_trajectories
+from scripts.generate_membrane import write_membrane
 from scripts.generate_n_body_gravity import (
     write_n_body_trajectory,
     write_n_body_variant_trajectories,
@@ -112,6 +113,10 @@ def main() -> None:
     write_vibrating_string(
         Path("data/generated/vibrating_string.json"),
         viewer_output=Path("viewer/public/data/vibrating_string.json"),
+    )
+    write_membrane(
+        Path("data/generated/membrane.json"),
+        viewer_output=Path("viewer/public/data/membrane.json"),
     )
     write_variable_speed_wavefront(
         Path("data/generated/variable_speed_wavefront.json"),

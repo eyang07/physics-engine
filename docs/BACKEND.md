@@ -82,7 +82,9 @@ artifacts.
     declare renderer-owned channels such as `scalar-field-series` with
     `rendererHint: "scalar-field"`. The vibrating-string example exports fixed-end
     normal-mode displacement and a d'Alembert traveling Gaussian packet, plus
-    measured energy residual metadata.
+    measured energy residual metadata. The membrane example exports rectangular
+    sine-mode surfaces, circular Bessel-mode drum surfaces, and animated modal
+    superpositions with finite masks for points outside the circular domain.
   - Field-line / streamline integration (`engine/fields/field_lines.py`): integral
     curves of a vector field's direction (`dx/ds = V/|V|`, unit arc length) via the
     shared RK4 step, with deterministic segment seeding, optional forward+backward
@@ -226,6 +228,7 @@ surfaces remain future work.
 - Hénon-Heiles system
 - Electromagnetic static field
 - Vibrating string
+- Membrane modes
 - Variable-speed wavefront propagation
 
 Backend-only examples include controlled pendulum and controlled spring
@@ -247,7 +250,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `747 passed`.
+Latest known result: `762 passed`.
 
 Use focused tests while iterating:
 
