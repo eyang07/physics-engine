@@ -133,6 +133,66 @@ def wavefront_envelope_records(
     return records
 
 
+def wavefront_surface_payload(
+    bundle: RayBundleResult,
+    *,
+    snapshot_stride: int,
+) -> dict[str, object]:
+    """Export sampled wavefront points with their measured eikonal phase."""
+
+    phases = ray_travel_times(bundle.rays, coordinate_count=bundle.coordinate_count)
+    indices = ray_bundle_snapshot_indices(len(bundle.time), snapshot_stride)
+    return {
+        "kind": "wavefront-surface",
+        "rendererHint": "scalar-field",
+        "name": "wavefrontSurface",
+        "coordinates": ["ray"],
+        "time": bundle.time[list(indices)].astype(float).tolist(),
+        "points": [
+            bundle.rays[:, index, : bundle.coordinate_count].astype(float).tolist()
+            for index in indices
+        ],
+        "travelTime": [
+            phases[:, index].astype(float).tolist()
+            for index in indices
+        ],
+        "evaluation": "measured-ray-bundle",
+        "rigor": "measured",
+    }
+
+
+def wavefront_intensity_payload(
+    bundle: RayBundleResult,
+    *,
+    snapshot_stride: int,
+    floor: float = 1e-3,
+) -> dict[str, object]:
+    """Export a measured intensity proxy from finite-difference ray spreading."""
+
+    if floor <= 0.0:
+        raise ValueError("floor must be positive")
+    factors = ray_spreading_factors(bundle.rays, coordinate_count=bundle.coordinate_count)
+    indices = ray_bundle_snapshot_indices(len(bundle.time), snapshot_stride)
+    positions, _ = _positions_and_momenta(bundle.rays, bundle.coordinate_count)
+    initial_midpoints = 0.5 * (positions[:-1, 0, :] + positions[1:, 0, :])
+    initial_axis = initial_midpoints[:, 1 if bundle.coordinate_count > 1 else 0]
+    sampled = factors[:, list(indices)].T
+    intensity = 1.0 / np.maximum(sampled, floor)
+    return {
+        "kind": "scalar-field-series",
+        "rendererHint": "scalar-field",
+        "name": "wavefrontIntensity",
+        "coordinates": ["initialY" if bundle.coordinate_count > 1 else "initialCoordinate"],
+        "axes": [initial_axis.astype(float).tolist()],
+        "time": bundle.time[list(indices)].astype(float).tolist(),
+        "shape": list(intensity.shape),
+        "values": intensity.astype(float).tolist(),
+        "source": "adjacent-ray finite-difference spreading factors",
+        "evaluation": "measured-ray-bundle",
+        "rigor": "measured",
+    }
+
+
 def ray_bundle_diagnostics(
     bundle: RayBundleResult,
     *,
@@ -199,4 +259,6 @@ __all__ = [
     "ray_spreading_factors",
     "ray_travel_times",
     "wavefront_envelope_records",
+    "wavefront_intensity_payload",
+    "wavefront_surface_payload",
 ]

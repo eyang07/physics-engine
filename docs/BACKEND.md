@@ -93,6 +93,11 @@ artifacts.
     shared RK4 step, with deterministic segment seeding, optional forward+backward
     tracing, and clean termination on the domain box, stagnation points, or listed
     singularities. Produces the polylines the `field-lines` export carries.
+  - Variable-speed wavefront exports now include backend-computed
+    `wavefront-surface` samples carrying ray-bundle points with measured eikonal
+    travel time, plus a `scalar-field-series` intensity proxy derived from
+    adjacent-ray spreading. Intensity is measured ray-bundle evidence, not a
+    solved wave equation.
 - Safety and verification:
   - Safe/unsafe sublevel sets and measured trajectory safety reports.
   - Event-based unsafe-set entry detection

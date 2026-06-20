@@ -7,6 +7,9 @@ from engine.dynamics import (
     CotangentHamiltonianSystem,
     integrate_ray_bundle,
     ray_bundle_coordinate_bounds,
+    ray_bundle_snapshot_indices,
+    ray_spreading_factors,
+    ray_travel_times,
 )
 from scripts.generate_variable_speed_wavefront import generate_variable_speed_wavefront
 from systems.variable_speed_wavefront import build_system, wave_speed
@@ -101,6 +104,11 @@ def test_variable_speed_wavefront_export_shape_and_hamiltonian_drift() -> None:
     wavefronts = trajectory.metadata["wavefronts"]
     assert len(wavefronts) == 6
     assert np.asarray(wavefronts[0]["points"], dtype=float).shape == (9, 2)
+    fields = trajectory.metadata["fields"]
+    assert fields["wavefrontSurface"]["rendererHint"] == "scalar-field"
+    assert np.asarray(fields["wavefrontSurface"]["points"], dtype=float).shape == (6, 9, 2)
+    assert fields["wavefrontIntensity"]["kind"] == "scalar-field-series"
+    assert fields["wavefrontIntensity"]["shape"] == [6, 8]
 
     hints = trajectory.metadata["rendererHints"]
     assert set(hints["bounds"]) == {"x", "y", "z"}
@@ -108,6 +116,46 @@ def test_variable_speed_wavefront_export_shape_and_hamiltonian_drift() -> None:
 
     assert trajectory.metadata["hamiltonian"]["maxDrift"] < 1e-8
     assert max(trajectory.series["p"]) - min(trajectory.series["p"]) < 1e-8
+
+
+def test_wavefront_surface_travel_time_matches_ray_phase_samples() -> None:
+    trajectory = generate_variable_speed_wavefront(
+        ray_count=7,
+        t_span=(0.0, 1.0),
+        dt=0.01,
+        snapshot_stride=25,
+    )
+    rays = np.asarray(
+        [ray["states"] for ray in trajectory.metadata["rayBundle"]["rays"]],
+        dtype=float,
+    )
+    phases = ray_travel_times(rays, coordinate_count=2)
+    indices = ray_bundle_snapshot_indices(trajectory.states.shape[0], 25)
+    surface = trajectory.metadata["fields"]["wavefrontSurface"]
+    assert np.allclose(np.asarray(surface["travelTime"]), phases[:, list(indices)].T)
+
+
+def test_wavefront_intensity_rises_near_minimum_spreading() -> None:
+    trajectory = generate_variable_speed_wavefront(
+        ray_count=11,
+        t_span=(0.0, 2.0),
+        dt=0.01,
+        snapshot_stride=20,
+    )
+    rays = np.asarray(
+        [ray["states"] for ray in trajectory.metadata["rayBundle"]["rays"]],
+        dtype=float,
+    )
+    factors = ray_spreading_factors(rays, coordinate_count=2)
+    indices = ray_bundle_snapshot_indices(trajectory.states.shape[0], 20)
+    sampled_factors = factors[:, list(indices)].T
+    intensity = np.asarray(
+        trajectory.metadata["fields"]["wavefrontIntensity"]["values"],
+        dtype=float,
+    )
+    assert np.unravel_index(np.argmin(sampled_factors), sampled_factors.shape) == (
+        np.unravel_index(np.argmax(intensity), intensity.shape)
+    )
 
 
 def test_variable_speed_wavefront_bundle_is_symmetric() -> None:

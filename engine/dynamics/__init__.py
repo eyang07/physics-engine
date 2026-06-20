@@ -52,6 +52,8 @@ from engine.dynamics.ray_diagnostics import (
     ray_spreading_factors,
     ray_travel_times,
     wavefront_envelope_records,
+    wavefront_intensity_payload,
+    wavefront_surface_payload,
 )
 from engine.dynamics.safety import (
     BarrierCandidate,
@@ -122,4 +124,6 @@ __all__ = [
     "schwarzschild_equatorial_metric",
     "two_sphere_metric",
     "wavefront_envelope_records",
+    "wavefront_intensity_payload",
+    "wavefront_surface_payload",
 ]

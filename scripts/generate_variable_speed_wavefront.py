@@ -11,6 +11,8 @@ from engine.dynamics import (
     integrate_ray_bundle,
     ray_bundle_coordinate_bounds,
     ray_bundle_diagnostics,
+    wavefront_intensity_payload,
+    wavefront_surface_payload,
 )
 from engine.export import Trajectory
 from systems.variable_speed_wavefront import build_system, wave_speed
@@ -119,6 +121,16 @@ def generate_variable_speed_wavefront(
             "rays": bundle.ray_records(),
         },
         "wavefronts": bundle.wavefront_records(snapshot_stride),
+        "fields": {
+            "wavefrontSurface": wavefront_surface_payload(
+                bundle,
+                snapshot_stride=snapshot_stride,
+            ),
+            "wavefrontIntensity": wavefront_intensity_payload(
+                bundle,
+                snapshot_stride=snapshot_stride,
+            ),
+        },
         "rendererHints": wavefront_renderer_hints(bundle.rays, x0=x0, y_span=y_span),
         "hamiltonian": {
             "initial": bundle.hamiltonian_initials.astype(float).tolist(),

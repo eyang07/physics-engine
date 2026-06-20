@@ -1356,6 +1356,20 @@ VARIABLE_SPEED_WAVEFRONT = SystemSpec(
     conserved=(),
     lenses=("variableSpeedWavefront",),
     data_path="/data/variable_speed_wavefront.json",
+    fields=(
+        {
+            "name": "wavefrontSurface",
+            "kind": "wavefront-surface",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.wavefrontSurface",
+        },
+        {
+            "name": "wavefrontIntensity",
+            "kind": "scalar-field-series",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.wavefrontIntensity",
+        },
+    ),
     system_kind="ray-bundle",
 )
 
