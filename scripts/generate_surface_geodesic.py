@@ -20,6 +20,8 @@ from systems.surface_geodesic import (
     torus_surface,
 )
 
+SURFACE_GEODESIC_HINT = "surface-geodesic"
+
 
 def _surface_from_values(
     family: SurfaceFamily,
@@ -119,6 +121,101 @@ def _renderer_hints(surface: SurfaceOfRevolution, positions: np.ndarray) -> dict
     }
 
 
+def _mesh_axes(
+    family: str,
+    *,
+    u_count: int = 49,
+    phi_count: int = 65,
+) -> tuple[np.ndarray, np.ndarray]:
+    if u_count < 2 or phi_count < 2:
+        raise ValueError("surface mesh axes need at least two samples")
+    if family == "sphere":
+        u_axis = np.linspace(0.0, np.pi, u_count)
+    elif family == "torus":
+        u_axis = np.linspace(-np.pi, np.pi, u_count)
+    elif family in {"paraboloid", "cone"}:
+        u_axis = np.linspace(0.2, 2.4, u_count)
+    elif family == "hyperboloid":
+        u_axis = np.linspace(-1.4, 1.4, u_count)
+    else:
+        raise ValueError(f"unknown surface family: {family!r}")
+    phi_axis = np.linspace(0.0, 2.0 * np.pi, phi_count)
+    return u_axis, phi_axis
+
+
+def _surface_triangles(u_count: int, phi_count: int) -> list[list[int]]:
+    triangles: list[list[int]] = []
+    for u_index in range(u_count - 1):
+        for phi_index in range(phi_count - 1):
+            lower_left = u_index * phi_count + phi_index
+            lower_right = lower_left + 1
+            upper_left = lower_left + phi_count
+            upper_right = upper_left + 1
+            triangles.append([lower_left, upper_left, lower_right])
+            triangles.append([lower_right, upper_left, upper_right])
+    return triangles
+
+
+def _surface_mesh_payload(surface: SurfaceOfRevolution) -> dict[str, object]:
+    u_axis, phi_axis = _mesh_axes(surface.family)
+    u_grid, phi_grid = np.meshgrid(u_axis, phi_axis, indexing="ij")
+    function = sp.lambdify(surface.coordinates, surface.embedding_expressions(), modules="numpy")
+    components = function(u_grid, phi_grid)
+    points = np.stack([np.asarray(component, dtype=float) for component in components], axis=-1)
+    return {
+        "kind": "surface-mesh",
+        "rendererHint": SURFACE_GEODESIC_HINT,
+        "family": surface.family,
+        "coordinates": ["u", "phi"],
+        "axes": [u_axis.astype(float).tolist(), phi_axis.astype(float).tolist()],
+        "shape": [int(len(u_axis)), int(len(phi_axis))],
+        "points": points.astype(float).tolist(),
+        "triangles": _surface_triangles(len(u_axis), len(phi_axis)),
+        "evaluation": "symbolic-exact",
+    }
+
+
+def _curvature_payload(surface: SurfaceOfRevolution) -> dict[str, object]:
+    u_axis, phi_axis = _mesh_axes(surface.family)
+    u_grid, phi_grid = np.meshgrid(u_axis, phi_axis, indexing="ij")
+    expression = surface.gaussian_curvature()
+    function = sp.lambdify(surface.coordinates, expression, modules="numpy")
+    values = np.asarray(function(u_grid, phi_grid), dtype=float)
+    values = np.broadcast_to(values, u_grid.shape).astype(float)
+    return {
+        "kind": "scalar-field",
+        "rendererHint": "scalar-field",
+        "name": "gaussianCurvature",
+        "coordinates": ["u", "phi"],
+        "axes": [u_axis.astype(float).tolist(), phi_axis.astype(float).tolist()],
+        "shape": [int(len(u_axis)), int(len(phi_axis))],
+        "values": values.tolist(),
+        "quantity": "Gaussian curvature",
+        "evaluation": "symbolic-exact",
+    }
+
+
+def _surface_geometry_payload(
+    surface: SurfaceOfRevolution,
+    positions: np.ndarray,
+) -> dict[str, object]:
+    return {
+        "kind": "surface-geodesic",
+        "rendererHint": SURFACE_GEODESIC_HINT,
+        "family": surface.family,
+        "surfaceMesh": _surface_mesh_payload(surface),
+        "geodesic": {
+            "kind": "embedded-polyline",
+            "rendererHint": SURFACE_GEODESIC_HINT,
+            "coordinates": ["x", "y", "z"],
+            "source": "trajectory.states[x,y,z]",
+            "points": positions.astype(float).tolist(),
+            "evaluation": "integrated-geodesic-embedding",
+        },
+        "curvature": _curvature_payload(surface),
+    }
+
+
 def generate_surface_geodesic_trajectory(
     *,
     family: SurfaceFamily = "torus",
@@ -146,6 +243,7 @@ def generate_surface_geodesic_trajectory(
         "family": family,
         "parameters": parameters,
         "rendererHints": _renderer_hints(surface, positions),
+        "surfaceGeometry": _surface_geometry_payload(surface, positions),
         "invariantResiduals": invariant_residual_records(series),
     }
     return Trajectory.from_arrays(

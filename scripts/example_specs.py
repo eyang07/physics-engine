@@ -122,6 +122,25 @@ def _surface_geodesic_clairaut(system):
     return sp.simplify((major + minor * sp.cos(u)) ** 2 * phi_dot)
 
 
+def _surface_geodesic_geometry(system):
+    return {
+        "kind": "surface-geodesic",
+        "rendererHint": "surface-geodesic",
+        "surfaceMesh": {
+            "kind": "surface-mesh",
+            "source": "trajectory.metadata.surfaceGeometry.surfaceMesh",
+        },
+        "geodesic": {
+            "kind": "embedded-polyline",
+            "source": "trajectory.metadata.surfaceGeometry.geodesic",
+        },
+        "curvature": {
+            "kind": "scalar-field",
+            "source": "trajectory.metadata.surfaceGeometry.curvature",
+        },
+    }
+
+
 LENSES: tuple[Lens, ...] = (
     Lens(
         id="pendulumMotionPhase",
@@ -501,6 +520,15 @@ SURFACE_GEODESIC = SystemSpec(
     ),
     lenses=("surfaceGeodesic",),
     data_path="/data/surface_geodesic.json",
+    geometry=_surface_geodesic_geometry,
+    fields=(
+        {
+            "name": "gaussianCurvature",
+            "kind": "scalar-field",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.surfaceGeometry.curvature",
+        },
+    ),
     system_kind="surface-geodesic",
 )
 

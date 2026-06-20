@@ -88,6 +88,11 @@ class SurfaceOfRevolution:
     def kinetic_energy(self) -> sp.Expr:
         return self.metric_geometry().kinetic_energy()
 
+    def gaussian_curvature(self) -> sp.Expr:
+        """Gaussian curvature from the two-dimensional scalar curvature."""
+
+        return sp.simplify(self.metric_geometry().scalar_curvature() / 2)
+
 
 def sphere_surface(radius: sp.Expr | float | None = None) -> SurfaceOfRevolution:
     theta = sp.Symbol("u", real=True)

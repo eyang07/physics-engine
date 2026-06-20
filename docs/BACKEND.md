@@ -60,6 +60,13 @@ artifacts.
     precomputed variants.
   - Optional backend-owned geometry metadata in manifest entries and trajectory
     metadata for renderer-specific structures such as rigid-body polhodes.
+  - Surface-geodesic export schema: manifest entries can declare
+    `geometry.kind="surface-geodesic"` with `rendererHint="surface-geodesic"`
+    and sources for `surfaceMesh`, embedded `geodesic`, and `curvature`
+    channels. The trajectory payload carries those under
+    `metadata.surfaceGeometry`; mesh and curvature samples are deterministic
+    symbolic evaluations, while rollout invariant residuals remain
+    `rigor="measured"`.
   - Optional rigid-body orientation channel: a trajectory carries a per-sample
     unit-quaternion series (`(w, x, y, z)`, sign-aligned for continuity) and the
     body-frame triad in space coordinates under `trajectory.orientation`, and the
@@ -228,6 +235,7 @@ surfaces remain future work.
 
 - Simple pendulum
 - Geodesic on a sphere
+- Geodesic on a surface of revolution
 - Charged particle in a uniform magnetic field
 - Uniform gravitational field
 - Ideal spring
@@ -298,5 +306,5 @@ ignored and should not be committed.
    adapter checks and robustness tests before adding more case-study breadth.
 2. Factor shared parameter-variant generation helpers if more systems add
    backend-generated parameter families.
-3. Keep backend-only geodesic exploration outside the gallery until the viewer
-   can render the geometry honestly.
+3. Keep future geometry exports explicit about which payloads are symbolic
+   samples, measured rollout diagnostics, or renderer hints.

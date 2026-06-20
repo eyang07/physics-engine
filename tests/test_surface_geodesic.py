@@ -5,6 +5,8 @@ import json
 import numpy as np
 import sympy as sp
 
+from engine.export import system_entry
+from scripts.example_specs import SURFACE_GEODESIC
 from scripts.generate_surface_geodesic import (
     generate_surface_geodesic_trajectory,
     write_surface_geodesic_trajectory,
@@ -88,6 +90,56 @@ def test_surface_geodesic_conserves_clairaut_quantity_measured() -> None:
     assert residuals["H"]["rigor"] == "measured"
     assert residuals["clairaut"]["maxAbs"] < 1e-8
     assert residuals["H"]["maxAbs"] < 1e-8
+
+
+def test_surface_geodesic_exports_mesh_geodesic_and_curvature_payloads() -> None:
+    trajectory = generate_surface_geodesic_trajectory(t_span=(0.0, 0.1), dt=0.01)
+    geometry = trajectory.metadata["surfaceGeometry"]
+    mesh = geometry["surfaceMesh"]
+    geodesic = geometry["geodesic"]
+    curvature = geometry["curvature"]
+
+    assert geometry["rendererHint"] == "surface-geodesic"
+    assert mesh["kind"] == "surface-mesh"
+    assert mesh["rendererHint"] == "surface-geodesic"
+    assert mesh["shape"] == [49, 65]
+    assert np.asarray(mesh["points"], dtype=float).shape == (49, 65, 3)
+    assert len(mesh["triangles"]) == 2 * (49 - 1) * (65 - 1)
+
+    assert geodesic["kind"] == "embedded-polyline"
+    assert geodesic["rendererHint"] == "surface-geodesic"
+    assert np.allclose(np.asarray(geodesic["points"], dtype=float), trajectory.states[:, 4:7])
+
+    assert curvature["kind"] == "scalar-field"
+    assert curvature["rendererHint"] == "scalar-field"
+    assert curvature["evaluation"] == "symbolic-exact"
+    values = np.asarray(curvature["values"], dtype=float)
+    assert values.shape == (49, 65)
+    assert np.all(np.isfinite(values))
+
+
+def test_surface_geodesic_manifest_declares_surface_channels() -> None:
+    entry = system_entry(SURFACE_GEODESIC)
+
+    assert entry["geometry"]["kind"] == "surface-geodesic"
+    assert entry["geometry"]["rendererHint"] == "surface-geodesic"
+    assert entry["geometry"]["surfaceMesh"]["source"] == (
+        "trajectory.metadata.surfaceGeometry.surfaceMesh"
+    )
+    assert entry["geometry"]["geodesic"]["source"] == (
+        "trajectory.metadata.surfaceGeometry.geodesic"
+    )
+    assert entry["geometry"]["curvature"]["source"] == (
+        "trajectory.metadata.surfaceGeometry.curvature"
+    )
+    assert entry["fields"] == [
+        {
+            "name": "gaussianCurvature",
+            "kind": "scalar-field",
+            "rendererHint": "scalar-field",
+            "source": "trajectory.metadata.surfaceGeometry.curvature",
+        }
+    ]
 
 
 def test_surface_geodesic_sphere_family_recovers_great_circle() -> None:
