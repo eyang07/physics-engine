@@ -216,12 +216,20 @@ for (const viewport of [
     await page.waitForSelector("#scene.stage__canvas--active");
     await page.waitForTimeout(500);
     await expectCanvasNonBlank(page, "#scene");
+    // FE-038: the shared scalar legend captions the potential field with a
+    // colormap ramp and qualitative (decimal-free) endpoints.
+    const scalarLegend = page.locator("#systemsDomain .scalar-legend");
+    await expect(scalarLegend).toBeVisible();
+    await expect(scalarLegend.locator(".scalar-legend__title")).toHaveText("potential");
+    await expect(scalarLegend.locator(".scalar-legend__label")).toHaveText(["high", "low"]);
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-henon-heiles-potential.png`) });
 
     await page.getByRole("button", { name: /Poincar/ }).click();
     await page.waitForSelector("#scene.stage__canvas--active");
     await page.waitForTimeout(500);
     await expectCanvasNonBlank(page, "#scene");
+    // Non-scalar lenses hide the legend rather than leaving a stale key.
+    await expect(scalarLegend).toBeHidden();
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-henon-heiles-poincare.png`) });
 
     await page.locator("#systemSelect").selectOption("variable-speed-wavefront");
