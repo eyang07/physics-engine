@@ -317,6 +317,79 @@ select {
   display: none;
 }
 
+/* FE-038: the shared scalar legend — a colormap ramp keyed by qualitative
+   endpoints (no raw decimals), reused by every scalar readout on the stage. */
+.scalar-legend {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 6px;
+  padding: 9px 11px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost-strong);
+  backdrop-filter: blur(20px);
+  pointer-events: none;
+}
+
+.scalar-legend[hidden] {
+  display: none;
+}
+
+.scalar-legend--top-right {
+  top: 14px;
+  right: 14px;
+}
+
+.scalar-legend--top-left {
+  top: 14px;
+  left: 14px;
+}
+
+.scalar-legend--bottom-right {
+  right: 14px;
+  bottom: 14px;
+}
+
+.scalar-legend--bottom-left {
+  left: 14px;
+  bottom: 14px;
+}
+
+.scalar-legend__title {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.scalar-legend__body {
+  display: flex;
+  gap: 8px;
+}
+
+.scalar-legend__ramp {
+  flex: none;
+  width: 12px;
+  height: 72px;
+  border-radius: 3px;
+  border: 1px solid var(--hairline);
+}
+
+.scalar-legend__labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.scalar-legend__label {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: lowercase;
+}
+
 .verif-violation-legend {
   position: absolute;
   top: 14px;

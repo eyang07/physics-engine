@@ -1,3 +1,4 @@
+import { scalarScale, viridis } from "./design/colormaps";
 import { theme } from "./design/theme";
 import type { ManifestLens, SystemManifest } from "./data/manifest";
 import { stateIndex, type Trajectory } from "./data/trajectory";
@@ -386,12 +387,17 @@ export function drawPotentialContourScene(
   const flatValues = surface.values.flat().filter(Number.isFinite);
   const valueRange = range(flatValues, surface.energy === undefined ? [] : [surface.energy]);
 
+  // Color the potential field through the shared scalar scale (FE-038), so the
+  // cell coloring matches the on-stage legend's ramp instead of an ad-hoc
+  // two-tone split. Alpha still climbs with the value so the contour lines and
+  // trajectory stay legible over the field.
+  const fieldScale = scalarScale(viridis, [valueRange.min, valueRange.max]);
   for (let row = 0; row < surface.yValues.length - 1; row += 1) {
     for (let col = 0; col < surface.xValues.length - 1; col += 1) {
       const value = surface.values[row][col];
-      const normalized = clamp((value - valueRange.min) / (valueRange.max - valueRange.min), 0, 1);
-      const alpha = 0.025 + normalized * 0.16;
-      ctx.fillStyle = normalized > 0.72 ? `rgba(240, 180, 106, ${alpha})` : `rgba(111, 182, 201, ${alpha})`;
+      const normalized = fieldScale.normalize(value);
+      const alpha = 0.05 + normalized * 0.32;
+      ctx.fillStyle = fieldScale.css(value, alpha);
       const x0 = xOf(surface.xValues[col], xRange, area);
       const x1 = xOf(surface.xValues[col + 1], xRange, area);
       const y0 = yOf(surface.yValues[row], yRange, area);

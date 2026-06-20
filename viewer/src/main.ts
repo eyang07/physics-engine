@@ -24,6 +24,8 @@ import { drawPoincareSectionScene } from "./poincareSectionCanvas";
 import { VerificationPanel } from "./verificationPanel";
 import { VerificationStage } from "./verificationStage";
 import { resolveRendererSurface } from "./rendererRegistry";
+import { createScalarLegend } from "./scalarLegend";
+import { viridis } from "./design/colormaps";
 import {
   loadVerificationAdapterStubs,
   loadVerificationIndex,
@@ -78,6 +80,7 @@ const verificationCanvas = requireElement<HTMLCanvasElement>("#verificationCanva
 const verificationPlayButton = requireElement<HTMLButtonElement>("#verificationPlayButton");
 const verificationSpeedControl = requireElement<HTMLInputElement>("#verificationSpeedControl");
 const verificationCertificateLanes = requireElement<HTMLElement>("#verificationCertificateLanes");
+const stage = requireElement<HTMLElement>("#systemsDomain .stage");
 const canvas = requireElement<HTMLCanvasElement>("#scene");
 const threeCanvas = requireElement<HTMLCanvasElement>("#hamiltonianScene");
 const systemTitle = requireElement<HTMLElement>("#systemTitle");
@@ -101,6 +104,12 @@ if (!context) {
 }
 const ctx: CanvasRenderingContext2D = context;
 const threeScene = new ThreeScene(threeCanvas);
+
+// One shared scalar legend overlay on the mechanics stage (FE-038). Scalar
+// lenses (potential field today; field magnitude / curvature / intensity later)
+// reveal it with their own caption; every other lens keeps it hidden.
+const scalarLegend = createScalarLegend({ title: "potential", low: "low", high: "high" });
+stage.appendChild(scalarLegend.element);
 
 const trajectorySource = new StaticSource();
 const structurePanel = new StructurePanel(principlesPanel, invariantsPanel, parametersPanel, loopPhaseArc);
@@ -498,6 +507,16 @@ function applyVisualization() {
   } else {
     // Both the 2D lenses and the fallback placeholder draw on the 2D canvas.
     setCanvasMode("2d");
+  }
+
+  // The scalar legend captions the only scalar field the viewer paints today —
+  // the potential contour. Other lenses keep it hidden until their scalar lens
+  // (field magnitude / curvature / intensity) lands and reuses it.
+  if (selectedVisualization.kind === "potential-contour") {
+    scalarLegend.setColormap(viridis, "potential", "low", "high");
+    scalarLegend.show();
+  } else {
+    scalarLegend.hide();
   }
 }
 

@@ -149,3 +149,60 @@ export const twilight = makeColormap(
 );
 
 export const colormaps: Record<string, Colormap> = { viridis, magma, twilight };
+
+/**
+ * A scalar-to-color scale — the single honest mapping from a data value in a
+ * known range onto a colormap. Field magnitude, curvature, intensity, and
+ * potential readouts all build their coloring on this, so the same value reads
+ * as the same color everywhere. The domain is *clamped*: out-of-range values
+ * saturate at the endpoints rather than wrapping or extrapolating, and a
+ * degenerate (zero-width or non-finite) domain collapses to the low end instead
+ * of dividing by zero.
+ */
+export interface ScalarScale {
+  readonly colormap: Colormap;
+  /** The data range the scale spans, as `[min, max]`. */
+  readonly domain: readonly [number, number];
+  /** Normalize a value to 0..1 within the clamped domain. */
+  normalize(value: number): number;
+  /** Color for a value, RGB in 0..255. */
+  at(value: number): RGB;
+  /** Color for a value, RGB in 0..1 per channel (for WebGL / three.js). */
+  atUnit(value: number): RGB;
+  /** CSS color string for a value. */
+  css(value: number, alpha?: number): string;
+}
+
+export function scalarScale(colormap: Colormap, domain: readonly [number, number]): ScalarScale {
+  const [lo, hi] = domain;
+  const span = hi - lo;
+  const normalize = (value: number): number => {
+    if (!(span > 0) || !Number.isFinite(value)) {
+      return 0;
+    }
+    const t = (value - lo) / span;
+    return t < 0 ? 0 : t > 1 ? 1 : t;
+  };
+  return {
+    colormap,
+    domain: [lo, hi],
+    normalize,
+    at: (value) => colormap.at(normalize(value)),
+    atUnit: (value) => colormap.atUnit(normalize(value)),
+    css: (value, alpha = 1) => colormap.css(normalize(value), alpha),
+  };
+}
+
+/**
+ * Sample a colormap at evenly spaced stops as a CSS `linear-gradient` color
+ * list. Shared so an on-stage legend can paint a ramp that matches exactly what
+ * a `ScalarScale` built on the same colormap draws.
+ */
+export function gradientStops(colormap: Colormap, steps = 12): string[] {
+  const count = Math.max(2, Math.floor(steps));
+  const stops: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    stops.push(colormap.css(i / (count - 1)));
+  }
+  return stops;
+}
