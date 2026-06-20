@@ -385,7 +385,8 @@ def test_entry_carries_symbolic_physics(spec) -> None:
         assert "physics" not in entry
         assert "dynamics" not in entry
         assert entry["fields"] and all(channel["source"] for channel in entry["fields"])
-        assert entry["normalModes"]["method"].startswith("analytic-")
+        if "normalModes" in entry:
+            assert entry["normalModes"]["method"].startswith("analytic-")
         assert entry["lenses"], "every system needs at least one visualization lens"
         assert entry["dataPath"].startswith("/data/")
         return

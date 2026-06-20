@@ -31,6 +31,7 @@ from scripts.generate_symmetric_top import write_symmetric_top_trajectory
 from scripts.generate_uniform_gravity import write_uniform_gravity_trajectory
 from scripts.generate_variable_speed_wavefront import write_variable_speed_wavefront
 from scripts.generate_vibrating_string import write_vibrating_string
+from scripts.generate_wave_packet import write_wave_packet
 
 
 def main() -> None:
@@ -117,6 +118,10 @@ def main() -> None:
     write_membrane(
         Path("data/generated/membrane.json"),
         viewer_output=Path("viewer/public/data/membrane.json"),
+    )
+    write_wave_packet(
+        Path("data/generated/wave_packet.json"),
+        viewer_output=Path("viewer/public/data/wave_packet.json"),
     )
     write_variable_speed_wavefront(
         Path("data/generated/variable_speed_wavefront.json"),

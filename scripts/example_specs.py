@@ -56,6 +56,7 @@ from systems.symmetric_top import (
 from systems.uniform_gravity import build_system as build_uniform_gravity
 from systems.variable_speed_wavefront import build_system as build_variable_speed_wavefront
 from systems.vibrating_string import build_system as build_vibrating_string
+from systems.wave_packet import build_system as build_wave_packet
 
 
 def _time_translation(system):
@@ -362,6 +363,12 @@ LENSES: tuple[Lens, ...] = (
         title="Membrane Modes",
         kind="field-evolution",
         description="Rectangular and circular membrane mode surfaces and modal superpositions.",
+    ),
+    Lens(
+        id="wavePacket",
+        title="Dispersive Wave Packet",
+        kind="field-evolution",
+        description="Amplitude and intensity fields for a Gaussian packet under quadratic dispersion.",
     ),
 )
 
@@ -1290,6 +1297,44 @@ MEMBRANE = SystemSpec(
 )
 
 
+WAVE_PACKET = SystemSpec(
+    id="wave-packet",
+    title="Dispersive Wave Packet",
+    category="Wave Propagation",
+    description=(
+        "A Gaussian wave packet under quadratic dispersion, separating phase "
+        "velocity, group velocity, and envelope spreading."
+    ),
+    build=build_wave_packet,
+    parameters=(
+        Parameter("alpha", r"\alpha", 0.04, 0.005, 0.2),
+        Parameter("k0", "k_0", 6.0, 1.0, 12.0),
+        Parameter("sigma", r"\sigma", 0.45, 0.1, 1.5),
+        Parameter("x0", "x_0", -1.0, -3.0, 3.0),
+    ),
+    state=(),
+    projections={},
+    conserved=(),
+    lenses=("wavePacket",),
+    data_path="/data/wave_packet.json",
+    fields=(
+        {
+            "name": "amplitude",
+            "kind": "scalar-field-series",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.amplitude",
+        },
+        {
+            "name": "intensity",
+            "kind": "scalar-field-series",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.intensity",
+        },
+    ),
+    system_kind="field-evolution",
+)
+
+
 VARIABLE_SPEED_WAVEFRONT = SystemSpec(
     id="variable-speed-wavefront",
     title="Variable-Speed Wavefront",
@@ -1333,5 +1378,6 @@ SPECS: tuple[SystemSpec, ...] = (
     ELECTROMAGNETIC_FIELD,
     VIBRATING_STRING,
     MEMBRANE,
+    WAVE_PACKET,
     VARIABLE_SPEED_WAVEFRONT,
 )

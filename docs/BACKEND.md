@@ -84,7 +84,10 @@ artifacts.
     normal-mode displacement and a d'Alembert traveling Gaussian packet, plus
     measured energy residual metadata. The membrane example exports rectangular
     sine-mode surfaces, circular Bessel-mode drum surfaces, and animated modal
-    superpositions with finite masks for points outside the circular domain.
+    superpositions with finite masks for points outside the circular domain. The
+    dispersive wave-packet example exports analytic amplitude/intensity fields
+    under a quadratic dispersion relation, with measured phase/group velocity and
+    envelope-spreading diagnostics.
   - Field-line / streamline integration (`engine/fields/field_lines.py`): integral
     curves of a vector field's direction (`dx/ds = V/|V|`, unit arc length) via the
     shared RK4 step, with deterministic segment seeding, optional forward+backward
@@ -229,6 +232,7 @@ surfaces remain future work.
 - Electromagnetic static field
 - Vibrating string
 - Membrane modes
+- Dispersive wave packet
 - Variable-speed wavefront propagation
 
 Backend-only examples include controlled pendulum and controlled spring
@@ -250,7 +254,7 @@ Current backend baseline:
 pytest -q
 ```
 
-Latest known result: `762 passed`.
+Latest known result: `777 passed`.
 
 Use focused tests while iterating:
 
