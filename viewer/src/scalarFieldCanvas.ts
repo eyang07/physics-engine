@@ -35,14 +35,19 @@ function drawBackground(ctx: CanvasRenderingContext2D, width: number, height: nu
   ctx.fillRect(0, 0, width, height);
 }
 
-type PlotArea = {
+export type PlotArea = {
   left: number;
   top: number;
   width: number;
   height: number;
 };
 
-function plotArea(width: number, height: number): PlotArea {
+/**
+ * The field plot rectangle for a stage of the given size. Shared so the vector
+ * overlay (FE-045) frames its glyphs and field lines on exactly the same area as
+ * the scalar heatmap underneath.
+ */
+export function fieldPlotArea(width: number, height: number): PlotArea {
   const marginX = Math.max(48, width * 0.09);
   const marginY = Math.max(40, height * 0.1);
   return {
@@ -50,6 +55,32 @@ function plotArea(width: number, height: number): PlotArea {
     top: marginY,
     width: Math.max(1, width - 2 * marginX),
     height: Math.max(1, height - 2 * marginY),
+  };
+}
+
+/**
+ * Map a field coordinate `(x, y)` to a screen point, using the same index-based
+ * convention as the heatmap blit (grid sample `i` sits at the center of its
+ * cell). Shared so overlaid field lines and glyphs register exactly on the
+ * colored cells they describe. Assumes the uniform sample spacing the export
+ * uses; the second coordinate runs upward on the stage.
+ */
+export function fieldProjector(
+  axes: readonly [number[], number[]],
+  area: PlotArea,
+): (x: number, y: number) => { x: number; y: number } {
+  const [xs, ys] = axes;
+  const nx = xs.length;
+  const ny = ys.length;
+  const dx = nx > 1 ? (xs[nx - 1] - xs[0]) / (nx - 1) : 0;
+  const dy = ny > 1 ? (ys[ny - 1] - ys[0]) / (ny - 1) : 0;
+  return (x, y) => {
+    const i = dx !== 0 ? (x - xs[0]) / dx : 0;
+    const j = dy !== 0 ? (y - ys[0]) / dy : 0;
+    return {
+      x: area.left + ((i + 0.5) / nx) * area.width,
+      y: area.top + ((ny - 1 - j + 0.5) / ny) * area.height,
+    };
   };
 }
 
@@ -206,7 +237,7 @@ export function drawScalarFieldScene(
   setupCanvas(ctx, width, height);
   drawBackground(ctx, width, height);
 
-  const area = plotArea(width, height);
+  const area = fieldPlotArea(width, height);
   const domain = valueDomain(field.values);
   const scale = scalarScale(viridis, domain);
 

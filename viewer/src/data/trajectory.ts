@@ -131,6 +131,35 @@ export type ScalarField = {
   evaluation?: string;
 };
 
+/**
+ * A vector field sampled over a 2D coordinate grid that Python evaluated and
+ * exported under `metadata.fields.<name>` (BE-091). `components[i][j]` is the
+ * vector `[u, v]` at `axes[0][i]`, `axes[1][j]`, and `magnitude[i][j]` its length
+ * — both shipped by Python. The vector-field lens (FE-045) draws glyphs from
+ * these as exported; it never differentiates a potential to get them.
+ */
+export type VectorField = {
+  name: string;
+  coordinates: [string, string];
+  axes: [number[], number[]];
+  shape: [number, number];
+  /** Components per grid point: `components[i][j] = [u, v]`. */
+  components: number[][][];
+  /** Vector length per grid point, as exported. */
+  magnitude: number[][];
+};
+
+/**
+ * Integrated field-line / streamline polylines Python exported under
+ * `metadata.fields.<name>` (BE-091). Each entry in `lines` is one polyline as a
+ * list of `[x, y]` points in field coordinates; the lens draws them as exported
+ * and never integrates the field itself.
+ */
+export type FieldLines = {
+  name: string;
+  lines: [number, number][][];
+};
+
 /** Map each state-variable name to its column index in `states`. */
 export function stateIndex(trajectory: Trajectory): Map<string, number> {
   const index = new Map<string, number>();
@@ -637,27 +666,92 @@ function parseScalarField(name: string, raw: Record<string, unknown>): ScalarFie
  * instead of drawing a broken grid.
  */
 export function scalarField(trajectory: Trajectory, preferredName?: string): ScalarField | null {
+  for (const [name, record] of fieldsByKind(trajectory, "scalar-field", preferredName)) {
+    const parsed = parseScalarField(name, record);
+    if (parsed) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+function fieldsByKind(trajectory: Trajectory, kind: string, preferredName?: string): [string, Record<string, unknown>][] {
   const fields = asRecord(trajectory.metadata?.fields);
   if (!fields) {
-    return null;
+    return [];
   }
   const names = Object.keys(fields);
   if (preferredName && names.includes(preferredName)) {
     names.sort((a, b) => (a === preferredName ? -1 : b === preferredName ? 1 : 0));
   }
+  const matches: [string, Record<string, unknown>][] = [];
   for (const name of names) {
     const record = asRecord(fields[name]);
-    if (!record) {
+    if (record && (record.kind ?? record.rendererHint) === kind) {
+      matches.push([name, record]);
+    }
+  }
+  return matches;
+}
+
+/**
+ * Read a vector-field grid Python exported under `metadata.fields` (BE-091),
+ * preferring one named `preferredName`. Returns null when no well-formed vector
+ * field is present, so the lens can skip the glyph overlay gracefully.
+ */
+export function vectorField(trajectory: Trajectory, preferredName?: string): VectorField | null {
+  for (const [name, raw] of fieldsByKind(trajectory, "vector-field", preferredName)) {
+    const { axes, components, magnitude } = raw;
+    if (!Array.isArray(axes) || axes.length !== 2 || !isNumberArray(axes[0]) || !isNumberArray(axes[1])) {
       continue;
     }
-    const tag = record.kind ?? record.rendererHint;
-    if (tag !== "scalar-field") {
+    const nx = axes[0].length;
+    const ny = axes[1].length;
+    const componentsOk =
+      Array.isArray(components) &&
+      components.length === nx &&
+      components.every(
+        (row) => Array.isArray(row) && row.length === ny && row.every((cell) => isNumberArray(cell) && cell.length >= 2),
+      );
+    const magnitudeOk =
+      Array.isArray(magnitude) && magnitude.length === nx && magnitude.every((row) => isNumberArray(row) && row.length === ny);
+    if (!componentsOk || !magnitudeOk) {
       continue;
     }
-    const parsed = parseScalarField(name, record);
-    if (parsed) {
-      return parsed;
+    const coords = Array.isArray(raw.coordinates)
+      ? raw.coordinates.filter((item): item is string => typeof item === "string")
+      : [];
+    return {
+      name,
+      coordinates: [coords[0] ?? "x", coords[1] ?? "y"],
+      axes: [axes[0], axes[1]],
+      shape: [nx, ny],
+      components: components as number[][][],
+      magnitude: magnitude as number[][],
+    };
+  }
+  return null;
+}
+
+/**
+ * Read integrated field-line polylines Python exported under `metadata.fields`
+ * (BE-091), preferring one named `preferredName`. Returns null when no well-formed
+ * field-line set is present.
+ */
+export function fieldLines(trajectory: Trajectory, preferredName?: string): FieldLines | null {
+  for (const [name, raw] of fieldsByKind(trajectory, "field-lines", preferredName)) {
+    const { lines } = raw;
+    if (!Array.isArray(lines)) {
+      continue;
     }
+    const parsed = lines.filter(
+      (line): line is [number, number][] =>
+        Array.isArray(line) && line.every((point) => isNumberArray(point) && point.length >= 2),
+    ) as [number, number][][];
+    if (parsed.length === 0) {
+      continue;
+    }
+    return { name, lines: parsed };
   }
   return null;
 }

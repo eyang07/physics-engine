@@ -222,8 +222,10 @@ for (const viewport of [
     await page.waitForTimeout(500);
     await expectCanvasNonBlank(page, "#scene");
     // FE-038: the shared scalar legend captions the potential field with a
-    // colormap ramp and qualitative (decimal-free) endpoints.
-    const scalarLegend = page.locator("#systemsDomain .scalar-legend");
+    // colormap ramp and qualitative (decimal-free) endpoints. Target the
+    // top-right (scalar) legend specifically; the field-magnitude legend (FE-045)
+    // is a second scalar legend in the opposite corner.
+    const scalarLegend = page.locator("#systemsDomain .scalar-legend--top-right");
     await expect(scalarLegend).toBeVisible();
     await expect(scalarLegend.locator(".scalar-legend__title")).toHaveText("potential");
     await expect(scalarLegend.locator(".scalar-legend__label")).toHaveText(["high", "low"]);
@@ -350,9 +352,11 @@ for (const viewport of [
     await page.waitForTimeout(300);
     await expect(modeControls).toBeHidden();
 
-    // FE-044: the electromagnetic field opens on its scalar-field lens — the
-    // exported electric-potential grid drawn as a heatmap with iso-contours,
-    // captioned by the shared scalar legend (qualitative, decimal-free).
+    // FE-044/FE-045: the electromagnetic field opens on its static-fields lens —
+    // the exported electric-potential grid as a heatmap with iso-contours
+    // (scalar legend), overlaid with the electric field's glyph quiver and field
+    // lines colored by magnitude (a second, field-magnitude legend).
+    const magnitudeLegend = page.locator("#systemsDomain .scalar-legend--bottom-right");
     await page.locator("#systemSelect").selectOption("electromagnetic-field");
     await page.waitForSelector("#scene.stage__canvas--active");
     await page.waitForTimeout(500);
@@ -360,13 +364,17 @@ for (const viewport of [
     await expect(scalarLegend).toBeVisible();
     await expect(scalarLegend.locator(".scalar-legend__title")).toHaveText("electric potential");
     await expect(scalarLegend.locator(".scalar-legend__label")).toHaveText(["high", "low"]);
+    await expect(magnitudeLegend).toBeVisible();
+    await expect(magnitudeLegend.locator(".scalar-legend__title")).toHaveText("field magnitude");
+    await expect(magnitudeLegend.locator(".scalar-legend__label")).toHaveText(["strong", "weak"]);
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-electromagnetic-field.png`) });
 
-    // Switching to a non-scalar Three.js lens hides the legend again.
+    // Switching to a non-scalar Three.js lens hides both field legends again.
     await page.locator("#systemSelect").selectOption("free-rigid-body");
     await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
     await page.waitForTimeout(300);
     await expect(scalarLegend).toBeHidden();
+    await expect(magnitudeLegend).toBeHidden();
 
     // The hard top-level domain menu swaps to the Verification workbench, which
     // renders the exported verification-problem IR read-only.

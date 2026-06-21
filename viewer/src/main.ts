@@ -23,14 +23,15 @@ import { DiagnosticsPanel } from "./diagnosticsPanel";
 import { drawWavefrontScene } from "./wavefrontCanvas";
 import { drawPoincareSectionScene } from "./poincareSectionCanvas";
 import { drawNormalModeScene } from "./normalModeCanvas";
-import { drawScalarFieldScene } from "./scalarFieldCanvas";
+import { drawScalarFieldScene, fieldPlotArea } from "./scalarFieldCanvas";
+import { drawVectorFieldOverlay, robustMagnitudeMax } from "./vectorFieldCanvas";
 import { VerificationPanel } from "./verificationPanel";
 import { VerificationStage } from "./verificationStage";
 import { resolveRendererSurface } from "./rendererRegistry";
 import { createScalarLegend } from "./scalarLegend";
 import { createBodyLegend } from "./bodyLegend";
-import { bodyColor, viridis } from "./design/colormaps";
-import { nBodyConfig, scalarField } from "./data/trajectory";
+import { bodyColor, magma, scalarScale, viridis } from "./design/colormaps";
+import { fieldLines, nBodyConfig, scalarField, vectorField } from "./data/trajectory";
 import {
   loadVerificationAdapterStubs,
   loadVerificationIndex,
@@ -120,6 +121,18 @@ const threeScene = new ThreeScene(threeCanvas);
 // reveal it with their own caption; every other lens keeps it hidden.
 const scalarLegend = createScalarLegend({ title: "potential", low: "low", high: "high" });
 stage.appendChild(scalarLegend.element);
+
+// A second scalar legend for the vector-field lens (FE-045): the glyph quiver is
+// colored by field magnitude through its own colormap, so it carries its own key
+// in the opposite corner from the scalar (potential) legend.
+const magnitudeLegend = createScalarLegend({
+  title: "field magnitude",
+  colormap: magma,
+  low: "weak",
+  high: "strong",
+  corner: "bottom-right",
+});
+stage.appendChild(magnitudeLegend.element);
 
 // One shared categorical body legend overlay (FE-042) keyed to the per-body
 // orbit-trail palette; the N-body orbit lens reveals it, others keep it hidden.
@@ -617,6 +630,14 @@ function applyVisualization() {
     scalarLegend.hide();
   }
 
+  // The field-magnitude legend keys the FE-045 glyph quiver; show it only when the
+  // static-fields lens has an exported vector field to color.
+  if (selectedVisualization.kind === "static-fields" && vectorField(trajectory)) {
+    magnitudeLegend.show();
+  } else {
+    magnitudeLegend.hide();
+  }
+
   // The body legend keys the N-body orbit-trail colors; it shows only when the
   // active trajectory carries an N-body orbit configuration.
   const nBody = nBodyConfig(trajectory);
@@ -754,8 +775,24 @@ function render(now: number) {
     drawPotentialScene(ctx, trajectory, selectedExample, selectedVisualization, current, canvas.clientWidth, canvas.clientHeight);
   } else if (isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "static-fields") {
     const field = scalarField(trajectory);
-    if (field) {
-      drawScalarFieldScene(ctx, field, canvas.clientWidth, canvas.clientHeight);
+    const vfield = vectorField(trajectory);
+    if (field || vfield) {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (field) {
+        drawScalarFieldScene(ctx, field, width, height);
+      }
+      // The vector field (glyphs + field lines) overlays the scalar heatmap on
+      // the shared plot area, so the electric field rides its own potential.
+      if (vfield) {
+        const magnitudeScale = scalarScale(magma, [0, robustMagnitudeMax(vfield)]);
+        drawVectorFieldOverlay(ctx, {
+          field: vfield,
+          lines: fieldLines(trajectory),
+          magnitudeScale,
+          area: fieldPlotArea(width, height),
+        });
+      }
     } else {
       resize2dCanvas();
       drawFallbackStage(selectedVisualization.title, canvas.clientWidth, canvas.clientHeight);
