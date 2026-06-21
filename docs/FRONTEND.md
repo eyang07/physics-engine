@@ -62,6 +62,14 @@ and trajectory data; it must not re-derive physics.
   remains `external-required`.
 - Three.js scenes for configuration-space, phase-space, orbit, field, spring,
   and attractor views.
+- Rigid-body lenses driven by exported geometry: the heavy symmetric top's
+  attitude playback orients a reusable body primitive (`AttitudeBody`) from the
+  exported quaternion series, and the free asymmetric top's polhode lens draws
+  the angular-momentum sphere, kinetic-energy ellipsoid, and their intersection
+  (the polhode) from `metadata.rigidBodyGeometry`, highlighting the intermediate
+  principal axis so the intermediate-axis instability reads clearly. The viewer
+  renders the exported attitude and geometry; it never integrates Euler's
+  equations.
 - Renderer-hint-based camera framing and a fit-to-system reset control.
 - Playwright visual regression coverage for all examples and fit-to-system
   behavior on desktop/mobile.

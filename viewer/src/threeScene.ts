@@ -8,9 +8,11 @@ import { FlowField } from "./flow";
 import {
   orientationChannel,
   rendererHints,
+  rigidBodyGeometry,
   type Orientation,
   type ReferenceGeometryHint,
   type RendererHints,
+  type RigidBodyGeometry,
   type Trajectory,
   type Vector3Tuple,
 } from "./data/trajectory";
@@ -27,7 +29,8 @@ export type ThreeMode =
   | "beadHoop"
   | "lorenzAttractor"
   | "henonHeilesFlow"
-  | "symmetricTopAxis";
+  | "symmetricTopAxis"
+  | "freeRigidBodyPolhode";
 
 const PENDULUM_GRAVITY = 9.81;
 
@@ -876,6 +879,89 @@ function makeSymmetricTopGroup(
   return { group, body };
 }
 
+/** The index of the intermediate principal moment — the unstable spin axis. */
+function intermediateMomentAxis(moments: Vector3Tuple): number {
+  const order = [0, 1, 2].sort((a, b) => moments[a] - moments[b]);
+  return order[1];
+}
+
+/**
+ * FE-041 — the Poinsot construction for the free asymmetric top: the
+ * body-frame angular-momentum sphere, the kinetic-energy ellipsoid, and the
+ * polhode where they intersect. The momentum curve is drawn straight from the
+ * exported geometry (body-angular-momentum space), normalized so the sphere has
+ * unit radius. The intermediate principal axis is highlighted so the wide swing
+ * of near-separatrix motion — the intermediate-axis instability — reads clearly.
+ * The tumbling body reuses `AttitudeBody` rather than re-rolling a shell.
+ */
+function makePolhodeGroup(
+  geometry: RigidBodyGeometry,
+  orientation: Orientation | null,
+): { group: THREE.Group; body: AttitudeBody | null; curve: THREE.Vector3[] } {
+  const group = new THREE.Group();
+  const targetRadius = 1;
+  const scale = geometry.sphereRadius > 1e-9 ? targetRadius / geometry.sphereRadius : 1;
+
+  // Angular-momentum sphere |L| = const — the faint reference surface.
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(targetRadius, 40, 24),
+    new THREE.MeshBasicMaterial({
+      color: new THREE.Color(theme.textFaint),
+      wireframe: true,
+      transparent: true,
+      opacity: 0.12,
+    }),
+  );
+  group.add(sphere);
+
+  // Kinetic-energy ellipsoid L1^2/I1 + L2^2/I2 + L3^2/I3 = 2H.
+  const [ea, eb, ec] = geometry.ellipsoidSemiAxes;
+  const ellipsoid = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 40, 24),
+    new THREE.MeshBasicMaterial({
+      color: new THREE.Color(theme.cool),
+      wireframe: true,
+      transparent: true,
+      opacity: 0.22,
+    }),
+  );
+  ellipsoid.scale.set(ea * scale, eb * scale, ec * scale);
+  group.add(ellipsoid);
+
+  // Principal axes; highlight the intermediate-moment axis (the unstable one).
+  const intermediate = intermediateMomentAxis(geometry.principalMoments);
+  const axisExtent = targetRadius * 1.18;
+  for (let axis = 0; axis < 3; axis += 1) {
+    const dir = new THREE.Vector3(axis === 0 ? 1 : 0, axis === 1 ? 1 : 0, axis === 2 ? 1 : 0);
+    const highlighted = axis === intermediate;
+    group.add(
+      lineFromPoints(
+        [dir.clone().multiplyScalar(-axisExtent), dir.clone().multiplyScalar(axisExtent)],
+        new THREE.Color(highlighted ? theme.accentStrong : theme.textFaint),
+        highlighted ? 0.6 : 0.26,
+      ),
+    );
+    const label = makeLabel(String(axis + 1));
+    label.position.copy(dir.clone().multiplyScalar(axisExtent + 0.14));
+    group.add(label);
+  }
+
+  // The polhode: the sphere ∩ energy-ellipsoid intersection, from exported data.
+  const curve = geometry.angularMomentumCurve.map(
+    (point) => new THREE.Vector3(point[0] * scale, point[1] * scale, point[2] * scale),
+  );
+  group.add(lineFromPoints(curve, new THREE.Color(theme.accent), 0.9));
+
+  // The tumbling body at the centre, oriented from the exported quaternion.
+  let body: AttitudeBody | null = null;
+  if (orientation) {
+    body = new AttitudeBody({ halfExtents: [0.14, 0.14, 0.26], triadLength: 0.4, opacity: 0.26 });
+    group.add(body.object);
+  }
+
+  return { group, body, curve };
+}
+
 export class ThreeScene {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
@@ -892,6 +978,7 @@ export class ThreeScene {
   private attitudeBody: AttitudeBody | null = null;
   private attitudeOrientation: Orientation | null = null;
   private attitudeTipRadius = 1;
+  private polhodeCurve: THREE.Vector3[] = [];
   private motionTrail: THREE.Line | null = null;
   private motionTrailPoints: THREE.Vector3[] = [];
   private flow: FlowField | null = null;
@@ -965,6 +1052,7 @@ export class ThreeScene {
     this.attitudeBody = null;
     this.attitudeOrientation = null;
     this.attitudeTipRadius = 1;
+    this.polhodeCurve = [];
     this.motionTrail = null;
     this.motionTrailPoints = [];
     this.flow?.dispose();
@@ -1082,6 +1170,22 @@ export class ThreeScene {
         this.marker.scale.setScalar(0.46);
       }
       this.applyCameraHints(hints, [1.2, 0.8, 1.3], [0, 0, 0]);
+    } else if (mode === "freeRigidBodyPolhode") {
+      const geometry = rigidBodyGeometry(data);
+      if (geometry) {
+        const orientation = orientationChannel(data);
+        const { group, body, curve } = makePolhodeGroup(geometry, orientation);
+        this.root.add(group);
+        this.polhodeCurve = curve;
+        this.attitudeBody = body;
+        this.attitudeOrientation = orientation;
+        if (orientation && body) {
+          body.setQuaternion(orientation.quaternion[0]);
+        }
+        this.setMotionTrail(curve, 140);
+        this.marker.scale.setScalar(0.34);
+      }
+      this.applyCameraHints(hints, [2.5, 1.7, 2.9], [0, 0, 0]);
     } else {
       this.henonData = data;
       this.henonHints = hints;
@@ -1205,6 +1309,19 @@ export class ThreeScene {
       this.attitudeBody?.setQuaternion(orientation.quaternion[index]);
       this.marker.position.copy(topAxisTip(orientation, index, this.attitudeTipRadius));
       this.root.rotation.y = Math.sin(elapsed * 0.08) * 0.06;
+    } else if (this.mode === "freeRigidBodyPolhode") {
+      if (this.polhodeCurve.length > 0) {
+        const index = Math.min(Math.max(0, sampleIndex), this.polhodeCurve.length - 1);
+        this.marker.position.copy(this.polhodeCurve[index]);
+      }
+      if (this.attitudeOrientation && this.attitudeBody) {
+        const qIndex = Math.min(
+          Math.max(0, sampleIndex),
+          this.attitudeOrientation.quaternion.length - 1,
+        );
+        this.attitudeBody.setQuaternion(this.attitudeOrientation.quaternion[qIndex]);
+      }
+      this.root.rotation.y = Math.sin(elapsed * 0.06) * 0.05;
     } else if (this.henonData) {
       const point = henonPoint(state, this.henonData, this.henonHints);
       this.marker.position.copy(point);

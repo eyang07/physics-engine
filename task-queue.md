@@ -75,22 +75,13 @@ rigid-body primitive — a translucent body shell, a body-fixed axis rod, and th
 body-frame triad, oriented straight from the exported quaternion series
 (`orientationChannel` in `viewer/src/data/trajectory.ts`). The Heavy Symmetric Top's
 `symmetricTopAxis` lens is its first consumer (attitude playback on the precessing
-axis). FE-041 should compose `AttitudeBody` on the free asymmetric top rather than
-re-rolling a body._
+axis). FE-041 is complete: `freeRigidBodyPolhode` (registered `3d`) composes
+`AttitudeBody` at the centre of the Poinsot construction — the angular-momentum
+sphere, kinetic-energy ellipsoid, and their intersection (the polhode) drawn from
+`metadata.rigidBodyGeometry` via `rigidBodyGeometry()` in
+`viewer/src/data/trajectory.ts`, with the intermediate principal axis highlighted._
 
-1. **FE-041: Polhode / momentum-sphere ∩ energy-ellipsoid lens**
-   - Goal: Render the free asymmetric top's angular-momentum sphere, kinetic-energy
-     ellipsoid, and the polhode curve traced on the body, making the intermediate-axis
-     instability legible.
-   - Scope: `viewer/src/threeScene.ts` (polhode lens), `viewer/src/data/
-     trajectory.ts` / `manifest.ts` for the exported geometry, and the viewer visual
-     test.
-   - Acceptance: the sphere/ellipsoid/polhode draw from the exported geometry only;
-     intermediate-axis motion visibly differs from the stable axes; `npm run build`
-     and the visual test pass.
-   - Depends on: BE-087 (polhode / energy-ellipsoid export).
-
-2. **FE-042: N-body orbit trails with center-of-mass framing**
+1. **FE-042: N-body orbit trails with center-of-mass framing**
    - Goal: Render N-body systems as per-body orbit trails in 3D, framed on the
      center of mass, with per-body color and a legend.
    - Scope: `viewer/src/threeScene.ts` (orbit-trail scene), renderer-hint framing in
@@ -100,7 +91,7 @@ re-rolling a body._
      visual test pass.
    - Depends on: BE-082 (N-body system + export).
 
-3. **FE-043: Normal-mode lens with mode selector and superposition scrub**
+2. **FE-043: Normal-mode lens with mode selector and superposition scrub**
    - Goal: Add a lens that animates each exported normal-mode shape, with a mode
      selector and a control to scrub a superposition, for the coupled-oscillator
      (and small-oscillation) systems.
@@ -114,7 +105,7 @@ re-rolling a body._
 
 ### Direction B — Field & wave rendering
 
-4. **FE-044: Scalar-field lens (heatmap / contour)**
+3. **FE-044: Scalar-field lens (heatmap / contour)**
    - Goal: Render an exported scalar-field grid as a heatmap/contour using the
      FE-038 color+legend layer, for potentials and other scalar fields.
    - Scope: a scalar-field lens in `viewer/src/`, `viewer/src/data/manifest.ts` for
@@ -125,7 +116,7 @@ re-rolling a body._
    - Depends on: BE-091 (field grid export); consumes BE-093 potentials, reusable for
      BE-105 curvature.
 
-5. **FE-045: Vector-field lens (glyphs + field lines)**
+4. **FE-045: Vector-field lens (glyphs + field lines)**
    - Goal: Render an exported vector-field grid as glyphs/quiver with magnitude→color,
      and draw the exported field-line / streamline polylines.
    - Scope: a vector-field lens in `viewer/src/`, `viewer/src/data/manifest.ts` /
@@ -135,7 +126,7 @@ re-rolling a body._
      to the shared color legend; `npm run build` and the visual test pass.
    - Depends on: BE-091 (vector-field + field-line export), BE-092, BE-093.
 
-6. **FE-046: 1D wave displacement animation (string and wave packet)**
+5. **FE-046: 1D wave displacement animation (string and wave packet)**
     - Goal: Animate the exported 1D displacement/amplitude field for the vibrating
       string and the dispersive wave packet, including a standing/traveling toggle
       where the data supports it.
@@ -147,7 +138,7 @@ re-rolling a body._
       pass.
     - Depends on: BE-094 (string), BE-096 (wave packet).
 
-7. **FE-047: 2D membrane mode surfaces with mode selector**
+6. **FE-047: 2D membrane mode surfaces with mode selector**
     - Goal: Render rectangular and circular membrane modes as animated displacement
       surfaces (reusing FE-039), with a mode selector and superposition.
     - Scope: a membrane lens, `viewer/src/structurePanel.ts` for the mode selector,
@@ -156,7 +147,7 @@ re-rolling a body._
       mode selector switches shapes; `npm run build` and the visual test pass.
     - Depends on: BE-095 (membrane modes export).
 
-8. **FE-048: 2D wavefront / intensity surface lens**
+7. **FE-048: 2D wavefront / intensity surface lens**
     - Goal: Render the exported 2D wavefront surfaces and intensity field from the
       heterogeneous-media work, reusing the wavefront/ray bundle path and the FE-038
       color layer for intensity.
@@ -170,7 +161,7 @@ re-rolling a body._
 
 ### Direction C — Curved-geometry rendering
 
-9. **FE-049: Surface-embedding mesh with geodesic drawn on the surface**
+8. **FE-049: Surface-embedding mesh with geodesic drawn on the surface**
     - Goal: Render an exported surface-of-revolution embedding mesh with the geodesic
       polyline drawn on the surface in embedded coordinates.
     - Scope: a surface-geodesic lens in `viewer/src/threeScene.ts`, `viewer/src/data/
@@ -181,7 +172,7 @@ re-rolling a body._
       test pass.
     - Depends on: BE-100 (surface geodesics), BE-101 (embedding export schema).
 
-10. **FE-050: Curvature coloring on the surface mesh**
+9. **FE-050: Curvature coloring on the surface mesh**
     - Goal: Color the surface-embedding mesh by the exported curvature scalar field
       using the FE-038 color+legend layer, making curvature visible.
     - Scope: the surface-geodesic lens, `viewer/src/data/manifest.ts` for the
@@ -191,7 +182,7 @@ re-rolling a body._
       visual test pass.
     - Depends on: BE-105 (curvature scalar-field export); reuses FE-049.
 
-11. **FE-051: Parallel-transport frame animation (holonomy)**
+10. **FE-051: Parallel-transport frame animation (holonomy)**
     - Goal: Animate the exported transported frame along a curve / closed loop on a
       curved surface, making the holonomy angle legible.
     - Scope: the surface-geodesic lens, `viewer/src/playback.ts`, `viewer/src/data/
@@ -201,7 +192,7 @@ re-rolling a body._
       `npm run build` and the visual test pass.
     - Depends on: BE-104 (parallel transport / holonomy export).
 
-12. **FE-052: Effective-potential and orbit lens for Kepler / Schwarzschild**
+11. **FE-052: Effective-potential and orbit lens for Kepler / Schwarzschild**
     - Goal: Render the exported effective potential with turning points alongside the
       orbit, surfacing bound/unbound/precessing classification for central-force and
       GR orbits.
@@ -219,7 +210,7 @@ _These two verification-view tasks predate the direction change and are kept for
 continuity. They are **deprioritized** while the frontend follows the physics
 directions; pick them up only on explicit request._
 
-13. **FE-035: Draw the certified enclosure box on the phase-plane stage**
+12. **FE-035: Draw the certified enclosure box on the phase-plane stage**
     - Goal: An obligation's certified-numeric enclosure (FE-032) records the box it
       is sound over in state-variable coordinates, but the stage never shows where
       on the phase plane that box lies. Draw a read-only certified-box overlay on
@@ -235,7 +226,7 @@ directions; pick them up only on explicit request._
       rollout/region rendering is otherwise unchanged; nothing reads as proved;
       `npm run build` and the visual test pass.
 
-14. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
+13. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
     - Goal: The catalog lists every package's region/obligation/candidate counts
       and Tier/regime, but not how many of its obligations reach level 2. Once the
       discovery index carries a per-package certified-numeric count, surface it as

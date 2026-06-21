@@ -71,6 +71,30 @@ export type Orientation = {
   bodyAxes?: { e1: Vector3Tuple[]; e2: Vector3Tuple[]; e3: Vector3Tuple[] };
 };
 
+/**
+ * The Poinsot polhode construction Python exported under
+ * `metadata.rigidBodyGeometry` (BE-087). In body-frame angular-momentum space the
+ * motion lies on the intersection of the angular-momentum sphere (|L| constant)
+ * and the kinetic-energy ellipsoid; `angularMomentumCurve` is that intersection
+ * (the L-space polhode), while `polhode` is the matching curve traced by the
+ * angular-velocity vector. The viewer draws these as exported; it never solves
+ * Euler's equations.
+ */
+export type RigidBodyGeometry = {
+  /** Principal moments of inertia [I1, I2, I3]. */
+  principalMoments: Vector3Tuple;
+  /** Radius of the body-frame angular-momentum sphere |L|. */
+  sphereRadius: number;
+  /** Semi-axes of the kinetic-energy ellipsoid in angular-momentum space. */
+  ellipsoidSemiAxes: Vector3Tuple;
+  /** Polhode in angular-velocity space, one point per trajectory sample. */
+  polhode: Vector3Tuple[];
+  /** Sphere ∩ ellipsoid curve in angular-momentum space, per sample. */
+  angularMomentumCurve: Vector3Tuple[];
+  /** Rigor label Python attached (the rollout diagnostics stay `measured`). */
+  rigor?: string;
+};
+
 /** Map each state-variable name to its column index in `states`. */
 export function stateIndex(trajectory: Trajectory): Map<string, number> {
   const index = new Map<string, number>();
@@ -470,6 +494,45 @@ export function orientationChannel(trajectory: Trajectory): Orientation | null {
     rigor: typeof raw.rigor === "string" ? raw.rigor : undefined,
     quaternion,
     bodyAxes,
+  };
+}
+
+/**
+ * Read the rigid-body polhode geometry Python exported with the trajectory.
+ * Returns null when the system carries no such geometry or the channel is
+ * malformed, so the lens can fall back gracefully.
+ */
+export function rigidBodyGeometry(trajectory: Trajectory): RigidBodyGeometry | null {
+  const raw = asRecord(trajectory.metadata?.rigidBodyGeometry);
+  if (!raw) {
+    return null;
+  }
+  const principalMoments = raw.principalMoments;
+  const sphere = asRecord(raw.angularMomentumSphere);
+  const ellipsoid = asRecord(raw.energyEllipsoid);
+  const polhodeRaw = asRecord(raw.polhode);
+  const curveRaw = asRecord(raw.angularMomentumCurve);
+  if (!sphere || !ellipsoid || !polhodeRaw || !curveRaw) {
+    return null;
+  }
+  if (!isNumberTuple3(principalMoments) || typeof sphere.radius !== "number") {
+    return null;
+  }
+  if (!isNumberTuple3(ellipsoid.semiAxes)) {
+    return null;
+  }
+  const polhode = vector3List(polhodeRaw.points);
+  const angularMomentumCurve = vector3List(curveRaw.points);
+  if (!polhode || !angularMomentumCurve) {
+    return null;
+  }
+  return {
+    principalMoments,
+    sphereRadius: sphere.radius,
+    ellipsoidSemiAxes: ellipsoid.semiAxes,
+    polhode,
+    angularMomentumCurve,
+    rigor: typeof raw.rigor === "string" ? raw.rigor : undefined,
   };
 }
 

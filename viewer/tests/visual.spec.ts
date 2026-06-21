@@ -68,6 +68,7 @@ const threeJsSystems = [
   "bead-on-hoop",
   "lorenz-attractor",
   "henon-heiles",
+  "free-rigid-body",
 ];
 
 for (const viewport of [
@@ -279,6 +280,15 @@ for (const viewport of [
     await page.waitForTimeout(500);
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-schwarzschild-potential.png`) });
+
+    // FE-041: the free asymmetric top opens on its polhode lens — the
+    // momentum-sphere ∩ energy-ellipsoid construction with the tumbling body,
+    // drawn from the exported rigid-body geometry (a Three.js scene).
+    await page.locator("#systemSelect").selectOption("free-rigid-body");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-free-rigid-body-polhode.png`) });
 
     // The hard top-level domain menu swaps to the Verification workbench, which
     // renders the exported verification-problem IR read-only.
