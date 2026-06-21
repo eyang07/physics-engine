@@ -108,6 +108,29 @@ export type NBodyConfig = {
   bounds?: AxisBounds;
 };
 
+/**
+ * A scalar field sampled over a 2D coordinate grid that Python evaluated and
+ * exported under `metadata.fields.<name>` (BE-091). `values[i][j]` is the field
+ * at `axes[0][i]` along the first coordinate and `axes[1][j]` along the second;
+ * the viewer colors these samples as exported and never evaluates the field
+ * itself. The scalar-field lens (FE-044) draws it as a heatmap with iso-contours;
+ * potentials, curvature, and intensity all reuse the same primitive.
+ */
+export type ScalarField = {
+  /** The field's source name, e.g. "electricPotential". */
+  name: string;
+  /** The two coordinate names spanning the grid, e.g. ["x", "y"]. */
+  coordinates: [string, string];
+  /** Sample positions along each coordinate: [firstAxis, secondAxis]. */
+  axes: [number[], number[]];
+  /** Grid dimensions [along axes[0], along axes[1]]. */
+  shape: [number, number];
+  /** Field values, the outer index running over the first coordinate. */
+  values: number[][];
+  /** How Python produced the samples, e.g. "symbolic-exact". */
+  evaluation?: string;
+};
+
 /** Map each state-variable name to its column index in `states`. */
 export function stateIndex(trajectory: Trajectory): Map<string, number> {
   const index = new Map<string, number>();
@@ -572,6 +595,71 @@ export function nBodyConfig(trajectory: Trajectory): NBodyConfig | null {
     centerOfMassFrame: raw.centerOfMassFrame === true,
     bounds: isBounds(raw.bounds) ? raw.bounds : undefined,
   };
+}
+
+function isNumberArray(value: unknown): value is number[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "number");
+}
+
+function parseScalarField(name: string, raw: Record<string, unknown>): ScalarField | null {
+  const { axes, values } = raw;
+  if (!Array.isArray(axes) || axes.length !== 2 || !isNumberArray(axes[0]) || !isNumberArray(axes[1])) {
+    return null;
+  }
+  if (!Array.isArray(values) || !values.every(isNumberArray)) {
+    return null;
+  }
+  const nx = axes[0].length;
+  const ny = axes[1].length;
+  // The grid must be consistent with its declared axes; a ragged or transposed
+  // payload is rejected rather than drawn as a misleading field.
+  if (nx < 2 || ny < 2 || values.length !== nx || !values.every((row) => row.length === ny)) {
+    return null;
+  }
+  const coords = Array.isArray(raw.coordinates)
+    ? raw.coordinates.filter((item): item is string => typeof item === "string")
+    : [];
+  return {
+    name,
+    coordinates: [coords[0] ?? "x", coords[1] ?? "y"],
+    axes: [axes[0], axes[1]],
+    shape: [nx, ny],
+    values: values as number[][],
+    evaluation: typeof raw.evaluation === "string" ? raw.evaluation : undefined,
+  };
+}
+
+/**
+ * Read a scalar-field grid Python exported under `metadata.fields` (BE-091),
+ * preferring one named `preferredName` and otherwise taking the first field
+ * tagged as a scalar field. Returns null when the trajectory carries no scalar
+ * field or the channel is malformed, so the lens can fall back to a placeholder
+ * instead of drawing a broken grid.
+ */
+export function scalarField(trajectory: Trajectory, preferredName?: string): ScalarField | null {
+  const fields = asRecord(trajectory.metadata?.fields);
+  if (!fields) {
+    return null;
+  }
+  const names = Object.keys(fields);
+  if (preferredName && names.includes(preferredName)) {
+    names.sort((a, b) => (a === preferredName ? -1 : b === preferredName ? 1 : 0));
+  }
+  for (const name of names) {
+    const record = asRecord(fields[name]);
+    if (!record) {
+      continue;
+    }
+    const tag = record.kind ?? record.rendererHint;
+    if (tag !== "scalar-field") {
+      continue;
+    }
+    const parsed = parseScalarField(name, record);
+    if (parsed) {
+      return parsed;
+    }
+  }
+  return null;
 }
 
 /** Renderer-only scene hints exported by Python alongside the trajectory. */

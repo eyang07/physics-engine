@@ -350,6 +350,24 @@ for (const viewport of [
     await page.waitForTimeout(300);
     await expect(modeControls).toBeHidden();
 
+    // FE-044: the electromagnetic field opens on its scalar-field lens — the
+    // exported electric-potential grid drawn as a heatmap with iso-contours,
+    // captioned by the shared scalar legend (qualitative, decimal-free).
+    await page.locator("#systemSelect").selectOption("electromagnetic-field");
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await expect(scalarLegend).toBeVisible();
+    await expect(scalarLegend.locator(".scalar-legend__title")).toHaveText("electric potential");
+    await expect(scalarLegend.locator(".scalar-legend__label")).toHaveText(["high", "low"]);
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-electromagnetic-field.png`) });
+
+    // Switching to a non-scalar Three.js lens hides the legend again.
+    await page.locator("#systemSelect").selectOption("free-rigid-body");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(300);
+    await expect(scalarLegend).toBeHidden();
+
     // The hard top-level domain menu swaps to the Verification workbench, which
     // renders the exported verification-problem IR read-only.
     await page.getByRole("button", { name: "Verification" }).click();

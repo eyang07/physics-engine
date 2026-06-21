@@ -23,13 +23,14 @@ import { DiagnosticsPanel } from "./diagnosticsPanel";
 import { drawWavefrontScene } from "./wavefrontCanvas";
 import { drawPoincareSectionScene } from "./poincareSectionCanvas";
 import { drawNormalModeScene } from "./normalModeCanvas";
+import { drawScalarFieldScene } from "./scalarFieldCanvas";
 import { VerificationPanel } from "./verificationPanel";
 import { VerificationStage } from "./verificationStage";
 import { resolveRendererSurface } from "./rendererRegistry";
 import { createScalarLegend } from "./scalarLegend";
 import { createBodyLegend } from "./bodyLegend";
 import { bodyColor, viridis } from "./design/colormaps";
-import { nBodyConfig } from "./data/trajectory";
+import { nBodyConfig, scalarField } from "./data/trajectory";
 import {
   loadVerificationAdapterStubs,
   loadVerificationIndex,
@@ -57,7 +58,8 @@ type CanvasMode =
   | "henonHeilesPhase"
   | "henonHeilesPotential"
   | "henonHeilesPoincare"
-  | "variableSpeedWavefront";
+  | "variableSpeedWavefront"
+  | "electromagneticField";
 
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -224,6 +226,17 @@ function isThreeMode(id: string): id is ThreeMode {
 // draw): routed to a graceful placeholder on the 2D stage, never a blank scene.
 function isFallbackMode(id: string): boolean {
   return resolveRendererSurface(id) === "fallback";
+}
+
+// Turn an exported scalar-field name ("electricPotential") into a qualitative
+// legend caption ("electric potential"). The legend stays decimal-free; this
+// only humanizes the channel name the field was exported under.
+function humanizeFieldName(name: string): string {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function lensFor(id: string): ManifestLens {
@@ -585,12 +598,21 @@ function applyVisualization() {
     setCanvasMode("2d");
   }
 
-  // The scalar legend captions the only scalar field the viewer paints today —
-  // the potential contour. Other lenses keep it hidden until their scalar lens
-  // (field magnitude / curvature / intensity) lands and reuses it.
+  // The scalar legend captions every scalar field the viewer paints: the
+  // potential contour and the FE-044 scalar-field lens (an exported potential /
+  // curvature / intensity grid). It stays hidden for non-scalar lenses rather
+  // than leaving a stale key.
   if (selectedVisualization.kind === "potential-contour") {
     scalarLegend.setColormap(viridis, "potential", "low", "high");
     scalarLegend.show();
+  } else if (selectedVisualization.kind === "static-fields") {
+    const field = scalarField(trajectory);
+    if (field) {
+      scalarLegend.setColormap(viridis, humanizeFieldName(field.name), "low", "high");
+      scalarLegend.show();
+    } else {
+      scalarLegend.hide();
+    }
   } else {
     scalarLegend.hide();
   }
@@ -730,6 +752,14 @@ function render(now: number) {
     drawPotentialContourScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else if (selectedExample && isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "potential-energy") {
     drawPotentialScene(ctx, trajectory, selectedExample, selectedVisualization, current, canvas.clientWidth, canvas.clientHeight);
+  } else if (isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "static-fields") {
+    const field = scalarField(trajectory);
+    if (field) {
+      drawScalarFieldScene(ctx, field, canvas.clientWidth, canvas.clientHeight);
+    } else {
+      resize2dCanvas();
+      drawFallbackStage(selectedVisualization.title, canvas.clientWidth, canvas.clientHeight);
+    }
   } else if (selectedVisualization.id === "variableSpeedWavefront") {
     drawWavefrontScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else if (selectedVisualization.id === "henonHeilesPoincare") {
