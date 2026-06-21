@@ -30,6 +30,8 @@ export const CANVAS_LENS_IDS = new Set<string>([
   "henonHeilesPotential",
   "henonHeilesPoincare",
   "variableSpeedWavefront",
+  "symmetricTopNutationPhase",
+  "doublePendulumPhase",
 ]);
 
 /** Lens ids drawn by a Three.js scene (`ThreeScene.setVisualization`). */

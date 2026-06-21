@@ -246,6 +246,23 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#hamiltonianScene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-symmetric-top-axis.png`) });
 
+    // The top's nutation-angle phase portrait renders on the generic 2D phase
+    // lens (no bespoke code — the exported projection drives it).
+    await page.getByRole("button", { name: "Nutation Phase" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-symmetric-top-nutation.png`) });
+
+    // The double pendulum's theta1 phase portrait also renders on the shared 2D
+    // phase lens.
+    await page.locator("#systemSelect").selectOption("double-pendulum");
+    await page.getByRole("button", { name: "Phase Portraits" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-double-pendulum-phase.png`) });
+
     // The hard top-level domain menu swaps to the Verification workbench, which
     // renders the exported verification-problem IR read-only.
     await page.getByRole("button", { name: "Verification" }).click();
