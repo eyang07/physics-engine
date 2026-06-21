@@ -37,7 +37,9 @@ import {
   nBodyConfig,
   scalarField,
   scalarFieldSeriesList,
+  surfaceFieldSeriesList,
   type ScalarFieldSeries,
+  type SurfaceFieldSeries,
   vectorField,
 } from "./data/trajectory";
 import {
@@ -107,6 +109,8 @@ const variantSection = requireElement<HTMLElement>("#variantSection");
 const variantModes = requireElement<HTMLElement>("#variantModes");
 const waveSeriesSection = requireElement<HTMLElement>("#waveSeriesSection");
 const waveSeriesModes = requireElement<HTMLElement>("#waveSeries");
+const membraneModesSection = requireElement<HTMLElement>("#membraneModesSection");
+const membraneModesSelector = requireElement<HTMLElement>("#membraneModes");
 const modeControlsSection = requireElement<HTMLElement>("#modeControlsSection");
 const modeSelector = requireElement<HTMLElement>("#modeSelector");
 const modeBlend = requireElement<HTMLInputElement>("#modeBlend");
@@ -188,6 +192,9 @@ let selectedModeIndex = 0;
 // The selected 1D wave series (FE-046) for a field-evolution lens, e.g. the
 // string's standing vs traveling solution (0-based, declaration order).
 let selectedSeriesIndex = 0;
+// The selected membrane shape family (FE-047) for the membrane lens, i.e. the
+// rectangular vs circular displacement surface (0-based, declaration order).
+let selectedMembraneIndex = 0;
 let trajectory: Trajectory | null = null;
 let pendulumBounds: Bounds | null = null;
 // Monotonic guard so a slow trajectory load can't overwrite a newer selection.
@@ -572,6 +579,47 @@ function renderWaveSeriesControls() {
   });
 }
 
+// The exported membrane displacement surfaces for the membrane lens (FE-047), or
+// an empty array for any other lens. The membrane exports one per shape family
+// (rectangular and circular), switched on stage by the selector below.
+function activeMembraneSurfaces(): SurfaceFieldSeries[] {
+  if (!trajectory || selectedVisualization?.id !== "membraneModes") {
+    return [];
+  }
+  return surfaceFieldSeriesList(trajectory);
+}
+
+// The membrane shape selector (rectangular / circular). It earns its place only
+// when more than one surface is exported; switching rebuilds the Three.js surface
+// from the chosen series without reloading the trajectory.
+function renderMembraneControls() {
+  const surfaces = activeMembraneSurfaces();
+  membraneModesSection.hidden = surfaces.length < 2;
+  membraneModesSelector.replaceChildren();
+  if (surfaces.length < 2) {
+    return;
+  }
+  if (selectedMembraneIndex >= surfaces.length) {
+    selectedMembraneIndex = 0;
+  }
+  surfaces.forEach((entry, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "mode-switch__button";
+    button.textContent = humanizeFieldName(entry.name);
+    button.classList.toggle("mode-switch__button--active", index === selectedMembraneIndex);
+    button.addEventListener("click", () => {
+      if (index === selectedMembraneIndex) {
+        return;
+      }
+      selectedMembraneIndex = index;
+      threeScene.selectMembraneSurface(index);
+      renderMembraneControls();
+    });
+    membraneModesSelector.append(button);
+  });
+}
+
 function renderModeControls() {
   const modes = activeNormalModes();
   modeControlsSection.hidden = modes === null;
@@ -679,6 +727,11 @@ function applyVisualization() {
     } else {
       scalarLegend.hide();
     }
+  } else if (selectedVisualization.id === "variableSpeedWavefront") {
+    // The wavefront lens (FE-048) colors the front by the measured intensity proxy;
+    // the legend keys the magma ramp qualitatively (spread → focused at caustics).
+    scalarLegend.setColormap(magma, "wavefront intensity", "spread", "focused");
+    scalarLegend.show();
   } else {
     scalarLegend.hide();
   }
@@ -711,6 +764,9 @@ function applyVisualization() {
   // The 1D wave series toggle (standing/traveling, amplitude/intensity) shows
   // only for a field-evolution lens carrying more than one exported series.
   renderWaveSeriesControls();
+  // The membrane shape selector (rectangular/circular) shows only for the membrane
+  // lens carrying more than one exported displacement surface.
+  renderMembraneControls();
 }
 
 async function selectExample(exampleId: string) {
@@ -723,6 +779,7 @@ async function selectExample(exampleId: string) {
   selectedVariant = defaultVariant(nextExample);
   selectedModeIndex = 0;
   selectedSeriesIndex = 0;
+  selectedMembraneIndex = 0;
   modeBlend.value = "0";
   systemTitle.textContent = nextExample.title;
   systemSelect.value = nextExample.id;

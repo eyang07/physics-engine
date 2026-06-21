@@ -1,5 +1,11 @@
 import { theme } from "./design/theme";
-import { rendererHints, type Trajectory } from "./data/trajectory";
+import {
+  rendererHints,
+  wavefrontField,
+  type Trajectory,
+  type WavefrontSnapshot,
+} from "./data/trajectory";
+import { magma, scalarScale, type ScalarScale } from "./design/colormaps";
 import type { Sample } from "./playback";
 import { clamp } from "./util";
 
@@ -19,7 +25,7 @@ type RayBundle = {
   rays: Ray[];
 };
 
-type WavefrontSnapshot = {
+type WavefrontRecord = {
   time: number;
   points: number[][];
 };
@@ -31,7 +37,7 @@ type WavefrontMetadata = {
     lens_width?: number;
   };
   rayBundle?: RayBundle;
-  wavefronts?: WavefrontSnapshot[];
+  wavefronts?: WavefrontRecord[];
   hamiltonian?: {
     maxDrift?: number;
   };
@@ -195,6 +201,39 @@ function drawWavefront(ctx: CanvasRenderingContext2D, points: number[][], bounds
   ctx.restore();
 }
 
+// FE-048 — draw one exported wavefront colored by its measured intensity proxy:
+// each segment between adjacent rays is tinted by the segment's spreading-derived
+// intensity, so the front brightens where rays bunch toward a caustic. The colors
+// are read straight from the exported diagnostic; no focusing is recomputed here.
+function drawIntensityWavefront(
+  ctx: CanvasRenderingContext2D,
+  snapshot: WavefrontSnapshot,
+  bounds: Bounds,
+  area: ReturnType<typeof plotArea>,
+  scale: ScalarScale,
+  alpha: number,
+  width: number,
+): void {
+  const points = snapshot.points.map((point) => project({ x: point[0], y: point[1] }, bounds, area));
+  if (points.length < 2) {
+    return;
+  }
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = width;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const intensity = snapshot.intensity[Math.min(index, snapshot.intensity.length - 1)] ?? 0;
+    ctx.strokeStyle = scale.css(intensity);
+    ctx.beginPath();
+    ctx.moveTo(points[index].x, points[index].y);
+    ctx.lineTo(points[index + 1].x, points[index + 1].y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export function drawWavefrontScene(
   ctx: CanvasRenderingContext2D,
   data: Trajectory,
@@ -226,11 +265,17 @@ export function drawWavefrontScene(
     drawRay(ctx, ray, currentIndex, bounds, area);
   }
 
-  const snapshots = meta.wavefronts ?? [];
-  for (const snapshot of snapshots) {
-    const index = data.time.findIndex((time) => time >= snapshot.time);
-    if (index >= 0 && index < currentIndex) {
-      drawWavefront(ctx, snapshot.points, bounds, area, 0.1, 1);
+  // The reached wavefronts, colored by the measured intensity proxy (FE-048): the
+  // caustic where rays cross reads as a bright band. Falls back to drawing only the
+  // rays + live front when the intensity channel is absent.
+  const field = wavefrontField(data);
+  if (field) {
+    const intensityScale = scalarScale(magma, [0, field.intensityMax]);
+    const currentTime = data.time[currentIndex] ?? 0;
+    for (const snapshot of field.snapshots) {
+      if (snapshot.time <= currentTime) {
+        drawIntensityWavefront(ctx, snapshot, bounds, area, intensityScale, 0.5, 2.6);
+      }
     }
   }
 

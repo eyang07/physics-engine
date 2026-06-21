@@ -823,6 +823,164 @@ export function scalarFieldSeriesList(trajectory: Trajectory): ScalarFieldSeries
   return out;
 }
 
+/**
+ * A 2D scalar field sampled over a coordinate grid and a sequence of times that
+ * Python exported under `metadata.fields.<name>` (kind `scalar-field-series` with
+ * two coordinate axes; BE-095 membrane). `frames[t][i][j]` is the displacement at
+ * time `times[t]`, at `axes[0][i]` along the first coordinate and `axes[1][j]`
+ * along the second. The membrane lens (FE-047) lifts these frames into an animated
+ * displacement surface; it plays back the exported series and never re-solves the
+ * wave equation.
+ */
+export type SurfaceFieldSeries = {
+  name: string;
+  /** The two coordinate names spanning the grid, e.g. ["x", "y"]. */
+  coordinates: [string, string];
+  /** Sample positions along each coordinate: [firstAxis, secondAxis]. */
+  axes: [number[], number[]];
+  /** Sample times, one per frame. */
+  times: number[];
+  /** `[frameCount, alongAxes0, alongAxes1]`. */
+  shape: [number, number, number];
+  /** Displacement per frame: `frames[t][i][j]`, `i` over `axes[0]`. */
+  frames: number[][][];
+  /** The solution variant Python tagged, e.g. a modal-superposition label. */
+  variant?: string;
+};
+
+function isNumberGrid(value: unknown): value is number[][] {
+  return Array.isArray(value) && value.length > 0 && value.every(isNumberArray);
+}
+
+/**
+ * Read every 2D scalar-field time series Python exported under `metadata.fields`
+ * (kind `scalar-field-series` with two coordinate axes), in declaration order. A
+ * membrane carries one per shape family (a rectangular and a circular modal
+ * superposition), so the membrane lens offers a selector between them. The 1D
+ * wave series (one coordinate axis) are read separately by `scalarFieldSeriesList`;
+ * the two readers partition the `scalar-field-series` channels by axis count.
+ */
+export function surfaceFieldSeriesList(trajectory: Trajectory): SurfaceFieldSeries[] {
+  const out: SurfaceFieldSeries[] = [];
+  for (const [name, raw] of fieldsByKind(trajectory, "scalar-field-series")) {
+    const { axes, time, values } = raw;
+    // A surface series spans two coordinate axes (a 1D wave series spans one).
+    if (!Array.isArray(axes) || axes.length !== 2 || !isNumberArray(axes[0]) || !isNumberArray(axes[1])) {
+      continue;
+    }
+    if (!isNumberArray(time) || !Array.isArray(values) || !values.every(isNumberGrid)) {
+      continue;
+    }
+    const n0 = axes[0].length;
+    const n1 = axes[1].length;
+    const frameCount = time.length;
+    if (
+      n0 < 2 ||
+      n1 < 2 ||
+      frameCount < 1 ||
+      values.length !== frameCount ||
+      !values.every((frame) => frame.length === n0 && frame.every((row) => row.length === n1))
+    ) {
+      continue;
+    }
+    const coords = Array.isArray(raw.coordinates)
+      ? raw.coordinates.filter((item): item is string => typeof item === "string")
+      : [];
+    out.push({
+      name,
+      coordinates: [coords[0] ?? "x", coords[1] ?? "y"],
+      axes: [axes[0], axes[1]],
+      times: time,
+      shape: [frameCount, n0, n1],
+      frames: values as number[][][],
+      variant: typeof raw.variant === "string" ? raw.variant : undefined,
+    });
+  }
+  return out;
+}
+
+/**
+ * One sampled wavefront from the variable-speed ray bundle (BE-097): the ray
+ * positions along the front at a snapshot time, with the measured intensity proxy
+ * for each segment between adjacent rays. Where neighbouring rays converge toward a
+ * caustic the segment intensity rises, so the lens colors the front by it.
+ */
+export type WavefrontSnapshot = {
+  time: number;
+  /** Ray positions along the front, `[x, y]`. */
+  points: [number, number][];
+  /** Per-segment intensity, length `points.length - 1`. */
+  intensity: number[];
+};
+
+/**
+ * The exported wavefront surface + measured intensity field (BE-097), zipped per
+ * snapshot. `intensityMax` is a robust high-percentile value used as the color
+ * scale's upper bound so a single near-singular caustic cell does not wash out the
+ * band. The intensity is `measured` (finite-difference ray spreading), never a
+ * proof of focusing — the lens renders the exported diagnostic.
+ */
+export type WavefrontField = {
+  snapshots: WavefrontSnapshot[];
+  intensityMax: number;
+};
+
+function asPoint2(value: unknown): [number, number] | null {
+  return isNumberArray(value) && value.length >= 2 ? [value[0], value[1]] : null;
+}
+
+/**
+ * Read the exported wavefront surface (`metadata.fields.wavefrontSurface`) and the
+ * measured intensity field (`metadata.fields.wavefrontIntensity`), aligned per
+ * snapshot. Returns null when either channel is absent or malformed, so the
+ * wavefront lens falls back to drawing rays without the intensity band.
+ */
+export function wavefrontField(trajectory: Trajectory): WavefrontField | null {
+  const fields = asRecord(trajectory.metadata?.fields);
+  if (!fields) {
+    return null;
+  }
+  const surface = asRecord(fields.wavefrontSurface);
+  const intensity = asRecord(fields.wavefrontIntensity);
+  if (!surface || !intensity) {
+    return null;
+  }
+  const points = surface.points;
+  const times = surface.time;
+  const values = intensity.values;
+  if (!Array.isArray(points) || !isNumberArray(times) || !Array.isArray(values)) {
+    return null;
+  }
+  const snapshots: WavefrontSnapshot[] = [];
+  const count = Math.min(points.length, times.length, values.length);
+  for (let s = 0; s < count; s += 1) {
+    const rawPoints = points[s];
+    const segments = values[s];
+    if (!Array.isArray(rawPoints) || !isNumberArray(segments)) {
+      continue;
+    }
+    const parsed = rawPoints.flatMap((point) => {
+      const tuple = asPoint2(point);
+      return tuple ? [tuple] : [];
+    });
+    if (parsed.length < 2) {
+      continue;
+    }
+    snapshots.push({ time: times[s], points: parsed, intensity: segments });
+  }
+  if (snapshots.length === 0) {
+    return null;
+  }
+  // Robust upper bound (95th percentile), mirroring the vector field's
+  // `robustMagnitudeMax`: a single caustic spike should not flatten the band.
+  const sorted = snapshots
+    .flatMap((snapshot) => snapshot.intensity)
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  const cutoff = sorted.length > 0 ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : 1;
+  return { snapshots, intensityMax: Math.max(cutoff, 1e-6) };
+}
+
 /** Renderer-only scene hints exported by Python alongside the trajectory. */
 export function rendererHints(trajectory: Trajectory): RendererHints {
   const raw = trajectory.metadata?.rendererHints;
