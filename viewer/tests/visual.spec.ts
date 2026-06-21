@@ -68,6 +68,8 @@ const threeJsSystems = [
   "bead-on-hoop",
   "lorenz-attractor",
   "henon-heiles",
+  "free-rigid-body",
+  "n-body-gravity",
 ];
 
 for (const viewport of [
@@ -75,6 +77,9 @@ for (const viewport of [
   { name: "mobile", width: 390, height: 844 },
 ]) {
   test(`renders all example systems at ${viewport.name}`, async ({ page }, testInfo) => {
+    // This test walks the full example gallery, so it runs longer than the
+    // 30s default; give it headroom as more systems land.
+    test.setTimeout(60_000);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto("/");
     // Boot straight into the Systems workbench — no splash gate, no gallery page.
@@ -245,6 +250,105 @@ for (const viewport of [
     await page.waitForTimeout(800);
     await expectCanvasNonBlank(page, "#hamiltonianScene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-symmetric-top-axis.png`) });
+
+    // The top's nutation-angle phase portrait renders on the generic 2D phase
+    // lens (no bespoke code — the exported projection drives it).
+    await page.getByRole("button", { name: "Nutation Phase" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-symmetric-top-nutation.png`) });
+
+    // The nutation effective potential renders on the shared data-driven
+    // effective-potential lens (exported V(theta) curve + energy line).
+    await page.getByRole("button", { name: "Effective Potential" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-symmetric-top-potential.png`) });
+
+    // The double pendulum's theta1 phase portrait also renders on the shared 2D
+    // phase lens.
+    await page.locator("#systemSelect").selectOption("double-pendulum");
+    await page.getByRole("button", { name: "Phase Portraits" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-double-pendulum-phase.png`) });
+
+    // Schwarzschild's GR effective potential renders from the exported relativistic
+    // V(r) curve, turning points, and orbit classification (same data-driven lens).
+    await page.locator("#systemSelect").selectOption("schwarzschild");
+    await page.getByRole("button", { name: "GR Effective Potential" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-schwarzschild-potential.png`) });
+
+    // FE-041: the free asymmetric top opens on its polhode lens — the
+    // momentum-sphere ∩ energy-ellipsoid construction with the tumbling body,
+    // drawn from the exported rigid-body geometry (a Three.js scene).
+    await page.locator("#systemSelect").selectOption("free-rigid-body");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-free-rigid-body-polhode.png`) });
+
+    // FE-042: the N-body gravity system opens on its orbit-trail lens — per-body
+    // trails framed on the center of mass, keyed by a categorical body legend.
+    await page.locator("#systemSelect").selectOption("n-body-gravity");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    const bodyLegend = page.locator(".body-legend");
+    await expect(bodyLegend).toBeVisible();
+    await expect(bodyLegend.locator(".body-legend__item")).toHaveCount(3);
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-n-body-figure-eight.png`) });
+
+    // The Sun–planets variant loads its own backend-generated data in place and
+    // still frames sensibly on the COM (no browser-side regeneration).
+    await page.getByRole("button", { name: "Sun + two planets" }).click();
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-n-body-sun-planets.png`) });
+
+    // Switching to a non-N-body system hides the body legend again.
+    await page.locator("#systemSelect").selectOption("free-rigid-body");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(400);
+    await expect(bodyLegend).toBeHidden();
+
+    // FE-043: the coupled-oscillator chain opens on its normal-mode lens — an
+    // animated mode shape on the 2D canvas with a mode selector and a
+    // superposition scrub, driven by the exported eigenvectors/frequencies.
+    await page.locator("#systemSelect").selectOption("coupled-oscillators");
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(600);
+    await expectCanvasNonBlank(page, "#scene");
+    const modeControls = page.locator("#modeControlsSection");
+    await expect(modeControls).toBeVisible();
+    await expect(modeControls.locator("#modeSelector .mode-switch__button")).toHaveCount(4);
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-coupled-oscillators-mode1.png`) });
+
+    // Selecting a higher mode and scrubbing the superposition keeps it rendering
+    // and updates the qualitative caption (no raw decimals).
+    await page.locator("#modeSelector .mode-switch__button").nth(2).click();
+    await page.locator("#modeBlend").evaluate((element) => {
+      const input = element as HTMLInputElement;
+      input.value = "0.5";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await page.waitForTimeout(600);
+    await expectCanvasNonBlank(page, "#scene");
+    await expect(page.locator("#modeBlendLabel")).toContainText("superpose");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-coupled-oscillators-superpose.png`) });
+
+    // Switching to a system without modes hides the mode controls again.
+    await page.locator("#systemSelect").selectOption("free-rigid-body");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(300);
+    await expect(modeControls).toBeHidden();
 
     // The hard top-level domain menu swaps to the Verification workbench, which
     // renders the exported verification-problem IR read-only.

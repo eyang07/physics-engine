@@ -206,3 +206,24 @@ export function gradientStops(colormap: Colormap, steps = 12): string[] {
   }
   return stops;
 }
+
+/**
+ * A small categorical palette for per-body / per-series rendering (e.g. the
+ * N-body orbit trails, FE-042). Distinct, stable hues indexed by body number;
+ * the index wraps if a system has more bodies than entries. These are data
+ * colors, not chrome, so they live here beside the colormaps.
+ */
+export const bodyPalette: readonly string[] = [
+  "#6fb6c9", // cool cyan
+  "#f0b46a", // warm amber
+  "#8ed081", // green
+  "#c78ed0", // violet
+  "#e8788a", // rose
+  "#d9c873", // gold
+];
+
+/** The categorical body color for a 0-based body index, wrapping the palette. */
+export function bodyColor(index: number): string {
+  const length = bodyPalette.length;
+  return bodyPalette[((index % length) + length) % length];
+}

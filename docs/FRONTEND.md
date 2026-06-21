@@ -62,6 +62,27 @@ and trajectory data; it must not re-derive physics.
   remains `external-required`.
 - Three.js scenes for configuration-space, phase-space, orbit, field, spring,
   and attractor views.
+- Rigid-body lenses driven by exported geometry: the heavy symmetric top's
+  attitude playback orients a reusable body primitive (`AttitudeBody`) from the
+  exported quaternion series, and the free asymmetric top's polhode lens draws
+  the angular-momentum sphere, kinetic-energy ellipsoid, and their intersection
+  (the polhode) from `metadata.rigidBodyGeometry`, highlighting the intermediate
+  principal axis so the intermediate-axis instability reads clearly. The viewer
+  renders the exported attitude and geometry; it never integrates Euler's
+  equations.
+- N-body orbit lens: the gravitational N-body systems draw one colored orbit
+  trail and a live marker per body, framed on the center of mass from the
+  exported COM-frame positions, with a categorical body legend keying the
+  palette. Backend-generated variants (figure-eight, Sun + two planets) load in
+  place. The viewer plots the exported trajectory; it never integrates the
+  N-body problem.
+- Normal-mode lens: the coupled-oscillator chain animates an exported mode shape
+  on the 2D canvas, with a mode selector and a superposition scrub that blends
+  toward the next mode (their frequencies beat). The mode shapes and frequencies
+  come from the backend small-oscillation eigenproblem (`manifest.normalModes`);
+  the viewer displays the exported eigenvectors at their exported frequencies and
+  never solves the eigenproblem. Frequencies stay qualitative — modes are numbered
+  low→high with no raw decimals on the stage.
 - Renderer-hint-based camera framing and a fit-to-system reset control.
 - Playwright visual regression coverage for all examples and fit-to-system
   behavior on desktop/mobile.

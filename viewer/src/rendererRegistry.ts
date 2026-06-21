@@ -30,6 +30,11 @@ export const CANVAS_LENS_IDS = new Set<string>([
   "henonHeilesPotential",
   "henonHeilesPoincare",
   "variableSpeedWavefront",
+  "symmetricTopNutationPhase",
+  "doublePendulumPhase",
+  "symmetricTopPotential",
+  "schwarzschildEffectivePotential",
+  "coupledOscillatorModes",
 ]);
 
 /** Lens ids drawn by a Three.js scene (`ThreeScene.setVisualization`). */
@@ -44,6 +49,8 @@ export const THREE_LENS_IDS = new Set<string>([
   "lorenzAttractor",
   "henonHeilesFlow",
   "symmetricTopAxis",
+  "freeRigidBodyPolhode",
+  "nBodyOrbits",
 ]);
 
 /** Resolve which stage primitive renders a lens, or `fallback` if none yet. */
