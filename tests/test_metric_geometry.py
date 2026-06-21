@@ -7,6 +7,7 @@ import sympy as sp
 from engine.dynamics import (
     MetricGeometry,
     schwarzschild_equatorial_metric,
+    schwarzschild_metric,
     two_sphere_metric,
 )
 from engine.numerics import integrate_fixed_step
@@ -168,6 +169,32 @@ def test_schwarzschild_equatorial_curvature_matches_reference() -> None:
     assert sp.simplify(ricci[1, 1] - rs / (2 * r**2 * (r - rs))) == 0
     assert sp.simplify(ricci[2, 2] + rs / r) == 0
     assert sp.simplify(geometry.scalar_curvature()) == 0
+
+
+def test_flat_metric_kretschmann_vanishes() -> None:
+    x, y, z = sp.symbols("x y z", real=True)
+    flat = MetricGeometry(coordinates=(x, y, z), metric=sp.eye(3))
+
+    assert flat.kretschmann_scalar() == 0
+
+
+def test_two_sphere_kretschmann_matches_constant_reference() -> None:
+    # A round 2-sphere of radius R has K = R_{abcd} R^{abcd} = 4 / R^4.
+    sphere = two_sphere_metric()
+    (radius,) = sphere.parameters
+
+    assert _trig_zero(sphere.kretschmann_scalar() - 4 / radius**4)
+
+
+def test_schwarzschild_kretschmann_matches_vacuum_invariant() -> None:
+    # The full (3+1)-dimensional Schwarzschild metric is Ricci-flat, so the
+    # Kretschmann scalar is the curvature invariant: K = 12 r_s^2 / r^6.
+    geometry = schwarzschild_metric()
+    _t, r, _theta, _phi = geometry.coordinates
+    (rs,) = geometry.parameters
+
+    assert sp.simplify(geometry.scalar_curvature()) == 0
+    assert sp.simplify(geometry.kretschmann_scalar() - 12 * rs**2 / r**6) == 0
 
 
 def test_schwarzschild_cogeodesic_hamiltonian() -> None:

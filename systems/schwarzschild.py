@@ -98,6 +98,31 @@ def embedding_xy(states: Sequence[Sequence[float]]) -> np.ndarray:
     return np.column_stack([r * np.cos(phi), r * np.sin(phi)])
 
 
+def flamm_embedding_z(
+    radius_values,
+    *,
+    schwarzschild_radius: float,
+) -> np.ndarray:
+    """Flamm-paraboloid embedding height ``z(r) = 2 sqrt(r_s (r - r_s))``.
+
+    The exterior equatorial spatial slice
+    ``ds^2 = dr^2 / (1 - r_s/r) + r^2 dphi^2`` embeds isometrically in Euclidean
+    3-space as the surface of revolution ``(r cos phi, r sin phi, z(r))`` whose
+    height profile is this Flamm paraboloid. It is real only outside the horizon
+    ``r > r_s`` (where ``1 - r_s/r > 0``); at ``r = r_s`` the height is zero but
+    the embedding slope diverges, marking the throat of the funnel.
+    """
+
+    if schwarzschild_radius <= 0.0:
+        raise ValueError("schwarzschild_radius must be positive")
+    radii = np.asarray(radius_values, dtype=float)
+    if np.any(radii < schwarzschild_radius):
+        raise ValueError(
+            "Flamm embedding radii must lie outside the horizon r >= r_s"
+        )
+    return 2.0 * np.sqrt(schwarzschild_radius * (radii - schwarzschild_radius))
+
+
 def conserved_series(
     states: Sequence[Sequence[float]],
     *,
@@ -298,6 +323,7 @@ __all__ = [
     "conserved_series",
     "domain_assumptions",
     "embedding_xy",
+    "flamm_embedding_z",
     "null_light_bending",
     "null_scattering_initial_state",
     "periapsis_precession",

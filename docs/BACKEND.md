@@ -57,7 +57,14 @@ artifacts.
   - Curvature exports for geometry examples: surface-of-revolution payloads
     include deterministic Gaussian-curvature scalar fields and measured
     Gauss-Bonnet quadrature diagnostics; Schwarzschild payloads include
-    deterministic Ricci and Kretschmann scalar fields.
+    deterministic Ricci and Kretschmann scalar fields, plus a Flamm-paraboloid
+    embedding mesh for the exterior `r > r_s` (`z = 2 sqrt(r_s (r - r_s))`) and a
+    Kretschmann scalar field aligned to that mesh for coloring the funnel.
+  - `MetricGeometry.kretschmann_scalar()` returns the symbolic curvature
+    invariant `R_abcd R^abcd`; with the full Schwarzschild metric
+    (`schwarzschild_metric`, the Ricci-flat 3+1 background) it equals the vacuum
+    value `12 r_s^2 / r^6` that the exported Schwarzschild curvature field is
+    validated against.
   - Effective-potential orbit helpers for Kepler and fixed-background
     Schwarzschild regimes: Python computes potential samples, analytic turning
     points, and qualitative orbit classification for renderer consumption.
@@ -131,6 +138,15 @@ artifacts.
     (`metadata.potentialPlots[name=wormhole_radial]`) and `classificationSource`
     (`metadata.orbitClassification`) expose the radial throat barrier, turning
     points, and a qualitative traversing/reflected class.
+  - Schwarzschild manifest entries may declare
+    `geometry.kind="schwarzschild-geodesic"` with sources for a Flamm-paraboloid
+    embedding mesh (`surface-mesh`), the geodesic lifted onto that funnel
+    (`embedded-polyline`), and a `scalar-field` `curvature` channel under
+    `metadata.schwarzschildGeometry`. The mesh and Kretschmann curvature samples
+    are deterministic symbolic evaluations sharing one `(r, phi)` grid; the mesh
+    stays strictly outside the horizon (`r > r_s`). The 1D radial Ricci /
+    Kretschmann profiles under `metadata.curvatureScalars` remain available as
+    top-level `fields`.
   - Fixed-background manifest entries may declare a `domain` channel
     (`kind="coordinate-domain"`, `source="trajectory.metadata.domain"`). The
     trajectory payload carries the matching `metadata.domain` descriptor: the

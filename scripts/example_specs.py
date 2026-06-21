@@ -150,6 +150,25 @@ def _surface_geodesic_geometry(system):
     }
 
 
+def _schwarzschild_geometry(system):
+    return {
+        "kind": "schwarzschild-geodesic",
+        "rendererHint": "schwarzschild-geodesic",
+        "embeddingMesh": {
+            "kind": "surface-mesh",
+            "source": "trajectory.metadata.schwarzschildGeometry.embeddingMesh",
+        },
+        "geodesic": {
+            "kind": "embedded-polyline",
+            "source": "trajectory.metadata.schwarzschildGeometry.geodesic",
+        },
+        "curvature": {
+            "kind": "scalar-field",
+            "source": "trajectory.metadata.schwarzschildGeometry.curvature",
+        },
+    }
+
+
 def _schwarzschild_state(system, name: str):
     return next(symbol for symbol in system.state if symbol.name == name)
 
@@ -898,6 +917,7 @@ SCHWARZSCHILD = SystemSpec(
     ),
     lenses=("schwarzschildOrbit", "schwarzschildEffectivePotential"),
     data_path="/data/schwarzschild.json",
+    geometry=_schwarzschild_geometry,
     effective_potentials=(
         EffectivePotential(
             name="schwarzschild_radial",

@@ -194,22 +194,7 @@ spacetimes, curvature, parallel transport, and orbital structure. Generalizes
 `systems/sphere_geodesic.py`, and gives the viewer curved-space trajectories and
 embedding diagrams._
 
-1. **BE-111: Export the Schwarzschild embedding mesh and curvature field**
-    - Goal: Give the Schwarzschild example the same embedding-mesh + colorable
-      curvature treatment the wormhole now has (BE-109), exporting a Flamm-paraboloid
-      embedding mesh for the exterior `r > r_s` and a curvature scalar field aligned to
-      that mesh so the curved-background gallery can render the funnel and color it by
-      curvature from Python-owned data.
-    - Scope: `systems/schwarzschild.py`, `scripts/generate_schwarzschild.py`,
-      `scripts/example_specs.py`, docs, and `tests/`.
-    - Acceptance: the embedding mesh matches the analytic Flamm paraboloid over the
-      exterior domain, the curvature field matches the `MetricGeometry` Kretschmann
-      scalar to tolerance over the mesh grid (the Ricci scalar vanishes in vacuum, so
-      Kretschmann is the curvature invariant used), the mesh stays outside the horizon,
-      the manifest declares the surface-mesh and scalar-field sources, and focused tests
-      plus generation pass.
-
-2. **BE-112: Export a non-radial Ellis-wormhole geodesic preset with turning points**
+1. **BE-112: Export a non-radial Ellis-wormhole geodesic preset with turning points**
     - Goal: Add an angular-momentum (`L != 0`) wormhole geodesic preset so the radial
       effective potential (BE-110) actually exhibits a reflected geodesic that turns
       around at the centrifugal barrier without crossing the throat, giving the viewer a
@@ -221,6 +206,19 @@ embedding diagrams._
       match the integrated radial extrema to tolerance, the exported classification reads
       `reflected`, the measured throat-traversal diagnostic agrees (does not cross), the
       manifest declares the variant, and focused tests plus generation pass.
+
+2. **BE-113: Export a measured geodesic-deviation diagnostic for the Schwarzschild bound orbit**
+    - Goal: Give the Schwarzschild bound-timelike preset the same measured
+      geodesic-deviation diagnostic the wormhole already exports, integrating a nearby
+      equatorial geodesic and recording the metric separation/focusing series along the
+      orbit so the viewer can show tidal convergence/divergence from Python-owned data.
+    - Scope: `scripts/generate_schwarzschild.py` (reuse
+      `MetricGeometry.geodesic_deviation_diagnostic` from the equatorial metric),
+      `scripts/example_specs.py` (declare the diagnostic source), docs, and `tests/`.
+    - Acceptance: the timelike payload carries a `diagnostics.geodesicDeviation`
+      block with `rigor="measured"`, the separation series is finite and starts from the
+      recorded initial offset, the neighbor stays outside the horizon, the manifest
+      declares the diagnostic source, and focused tests plus generation pass.
 
 ### Verification track (paused)
 

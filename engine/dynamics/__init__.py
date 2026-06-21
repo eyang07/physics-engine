@@ -38,6 +38,7 @@ from engine.dynamics.media import (
 from engine.dynamics.metric import (
     MetricGeometry,
     schwarzschild_equatorial_metric,
+    schwarzschild_metric,
     two_sphere_metric,
 )
 from engine.dynamics.orbits import (
@@ -138,6 +139,7 @@ __all__ = [
     "rollout",
     "sample_obligation",
     "schwarzschild_equatorial_metric",
+    "schwarzschild_metric",
     "schwarzschild_effective_potential_values",
     "schwarzschild_turning_points",
     "two_sphere_metric",

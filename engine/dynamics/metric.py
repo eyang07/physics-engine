@@ -206,6 +206,53 @@ class MetricGeometry:
             sum(inverse[i, j] * ricci[i, j] for i in range(n) for j in range(n))
         )
 
+    def kretschmann_scalar(self) -> sp.Expr:
+        """Kretschmann scalar ``R_{abcd} R^{abcd}``.
+
+        The fully contracted square of the Riemann tensor: the
+        contravariant index of :meth:`riemann_tensor` is lowered with the
+        metric, the tensor is then raised on every index, and the two are
+        contracted. Unlike the scalar curvature it does not vanish in vacuum,
+        so it is the natural curvature invariant for Ricci-flat backgrounds
+        such as Schwarzschild (where ``R_{abcd} R^{abcd} = 12 r_s^2 / r^6``).
+        """
+
+        n = self.dimension
+        g = self.metric
+        g_inv = self.inverse_metric()
+        riemann = self.riemann_tensor()
+        lowered = [
+            [
+                [
+                    [
+                        sum(g[rho, lam] * riemann[lam, sigma, mu, nu] for lam in range(n))
+                        for nu in range(n)
+                    ]
+                    for mu in range(n)
+                ]
+                for sigma in range(n)
+            ]
+            for rho in range(n)
+        ]
+        total = sp.Integer(0)
+        for a in range(n):
+            for b in range(n):
+                for c in range(n):
+                    for d in range(n):
+                        raised = sum(
+                            g_inv[a, e]
+                            * g_inv[b, f]
+                            * g_inv[c, h]
+                            * g_inv[d, k]
+                            * lowered[e][f][h][k]
+                            for e in range(n)
+                            for f in range(n)
+                            for h in range(n)
+                            for k in range(n)
+                        )
+                        total += lowered[a][b][c][d] * raised
+        return _trig_simplify(total)
+
     def geodesic_system(self) -> FirstOrderSystem:
         """The geodesic equation as a first-order system in ``(q, q_dot)``.
 
@@ -458,6 +505,35 @@ def schwarzschild_equatorial_metric(
     )
 
 
+def schwarzschild_metric(
+    schwarzschild_radius: sp.Expr | float | None = None,
+) -> MetricGeometry:
+    """Full Schwarzschild metric in coordinates ``(t, r, theta, phi)``.
+
+    ``ds^2 = -(1 - rs/r) dt^2 + dr^2 / (1 - rs/r)
+    + r^2 (dtheta^2 + sin(theta)^2 dphi^2)`` in geometrized units
+    ``G = c = 1``. Unlike :func:`schwarzschild_equatorial_metric` this keeps the
+    full 2-sphere factor, so it is Ricci-flat and its curvature invariant is the
+    vacuum Kretschmann scalar ``12 rs^2 / r^6``.
+    """
+
+    rs = (
+        sp.Symbol("r_s", positive=True)
+        if schwarzschild_radius is None
+        else schwarzschild_radius
+    )
+    t = sp.Symbol("t", real=True)
+    r = sp.Symbol("r", positive=True)
+    theta = sp.Symbol("theta", real=True)
+    phi = sp.Symbol("phi", real=True)
+    factor = 1 - rs / r
+    return MetricGeometry(
+        coordinates=(t, r, theta, phi),
+        metric=sp.diag(-factor, 1 / factor, r**2, r**2 * sp.sin(theta) ** 2),
+        parameters=(rs,) if isinstance(rs, sp.Symbol) else (),
+    )
+
+
 def two_sphere_metric(radius: sp.Expr | float | None = None) -> MetricGeometry:
     """Round-sphere metric ``ds^2 = R^2 (dtheta^2 + sin(theta)^2 dphi^2)``."""
 
@@ -474,5 +550,6 @@ def two_sphere_metric(radius: sp.Expr | float | None = None) -> MetricGeometry:
 __all__ = [
     "MetricGeometry",
     "schwarzschild_equatorial_metric",
+    "schwarzschild_metric",
     "two_sphere_metric",
 ]

@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 import sympy as sp
 
+from engine.dynamics import schwarzschild_metric
 from engine.export.manifest import system_entry
 from scripts.example_specs import SCHWARZSCHILD
 from scripts.generate_schwarzschild import (
@@ -16,6 +17,7 @@ from systems.schwarzschild import (
     assert_outside_horizon,
     build_system,
     domain_assumptions,
+    flamm_embedding_z,
     kretschmann_scalar_values,
     null_light_bending,
     null_scattering_initial_state,
@@ -183,6 +185,109 @@ def test_schwarzschild_curvature_scalars_match_vacuum_closed_forms() -> None:
     assert np.allclose(
         kretschmann_scalar_values(radii, schwarzschild_radius=2.0),
         12.0 * 2.0**2 / radii**6,
+    )
+
+
+def test_flamm_embedding_rejects_interior_radii() -> None:
+    assert np.allclose(
+        flamm_embedding_z([2.0, 6.0], schwarzschild_radius=2.0),
+        [0.0, 2.0 * np.sqrt(2.0 * 4.0)],
+    )
+    with pytest.raises(ValueError, match="outside the horizon"):
+        flamm_embedding_z([1.5], schwarzschild_radius=2.0)
+
+
+def test_schwarzschild_exports_flamm_embedding_mesh() -> None:
+    trajectory = generate_schwarzschild_trajectory(kind="timelike")
+    geometry = trajectory.metadata["schwarzschildGeometry"]
+    mesh = geometry["embeddingMesh"]
+
+    assert geometry["kind"] == "schwarzschild-geodesic"
+    assert mesh["kind"] == "surface-mesh"
+    assert mesh["rendererHint"] == "schwarzschild-geodesic"
+    assert mesh["evaluation"] == "symbolic-exact"
+    assert mesh["horizonRadius"] == 2.0
+
+    r_axis = np.asarray(mesh["axes"][0], dtype=float)
+    phi_axis = np.asarray(mesh["axes"][1], dtype=float)
+    points = np.asarray(mesh["points"], dtype=float)
+
+    # The whole mesh lies strictly outside the horizon and spans the geodesic.
+    assert r_axis.min() > mesh["horizonRadius"]
+    assert r_axis.max() > float(np.max(trajectory.states[:, 1]))
+    assert points.shape == (len(r_axis), len(phi_axis), 3)
+    assert np.asarray(mesh["triangles"], dtype=int).shape[1] == 3
+
+    # The mesh is the analytic Flamm paraboloid of revolution: cylindrical
+    # radius matches r and height matches z(r) = 2 sqrt(r_s (r - r_s)).
+    r_grid, phi_grid = np.meshgrid(r_axis, phi_axis, indexing="ij")
+    assert np.allclose(np.hypot(points[..., 0], points[..., 1]), r_grid)
+    assert np.allclose(
+        points[..., 2], flamm_embedding_z(r_grid, schwarzschild_radius=2.0)
+    )
+
+    # The geodesic is lifted onto the funnel using the same height profile.
+    geodesic = np.asarray(geometry["geodesic"]["points"], dtype=float)
+    radii = trajectory.states[:, 1]
+    assert geodesic.shape == (len(radii), 3)
+    assert np.allclose(
+        geodesic[:, 2], flamm_embedding_z(radii, schwarzschild_radius=2.0)
+    )
+
+
+def test_schwarzschild_curvature_field_matches_metric_geometry_kretschmann() -> None:
+    trajectory = generate_schwarzschild_trajectory(kind="timelike")
+    geometry = trajectory.metadata["schwarzschildGeometry"]
+    curvature = geometry["curvature"]
+    mesh = geometry["embeddingMesh"]
+
+    assert curvature["kind"] == "scalar-field"
+    assert curvature["rendererHint"] == "scalar-field"
+    assert curvature["name"] == "kretschmannScalar"
+    assert curvature["coordinates"] == ["r", "phi"]
+    assert curvature["evaluation"] == "symbolic-exact"
+
+    # The curvature grid aligns vertex-for-vertex with the embedding mesh.
+    assert curvature["shape"] == mesh["shape"]
+    r_axis = np.asarray(curvature["axes"][0], dtype=float)
+    phi_axis = np.asarray(curvature["axes"][1], dtype=float)
+    assert np.allclose(r_axis, np.asarray(mesh["axes"][0], dtype=float))
+    assert np.allclose(phi_axis, np.asarray(mesh["axes"][1], dtype=float))
+    values = np.asarray(curvature["values"], dtype=float)
+    assert values.shape == (len(r_axis), len(phi_axis))
+
+    # The exported field matches the Kretschmann scalar of the full vacuum
+    # Schwarzschild metric computed symbolically by MetricGeometry; the Ricci
+    # scalar vanishes, so Kretschmann is the curvature invariant.
+    metric = schwarzschild_metric(2.0)
+    _t, r_symbol, _theta, _phi = metric.coordinates
+    assert sp.simplify(metric.scalar_curvature()) == 0
+    kretschmann_fn = sp.lambdify(r_symbol, metric.kretschmann_scalar(), modules="numpy")
+    r_grid, _phi_grid = np.meshgrid(r_axis, phi_axis, indexing="ij")
+    assert np.allclose(values, kretschmann_fn(r_grid))
+
+    # No phi dependence: curvature is broadcast across the azimuthal axis and
+    # decays monotonically outward from the throat.
+    assert np.allclose(values, values[:, :1])
+    assert values[0, 0] > values[-1, 0]
+
+
+def test_schwarzschild_manifest_declares_embedding_and_curvature_sources() -> None:
+    entry = system_entry(SCHWARZSCHILD)
+    geometry = entry["geometry"]
+
+    assert geometry["kind"] == "schwarzschild-geodesic"
+    assert geometry["rendererHint"] == "schwarzschild-geodesic"
+    assert geometry["embeddingMesh"] == {
+        "kind": "surface-mesh",
+        "source": "trajectory.metadata.schwarzschildGeometry.embeddingMesh",
+    }
+    assert geometry["curvature"] == {
+        "kind": "scalar-field",
+        "source": "trajectory.metadata.schwarzschildGeometry.curvature",
+    }
+    assert geometry["geodesic"]["source"] == (
+        "trajectory.metadata.schwarzschildGeometry.geodesic"
     )
 
 

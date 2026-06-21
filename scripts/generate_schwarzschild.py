@@ -20,6 +20,7 @@ from systems.schwarzschild import (
     conserved_series,
     domain_assumptions,
     embedding_xy,
+    flamm_embedding_z,
     kretschmann_scalar_values,
     null_light_bending,
     null_scattering_initial_state,
@@ -141,6 +142,155 @@ def _curvature_scalar_fields(
     }
 
 
+def _embedding_mesh_axes(
+    *,
+    schwarzschild_radius: float,
+    max_radius: float,
+    r_count: int = 72,
+    phi_count: int = 64,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Shared ``(r, phi)`` sampling for the Flamm mesh and its curvature field.
+
+    The radial axis starts just outside the horizon so the funnel throat is
+    sampled while the mesh stays strictly in the exterior chart ``r > r_s``, and
+    extends past the geodesic so the orbit sits on the rendered surface. The
+    curvature grid reuses this axis so it aligns vertex-for-vertex with the mesh
+    the viewer colors.
+    """
+
+    r_lower = schwarzschild_radius * 1.001
+    r_upper = max(max_radius * 1.15, schwarzschild_radius * 6.0)
+    r_axis = np.linspace(r_lower, r_upper, r_count)
+    phi_axis = np.linspace(0.0, 2.0 * np.pi, phi_count)
+    return r_axis, phi_axis
+
+
+def _embedding_mesh(
+    *,
+    schwarzschild_radius: float,
+    max_radius: float,
+    r_count: int = 72,
+    phi_count: int = 64,
+) -> dict[str, object]:
+    """Flamm-paraboloid embedding mesh of the exterior equatorial slice.
+
+    The surface of revolution ``(r cos phi, r sin phi, z(r))`` with
+    ``z(r) = 2 sqrt(r_s (r - r_s))`` is the exact isometric embedding of the
+    exterior spatial slice; the points are deterministic given the axes, not
+    measured numerical evidence.
+    """
+
+    r_axis, phi_axis = _embedding_mesh_axes(
+        schwarzschild_radius=schwarzschild_radius,
+        max_radius=max_radius,
+        r_count=r_count,
+        phi_count=phi_count,
+    )
+    r_grid, phi_grid = np.meshgrid(r_axis, phi_axis, indexing="ij")
+    z = flamm_embedding_z(r_grid, schwarzschild_radius=schwarzschild_radius)
+    points = np.stack(
+        [r_grid * np.cos(phi_grid), r_grid * np.sin(phi_grid), z], axis=-1
+    )
+    triangles: list[list[int]] = []
+    for r_index in range(r_count - 1):
+        for phi_index in range(phi_count - 1):
+            lower_left = r_index * phi_count + phi_index
+            lower_right = lower_left + 1
+            upper_left = lower_left + phi_count
+            upper_right = upper_left + 1
+            triangles.append([lower_left, upper_left, lower_right])
+            triangles.append([lower_right, upper_left, upper_right])
+    return {
+        "kind": "surface-mesh",
+        "rendererHint": "schwarzschild-geodesic",
+        "coordinates": ["r", "phi"],
+        "axes": [r_axis.astype(float).tolist(), phi_axis.astype(float).tolist()],
+        "shape": [r_count, phi_count],
+        "points": points.astype(float).tolist(),
+        "triangles": triangles,
+        "horizonRadius": float(schwarzschild_radius),
+        "evaluation": "symbolic-exact",
+    }
+
+
+def _embedding_curvature_field(
+    *,
+    schwarzschild_radius: float,
+    max_radius: float,
+    r_count: int = 72,
+    phi_count: int = 64,
+) -> dict[str, object]:
+    """Kretschmann scalar samples aligned to the Flamm embedding mesh.
+
+    The Schwarzschild spacetime is vacuum, so the Ricci scalar vanishes and the
+    Kretschmann invariant ``R_abcd R^abcd = 12 r_s^2 / r^6`` is the curvature
+    used to color the funnel. The values depend only on ``r`` and are broadcast
+    across ``phi`` to match the mesh grid; they are exact symbolic evaluations,
+    extremal at the throat and decaying outward.
+    """
+
+    r_axis, phi_axis = _embedding_mesh_axes(
+        schwarzschild_radius=schwarzschild_radius,
+        max_radius=max_radius,
+        r_count=r_count,
+        phi_count=phi_count,
+    )
+    r_grid, _phi_grid = np.meshgrid(r_axis, phi_axis, indexing="ij")
+    values = kretschmann_scalar_values(
+        r_grid, schwarzschild_radius=schwarzschild_radius
+    )
+    return {
+        "kind": "scalar-field",
+        "rendererHint": "scalar-field",
+        "name": "kretschmannScalar",
+        "coordinates": ["r", "phi"],
+        "axes": [r_axis.astype(float).tolist(), phi_axis.astype(float).tolist()],
+        "shape": [r_count, phi_count],
+        "values": values.astype(float).tolist(),
+        "quantity": "Kretschmann scalar",
+        "horizon": {
+            "r": float(schwarzschild_radius),
+            "kretschmannScalar": float(values[0, 0]),
+            "description": "curvature peaks near the horizon and decays as r^-6",
+        },
+        "evaluation": "symbolic-exact",
+    }
+
+
+def _schwarzschild_geometry(
+    intrinsic_states: np.ndarray,
+    positions: np.ndarray,
+    *,
+    schwarzschild_radius: float,
+) -> dict[str, object]:
+    """Funnel embedding mesh, curvature field, and the geodesic on the funnel."""
+
+    max_radius = float(np.max(intrinsic_states[:, 1]))
+    funnel_z = flamm_embedding_z(
+        intrinsic_states[:, 1], schwarzschild_radius=schwarzschild_radius
+    )
+    geodesic_points = np.column_stack([positions, funnel_z])
+    return {
+        "kind": "schwarzschild-geodesic",
+        "rendererHint": "schwarzschild-geodesic",
+        "schwarzschildRadius": schwarzschild_radius,
+        "embeddingMesh": _embedding_mesh(
+            schwarzschild_radius=schwarzschild_radius, max_radius=max_radius
+        ),
+        "curvature": _embedding_curvature_field(
+            schwarzschild_radius=schwarzschild_radius, max_radius=max_radius
+        ),
+        "geodesic": {
+            "kind": "embedded-polyline",
+            "rendererHint": "schwarzschild-geodesic",
+            "coordinates": ["x", "y", "z"],
+            "source": "trajectory.metadata.schwarzschildGeometry.geodesic",
+            "points": geodesic_points.astype(float).tolist(),
+            "evaluation": "integrated-geodesic-embedding",
+        },
+    }
+
+
 def generate_schwarzschild_trajectory(
     *,
     kind: SchwarzschildGeodesicKind = "timelike",
@@ -237,6 +387,11 @@ def generate_schwarzschild_trajectory(
         "orbitClassification": classification,
         "curvatureScalars": _curvature_scalar_fields(
             radius_values=intrinsic_states[:, 1],
+            schwarzschild_radius=schwarzschild_radius,
+        ),
+        "schwarzschildGeometry": _schwarzschild_geometry(
+            intrinsic_states,
+            positions,
             schwarzschild_radius=schwarzschild_radius,
         ),
         "diagnostics": diagnostics,
