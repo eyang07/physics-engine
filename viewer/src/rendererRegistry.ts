@@ -36,6 +36,8 @@ export const CANVAS_LENS_IDS = new Set<string>([
   "schwarzschildEffectivePotential",
   "coupledOscillatorModes",
   "electromagneticField",
+  "vibratingString",
+  "wavePacket",
 ]);
 
 /** Lens ids drawn by a Three.js scene (`ThreeScene.setVisualization`). */

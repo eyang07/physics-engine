@@ -25,13 +25,21 @@ import { drawPoincareSectionScene } from "./poincareSectionCanvas";
 import { drawNormalModeScene } from "./normalModeCanvas";
 import { drawScalarFieldScene, fieldPlotArea } from "./scalarFieldCanvas";
 import { drawVectorFieldOverlay, robustMagnitudeMax } from "./vectorFieldCanvas";
+import { drawWaveScene } from "./waveCanvas";
 import { VerificationPanel } from "./verificationPanel";
 import { VerificationStage } from "./verificationStage";
 import { resolveRendererSurface } from "./rendererRegistry";
 import { createScalarLegend } from "./scalarLegend";
 import { createBodyLegend } from "./bodyLegend";
 import { bodyColor, magma, scalarScale, viridis } from "./design/colormaps";
-import { fieldLines, nBodyConfig, scalarField, vectorField } from "./data/trajectory";
+import {
+  fieldLines,
+  nBodyConfig,
+  scalarField,
+  scalarFieldSeriesList,
+  type ScalarFieldSeries,
+  vectorField,
+} from "./data/trajectory";
 import {
   loadVerificationAdapterStubs,
   loadVerificationIndex,
@@ -60,7 +68,9 @@ type CanvasMode =
   | "henonHeilesPotential"
   | "henonHeilesPoincare"
   | "variableSpeedWavefront"
-  | "electromagneticField";
+  | "electromagneticField"
+  | "vibratingString"
+  | "wavePacket";
 
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -95,6 +105,8 @@ const systemSelect = requireElement<HTMLSelectElement>("#systemSelect");
 const visualizationModes = requireElement<HTMLElement>("#visualizationModes");
 const variantSection = requireElement<HTMLElement>("#variantSection");
 const variantModes = requireElement<HTMLElement>("#variantModes");
+const waveSeriesSection = requireElement<HTMLElement>("#waveSeriesSection");
+const waveSeriesModes = requireElement<HTMLElement>("#waveSeries");
 const modeControlsSection = requireElement<HTMLElement>("#modeControlsSection");
 const modeSelector = requireElement<HTMLElement>("#modeSelector");
 const modeBlend = requireElement<HTMLInputElement>("#modeBlend");
@@ -173,6 +185,9 @@ let selectedVisualization: ManifestLens | null = null;
 let selectedVariant: ManifestParameterVariant | null = null;
 // The selected normal mode for the normal-mode lens (0-based, ascending freq).
 let selectedModeIndex = 0;
+// The selected 1D wave series (FE-046) for a field-evolution lens, e.g. the
+// string's standing vs traveling solution (0-based, declaration order).
+let selectedSeriesIndex = 0;
 let trajectory: Trajectory | null = null;
 let pendulumBounds: Bounds | null = null;
 // Monotonic guard so a slow trajectory load can't overwrite a newer selection.
@@ -519,6 +534,44 @@ function updateModeBlendLabel(modes: ManifestNormalModes) {
   }
 }
 
+// The exported 1D wave series for the active field-evolution lens (FE-046), or
+// an empty array for any other lens. A system can export several (standing vs
+// traveling string; packet amplitude vs envelope intensity), toggled on stage.
+function activeWaveSeries(): ScalarFieldSeries[] {
+  if (!trajectory || selectedVisualization?.kind !== "field-evolution") {
+    return [];
+  }
+  return scalarFieldSeriesList(trajectory);
+}
+
+function renderWaveSeriesControls() {
+  const series = activeWaveSeries();
+  // A toggle only earns its place when there is more than one series to choose.
+  waveSeriesSection.hidden = series.length < 2;
+  waveSeriesModes.replaceChildren();
+  if (series.length < 2) {
+    return;
+  }
+  if (selectedSeriesIndex >= series.length) {
+    selectedSeriesIndex = 0;
+  }
+  series.forEach((entry, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "mode-switch__button";
+    button.textContent = humanizeFieldName(entry.name);
+    button.classList.toggle("mode-switch__button--active", index === selectedSeriesIndex);
+    button.addEventListener("click", () => {
+      if (index === selectedSeriesIndex) {
+        return;
+      }
+      selectedSeriesIndex = index;
+      renderWaveSeriesControls();
+    });
+    waveSeriesModes.append(button);
+  });
+}
+
 function renderModeControls() {
   const modes = activeNormalModes();
   modeControlsSection.hidden = modes === null;
@@ -655,6 +708,9 @@ function applyVisualization() {
 
   // The normal-mode selector + superposition scrub show only for the mode lens.
   renderModeControls();
+  // The 1D wave series toggle (standing/traveling, amplitude/intensity) shows
+  // only for a field-evolution lens carrying more than one exported series.
+  renderWaveSeriesControls();
 }
 
 async function selectExample(exampleId: string) {
@@ -666,6 +722,7 @@ async function selectExample(exampleId: string) {
   selectedVisualization = lensFor(nextExample.lenses[0]);
   selectedVariant = defaultVariant(nextExample);
   selectedModeIndex = 0;
+  selectedSeriesIndex = 0;
   modeBlend.value = "0";
   systemTitle.textContent = nextExample.title;
   systemSelect.value = nextExample.id;
@@ -801,6 +858,15 @@ function render(now: number) {
     drawWavefrontScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else if (selectedVisualization.id === "henonHeilesPoincare") {
     drawPoincareSectionScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
+  } else if (isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "field-evolution") {
+    resize2dCanvas();
+    const series = scalarFieldSeriesList(trajectory);
+    const active = series[selectedSeriesIndex] ?? series[0];
+    if (active) {
+      drawWaveScene(ctx, active, time, canvas.clientWidth, canvas.clientHeight);
+    } else {
+      drawFallbackStage(selectedVisualization.title, canvas.clientWidth, canvas.clientHeight);
+    }
   } else if (selectedVisualization.kind === "normal-modes" && selectedExample?.normalModes) {
     resize2dCanvas();
     drawNormalModeScene(

@@ -376,6 +376,43 @@ for (const viewport of [
     await expect(scalarLegend).toBeHidden();
     await expect(magnitudeLegend).toBeHidden();
 
+    // FE-046: the vibrating string opens on its 1D wave lens — an animated
+    // displacement curve from the exported series, with a standing/traveling
+    // toggle (two exported solutions).
+    await page.locator("#systemSelect").selectOption("vibrating-string");
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    const waveSeries = page.locator("#waveSeriesSection");
+    await expect(waveSeries).toBeVisible();
+    await expect(waveSeries.locator(".mode-switch__button")).toHaveCount(2);
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-vibrating-string-standing.png`) });
+
+    // Toggling to the traveling solution keeps the lens animating from exported
+    // data.
+    await page.getByRole("button", { name: "traveling displacement" }).click();
+    await page.waitForTimeout(400);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-vibrating-string-traveling.png`) });
+
+    // FE-046: the dispersive wave packet animates its exported amplitude /
+    // envelope-intensity series (the envelope spreads over time).
+    await page.locator("#systemSelect").selectOption("wave-packet");
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await expect(waveSeries.locator(".mode-switch__button")).toHaveCount(2);
+    await page.getByRole("button", { name: "intensity" }).click();
+    await page.waitForTimeout(400);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-wave-packet.png`) });
+
+    // Switching to a system without a wave series hides the toggle again.
+    await page.locator("#systemSelect").selectOption("free-rigid-body");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(300);
+    await expect(waveSeries).toBeHidden();
+
     // The hard top-level domain menu swaps to the Verification workbench, which
     // renders the exported verification-problem IR read-only.
     await page.getByRole("button", { name: "Verification" }).click();

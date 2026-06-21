@@ -160,6 +160,29 @@ export type FieldLines = {
   lines: [number, number][][];
 };
 
+/**
+ * A 1D scalar field sampled over a coordinate and a sequence of times that Python
+ * evaluated and exported under `metadata.fields.<name>` (BE-094 string, BE-096
+ * wave packet). `values[t][i]` is the displacement/amplitude at time `times[t]`
+ * and position `axis[i]`. The 1D wave lens (FE-046) animates these frames; it
+ * plays back the exported series and never re-solves the wave equation.
+ */
+export type ScalarFieldSeries = {
+  name: string;
+  /** The single spatial coordinate name, e.g. "x". */
+  coordinate: string;
+  /** Sample positions along the coordinate. */
+  axis: number[];
+  /** Sample times, one per frame. */
+  times: number[];
+  /** `[frameCount, sampleCount]`. */
+  shape: [number, number];
+  /** Field values per frame: `values[t][i]`. */
+  values: number[][];
+  /** The solution variant Python tagged, e.g. a standing vs traveling label. */
+  variant?: string;
+};
+
 /** Map each state-variable name to its column index in `states`. */
 export function stateIndex(trajectory: Trajectory): Map<string, number> {
   const index = new Map<string, number>();
@@ -754,6 +777,50 @@ export function fieldLines(trajectory: Trajectory, preferredName?: string): Fiel
     return { name, lines: parsed };
   }
   return null;
+}
+
+/**
+ * Read every 1D scalar-field time series Python exported under `metadata.fields`
+ * (kind `scalar-field-series`), in declaration order. A system can carry more
+ * than one (a standing and a traveling string solution; a packet amplitude and
+ * its envelope intensity), so the wave lens offers a toggle between them. Returns
+ * an empty array when none are present or well-formed.
+ */
+export function scalarFieldSeriesList(trajectory: Trajectory): ScalarFieldSeries[] {
+  const out: ScalarFieldSeries[] = [];
+  for (const [name, raw] of fieldsByKind(trajectory, "scalar-field-series")) {
+    const { axes, time, values } = raw;
+    if (!Array.isArray(axes) || axes.length < 1 || !isNumberArray(axes[0])) {
+      continue;
+    }
+    if (!isNumberArray(time) || !Array.isArray(values) || !values.every(isNumberArray)) {
+      continue;
+    }
+    const axis = axes[0];
+    const frameCount = time.length;
+    const sampleCount = axis.length;
+    if (
+      frameCount < 1 ||
+      sampleCount < 2 ||
+      values.length !== frameCount ||
+      !values.every((row) => row.length === sampleCount)
+    ) {
+      continue;
+    }
+    const coords = Array.isArray(raw.coordinates)
+      ? raw.coordinates.filter((item): item is string => typeof item === "string")
+      : [];
+    out.push({
+      name,
+      coordinate: coords[0] ?? "x",
+      axis,
+      times: time,
+      shape: [frameCount, sampleCount],
+      values: values as number[][],
+      variant: typeof raw.variant === "string" ? raw.variant : undefined,
+    });
+  }
+  return out;
 }
 
 /** Renderer-only scene hints exported by Python alongside the trajectory. */
