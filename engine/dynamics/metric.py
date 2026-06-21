@@ -13,6 +13,8 @@ derives:
 - the cogeodesic Hamiltonian flow on the cotangent side, via
   :class:`~engine.dynamics.media.InverseMetricMedium`, to which the existing
   ray-bundle and ray-diagnostics utilities apply directly;
+- measured geodesic-deviation diagnostics from pairs of sampled geodesic
+  rollouts;
 - a metric-compatibility residual ``nabla g`` that must vanish identically,
   as a self-check suitable for proof-obligation-style artifacts.
 
@@ -305,6 +307,98 @@ class MetricGeometry:
             k4 = rhs(q1, tangent, current + ds * k3)
             transported[index + 1] = current + ds * (k1 + 2 * k2 + 2 * k3 + k4) / 6.0
         return transported
+
+    def geodesic_deviation_diagnostic(
+        self,
+        parameter: Sequence[float],
+        reference_states: Sequence[Sequence[float]],
+        neighboring_states: Sequence[Sequence[float]],
+        *,
+        parameter_values: dict[str, float] | None = None,
+    ) -> dict[str, object]:
+        """Measured separation/focusing diagnostic for nearby geodesic rollouts.
+
+        Separation is computed from the coordinate displacement using the metric
+        at the reference geodesic sample. This is a finite-rollout diagnostic,
+        not a symbolic Jacobi-field proof.
+        """
+
+        samples = np.asarray(parameter, dtype=float)
+        reference = np.asarray(reference_states, dtype=float)
+        neighboring = np.asarray(neighboring_states, dtype=float)
+        if samples.ndim != 1:
+            raise ValueError("parameter samples must be one-dimensional")
+        if reference.shape != neighboring.shape:
+            raise ValueError("reference and neighboring states must have the same shape")
+        if reference.ndim != 2 or reference.shape[0] != len(samples):
+            raise ValueError("states must have shape (sample, state)")
+        if reference.shape[1] < self.dimension:
+            raise ValueError("states must include the metric coordinates")
+        if len(samples) < 2:
+            raise ValueError("geodesic deviation needs at least two samples")
+        if np.any(np.diff(samples) <= 0.0):
+            raise ValueError("parameter samples must be strictly increasing")
+
+        reference_coordinates = reference[:, : self.dimension]
+        neighboring_coordinates = neighboring[:, : self.dimension]
+        coordinate_delta = neighboring_coordinates - reference_coordinates
+        metric_values = list(self.metric)
+        metric_function = sp.lambdify(
+            (*self.coordinates, *(self.parameters or ())),
+            metric_values,
+            modules="numpy",
+        )
+        parameter_args = [
+            float((parameter_values or {})[symbol.name])
+            for symbol in (self.parameters or ())
+        ]
+        raw_values = metric_function(
+            *(reference_coordinates[:, axis] for axis in range(self.dimension)),
+            *parameter_args,
+        )
+        components = [
+            np.broadcast_to(np.asarray(value, dtype=float), (len(samples),))
+            for value in raw_values
+        ]
+        metric_samples = np.stack(components, axis=1).reshape(
+            len(samples),
+            self.dimension,
+            self.dimension,
+        )
+        signed_squared = np.einsum(
+            "ni,nij,nj->n",
+            coordinate_delta,
+            metric_samples,
+            coordinate_delta,
+        )
+        if np.any(signed_squared < -1e-12):
+            raise ValueError("metric separation became timelike/negative")
+        separation = np.sqrt(np.maximum(signed_squared, 0.0))
+        initial = float(separation[0])
+        if initial <= 0.0:
+            raise ValueError("nearby geodesics must start with positive separation")
+        relative = separation / initial
+        min_index = int(np.argmin(relative))
+        max_index = int(np.argmax(relative))
+        return {
+            "kind": "geodesic-deviation",
+            "rendererHint": "geodesic-deviation",
+            "coordinates": [symbol.name for symbol in self.coordinates],
+            "parameter": samples.astype(float).tolist(),
+            "separation": separation.astype(float).tolist(),
+            "relativeSeparation": relative.astype(float).tolist(),
+            "initialSeparation": initial,
+            "finalSeparation": float(separation[-1]),
+            "minRelativeSeparation": float(relative[min_index]),
+            "maxRelativeSeparation": float(relative[max_index]),
+            "minParameter": float(samples[min_index]),
+            "maxParameter": float(samples[max_index]),
+            "coordinateDelta": coordinate_delta.astype(float).tolist(),
+            "signedSquaredSeparation": signed_squared.astype(float).tolist(),
+            "evaluation": "measured-nearby-geodesic-rollout",
+            "rigor": "measured",
+            "note": "Measured rollout diagnostic only; not a proof of geodesic deviation.",
+        }
 
     def oriented_angle_2d(
         self,

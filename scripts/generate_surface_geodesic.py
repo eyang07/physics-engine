@@ -336,6 +336,28 @@ def _parallel_transport_payload(
     }
 
 
+def _geodesic_deviation_payload(
+    surface: SurfaceOfRevolution,
+    time: np.ndarray,
+    intrinsic_states: np.ndarray,
+) -> dict[str, object]:
+    initial = intrinsic_states[0].copy()
+    initial[1] += 0.025
+    _neighbor_time, neighboring = integrate_fixed_step(
+        surface.geodesic_system().numerical_rhs(),
+        initial_state=initial,
+        t_span=(float(time[0]), float(time[-1])),
+        dt=float(time[1] - time[0]),
+    )
+    payload = surface.metric_geometry().geodesic_deviation_diagnostic(
+        time,
+        intrinsic_states,
+        neighboring,
+    )
+    payload["neighborInitialOffset"] = {"phi": 0.025}
+    return payload
+
+
 def generate_surface_geodesic_trajectory(
     *,
     family: SurfaceFamily = "torus",
@@ -365,6 +387,9 @@ def generate_surface_geodesic_trajectory(
         "rendererHints": _renderer_hints(surface, positions),
         "surfaceGeometry": _surface_geometry_payload(surface, positions),
         "parallelTransport": _parallel_transport_payload(surface, time, intrinsic_states),
+        "diagnostics": {
+            "geodesicDeviation": _geodesic_deviation_payload(surface, time, intrinsic_states),
+        },
         "invariantResiduals": invariant_residual_records(series),
     }
     return Trajectory.from_arrays(

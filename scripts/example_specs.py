@@ -144,6 +144,9 @@ def _surface_geodesic_geometry(system):
             "kind": "parallel-transport-frame",
             "source": "trajectory.metadata.parallelTransport",
         },
+        "diagnostics": {
+            "geodesicDeviation": "trajectory.metadata.diagnostics.geodesicDeviation",
+        },
     }
 
 
@@ -200,6 +203,7 @@ def _wormhole_geometry(system):
         },
         "diagnostics": {
             "throatTraversal": "trajectory.metadata.diagnostics.throatTraversal",
+            "geodesicDeviation": "trajectory.metadata.diagnostics.geodesicDeviation",
         },
     }
 

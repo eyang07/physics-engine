@@ -12,6 +12,7 @@ from scripts.generation import invariant_residual_records, write_trajectory_outp
 from systems.wormhole import (
     build_system,
     conserved_series,
+    ellis_wormhole_metric,
     embedding_xyz,
     radial_throat_initial_state,
 )
@@ -92,6 +93,30 @@ def _throat_traversal(time: np.ndarray, intrinsic_states: np.ndarray) -> dict[st
     }
 
 
+def _geodesic_deviation_payload(
+    time: np.ndarray,
+    intrinsic_states: np.ndarray,
+    *,
+    throat_radius: float,
+) -> dict[str, object]:
+    initial = intrinsic_states[0].copy()
+    initial[2] += 0.03
+    system = build_system(throat_radius=throat_radius)
+    _neighbor_time, neighboring = integrate_fixed_step(
+        system.numerical_rhs(),
+        initial_state=initial,
+        t_span=(float(time[0]), float(time[-1])),
+        dt=float(time[1] - time[0]),
+    )
+    payload = ellis_wormhole_metric(throat_radius).geodesic_deviation_diagnostic(
+        time,
+        intrinsic_states,
+        neighboring,
+    )
+    payload["neighborInitialOffset"] = {"phi": 0.03}
+    return payload
+
+
 def generate_wormhole_trajectory(
     *,
     throat_radius: float = 1.0,
@@ -135,6 +160,11 @@ def generate_wormhole_trajectory(
         },
         "diagnostics": {
             "throatTraversal": _throat_traversal(time, intrinsic_states),
+            "geodesicDeviation": _geodesic_deviation_payload(
+                time,
+                intrinsic_states,
+                throat_radius=throat_radius,
+            ),
         },
         "invariantResiduals": invariant_residual_records(series),
     }

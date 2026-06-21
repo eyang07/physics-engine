@@ -303,17 +303,7 @@ spacetimes, curvature, parallel transport, and orbital structure. Generalizes
 `systems/sphere_geodesic.py`, and gives the viewer curved-space trajectories and
 embedding diagrams._
 
-1. **BE-107: Geodesic-deviation diagnostics for curved backgrounds**
-    - Goal: Add measured Jacobi/geodesic-deviation diagnostics for nearby geodesics,
-      making curvature-driven focusing or defocusing exportable without viewer-side
-      physics.
-    - Scope: `engine/dynamics/metric.py` (or a small geometry helper), the surface and
-      curved-background generators, and `tests/`.
-    - Acceptance: flat-space deviation is trivial/linear, spherical positive curvature
-      produces the expected focusing trend to tolerance, exported separation/focusing
-      payloads are labeled `measured`, and focused tests pass.
-
-2. **BE-108: Add coordinate-domain guards for curved backgrounds**
+1. **BE-108: Add coordinate-domain guards for curved backgrounds**
     - Goal: Validate and export the coordinate/domain assumptions for fixed-background
       curved examples so invalid presets fail in Python instead of producing ambiguous
       viewer payloads.
@@ -322,6 +312,16 @@ embedding diagrams._
     - Acceptance: invalid Schwarzschild horizon-crossing and invalid wormhole throat
       parameters are rejected with clear errors; trajectory metadata documents the
       fixed-background domain assumptions; focused tests and generation pass.
+
+2. **BE-109: Export wormhole curvature fields**
+    - Goal: Add deterministic curvature scalar samples for the Ellis-wormhole fixed
+      background so the curved-background gallery can color the throat geometry from
+      Python-owned data.
+    - Scope: `systems/wormhole.py`, `scripts/generate_wormhole.py`,
+      `scripts/example_specs.py`, docs, and `tests/`.
+    - Acceptance: scalar curvature samples match the `MetricGeometry` symbolic
+      expression to tolerance, the throat extremum is sampled, the manifest declares
+      the scalar-field source, and focused tests plus generation pass.
 
 ### Verification track (paused)
 

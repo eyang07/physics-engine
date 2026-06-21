@@ -59,6 +59,9 @@ def test_wormhole_manifest_exposes_embedding_contract() -> None:
     assert geometry["diagnostics"]["throatTraversal"] == (
         "trajectory.metadata.diagnostics.throatTraversal"
     )
+    assert geometry["diagnostics"]["geodesicDeviation"] == (
+        "trajectory.metadata.diagnostics.geodesicDeviation"
+    )
 
 
 def test_wormhole_exports_throat_traversal_and_measured_invariants() -> None:
@@ -68,6 +71,7 @@ def test_wormhole_exports_throat_traversal_and_measured_invariants() -> None:
         for record in trajectory.metadata["invariantResiduals"]
     }
     traversal = trajectory.metadata["diagnostics"]["throatTraversal"]
+    deviation = trajectory.metadata["diagnostics"]["geodesicDeviation"]
     ell = trajectory.states[:, 1]
 
     assert trajectory.metadata["kind"] == "fixed-background"
@@ -80,6 +84,11 @@ def test_wormhole_exports_throat_traversal_and_measured_invariants() -> None:
     assert residuals["E"]["maxRelative"] < 1e-12
     assert residuals["L"]["maxAbs"] < 1e-12
     assert residuals["metricNorm"]["maxAbs"] < 1e-12
+    assert deviation["kind"] == "geodesic-deviation"
+    assert deviation["rigor"] == "measured"
+    assert deviation["neighborInitialOffset"] == {"phi": 0.03}
+    assert deviation["minRelativeSeparation"] < 0.2
+    assert abs(deviation["minParameter"] - traversal["crossingTime"]) < 0.04
 
 
 def test_wormhole_embedding_matches_surface_of_revolution() -> None:

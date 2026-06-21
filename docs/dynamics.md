@@ -21,6 +21,9 @@ diagnostics, and safety/certificate candidates.
 - Metric geometry also supports numerical parallel transport along sampled
   curves and oriented 2D holonomy angles; sampled transport exports are
   measured diagnostics.
+- Metric geometry can compute measured nearby-geodesic separation/focusing
+  diagnostics from two sampled rollouts. These payloads are level-1 numerical
+  evidence, not symbolic Jacobi-field proofs.
 - Surface-of-revolution geodesic helpers build sphere, torus, paraboloid,
   cone, and hyperboloid metrics from symbolic profiles; rollout diagnostics
   label energy and Clairaut conservation residuals as measured evidence.

@@ -51,6 +51,9 @@ artifacts.
   - Parallel transport on sampled metric curves, with 2D holonomy-angle support;
     surface-geodesic exports include a measured transported-frame payload along
     the generated curve.
+  - Measured geodesic-deviation diagnostics compare nearby sampled geodesics
+    with metric separation/focusing series; these are rollout diagnostics, not
+    Jacobi-field proofs.
   - Curvature exports for geometry examples: surface-of-revolution payloads
     include deterministic Gaussian-curvature scalar fields and measured
     Gauss-Bonnet quadrature diagnostics; Schwarzschild payloads include
@@ -109,8 +112,8 @@ artifacts.
     radial turning points and bound/unbound/critical classification.
   - Wormhole manifest entries may declare `geometry.kind="wormhole-geodesic"`
     with sources for an embedding mesh, embedded geodesic, and measured
-    throat-traversal diagnostic under `metadata.wormholeGeometry` /
-    `metadata.diagnostics`.
+    throat-traversal / geodesic-deviation diagnostics under
+    `metadata.wormholeGeometry` / `metadata.diagnostics`.
   - Static-field manifest entries (`systemKind: "static-field"`): systems whose
     payload is a time-independent field export, not a Lagrangian or first-order
     flow, intentionally omit `physics`, `derivation`, and `dynamics`. They expose

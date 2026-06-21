@@ -115,6 +115,7 @@ def test_surface_geodesic_conserves_clairaut_quantity_measured() -> None:
 def test_surface_geodesic_exports_mesh_geodesic_and_curvature_payloads() -> None:
     trajectory = generate_surface_geodesic_trajectory(t_span=(0.0, 0.1), dt=0.01)
     geometry = trajectory.metadata["surfaceGeometry"]
+    diagnostics = trajectory.metadata["diagnostics"]
     mesh = geometry["surfaceMesh"]
     geodesic = geometry["geodesic"]
     curvature = geometry["curvature"]
@@ -141,6 +142,11 @@ def test_surface_geodesic_exports_mesh_geodesic_and_curvature_payloads() -> None
     assert gauss_bonnet["rigor"] == "measured"
     assert gauss_bonnet["eulerCharacteristic"] == 0
     assert abs(gauss_bonnet["residual"]) < 1e-10
+    deviation = diagnostics["geodesicDeviation"]
+    assert deviation["kind"] == "geodesic-deviation"
+    assert deviation["rigor"] == "measured"
+    assert deviation["neighborInitialOffset"] == {"phi": 0.025}
+    assert len(deviation["separation"]) == len(trajectory.time)
 
 
 def test_sphere_gauss_bonnet_matches_two_pi_chi_measured() -> None:
@@ -173,6 +179,9 @@ def test_surface_geodesic_manifest_declares_surface_channels() -> None:
     )
     assert entry["geometry"]["parallelTransport"]["source"] == (
         "trajectory.metadata.parallelTransport"
+    )
+    assert entry["geometry"]["diagnostics"]["geodesicDeviation"] == (
+        "trajectory.metadata.diagnostics.geodesicDeviation"
     )
     assert entry["fields"] == [
         {

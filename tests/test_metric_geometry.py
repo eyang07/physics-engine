@@ -206,6 +206,55 @@ def test_schwarzschild_circular_orbit_stays_circular() -> None:
     assert np.max(np.abs(angular_momentum - angular_momentum[0])) < 1e-12
 
 
+def test_flat_geodesic_deviation_is_linear_for_straight_rollouts() -> None:
+    x, y = sp.symbols("x y", real=True)
+    geometry = MetricGeometry(coordinates=(x, y), metric=sp.eye(2))
+    time = np.linspace(0.0, 2.0, 101)
+    reference = np.column_stack(
+        [time, np.zeros_like(time), np.ones_like(time), np.zeros_like(time)]
+    )
+    neighboring = np.column_stack(
+        [
+            time,
+            0.25 + 0.1 * time,
+            np.ones_like(time),
+            0.1 * np.ones_like(time),
+        ]
+    )
+
+    payload = geometry.geodesic_deviation_diagnostic(time, reference, neighboring)
+
+    assert payload["rigor"] == "measured"
+    assert payload["evaluation"] == "measured-nearby-geodesic-rollout"
+    assert np.allclose(payload["separation"], 0.25 + 0.1 * time)
+    assert np.isclose(payload["minRelativeSeparation"], 1.0)
+    assert np.isclose(payload["maxRelativeSeparation"], 1.8)
+
+
+def test_positive_sphere_curvature_focuses_nearby_meridians() -> None:
+    sphere = two_sphere_metric(radius=1.0)
+    rhs = sphere.geodesic_system().numerical_rhs()
+    time, reference = integrate_fixed_step(
+        rhs,
+        initial_state=[float(np.pi / 2), 0.0, -1.0, 0.0],
+        t_span=(0.0, 1.3),
+        dt=0.01,
+    )
+    _neighbor_time, neighboring = integrate_fixed_step(
+        rhs,
+        initial_state=[float(np.pi / 2), 0.025, -1.0, 0.0],
+        t_span=(0.0, 1.3),
+        dt=0.01,
+    )
+
+    payload = sphere.geodesic_deviation_diagnostic(time, reference, neighboring)
+
+    assert payload["rigor"] == "measured"
+    assert payload["finalSeparation"] < 0.3 * payload["initialSeparation"]
+    assert payload["minRelativeSeparation"] < 0.3
+    assert payload["minParameter"] > 1.2
+
+
 def test_metric_geometry_validation() -> None:
     x, y = sp.symbols("x y", real=True)
 
