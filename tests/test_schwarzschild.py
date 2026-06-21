@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import numpy as np
 import sympy as sp
 
 from engine.export.manifest import system_entry
@@ -12,9 +13,11 @@ from scripts.generate_schwarzschild import (
 )
 from systems.schwarzschild import (
     build_system,
+    kretschmann_scalar_values,
     null_light_bending,
     null_scattering_initial_state,
     photon_sphere_radius,
+    ricci_scalar_values,
     timelike_bound_initial_state,
 )
 
@@ -51,6 +54,10 @@ def test_schwarzschild_manifest_exposes_orbit_and_effective_potential() -> None:
     assert [potential["name"] for potential in potentials] == ["schwarzschild_radial"]
     assert potentials[0]["turningPointsSource"].endswith(".turningPoints")
     assert potentials[0]["classificationSource"] == "trajectory.metadata.orbitClassification"
+    assert [field["name"] for field in entry["fields"]] == [
+        "ricciScalar",
+        "kretschmannScalar",
+    ]
 
 
 def test_timelike_schwarzschild_exports_precession_and_measured_invariants() -> None:
@@ -74,6 +81,17 @@ def test_timelike_schwarzschild_exports_precession_and_measured_invariants() -> 
     assert plot["rendererHint"] == "effective-potential"
     assert plot["classification"] == "bound"
     assert len(plot["turningPoints"]) >= 2
+    curvature = trajectory.metadata["curvatureScalars"]
+    ricci = curvature["ricciScalar"]
+    kretschmann = curvature["kretschmannScalar"]
+    radii = np.asarray(ricci["axes"][0], dtype=float)
+    assert ricci["evaluation"] == "symbolic-exact"
+    assert kretschmann["evaluation"] == "symbolic-exact"
+    assert np.allclose(np.asarray(ricci["values"], dtype=float), 0.0)
+    assert np.allclose(
+        np.asarray(kretschmann["values"], dtype=float),
+        kretschmann_scalar_values(radii, schwarzschild_radius=2.0),
+    )
 
 
 def test_null_schwarzschild_exports_light_bending_and_photon_sphere() -> None:
@@ -107,6 +125,16 @@ def test_schwarzschild_effective_potential_expression() -> None:
 
     expected = (1 - rs / r) * (1 + ell**2 / r**2)
     assert sp.simplify(potential.expression_for(system) - expected) == 0
+
+
+def test_schwarzschild_curvature_scalars_match_vacuum_closed_forms() -> None:
+    radii = np.array([3.0, 5.0, 10.0])
+
+    assert np.allclose(ricci_scalar_values(radii, schwarzschild_radius=2.0), 0.0)
+    assert np.allclose(
+        kretschmann_scalar_values(radii, schwarzschild_radius=2.0),
+        12.0 * 2.0**2 / radii**6,
+    )
 
 
 def test_schwarzschild_script_writes_primary_and_viewer_outputs(tmp_path) -> None:

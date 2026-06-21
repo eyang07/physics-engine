@@ -851,6 +851,20 @@ SCHWARZSCHILD = SystemSpec(
             classification_source="trajectory.metadata.orbitClassification",
         ),
     ),
+    fields=(
+        {
+            "name": "ricciScalar",
+            "kind": "scalar-field",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.curvatureScalars.ricciScalar",
+        },
+        {
+            "name": "kretschmannScalar",
+            "kind": "scalar-field",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.curvatureScalars.kretschmannScalar",
+        },
+    ),
     system_kind="schwarzschild-geodesic",
 )
 

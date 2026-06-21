@@ -60,6 +60,11 @@ class SurfaceOfRevolution:
             sp.simplify(self.profile_radius**2),
         )
 
+    def area_density(self) -> sp.Expr:
+        """Surface area density ``sqrt(det(g))`` in ``(u, phi)`` coordinates."""
+
+        return sp.simplify(sp.sqrt(self.first_fundamental_form().det()))
+
     def metric_geometry(self) -> MetricGeometry:
         return MetricGeometry(
             coordinates=self.coordinates,

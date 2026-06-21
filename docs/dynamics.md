@@ -24,13 +24,16 @@ diagnostics, and safety/certificate candidates.
 - Surface-of-revolution geodesic helpers build sphere, torus, paraboloid,
   cone, and hyperboloid metrics from symbolic profiles; rollout diagnostics
   label energy and Clairaut conservation residuals as measured evidence.
+  They also export deterministic Gaussian-curvature fields and measured
+  Gauss-Bonnet quadrature checks for closed surface families.
 - Orbit-classification helpers compute effective-potential samples, analytic
   turning points, and qualitative Kepler / fixed-background Schwarzschild orbit
   classes for export; these are backend-computed renderer payloads, not viewer
   physics.
 - Schwarzschild geodesic generation uses the metric geodesic flow for timelike
   and null equatorial orbits, with measured conservation residuals and
-  backend-computed precession / light-bending diagnostics.
+  backend-computed precession / light-bending diagnostics plus deterministic
+  Ricci and Kretschmann scalar fields.
 - Safety helpers represent safe/unsafe sets, candidate Lyapunov/barrier
   functions, proof obligations, and measured sampled checks.
 - `engine.verification` serializes proof obligations into a backend-agnostic IR.

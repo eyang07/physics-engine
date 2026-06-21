@@ -18,9 +18,11 @@ from systems.schwarzschild import (
     build_system,
     conserved_series,
     embedding_xy,
+    kretschmann_scalar_values,
     null_light_bending,
     null_scattering_initial_state,
     periapsis_precession,
+    ricci_scalar_values,
     timelike_bound_constants,
     timelike_bound_initial_state,
     weak_field_precession,
@@ -95,6 +97,46 @@ def _potential_plot(
         },
         classification.to_dict(),
     )
+
+
+def _curvature_scalar_fields(
+    *,
+    radius_values: np.ndarray,
+    schwarzschild_radius: float,
+) -> dict[str, object]:
+    lower = max(schwarzschild_radius * 1.02, float(np.min(radius_values)) * 0.75)
+    upper = float(np.max(radius_values)) * 1.2
+    coordinate_values = np.linspace(lower, upper, 360)
+    return {
+        "ricciScalar": {
+            "kind": "scalar-field",
+            "rendererHint": "scalar-field",
+            "name": "ricciScalar",
+            "coordinates": ["r"],
+            "axes": [coordinate_values.astype(float).tolist()],
+            "shape": [int(len(coordinate_values))],
+            "values": ricci_scalar_values(
+                coordinate_values,
+                schwarzschild_radius=schwarzschild_radius,
+            ).astype(float).tolist(),
+            "quantity": "Ricci scalar",
+            "evaluation": "symbolic-exact",
+        },
+        "kretschmannScalar": {
+            "kind": "scalar-field",
+            "rendererHint": "scalar-field",
+            "name": "kretschmannScalar",
+            "coordinates": ["r"],
+            "axes": [coordinate_values.astype(float).tolist()],
+            "shape": [int(len(coordinate_values))],
+            "values": kretschmann_scalar_values(
+                coordinate_values,
+                schwarzschild_radius=schwarzschild_radius,
+            ).astype(float).tolist(),
+            "quantity": "Kretschmann scalar",
+            "evaluation": "symbolic-exact",
+        },
+    }
 
 
 def generate_schwarzschild_trajectory(
@@ -179,6 +221,10 @@ def generate_schwarzschild_trajectory(
         ),
         "potentialPlots": [potential_plot],
         "orbitClassification": classification,
+        "curvatureScalars": _curvature_scalar_fields(
+            radius_values=intrinsic_states[:, 1],
+            schwarzschild_radius=schwarzschild_radius,
+        ),
         "diagnostics": diagnostics,
         "invariantResiduals": invariant_residual_records(series),
     }

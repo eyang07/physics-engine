@@ -303,18 +303,7 @@ spacetimes, curvature, parallel transport, and orbital structure. Generalizes
 `systems/sphere_geodesic.py`, and gives the viewer curved-space trajectories and
 embedding diagrams._
 
-1. **BE-105: Curvature scalar fields and a Gauss–Bonnet diagnostic**
-    - Goal: Export Gaussian curvature over surfaces of revolution and curvature scalars
-      (Ricci / Kretschmann) for spacetimes as scalar fields, and add a measured
-      Gauss–Bonnet check relating integrated curvature to topology.
-    - Scope: `engine/dynamics/metric.py` (or `engine/geometry/`), the geodesic
-      generators, reusing BE-091/BE-101 scalar-field export, and `tests/`.
-    - Acceptance: Gaussian curvature matches closed forms for standard surfaces; the
-      integrated-curvature Gauss–Bonnet check matches `2πχ` to tolerance and is labeled
-      `measured`; curvature fields export deterministically; focused tests pass and
-      generation is clean.
-
-2. **BE-106: Add a second curved background (wormhole or FLRW)**
+1. **BE-106: Add a second curved background (wormhole or FLRW)**
     - Goal: Add one additional fixed-background spacetime — an Ellis-wormhole
       embedding or an FLRW expansion slice — exercising the general BE-099 module and
       kept honest as a fixed background (no dynamical gravity).
@@ -324,6 +313,16 @@ embedding diagrams._
       characteristic feature is reproduced (e.g. throat traversal for the wormhole, or
       redshift along an FLRW null geodesic) to tolerance; the manifest exposes the
       embedding/curve; focused tests pass and generation is clean.
+
+2. **BE-107: Geodesic-deviation diagnostics for curved backgrounds**
+    - Goal: Add measured Jacobi/geodesic-deviation diagnostics for nearby geodesics,
+      making curvature-driven focusing or defocusing exportable without viewer-side
+      physics.
+    - Scope: `engine/dynamics/metric.py` (or a small geometry helper), the surface and
+      curved-background generators, and `tests/`.
+    - Acceptance: flat-space deviation is trivial/linear, spherical positive curvature
+      produces the expected focusing trend to tolerance, exported separation/focusing
+      payloads are labeled `measured`, and focused tests pass.
 
 ### Verification track (paused)
 

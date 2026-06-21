@@ -195,11 +195,70 @@ def _curvature_payload(surface: SurfaceOfRevolution) -> dict[str, object]:
     }
 
 
+def _closed_surface_midpoint_axes(
+    family: str,
+    *,
+    u_count: int = 720,
+    phi_count: int = 720,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    if family == "sphere":
+        u_edges = np.linspace(0.0, np.pi, u_count + 1)
+    elif family == "torus":
+        u_edges = np.linspace(-np.pi, np.pi, u_count + 1)
+    else:
+        return None
+    phi_edges = np.linspace(0.0, 2.0 * np.pi, phi_count + 1)
+    return 0.5 * (u_edges[:-1] + u_edges[1:]), 0.5 * (phi_edges[:-1] + phi_edges[1:])
+
+
+def _gauss_bonnet_payload(surface: SurfaceOfRevolution) -> dict[str, object] | None:
+    axes = _closed_surface_midpoint_axes(surface.family)
+    if axes is None:
+        return None
+    u_axis, phi_axis = axes
+    u_grid, phi_grid = np.meshgrid(u_axis, phi_axis, indexing="ij")
+    curvature_function = sp.lambdify(
+        surface.coordinates,
+        surface.gaussian_curvature(),
+        modules="numpy",
+    )
+    area_function = sp.lambdify(
+        surface.coordinates,
+        surface.area_density(),
+        modules="numpy",
+    )
+    curvature = np.broadcast_to(
+        np.asarray(curvature_function(u_grid, phi_grid), dtype=float),
+        u_grid.shape,
+    )
+    area_density = np.broadcast_to(
+        np.asarray(area_function(u_grid, phi_grid), dtype=float),
+        u_grid.shape,
+    )
+    du = float(u_axis[1] - u_axis[0])
+    dphi = float(phi_axis[1] - phi_axis[0])
+    integral = float(np.sum(curvature * area_density) * du * dphi)
+    euler_characteristic = 2 if surface.family == "sphere" else 0
+    expected = float(2.0 * np.pi * euler_characteristic)
+    return {
+        "kind": "gauss-bonnet-diagnostic",
+        "surface": surface.family,
+        "integralCurvature": integral,
+        "expected": expected,
+        "residual": integral - expected,
+        "eulerCharacteristic": euler_characteristic,
+        "sampleCount": int(curvature.size),
+        "evaluation": "measured-midpoint-quadrature",
+        "rigor": "measured",
+        "note": "Measured quadrature diagnostic only; agreement is not a proof.",
+    }
+
+
 def _surface_geometry_payload(
     surface: SurfaceOfRevolution,
     positions: np.ndarray,
 ) -> dict[str, object]:
-    return {
+    payload: dict[str, object] = {
         "kind": "surface-geodesic",
         "rendererHint": SURFACE_GEODESIC_HINT,
         "family": surface.family,
@@ -214,6 +273,10 @@ def _surface_geometry_payload(
         },
         "curvature": _curvature_payload(surface),
     }
+    gauss_bonnet = _gauss_bonnet_payload(surface)
+    if gauss_bonnet is not None:
+        payload["curvatureDiagnostics"] = {"gaussBonnet": gauss_bonnet}
+    return payload
 
 
 def _embedded_tangent_vectors(

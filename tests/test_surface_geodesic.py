@@ -76,6 +76,26 @@ def test_sphere_surface_metric_recovers_round_sphere() -> None:
     assert sp.simplify(surface.metric_geometry().scalar_curvature() - 2 / radius**2) == 0
 
 
+def test_gaussian_curvature_matches_standard_surface_closed_forms() -> None:
+    radius = sp.Symbol("R", positive=True)
+    sphere = sphere_surface(radius=radius)
+    assert sp.simplify(sphere.gaussian_curvature() - 1 / radius**2) == 0
+
+    major, minor = sp.symbols("R_major r_minor", positive=True)
+    torus = torus_surface(major_radius=major, minor_radius=minor)
+    u, _phi = torus.coordinates
+    expected_torus = sp.cos(u) / (minor * (major + minor * sp.cos(u)))
+    assert sp.simplify(torus.gaussian_curvature() - expected_torus) == 0
+
+    scale = sp.Symbol("a", positive=True)
+    paraboloid = paraboloid_surface(scale=scale)
+    u, _phi = paraboloid.coordinates
+    expected_paraboloid = 4 * scale**2 / (1 + 4 * scale**2 * u**2) ** 2
+    assert sp.simplify(paraboloid.gaussian_curvature() - expected_paraboloid) == 0
+
+    assert sp.simplify(cone_surface().gaussian_curvature()) == 0
+
+
 def test_surface_geodesic_conserves_clairaut_quantity_measured() -> None:
     trajectory = generate_surface_geodesic_trajectory(t_span=(0.0, 5.0), dt=0.01)
     residuals = {
@@ -116,6 +136,25 @@ def test_surface_geodesic_exports_mesh_geodesic_and_curvature_payloads() -> None
     values = np.asarray(curvature["values"], dtype=float)
     assert values.shape == (49, 65)
     assert np.all(np.isfinite(values))
+    gauss_bonnet = geometry["curvatureDiagnostics"]["gaussBonnet"]
+    assert gauss_bonnet["kind"] == "gauss-bonnet-diagnostic"
+    assert gauss_bonnet["rigor"] == "measured"
+    assert gauss_bonnet["eulerCharacteristic"] == 0
+    assert abs(gauss_bonnet["residual"]) < 1e-10
+
+
+def test_sphere_gauss_bonnet_matches_two_pi_chi_measured() -> None:
+    trajectory = generate_surface_geodesic_trajectory(
+        family="sphere",
+        t_span=(0.0, 0.1),
+        dt=0.01,
+    )
+    gauss_bonnet = trajectory.metadata["surfaceGeometry"]["curvatureDiagnostics"]["gaussBonnet"]
+
+    assert gauss_bonnet["rigor"] == "measured"
+    assert gauss_bonnet["eulerCharacteristic"] == 2
+    assert abs(gauss_bonnet["integralCurvature"] - 4.0 * np.pi) < 1e-4
+    assert abs(gauss_bonnet["residual"]) < 1e-4
 
 
 def test_surface_geodesic_manifest_declares_surface_channels() -> None:

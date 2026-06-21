@@ -197,6 +197,32 @@ def null_light_bending(
     }
 
 
+def ricci_scalar_values(
+    radius_values: Sequence[float],
+    *,
+    schwarzschild_radius: float,
+) -> np.ndarray:
+    """Ricci scalar of the Schwarzschild vacuum spacetime."""
+
+    radii = np.asarray(radius_values, dtype=float)
+    if np.any(radii <= schwarzschild_radius):
+        raise ValueError("Schwarzschild curvature radii must lie outside the horizon")
+    return np.zeros_like(radii, dtype=float)
+
+
+def kretschmann_scalar_values(
+    radius_values: Sequence[float],
+    *,
+    schwarzschild_radius: float,
+) -> np.ndarray:
+    """Kretschmann scalar ``R_abcd R^abcd = 12 r_s^2 / r^6``."""
+
+    radii = np.asarray(radius_values, dtype=float)
+    if np.any(radii <= schwarzschild_radius):
+        raise ValueError("Schwarzschild curvature radii must lie outside the horizon")
+    return 12.0 * schwarzschild_radius**2 / radii**6
+
+
 system = build_system()
 
 
@@ -209,6 +235,8 @@ __all__ = [
     "null_scattering_initial_state",
     "periapsis_precession",
     "photon_sphere_radius",
+    "kretschmann_scalar_values",
+    "ricci_scalar_values",
     "timelike_bound_constants",
     "timelike_bound_initial_state",
     "weak_field_light_bending",
