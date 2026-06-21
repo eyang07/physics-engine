@@ -26,12 +26,15 @@ from scripts.generate_n_body_gravity import (
     write_n_body_variant_trajectories,
 )
 from scripts.generate_pendulum import write_pendulum_trajectory
+from scripts.generate_schwarzschild import write_schwarzschild_trajectory
 from scripts.generate_sphere_geodesic import write_sphere_geodesic_trajectory
+from scripts.generate_surface_geodesic import write_surface_geodesic_trajectory
 from scripts.generate_symmetric_top import write_symmetric_top_trajectory
 from scripts.generate_uniform_gravity import write_uniform_gravity_trajectory
 from scripts.generate_variable_speed_wavefront import write_variable_speed_wavefront
 from scripts.generate_vibrating_string import write_vibrating_string
 from scripts.generate_wave_packet import write_wave_packet
+from scripts.generate_wormhole import write_wormhole_trajectory
 
 
 def main() -> None:
@@ -42,6 +45,10 @@ def main() -> None:
     write_sphere_geodesic_trajectory(
         Path("data/generated/sphere_geodesic.json"),
         viewer_output=Path("viewer/public/data/sphere_geodesic.json"),
+    )
+    write_surface_geodesic_trajectory(
+        Path("data/generated/surface_geodesic.json"),
+        viewer_output=Path("viewer/public/data/surface_geodesic.json"),
     )
     write_charged_particle_trajectory(
         Path("data/generated/charged_particle.json"),
@@ -66,6 +73,14 @@ def main() -> None:
     write_kepler_trajectory(
         Path("data/generated/kepler_problem.json"),
         viewer_output=Path("viewer/public/data/kepler_problem.json"),
+    )
+    write_schwarzschild_trajectory(
+        Path("data/generated/schwarzschild.json"),
+        viewer_output=Path("viewer/public/data/schwarzschild.json"),
+    )
+    write_wormhole_trajectory(
+        Path("data/generated/wormhole.json"),
+        viewer_output=Path("viewer/public/data/wormhole.json"),
     )
     write_bead_on_hoop_trajectory(
         Path("data/generated/bead_on_hoop.json"),

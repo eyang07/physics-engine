@@ -429,6 +429,12 @@ def test_effective_potentials_render_when_declared(spec) -> None:
         assert rendered["latex"]
         assert rendered["conserved_latex"]
         assert rendered["expression_latex"]
+        if declared.plot_source is not None:
+            assert rendered["plotSource"] == declared.plot_source
+        if declared.turning_points_source is not None:
+            assert rendered["turningPointsSource"] == declared.turning_points_source
+        if declared.classification_source is not None:
+            assert rendered["classificationSource"] == declared.classification_source
 
 
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])

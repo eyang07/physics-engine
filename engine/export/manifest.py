@@ -132,9 +132,22 @@ class EffectivePotential:
     conserved: str
     conserved_latex: str
     expression: Callable[[LagrangianSystem], sp.Expr]
+    plot_source: str | None = None
+    turning_points_source: str | None = None
+    classification_source: str | None = None
 
     def expression_for(self, system: LagrangianSystem) -> sp.Expr:
         return self.expression(system)
+
+    def sources_payload(self) -> dict[str, str]:
+        payload: dict[str, str] = {}
+        if self.plot_source is not None:
+            payload["plotSource"] = self.plot_source
+        if self.turning_points_source is not None:
+            payload["turningPointsSource"] = self.turning_points_source
+        if self.classification_source is not None:
+            payload["classificationSource"] = self.classification_source
+        return payload
 
 
 @dataclass(frozen=True)
@@ -376,6 +389,7 @@ def derivation_entry(
             "conserved": potential.conserved,
             "conserved_latex": potential.conserved_latex,
             "expression_latex": latex(sp.simplify(potential.expression_for(system))),
+            **potential.sources_payload(),
         }
         for potential in spec.effective_potentials
     ]
@@ -444,6 +458,7 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
             "conserved": potential.conserved,
             "conserved_latex": potential.conserved_latex,
             "expression_latex": latex(sp.simplify(potential.expression_for(system))),
+            **potential.sources_payload(),
         }
         for potential in spec.effective_potentials
     ]
@@ -540,6 +555,18 @@ def first_order_system_entry(spec: SystemSpec, system: FirstOrderSystem) -> dict
             )
             item["expression_latex"] = latex(rendered_expression)
         conserved.append(item)
+    effective_potentials = [
+        {
+            "name": potential.name,
+            "coordinate": potential.coordinate,
+            "latex": potential.latex,
+            "conserved": potential.conserved,
+            "conserved_latex": potential.conserved_latex,
+            "expression_latex": latex(sp.simplify(potential.expression_for(system))),
+            **potential.sources_payload(),
+        }
+        for potential in spec.effective_potentials
+    ]
 
     entry = {
         "id": spec.id,
@@ -552,7 +579,7 @@ def first_order_system_entry(spec: SystemSpec, system: FirstOrderSystem) -> dict
         "state": [variable.to_dict() for variable in spec.state],
         "projections": {name: list(group) for name, group in spec.projections.items()},
         "conserved": conserved,
-        "effectivePotentials": [],
+        "effectivePotentials": effective_potentials,
         "lenses": list(spec.lenses),
         "dynamics": {
             "vector_field": vector_field,

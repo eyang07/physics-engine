@@ -137,6 +137,18 @@ def test_kepler_generated_motion_conserves_energy_and_angular_momentum():
     assert hints["camera"]["position"][1] > 0
     assert hints["referenceGeometry"][0]["kind"] == "centralBody"
     assert hints["flow"]["kind"] == "centralAttraction"
+    classification = trajectory.metadata["orbitClassification"]
+    assert classification["classification"] == "bound"
+    plot = trajectory.metadata["potentialPlots"][0]
+    assert plot["name"] == "kepler_radial"
+    assert plot["rendererHint"] == "effective-potential"
+    assert plot["classification"] == "bound"
+    turning_points = np.asarray(plot["turningPoints"], dtype=float)
+    assert turning_points.shape == (2,)
+    potential_at_roots = turning_points ** -2 * 0.5 * plot["angularMomentum"] ** 2 - (
+        1.0 / turning_points
+    )
+    assert np.allclose(potential_at_roots, plot["energy"])
 
 
 def test_kepler_effective_potential_matches_radial_energy_reduction():
@@ -150,6 +162,8 @@ def test_kepler_effective_potential_matches_radial_energy_reduction():
 
     expected = ell**2 / (2 * m * r**2) - mu * m / r
     assert sp.simplify(effective_potential.expression_for(system) - expected) == 0
+    assert effective_potential.turning_points_source is not None
+    assert effective_potential.classification_source == "trajectory.metadata.orbitClassification"
 
     radial_energy = sp.simplify(system.energy().subs({phi_dot: ell / (m * r**2)}))
     radial_kinetic = m * r_dot**2 / 2

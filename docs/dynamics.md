@@ -15,8 +15,32 @@ diagnostics, and safety/certificate candidates.
 - Cotangent Hamiltonian systems support ray/geodesic-style flow.
 - Parameterized media models cover scalar speed, refractive index, and inverse
   metric descriptions.
-- Metric geometry helpers derive Christoffel symbols, geodesic equations, and
-  cogeodesic media for fixed-background examples.
+- Metric geometry helpers derive Christoffel symbols, geodesic equations,
+  symbolic Riemann/Ricci/scalar curvature, and cogeodesic media for
+  fixed-background examples.
+- Metric geometry also supports numerical parallel transport along sampled
+  curves and oriented 2D holonomy angles; sampled transport exports are
+  measured diagnostics.
+- Metric geometry can compute measured nearby-geodesic separation/focusing
+  diagnostics from two sampled rollouts. These payloads are level-1 numerical
+  evidence, not symbolic Jacobi-field proofs.
+- Surface-of-revolution geodesic helpers build sphere, torus, paraboloid,
+  cone, and hyperboloid metrics from symbolic profiles; rollout diagnostics
+  label energy and Clairaut conservation residuals as measured evidence.
+  They also export deterministic Gaussian-curvature fields and measured
+  Gauss-Bonnet quadrature checks for closed surface families.
+- Orbit-classification helpers compute effective-potential samples, analytic
+  turning points, and qualitative Kepler / fixed-background Schwarzschild orbit
+  classes for export; these are backend-computed renderer payloads, not viewer
+  physics.
+- Schwarzschild geodesic generation uses the metric geodesic flow for timelike
+  and null equatorial orbits, with measured conservation residuals and
+  backend-computed precession / light-bending diagnostics plus deterministic
+  Ricci and Kretschmann scalar fields.
+- Ellis wormhole geodesic generation uses a fixed equatorial metric with
+  backend-exported embedding geometry and measured throat-traversal /
+  conservation diagnostics; the background is prescribed, not dynamically
+  solved.
 - Safety helpers represent safe/unsafe sets, candidate Lyapunov/barrier
   functions, proof obligations, and measured sampled checks.
 - `engine.verification` serializes proof obligations into a backend-agnostic IR.

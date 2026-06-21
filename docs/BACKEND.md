@@ -43,7 +43,32 @@ artifacts.
   - Cotangent Hamiltonian systems.
   - Ray-bundle integration/export.
   - Parameterized scalar-speed, refractive-index, and inverse-metric media.
-  - Metric geometry helpers for fixed-background geodesics.
+  - Metric geometry helpers for fixed-background geodesics, including symbolic
+    Christoffel, Riemann, Ricci, and scalar-curvature calculations.
+  - Surface-of-revolution geodesic systems (sphere, torus, paraboloid, cone,
+    hyperboloid) generated from reusable metric geometry, with measured
+    invariant residuals for rollout diagnostics.
+  - Parallel transport on sampled metric curves, with 2D holonomy-angle support;
+    surface-geodesic exports include a measured transported-frame payload along
+    the generated curve.
+  - Measured geodesic-deviation diagnostics compare nearby sampled geodesics
+    with metric separation/focusing series; these are rollout diagnostics, not
+    Jacobi-field proofs.
+  - Curvature exports for geometry examples: surface-of-revolution payloads
+    include deterministic Gaussian-curvature scalar fields and measured
+    Gauss-Bonnet quadrature diagnostics; Schwarzschild payloads include
+    deterministic Ricci and Kretschmann scalar fields.
+  - Effective-potential orbit helpers for Kepler and fixed-background
+    Schwarzschild regimes: Python computes potential samples, analytic turning
+    points, and qualitative orbit classification for renderer consumption.
+  - Schwarzschild geodesic generator for equatorial timelike and null geodesics,
+    exporting measured conserved-energy/angular-momentum residuals, perihelion
+    precession for the bound timelike preset, photon-sphere/light-bending
+    diagnostics for the null preset, and the GR effective potential.
+  - Ellis wormhole geodesic generator for a fixed equatorial background,
+    exporting an embedding mesh, embedded geodesic curve, measured invariant
+    residuals, and measured throat-traversal diagnostics; it does not solve
+    dynamical gravity.
 - Diagnostics:
   - Invariant residuals.
   - Poincare sections.
@@ -56,6 +81,18 @@ artifacts.
     precomputed variants.
   - Optional backend-owned geometry metadata in manifest entries and trajectory
     metadata for renderer-specific structures such as rigid-body polhodes.
+  - Surface-geodesic export schema: manifest entries can declare
+    `geometry.kind="surface-geodesic"` with `rendererHint="surface-geodesic"`
+    and sources for `surfaceMesh`, embedded `geodesic`, and `curvature`
+    channels. The trajectory payload carries those under
+    `metadata.surfaceGeometry`; mesh and curvature samples are deterministic
+    symbolic evaluations, while rollout invariant residuals remain
+    `rigor="measured"`.
+    `geometry.parallelTransport.source` points to
+    `metadata.parallelTransport`, a measured sampled frame transport along the
+    exported curve.
+    Closed surface payloads also carry `curvatureDiagnostics.gaussBonnet` with
+    `rigor="measured"`; it is a quadrature diagnostic, not a proof.
   - Optional rigid-body orientation channel: a trajectory carries a per-sample
     unit-quaternion series (`(w, x, y, z)`, sign-aligned for continuity) and the
     body-frame triad in space coordinates under `trajectory.orientation`, and the
@@ -69,6 +106,14 @@ artifacts.
     channels (name/kind/rendererHint/source). Sampled values are exact
     evaluations of the symbolic field (`evaluation: symbolic-exact`), not measured
     evidence.
+  - Effective-potential manifest entries may declare `plotSource`,
+    `turningPointsSource`, and `classificationSource` when a generator exports
+    the corresponding backend-owned payload. The Kepler example uses this for
+    radial turning points and bound/unbound/critical classification.
+  - Wormhole manifest entries may declare `geometry.kind="wormhole-geodesic"`
+    with sources for an embedding mesh, embedded geodesic, and measured
+    throat-traversal / geodesic-deviation diagnostics under
+    `metadata.wormholeGeometry` / `metadata.diagnostics`.
   - Static-field manifest entries (`systemKind: "static-field"`): systems whose
     payload is a time-independent field export, not a Lagrangian or first-order
     flow, intentionally omit `physics`, `derivation`, and `dynamics`. They expose
@@ -224,11 +269,14 @@ surfaces remain future work.
 
 - Simple pendulum
 - Geodesic on a sphere
+- Geodesic on a surface of revolution
 - Charged particle in a uniform magnetic field
 - Uniform gravitational field
 - Ideal spring
 - Coupled oscillators
 - Kepler problem
+- Schwarzschild geodesic
+- Ellis wormhole geodesic
 - Bead on a rotating hoop
 - Double pendulum
 - N-body gravity
@@ -294,5 +342,5 @@ ignored and should not be committed.
    adapter checks and robustness tests before adding more case-study breadth.
 2. Factor shared parameter-variant generation helpers if more systems add
    backend-generated parameter families.
-3. Keep backend-only geodesic exploration outside the gallery until the viewer
-   can render the geometry honestly.
+3. Keep future geometry exports explicit about which payloads are symbolic
+   samples, measured rollout diagnostics, or renderer hints.

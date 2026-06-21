@@ -49,6 +49,8 @@ from systems.n_body_gravity import (
 )
 from systems.pendulum import build_system as build_pendulum
 from systems.sphere_geodesic import build_system as build_sphere_geodesic
+from systems.surface_geodesic import build_system as build_surface_geodesic
+from systems.schwarzschild import build_system as build_schwarzschild
 from systems.symmetric_top import (
     build_system as build_symmetric_top,
     effective_potential as symmetric_top_effective_potential,
@@ -57,6 +59,7 @@ from systems.uniform_gravity import build_system as build_uniform_gravity
 from systems.variable_speed_wavefront import build_system as build_variable_speed_wavefront
 from systems.vibrating_string import build_system as build_vibrating_string
 from systems.wave_packet import build_system as build_wave_packet
+from systems.wormhole import build_system as build_wormhole
 
 
 def _time_translation(system):
@@ -95,6 +98,116 @@ def _coupled_oscillator_modes(system):
     return payload
 
 
+def _first_order_state(system, name: str):
+    return next(symbol for symbol in system.state if symbol.name == name)
+
+
+def _first_order_parameter(system, name: str):
+    return next(symbol for symbol in system.parameters if symbol.name == name)
+
+
+def _surface_geodesic_energy(system):
+    u = _first_order_state(system, "u")
+    u_dot = _first_order_state(system, "u_dot")
+    phi_dot = _first_order_state(system, "phi_dot")
+    major = _first_order_parameter(system, "R_major")
+    minor = _first_order_parameter(system, "r_minor")
+    rho = major + minor * sp.cos(u)
+    return sp.simplify((minor**2 * u_dot**2 + rho**2 * phi_dot**2) / 2)
+
+
+def _surface_geodesic_clairaut(system):
+    u = _first_order_state(system, "u")
+    phi_dot = _first_order_state(system, "phi_dot")
+    major = _first_order_parameter(system, "R_major")
+    minor = _first_order_parameter(system, "r_minor")
+    return sp.simplify((major + minor * sp.cos(u)) ** 2 * phi_dot)
+
+
+def _surface_geodesic_geometry(system):
+    return {
+        "kind": "surface-geodesic",
+        "rendererHint": "surface-geodesic",
+        "surfaceMesh": {
+            "kind": "surface-mesh",
+            "source": "trajectory.metadata.surfaceGeometry.surfaceMesh",
+        },
+        "geodesic": {
+            "kind": "embedded-polyline",
+            "source": "trajectory.metadata.surfaceGeometry.geodesic",
+        },
+        "curvature": {
+            "kind": "scalar-field",
+            "source": "trajectory.metadata.surfaceGeometry.curvature",
+        },
+        "parallelTransport": {
+            "kind": "parallel-transport-frame",
+            "source": "trajectory.metadata.parallelTransport",
+        },
+        "diagnostics": {
+            "geodesicDeviation": "trajectory.metadata.diagnostics.geodesicDeviation",
+        },
+    }
+
+
+def _schwarzschild_state(system, name: str):
+    return next(symbol for symbol in system.state if symbol.name == name)
+
+
+def _schwarzschild_parameter(system, name: str):
+    return next(symbol for symbol in system.parameters if symbol.name == name)
+
+
+def _schwarzschild_energy(system):
+    r = _schwarzschild_state(system, "r")
+    t_dot = _schwarzschild_state(system, "t_dot")
+    rs = _schwarzschild_parameter(system, "r_s")
+    return sp.simplify((1 - rs / r) * t_dot)
+
+
+def _schwarzschild_angular_momentum(system):
+    r = _schwarzschild_state(system, "r")
+    phi_dot = _schwarzschild_state(system, "phi_dot")
+    return sp.simplify(r**2 * phi_dot)
+
+
+def _schwarzschild_effective_potential(system):
+    r = _schwarzschild_state(system, "r")
+    rs = _schwarzschild_parameter(system, "r_s")
+    ell = sp.Symbol("L")
+    return sp.simplify((1 - rs / r) * (1 + ell**2 / r**2))
+
+
+def _wormhole_energy(system):
+    return _first_order_state(system, "t_dot")
+
+
+def _wormhole_angular_momentum(system):
+    ell = _first_order_state(system, "l")
+    phi_dot = _first_order_state(system, "phi_dot")
+    throat_radius = _first_order_parameter(system, "a")
+    return sp.simplify((ell**2 + throat_radius**2) * phi_dot)
+
+
+def _wormhole_geometry(system):
+    return {
+        "kind": "wormhole-geodesic",
+        "rendererHint": "wormhole-geodesic",
+        "embeddingMesh": {
+            "kind": "surface-mesh",
+            "source": "trajectory.metadata.wormholeGeometry.embeddingMesh",
+        },
+        "geodesic": {
+            "kind": "embedded-polyline",
+            "source": "trajectory.metadata.wormholeGeometry.geodesic",
+        },
+        "diagnostics": {
+            "throatTraversal": "trajectory.metadata.diagnostics.throatTraversal",
+            "geodesicDeviation": "trajectory.metadata.diagnostics.geodesicDeviation",
+        },
+    }
+
+
 LENSES: tuple[Lens, ...] = (
     Lens(
         id="pendulumMotionPhase",
@@ -126,6 +239,14 @@ LENSES: tuple[Lens, ...] = (
         description="Geodesic motion embedded in three-dimensional space.",
         projections=("embedding3d",),
         conserved=("H", "p_phi"),
+    ),
+    Lens(
+        id="surfaceGeodesic",
+        title="Surface Geodesic",
+        kind="configuration-space",
+        description="Geodesic motion on an embedded surface of revolution.",
+        projections=("embedding3d",),
+        conserved=("H", "clairaut"),
     ),
     Lens(
         id="chargedParticle",
@@ -215,6 +336,31 @@ LENSES: tuple[Lens, ...] = (
         description="Radial motion after reducing the central-force orbit.",
         projections=("phase",),
         conserved=("H", "ell"),
+    ),
+    Lens(
+        id="schwarzschildOrbit",
+        title="Relativistic Orbit",
+        kind="configuration-space",
+        description="Timelike or null geodesic in the equatorial Schwarzschild plane.",
+        projections=("orbitPlane",),
+        conserved=("E", "L"),
+    ),
+    Lens(
+        id="schwarzschildEffectivePotential",
+        title="GR Effective Potential",
+        kind="effective-potential",
+        description="Schwarzschild radial reduction with turning points and orbit class.",
+        projections=("phase",),
+        conserved=("E", "L"),
+        effective_potentials=("schwarzschild_radial",),
+    ),
+    Lens(
+        id="wormholeGeodesic",
+        title="Wormhole Throat",
+        kind="configuration-space",
+        description="Radial geodesic traversal through an embedded Ellis-wormhole throat.",
+        projections=("embedding3d",),
+        conserved=("E", "L"),
     ),
     Lens(
         id="beadHoop",
@@ -431,6 +577,54 @@ SPHERE_GEODESIC = SystemSpec(
 )
 
 
+SURFACE_GEODESIC = SystemSpec(
+    id="surface-geodesic",
+    title="Geodesic on a Surface of Revolution",
+    category="Differential Geometry",
+    description="Free motion on a torus generated from a reusable surface-of-revolution metric.",
+    build=build_surface_geodesic,
+    parameters=(
+        Parameter("R_major", "R", 2.0, 1.2, 3.0),
+        Parameter("r_minor", "r", 0.7, 0.2, 1.0),
+        Parameter("u0", "u_0", 0.72, -3.14, 3.14, role="initial"),
+        Parameter("phi0", r"\phi_0", 0.0, -3.14, 3.14, role="initial"),
+        Parameter("u_dot0", r"\dot{u}_0", 0.38, -2.0, 2.0, role="initial"),
+        Parameter("phi_dot0", r"\dot{\phi}_0", 0.92, -2.0, 2.0, role="initial"),
+    ),
+    state=(
+        StateVar("u", "u", "coordinate"),
+        StateVar("phi", r"\phi", "coordinate"),
+        StateVar("u_dot", r"\dot{u}", "velocity"),
+        StateVar("phi_dot", r"\dot{\phi}", "velocity"),
+        StateVar("x", "x", "embedding"),
+        StateVar("y", "y", "embedding"),
+        StateVar("z", "z", "embedding"),
+    ),
+    projections={"embedding3d": ("x", "y", "z")},
+    conserved=(
+        Conserved("H", "H", "geodesic kinetic energy", expression=_surface_geodesic_energy),
+        Conserved(
+            "clairaut",
+            "C",
+            "azimuthal rotation / Clairaut momentum",
+            expression=_surface_geodesic_clairaut,
+        ),
+    ),
+    lenses=("surfaceGeodesic",),
+    data_path="/data/surface_geodesic.json",
+    geometry=_surface_geodesic_geometry,
+    fields=(
+        {
+            "name": "gaussianCurvature",
+            "kind": "scalar-field",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.surfaceGeometry.curvature",
+        },
+    ),
+    system_kind="surface-geodesic",
+)
+
+
 CHARGED_PARTICLE = SystemSpec(
     id="charged-particle",
     title="Electron in a Magnetic Field",
@@ -640,8 +834,117 @@ KEPLER = SystemSpec(
             conserved="ell",
             conserved_latex=r"\ell",
             expression=_kepler_effective_potential,
+            plot_source="trajectory.metadata.potentialPlots[name=kepler_radial]",
+            turning_points_source=(
+                "trajectory.metadata.potentialPlots[name=kepler_radial].turningPoints"
+            ),
+            classification_source="trajectory.metadata.orbitClassification",
         ),
     ),
+)
+
+
+SCHWARZSCHILD = SystemSpec(
+    id="schwarzschild",
+    title="Schwarzschild Geodesic",
+    category="Relativity",
+    description="Timelike and null geodesics in a fixed Schwarzschild background.",
+    build=build_schwarzschild,
+    parameters=(
+        Parameter("r_s", "r_s", 2.0, 0.5, 4.0),
+        Parameter("semi_latus_rectum", "p", 40.0, 20.0, 120.0, role="initial"),
+        Parameter("eccentricity", "e", 0.1, 0.0, 0.5, role="initial"),
+        Parameter("impact_parameter", "b", 30.0, 8.0, 80.0, role="initial"),
+    ),
+    state=(
+        StateVar("t", "t", "coordinate"),
+        StateVar("r", "r", "coordinate"),
+        StateVar("phi", r"\phi", "coordinate"),
+        StateVar("t_dot", r"\dot{t}", "velocity"),
+        StateVar("r_dot", r"\dot{r}", "velocity"),
+        StateVar("phi_dot", r"\dot{\phi}", "velocity"),
+        StateVar("x", "x", "embedding"),
+        StateVar("y", "y", "embedding"),
+    ),
+    projections={"orbitPlane": ("x", "y"), "phase": ("r", "r_dot")},
+    conserved=(
+        Conserved("E", "E", "stationarity / time translation", expression=_schwarzschild_energy),
+        Conserved(
+            "L",
+            "L",
+            "axial rotation",
+            expression=_schwarzschild_angular_momentum,
+        ),
+    ),
+    lenses=("schwarzschildOrbit", "schwarzschildEffectivePotential"),
+    data_path="/data/schwarzschild.json",
+    effective_potentials=(
+        EffectivePotential(
+            name="schwarzschild_radial",
+            coordinate="r",
+            latex=r"V_{\mathrm{eff}}^2",
+            conserved="L",
+            conserved_latex="L",
+            expression=_schwarzschild_effective_potential,
+            plot_source="trajectory.metadata.potentialPlots[name=schwarzschild_radial]",
+            turning_points_source=(
+                "trajectory.metadata.potentialPlots[name=schwarzschild_radial].turningPoints"
+            ),
+            classification_source="trajectory.metadata.orbitClassification",
+        ),
+    ),
+    fields=(
+        {
+            "name": "ricciScalar",
+            "kind": "scalar-field",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.curvatureScalars.ricciScalar",
+        },
+        {
+            "name": "kretschmannScalar",
+            "kind": "scalar-field",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.curvatureScalars.kretschmannScalar",
+        },
+    ),
+    system_kind="schwarzschild-geodesic",
+)
+
+
+WORMHOLE = SystemSpec(
+    id="wormhole",
+    title="Ellis Wormhole Geodesic",
+    category="Relativity",
+    description=(
+        "Timelike geodesic traversal in a fixed Ellis-wormhole background; "
+        "the spacetime is prescribed, not dynamically solved."
+    ),
+    build=build_wormhole,
+    parameters=(
+        Parameter("a", "a", 1.0, 0.4, 3.0),
+        Parameter("l0", "l_0", -6.0, -10.0, -0.5, role="initial"),
+        Parameter("l_dot0", r"\dot{l}_0", 0.4, 0.1, 1.2, role="initial"),
+    ),
+    state=(
+        StateVar("t", "t", "coordinate"),
+        StateVar("l", "l", "coordinate"),
+        StateVar("phi", r"\phi", "coordinate"),
+        StateVar("t_dot", r"\dot{t}", "velocity"),
+        StateVar("l_dot", r"\dot{l}", "velocity"),
+        StateVar("phi_dot", r"\dot{\phi}", "velocity"),
+        StateVar("x", "x", "embedding"),
+        StateVar("y", "y", "embedding"),
+        StateVar("z", "z", "embedding"),
+    ),
+    projections={"embedding3d": ("x", "y", "z"), "phase": ("l", "l_dot")},
+    conserved=(
+        Conserved("E", "E", "stationarity / time translation", expression=_wormhole_energy),
+        Conserved("L", "L", "axial rotation", expression=_wormhole_angular_momentum),
+    ),
+    lenses=("wormholeGeodesic",),
+    data_path="/data/wormhole.json",
+    geometry=_wormhole_geometry,
+    system_kind="wormhole-geodesic",
 )
 
 
@@ -1377,11 +1680,14 @@ VARIABLE_SPEED_WAVEFRONT = SystemSpec(
 SPECS: tuple[SystemSpec, ...] = (
     PENDULUM,
     SPHERE_GEODESIC,
+    SURFACE_GEODESIC,
     CHARGED_PARTICLE,
     UNIFORM_GRAVITY,
     IDEAL_SPRING,
     COUPLED_OSCILLATORS,
     KEPLER,
+    SCHWARZSCHILD,
+    WORMHOLE,
     BEAD_ON_HOOP,
     DOUBLE_PENDULUM,
     N_BODY_GRAVITY,
