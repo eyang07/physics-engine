@@ -48,6 +48,14 @@
             <p class="control-label">parameter family</p>
             <div id="variantModes" class="mode-switch" aria-label="Parameter variant"></div>
           </div>
+          <div id="modeControlsSection" class="panel-mode-controls" hidden>
+            <p class="control-label">normal mode</p>
+            <div id="modeSelector" class="mode-switch" aria-label="Normal mode"></div>
+            <label class="mode-blend">
+              <span id="modeBlendLabel">superpose</span>
+              <input id="modeBlend" type="range" min="0" max="1" step="0.01" value="0" />
+            </label>
+          </div>
           <section class="panel-section">
             <p class="control-label">principles</p>
             <div id="principles" class="principles"></div>

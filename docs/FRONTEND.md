@@ -76,6 +76,13 @@ and trajectory data; it must not re-derive physics.
   palette. Backend-generated variants (figure-eight, Sun + two planets) load in
   place. The viewer plots the exported trajectory; it never integrates the
   N-body problem.
+- Normal-mode lens: the coupled-oscillator chain animates an exported mode shape
+  on the 2D canvas, with a mode selector and a superposition scrub that blends
+  toward the next mode (their frequencies beat). The mode shapes and frequencies
+  come from the backend small-oscillation eigenproblem (`manifest.normalModes`);
+  the viewer displays the exported eigenvectors at their exported frequencies and
+  never solves the eigenproblem. Frequencies stay qualitative — modes are numbered
+  low→high with no raw decimals on the stage.
 - Renderer-hint-based camera framing and a fit-to-system reset control.
 - Playwright visual regression coverage for all examples and fit-to-system
   behavior on desktop/mobile.

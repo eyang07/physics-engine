@@ -4,6 +4,7 @@ import { theme } from "./design/theme";
 import {
   loadManifest,
   type ManifestLens,
+  type ManifestNormalModes,
   type ManifestParameterVariant,
   type SystemManifest,
 } from "./data/manifest";
@@ -21,6 +22,7 @@ import { StructurePanel } from "./structurePanel";
 import { DiagnosticsPanel } from "./diagnosticsPanel";
 import { drawWavefrontScene } from "./wavefrontCanvas";
 import { drawPoincareSectionScene } from "./poincareSectionCanvas";
+import { drawNormalModeScene } from "./normalModeCanvas";
 import { VerificationPanel } from "./verificationPanel";
 import { VerificationStage } from "./verificationStage";
 import { resolveRendererSurface } from "./rendererRegistry";
@@ -90,6 +92,10 @@ const systemSelect = requireElement<HTMLSelectElement>("#systemSelect");
 const visualizationModes = requireElement<HTMLElement>("#visualizationModes");
 const variantSection = requireElement<HTMLElement>("#variantSection");
 const variantModes = requireElement<HTMLElement>("#variantModes");
+const modeControlsSection = requireElement<HTMLElement>("#modeControlsSection");
+const modeSelector = requireElement<HTMLElement>("#modeSelector");
+const modeBlend = requireElement<HTMLInputElement>("#modeBlend");
+const modeBlendLabel = requireElement<HTMLElement>("#modeBlendLabel");
 const playButton = requireElement<HTMLButtonElement>("#playButton");
 const fitToSystem = requireElement<HTMLButtonElement>("#fitToSystem");
 const speedControl = requireElement<HTMLInputElement>("#speedControl");
@@ -150,6 +156,8 @@ let lensById = new Map<string, ManifestLens>();
 let selectedExample: SystemManifest | null = null;
 let selectedVisualization: ManifestLens | null = null;
 let selectedVariant: ManifestParameterVariant | null = null;
+// The selected normal mode for the normal-mode lens (0-based, ascending freq).
+let selectedModeIndex = 0;
 let trajectory: Trajectory | null = null;
 let pendulumBounds: Bounds | null = null;
 // Monotonic guard so a slow trajectory load can't overwrite a newer selection.
@@ -173,6 +181,15 @@ playButton.addEventListener("click", () => {
 
 fitToSystem.addEventListener("click", () => {
   threeScene.resetCamera();
+});
+
+// Update the superposition caption as the blend scrub moves (the frame loop
+// reads the slider value directly for the animation).
+modeBlend.addEventListener("input", () => {
+  const modes = activeNormalModes();
+  if (modes) {
+    updateModeBlendLabel(modes);
+  }
 });
 
 domainSystemsButton.addEventListener("click", () => {
@@ -454,6 +471,58 @@ function renderVariantButtons() {
   });
 }
 
+// The normal-mode lens (FE-043) exposes a mode selector and a superposition
+// scrub. The selector picks one exported mode shape; the blend slider scrubs a
+// superposition toward the next mode (their two frequencies beat). Frequencies
+// stay qualitative — buttons are numbered low→high, never labelled with decimals.
+function activeNormalModes(): ManifestNormalModes | null {
+  if (!selectedExample?.normalModes || selectedVisualization?.kind !== "normal-modes") {
+    return null;
+  }
+  return selectedExample.normalModes;
+}
+
+function updateModeBlendLabel(modes: ManifestNormalModes) {
+  const count = modes.coordinates.length;
+  const blend = Number(modeBlend.value);
+  if (blend > 0.001) {
+    const next = ((selectedModeIndex + 1) % count) + 1;
+    modeBlendLabel.textContent = `superpose → mode ${next}`;
+  } else {
+    modeBlendLabel.textContent = "superpose";
+  }
+}
+
+function renderModeControls() {
+  const modes = activeNormalModes();
+  modeControlsSection.hidden = modes === null;
+  if (!modes) {
+    return;
+  }
+  if (selectedModeIndex >= modes.frequencies.length) {
+    selectedModeIndex = 0;
+  }
+  modeSelector.replaceChildren();
+  modes.frequencies.forEach((_frequency, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "mode-switch__button";
+    button.textContent = `Mode ${index + 1}`;
+    button.classList.toggle("mode-switch__button--active", index === selectedModeIndex);
+    button.addEventListener("click", () => {
+      if (index === selectedModeIndex) {
+        return;
+      }
+      selectedModeIndex = index;
+      // Picking a mode shows it pure; the scrub then superposes from there.
+      modeBlend.value = "0";
+      renderModeControls();
+    });
+    modeSelector.append(button);
+  });
+  updateModeBlendLabel(modes);
+}
+
 function loadActiveTrajectory(): Promise<Trajectory> {
   // Behind the StaticSource seam: a future GeneratedSource (Python server)
   // implements the same interface, so parameter-driven generation can drop in
@@ -540,6 +609,9 @@ function applyVisualization() {
   } else {
     bodyLegend.hide();
   }
+
+  // The normal-mode selector + superposition scrub show only for the mode lens.
+  renderModeControls();
 }
 
 async function selectExample(exampleId: string) {
@@ -550,6 +622,8 @@ async function selectExample(exampleId: string) {
   selectedExample = nextExample;
   selectedVisualization = lensFor(nextExample.lenses[0]);
   selectedVariant = defaultVariant(nextExample);
+  selectedModeIndex = 0;
+  modeBlend.value = "0";
   systemTitle.textContent = nextExample.title;
   systemSelect.value = nextExample.id;
   updateCatalogActive();
@@ -660,6 +734,15 @@ function render(now: number) {
     drawWavefrontScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else if (selectedVisualization.id === "henonHeilesPoincare") {
     drawPoincareSectionScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
+  } else if (selectedVisualization.kind === "normal-modes" && selectedExample?.normalModes) {
+    resize2dCanvas();
+    drawNormalModeScene(
+      ctx,
+      selectedExample.normalModes,
+      { modeIndex: selectedModeIndex, blend: Number(modeBlend.value), time },
+      canvas.clientWidth,
+      canvas.clientHeight,
+    );
   } else {
     threeScene.render(current.state, time, current.index);
   }

@@ -319,6 +319,37 @@ for (const viewport of [
     await page.waitForTimeout(400);
     await expect(bodyLegend).toBeHidden();
 
+    // FE-043: the coupled-oscillator chain opens on its normal-mode lens — an
+    // animated mode shape on the 2D canvas with a mode selector and a
+    // superposition scrub, driven by the exported eigenvectors/frequencies.
+    await page.locator("#systemSelect").selectOption("coupled-oscillators");
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(600);
+    await expectCanvasNonBlank(page, "#scene");
+    const modeControls = page.locator("#modeControlsSection");
+    await expect(modeControls).toBeVisible();
+    await expect(modeControls.locator("#modeSelector .mode-switch__button")).toHaveCount(4);
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-coupled-oscillators-mode1.png`) });
+
+    // Selecting a higher mode and scrubbing the superposition keeps it rendering
+    // and updates the qualitative caption (no raw decimals).
+    await page.locator("#modeSelector .mode-switch__button").nth(2).click();
+    await page.locator("#modeBlend").evaluate((element) => {
+      const input = element as HTMLInputElement;
+      input.value = "0.5";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await page.waitForTimeout(600);
+    await expectCanvasNonBlank(page, "#scene");
+    await expect(page.locator("#modeBlendLabel")).toContainText("superpose");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-coupled-oscillators-superpose.png`) });
+
+    // Switching to a system without modes hides the mode controls again.
+    await page.locator("#systemSelect").selectOption("free-rigid-body");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(300);
+    await expect(modeControls).toBeHidden();
+
     // The hard top-level domain menu swaps to the Verification workbench, which
     // renders the exported verification-problem IR read-only.
     await page.getByRole("button", { name: "Verification" }).click();

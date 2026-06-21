@@ -132,6 +132,22 @@ export interface ManifestDynamics {
   jacobian_latex: string;
 }
 
+/**
+ * The small-oscillation normal-mode analysis Python exported on a system entry
+ * (BE-083): the generalized eigenproblem `K phi = omega^2 M phi` solved once in
+ * Python. `modeShapes[i]` is the eigenvector of `frequencies[i]`, both ordered by
+ * ascending frequency. The viewer animates these exported shapes; it never solves
+ * the eigenproblem in the browser.
+ */
+export interface ManifestNormalModes {
+  coordinates: string[];
+  massMatrix: number[][];
+  stiffnessMatrix: number[][];
+  frequencies: number[];
+  modeShapes: number[][];
+  method: string;
+}
+
 export interface SystemManifest {
   id: string;
   title: string;
@@ -151,6 +167,7 @@ export interface SystemManifest {
   physics?: ManifestPhysics;
   derivation?: ManifestDerivation;
   dynamics?: ManifestDynamics;
+  normalModes?: ManifestNormalModes;
 }
 
 export interface Manifest {

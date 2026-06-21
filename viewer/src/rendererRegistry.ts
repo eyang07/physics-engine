@@ -34,6 +34,7 @@ export const CANVAS_LENS_IDS = new Set<string>([
   "doublePendulumPhase",
   "symmetricTopPotential",
   "schwarzschildEffectivePotential",
+  "coupledOscillatorModes",
 ]);
 
 /** Lens ids drawn by a Three.js scene (`ThreeScene.setVisualization`). */

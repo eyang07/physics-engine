@@ -85,23 +85,15 @@ and a live marker per body, framed on the center of mass from the exported
 COM-frame positions (`nBodyConfig()` in `viewer/src/data/trajectory.ts`), keyed by
 the categorical `bodyLegend` overlay (`viewer/src/bodyLegend.ts`) over the shared
 `bodyPalette` (`viewer/src/design/colormaps.ts`); the figure-eight and
-Sun + two-planets variants load in place._
-
-1. **FE-043: Normal-mode lens with mode selector and superposition scrub**
-   - Goal: Add a lens that animates each exported normal-mode shape, with a mode
-     selector and a control to scrub a superposition, for the coupled-oscillator
-     (and small-oscillation) systems.
-   - Scope: `viewer/src/threeScene.ts` or a mode lens, `viewer/src/structurePanel.ts`
-     for the mode selector, `viewer/src/data/manifest.ts` for mode shapes/frequencies,
-     and the viewer visual test.
-   - Acceptance: selecting a mode animates its shape at its frequency; a superposition
-     scrub blends modes; frequencies display qualitatively (no raw decimals);
-     `npm run build` and the visual test pass.
-   - Depends on: BE-083 (normal-mode analysis + coupled-oscillator export).
+Sun + two-planets variants load in place. FE-043 is complete: `coupledOscillatorModes`
+(registered `2d`) animates an exported mode shape on the canvas
+(`viewer/src/normalModeCanvas.ts`) with a mode selector and a superposition scrub
+in `viewer/src/main.ts`, reading `manifest.normalModes` (`ManifestNormalModes` in
+`viewer/src/data/manifest.ts`). **Direction A is complete (FE-040..FE-043).**_
 
 ### Direction B — Field & wave rendering
 
-3. **FE-044: Scalar-field lens (heatmap / contour)**
+1. **FE-044: Scalar-field lens (heatmap / contour)**
    - Goal: Render an exported scalar-field grid as a heatmap/contour using the
      FE-038 color+legend layer, for potentials and other scalar fields.
    - Scope: a scalar-field lens in `viewer/src/`, `viewer/src/data/manifest.ts` for
@@ -112,7 +104,7 @@ Sun + two-planets variants load in place._
    - Depends on: BE-091 (field grid export); consumes BE-093 potentials, reusable for
      BE-105 curvature.
 
-4. **FE-045: Vector-field lens (glyphs + field lines)**
+2. **FE-045: Vector-field lens (glyphs + field lines)**
    - Goal: Render an exported vector-field grid as glyphs/quiver with magnitude→color,
      and draw the exported field-line / streamline polylines.
    - Scope: a vector-field lens in `viewer/src/`, `viewer/src/data/manifest.ts` /
@@ -122,7 +114,7 @@ Sun + two-planets variants load in place._
      to the shared color legend; `npm run build` and the visual test pass.
    - Depends on: BE-091 (vector-field + field-line export), BE-092, BE-093.
 
-5. **FE-046: 1D wave displacement animation (string and wave packet)**
+3. **FE-046: 1D wave displacement animation (string and wave packet)**
     - Goal: Animate the exported 1D displacement/amplitude field for the vibrating
       string and the dispersive wave packet, including a standing/traveling toggle
       where the data supports it.
@@ -134,7 +126,7 @@ Sun + two-planets variants load in place._
       pass.
     - Depends on: BE-094 (string), BE-096 (wave packet).
 
-6. **FE-047: 2D membrane mode surfaces with mode selector**
+4. **FE-047: 2D membrane mode surfaces with mode selector**
     - Goal: Render rectangular and circular membrane modes as animated displacement
       surfaces (reusing FE-039), with a mode selector and superposition.
     - Scope: a membrane lens, `viewer/src/structurePanel.ts` for the mode selector,
@@ -143,7 +135,7 @@ Sun + two-planets variants load in place._
       mode selector switches shapes; `npm run build` and the visual test pass.
     - Depends on: BE-095 (membrane modes export).
 
-7. **FE-048: 2D wavefront / intensity surface lens**
+5. **FE-048: 2D wavefront / intensity surface lens**
     - Goal: Render the exported 2D wavefront surfaces and intensity field from the
       heterogeneous-media work, reusing the wavefront/ray bundle path and the FE-038
       color layer for intensity.
@@ -157,7 +149,7 @@ Sun + two-planets variants load in place._
 
 ### Direction C — Curved-geometry rendering
 
-8. **FE-049: Surface-embedding mesh with geodesic drawn on the surface**
+6. **FE-049: Surface-embedding mesh with geodesic drawn on the surface**
     - Goal: Render an exported surface-of-revolution embedding mesh with the geodesic
       polyline drawn on the surface in embedded coordinates.
     - Scope: a surface-geodesic lens in `viewer/src/threeScene.ts`, `viewer/src/data/
@@ -168,7 +160,7 @@ Sun + two-planets variants load in place._
       test pass.
     - Depends on: BE-100 (surface geodesics), BE-101 (embedding export schema).
 
-9. **FE-050: Curvature coloring on the surface mesh**
+7. **FE-050: Curvature coloring on the surface mesh**
     - Goal: Color the surface-embedding mesh by the exported curvature scalar field
       using the FE-038 color+legend layer, making curvature visible.
     - Scope: the surface-geodesic lens, `viewer/src/data/manifest.ts` for the
@@ -178,7 +170,7 @@ Sun + two-planets variants load in place._
       visual test pass.
     - Depends on: BE-105 (curvature scalar-field export); reuses FE-049.
 
-10. **FE-051: Parallel-transport frame animation (holonomy)**
+8. **FE-051: Parallel-transport frame animation (holonomy)**
     - Goal: Animate the exported transported frame along a curve / closed loop on a
       curved surface, making the holonomy angle legible.
     - Scope: the surface-geodesic lens, `viewer/src/playback.ts`, `viewer/src/data/
@@ -188,7 +180,7 @@ Sun + two-planets variants load in place._
       `npm run build` and the visual test pass.
     - Depends on: BE-104 (parallel transport / holonomy export).
 
-11. **FE-052: Effective-potential and orbit lens for Kepler / Schwarzschild**
+9. **FE-052: Effective-potential and orbit lens for Kepler / Schwarzschild**
     - Goal: Render the exported effective potential with turning points alongside the
       orbit, surfacing bound/unbound/precessing classification for central-force and
       GR orbits.
@@ -206,7 +198,7 @@ _These two verification-view tasks predate the direction change and are kept for
 continuity. They are **deprioritized** while the frontend follows the physics
 directions; pick them up only on explicit request._
 
-12. **FE-035: Draw the certified enclosure box on the phase-plane stage**
+10. **FE-035: Draw the certified enclosure box on the phase-plane stage**
     - Goal: An obligation's certified-numeric enclosure (FE-032) records the box it
       is sound over in state-variable coordinates, but the stage never shows where
       on the phase plane that box lies. Draw a read-only certified-box overlay on
@@ -222,7 +214,7 @@ directions; pick them up only on explicit request._
       rollout/region rendering is otherwise unchanged; nothing reads as proved;
       `npm run build` and the visual test pass.
 
-13. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
+11. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
     - Goal: The catalog lists every package's region/obligation/candidate counts
       and Tier/regime, but not how many of its obligations reach level 2. Once the
       discovery index carries a per-package certified-numeric count, surface it as
