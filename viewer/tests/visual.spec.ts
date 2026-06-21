@@ -238,6 +238,14 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-variable-speed-wavefront.png`) });
 
+    // FE-040: the heavy symmetric top opens on its attitude-playback lens, a
+    // Three.js scene that spins the body from the exported orientation series.
+    await page.locator("#systemSelect").selectOption("symmetric-top");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-symmetric-top-axis.png`) });
+
     // The hard top-level domain menu swaps to the Verification workbench, which
     // renders the exported verification-problem IR read-only.
     await page.getByRole("button", { name: "Verification" }).click();

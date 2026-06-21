@@ -1,11 +1,14 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { AttitudeBody } from "./attitudeBody";
 import { viridis } from "./design/colormaps";
 import { theme } from "./design/theme";
 import { FieldSurface } from "./fieldSurface";
 import { FlowField } from "./flow";
 import {
+  orientationChannel,
   rendererHints,
+  type Orientation,
   type ReferenceGeometryHint,
   type RendererHints,
   type Trajectory,
@@ -23,7 +26,8 @@ export type ThreeMode =
   | "keplerOrbit"
   | "beadHoop"
   | "lorenzAttractor"
-  | "henonHeilesFlow";
+  | "henonHeilesFlow"
+  | "symmetricTopAxis";
 
 const PENDULUM_GRAVITY = 9.81;
 
@@ -819,6 +823,59 @@ function makeHenonHeilesGroup(data: Trajectory, hints: RendererHints): THREE.Gro
   return group;
 }
 
+// The symmetry-axis tip in world coordinates at one frame, on the sphere of
+// radius `radius`. Prefers the exported body triad (e3); falls back to rotating
+// the body-z basis by the exported quaternion when no triad was exported.
+function topAxisTip(orientation: Orientation, index: number, radius: number): THREE.Vector3 {
+  const clamped = Math.min(Math.max(0, index), orientation.quaternion.length - 1);
+  const e3 = orientation.bodyAxes?.e3[clamped];
+  if (e3) {
+    return new THREE.Vector3(e3[0], e3[1], e3[2]).multiplyScalar(radius);
+  }
+  const [w, x, y, z] = orientation.quaternion[clamped];
+  return new THREE.Vector3(0, 0, 1)
+    .applyQuaternion(new THREE.Quaternion(x, y, z, w))
+    .multiplyScalar(radius);
+}
+
+function makeSymmetricTopGroup(
+  data: Trajectory,
+  hints: RendererHints,
+  orientation: Orientation,
+  tipRadius: number,
+): { group: THREE.Group; body: AttitudeBody } {
+  const group = new THREE.Group();
+
+  // A faint reference sphere the precessing/nutating axis tip traces across.
+  const wire = new THREE.Mesh(
+    new THREE.SphereGeometry(tipRadius, 32, 16),
+    new THREE.MeshBasicMaterial({
+      color: new THREE.Color(theme.textFaint),
+      wireframe: true,
+      transparent: true,
+      opacity: 0.14,
+    }),
+  );
+  group.add(wire);
+
+  // The full axis-tip path (precession + nutation) drawn from the exported
+  // orientation, with the live tip tracked by the motion trail in render().
+  const tip = orientation.quaternion.map((_quaternion, index) => topAxisTip(orientation, index, tipRadius));
+  group.add(contextLine(tip, 0.32));
+
+  const axisHint = referenceHint(hints, "rotationAxis");
+  const body = new AttitudeBody({
+    axis:
+      axisHint?.start && axisHint?.end ? { start: axisHint.start, end: axisHint.end } : undefined,
+    halfExtents: [0.16, 0.16, 0.3],
+    triadLength: 0.46,
+    opacity: 0.3,
+  });
+  group.add(body.object);
+
+  return { group, body };
+}
+
 export class ThreeScene {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
@@ -832,6 +889,9 @@ export class ThreeScene {
   private lorenzTransform: LorenzTransform = { center: new THREE.Vector3(), scale: 1 };
   private henonData: Trajectory | null = null;
   private henonHints: RendererHints = {};
+  private attitudeBody: AttitudeBody | null = null;
+  private attitudeOrientation: Orientation | null = null;
+  private attitudeTipRadius = 1;
   private motionTrail: THREE.Line | null = null;
   private motionTrailPoints: THREE.Vector3[] = [];
   private flow: FlowField | null = null;
@@ -901,6 +961,10 @@ export class ThreeScene {
     this.lorenzTransform = { center: new THREE.Vector3(), scale: 1 };
     this.henonData = null;
     this.henonHints = {};
+    this.attitudeBody?.dispose();
+    this.attitudeBody = null;
+    this.attitudeOrientation = null;
+    this.attitudeTipRadius = 1;
     this.motionTrail = null;
     this.motionTrailPoints = [];
     this.flow?.dispose();
@@ -1000,6 +1064,24 @@ export class ThreeScene {
       this.setMotionTrail(data.states.map((state) => lorenzPoint(state, this.lorenzTransform)), 180);
       this.marker.scale.setScalar(0.72);
       this.applyCameraHints(hints, [3.0, 2.05, 4.4], [0, 0.05, 0]);
+    } else if (mode === "symmetricTopAxis") {
+      const orientation = orientationChannel(data);
+      if (orientation) {
+        const axisHint = referenceHint(hints, "rotationAxis");
+        const tipRadius = axisHint?.end ? vectorFromTuple(axisHint.end).length() : 0.625;
+        this.attitudeOrientation = orientation;
+        this.attitudeTipRadius = tipRadius;
+        const { group, body } = makeSymmetricTopGroup(data, hints, orientation, tipRadius);
+        this.root.add(group);
+        this.attitudeBody = body;
+        body.setQuaternion(orientation.quaternion[0]);
+        this.setMotionTrail(
+          orientation.quaternion.map((_quaternion, index) => topAxisTip(orientation, index, tipRadius)),
+          120,
+        );
+        this.marker.scale.setScalar(0.46);
+      }
+      this.applyCameraHints(hints, [1.2, 0.8, 1.3], [0, 0, 0]);
     } else {
       this.henonData = data;
       this.henonHints = hints;
@@ -1117,6 +1199,12 @@ export class ThreeScene {
       const point = lorenzPoint(state, this.lorenzTransform);
       this.marker.position.copy(point);
       this.root.rotation.y = -0.35 + Math.sin(elapsed * 0.065) * 0.08;
+    } else if (this.mode === "symmetricTopAxis" && this.attitudeOrientation) {
+      const orientation = this.attitudeOrientation;
+      const index = Math.min(Math.max(0, sampleIndex), orientation.quaternion.length - 1);
+      this.attitudeBody?.setQuaternion(orientation.quaternion[index]);
+      this.marker.position.copy(topAxisTip(orientation, index, this.attitudeTipRadius));
+      this.root.rotation.y = Math.sin(elapsed * 0.08) * 0.06;
     } else if (this.henonData) {
       const point = henonPoint(state, this.henonData, this.henonHints);
       this.marker.position.copy(point);

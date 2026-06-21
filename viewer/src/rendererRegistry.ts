@@ -43,6 +43,7 @@ export const THREE_LENS_IDS = new Set<string>([
   "beadHoop",
   "lorenzAttractor",
   "henonHeilesFlow",
+  "symmetricTopAxis",
 ]);
 
 /** Resolve which stage primitive renders a lens, or `fallback` if none yet. */
