@@ -69,6 +69,7 @@ const threeJsSystems = [
   "lorenz-attractor",
   "henon-heiles",
   "free-rigid-body",
+  "n-body-gravity",
 ];
 
 for (const viewport of [
@@ -76,6 +77,9 @@ for (const viewport of [
   { name: "mobile", width: 390, height: 844 },
 ]) {
   test(`renders all example systems at ${viewport.name}`, async ({ page }, testInfo) => {
+    // This test walks the full example gallery, so it runs longer than the
+    // 30s default; give it headroom as more systems land.
+    test.setTimeout(60_000);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto("/");
     // Boot straight into the Systems workbench — no splash gate, no gallery page.
@@ -289,6 +293,31 @@ for (const viewport of [
     await page.waitForTimeout(800);
     await expectCanvasNonBlank(page, "#hamiltonianScene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-free-rigid-body-polhode.png`) });
+
+    // FE-042: the N-body gravity system opens on its orbit-trail lens — per-body
+    // trails framed on the center of mass, keyed by a categorical body legend.
+    await page.locator("#systemSelect").selectOption("n-body-gravity");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    const bodyLegend = page.locator(".body-legend");
+    await expect(bodyLegend).toBeVisible();
+    await expect(bodyLegend.locator(".body-legend__item")).toHaveCount(3);
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-n-body-figure-eight.png`) });
+
+    // The Sun–planets variant loads its own backend-generated data in place and
+    // still frames sensibly on the COM (no browser-side regeneration).
+    await page.getByRole("button", { name: "Sun + two planets" }).click();
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-n-body-sun-planets.png`) });
+
+    // Switching to a non-N-body system hides the body legend again.
+    await page.locator("#systemSelect").selectOption("free-rigid-body");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(400);
+    await expect(bodyLegend).toBeHidden();
 
     // The hard top-level domain menu swaps to the Verification workbench, which
     // renders the exported verification-problem IR read-only.

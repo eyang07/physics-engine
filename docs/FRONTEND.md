@@ -70,6 +70,12 @@ and trajectory data; it must not re-derive physics.
   principal axis so the intermediate-axis instability reads clearly. The viewer
   renders the exported attitude and geometry; it never integrates Euler's
   equations.
+- N-body orbit lens: the gravitational N-body systems draw one colored orbit
+  trail and a live marker per body, framed on the center of mass from the
+  exported COM-frame positions, with a categorical body legend keying the
+  palette. Backend-generated variants (figure-eight, Sun + two planets) load in
+  place. The viewer plots the exported trajectory; it never integrates the
+  N-body problem.
 - Renderer-hint-based camera framing and a fit-to-system reset control.
 - Playwright visual regression coverage for all examples and fit-to-system
   behavior on desktop/mobile.

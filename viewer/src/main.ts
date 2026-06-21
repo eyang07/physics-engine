@@ -25,7 +25,9 @@ import { VerificationPanel } from "./verificationPanel";
 import { VerificationStage } from "./verificationStage";
 import { resolveRendererSurface } from "./rendererRegistry";
 import { createScalarLegend } from "./scalarLegend";
-import { viridis } from "./design/colormaps";
+import { createBodyLegend } from "./bodyLegend";
+import { bodyColor, viridis } from "./design/colormaps";
+import { nBodyConfig } from "./data/trajectory";
 import {
   loadVerificationAdapterStubs,
   loadVerificationIndex,
@@ -110,6 +112,11 @@ const threeScene = new ThreeScene(threeCanvas);
 // reveal it with their own caption; every other lens keeps it hidden.
 const scalarLegend = createScalarLegend({ title: "potential", low: "low", high: "high" });
 stage.appendChild(scalarLegend.element);
+
+// One shared categorical body legend overlay (FE-042) keyed to the per-body
+// orbit-trail palette; the N-body orbit lens reveals it, others keep it hidden.
+const bodyLegend = createBodyLegend({ title: "bodies", corner: "top-left" });
+stage.appendChild(bodyLegend.element);
 
 const trajectorySource = new StaticSource();
 const structurePanel = new StructurePanel(principlesPanel, invariantsPanel, parametersPanel, loopPhaseArc);
@@ -517,6 +524,21 @@ function applyVisualization() {
     scalarLegend.show();
   } else {
     scalarLegend.hide();
+  }
+
+  // The body legend keys the N-body orbit-trail colors; it shows only when the
+  // active trajectory carries an N-body orbit configuration.
+  const nBody = nBodyConfig(trajectory);
+  if (nBody) {
+    bodyLegend.setEntries(
+      Array.from({ length: nBody.bodyCount }, (_value, index) => ({
+        label: `Body ${index + 1}`,
+        color: bodyColor(index),
+      })),
+    );
+    bodyLegend.show();
+  } else {
+    bodyLegend.hide();
   }
 }
 

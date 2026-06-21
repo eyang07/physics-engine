@@ -79,19 +79,15 @@ axis). FE-041 is complete: `freeRigidBodyPolhode` (registered `3d`) composes
 `AttitudeBody` at the centre of the Poinsot construction — the angular-momentum
 sphere, kinetic-energy ellipsoid, and their intersection (the polhode) drawn from
 `metadata.rigidBodyGeometry` via `rigidBodyGeometry()` in
-`viewer/src/data/trajectory.ts`, with the intermediate principal axis highlighted._
+`viewer/src/data/trajectory.ts`, with the intermediate principal axis highlighted.
+FE-042 is complete: `nBodyOrbits` (registered `3d`) draws one colored orbit trail
+and a live marker per body, framed on the center of mass from the exported
+COM-frame positions (`nBodyConfig()` in `viewer/src/data/trajectory.ts`), keyed by
+the categorical `bodyLegend` overlay (`viewer/src/bodyLegend.ts`) over the shared
+`bodyPalette` (`viewer/src/design/colormaps.ts`); the figure-eight and
+Sun + two-planets variants load in place._
 
-1. **FE-042: N-body orbit trails with center-of-mass framing**
-   - Goal: Render N-body systems as per-body orbit trails in 3D, framed on the
-     center of mass, with per-body color and a legend.
-   - Scope: `viewer/src/threeScene.ts` (orbit-trail scene), renderer-hint framing in
-     `viewer/src/main.ts`, and the viewer visual test.
-   - Acceptance: each body draws a distinct colored trail; the figure-eight and
-     Sun–planets configurations frame sensibly on the COM; `npm run build` and the
-     visual test pass.
-   - Depends on: BE-082 (N-body system + export).
-
-2. **FE-043: Normal-mode lens with mode selector and superposition scrub**
+1. **FE-043: Normal-mode lens with mode selector and superposition scrub**
    - Goal: Add a lens that animates each exported normal-mode shape, with a mode
      selector and a control to scrub a superposition, for the coupled-oscillator
      (and small-oscillation) systems.

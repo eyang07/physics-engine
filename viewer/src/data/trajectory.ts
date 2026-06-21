@@ -95,6 +95,19 @@ export type RigidBodyGeometry = {
   rigor?: string;
 };
 
+/**
+ * The N-body orbit configuration Python exported in `metadata.rendererHints`
+ * (BE-082). The bodies' positions are the leading `2 * bodyCount` state columns
+ * (planar `x_i, y_i`), already shifted to the center-of-mass frame when
+ * `centerOfMassFrame` is set. `bodyColors` names a stable per-body palette slot.
+ */
+export type NBodyConfig = {
+  bodyCount: number;
+  bodyColors: string[];
+  centerOfMassFrame: boolean;
+  bounds?: AxisBounds;
+};
+
 /** Map each state-variable name to its column index in `states`. */
 export function stateIndex(trajectory: Trajectory): Map<string, number> {
   const index = new Map<string, number>();
@@ -533,6 +546,31 @@ export function rigidBodyGeometry(trajectory: Trajectory): RigidBodyGeometry | n
     polhode,
     angularMomentumCurve,
     rigor: typeof raw.rigor === "string" ? raw.rigor : undefined,
+  };
+}
+
+/**
+ * Read the N-body orbit configuration Python exported with the trajectory.
+ * Returns null when the trajectory is not an N-body orbit payload or the channel
+ * is malformed, so callers can fall back gracefully.
+ */
+export function nBodyConfig(trajectory: Trajectory): NBodyConfig | null {
+  const raw = asRecord(trajectory.metadata?.rendererHints);
+  if (!raw || raw.kind !== "n-body-orbits") {
+    return null;
+  }
+  const bodyCount = asNumber(raw.bodyCount);
+  if (bodyCount === undefined || bodyCount < 1) {
+    return null;
+  }
+  const bodyColors = Array.isArray(raw.bodyColors)
+    ? raw.bodyColors.filter((item): item is string => typeof item === "string")
+    : [];
+  return {
+    bodyCount: Math.floor(bodyCount),
+    bodyColors,
+    centerOfMassFrame: raw.centerOfMassFrame === true,
+    bounds: isBounds(raw.bounds) ? raw.bounds : undefined,
   };
 }
 

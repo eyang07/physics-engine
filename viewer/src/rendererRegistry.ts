@@ -49,6 +49,7 @@ export const THREE_LENS_IDS = new Set<string>([
   "henonHeilesFlow",
   "symmetricTopAxis",
   "freeRigidBodyPolhode",
+  "nBodyOrbits",
 ]);
 
 /** Resolve which stage primitive renders a lens, or `fallback` if none yet. */
