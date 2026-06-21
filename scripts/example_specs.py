@@ -59,6 +59,7 @@ from systems.uniform_gravity import build_system as build_uniform_gravity
 from systems.variable_speed_wavefront import build_system as build_variable_speed_wavefront
 from systems.vibrating_string import build_system as build_vibrating_string
 from systems.wave_packet import build_system as build_wave_packet
+from systems.wormhole import build_system as build_wormhole
 
 
 def _time_translation(system):
@@ -172,6 +173,35 @@ def _schwarzschild_effective_potential(system):
     rs = _schwarzschild_parameter(system, "r_s")
     ell = sp.Symbol("L")
     return sp.simplify((1 - rs / r) * (1 + ell**2 / r**2))
+
+
+def _wormhole_energy(system):
+    return _first_order_state(system, "t_dot")
+
+
+def _wormhole_angular_momentum(system):
+    ell = _first_order_state(system, "l")
+    phi_dot = _first_order_state(system, "phi_dot")
+    throat_radius = _first_order_parameter(system, "a")
+    return sp.simplify((ell**2 + throat_radius**2) * phi_dot)
+
+
+def _wormhole_geometry(system):
+    return {
+        "kind": "wormhole-geodesic",
+        "rendererHint": "wormhole-geodesic",
+        "embeddingMesh": {
+            "kind": "surface-mesh",
+            "source": "trajectory.metadata.wormholeGeometry.embeddingMesh",
+        },
+        "geodesic": {
+            "kind": "embedded-polyline",
+            "source": "trajectory.metadata.wormholeGeometry.geodesic",
+        },
+        "diagnostics": {
+            "throatTraversal": "trajectory.metadata.diagnostics.throatTraversal",
+        },
+    }
 
 
 LENSES: tuple[Lens, ...] = (
@@ -319,6 +349,14 @@ LENSES: tuple[Lens, ...] = (
         projections=("phase",),
         conserved=("E", "L"),
         effective_potentials=("schwarzschild_radial",),
+    ),
+    Lens(
+        id="wormholeGeodesic",
+        title="Wormhole Throat",
+        kind="configuration-space",
+        description="Radial geodesic traversal through an embedded Ellis-wormhole throat.",
+        projections=("embedding3d",),
+        conserved=("E", "L"),
     ),
     Lens(
         id="beadHoop",
@@ -866,6 +904,43 @@ SCHWARZSCHILD = SystemSpec(
         },
     ),
     system_kind="schwarzschild-geodesic",
+)
+
+
+WORMHOLE = SystemSpec(
+    id="wormhole",
+    title="Ellis Wormhole Geodesic",
+    category="Relativity",
+    description=(
+        "Timelike geodesic traversal in a fixed Ellis-wormhole background; "
+        "the spacetime is prescribed, not dynamically solved."
+    ),
+    build=build_wormhole,
+    parameters=(
+        Parameter("a", "a", 1.0, 0.4, 3.0),
+        Parameter("l0", "l_0", -6.0, -10.0, -0.5, role="initial"),
+        Parameter("l_dot0", r"\dot{l}_0", 0.4, 0.1, 1.2, role="initial"),
+    ),
+    state=(
+        StateVar("t", "t", "coordinate"),
+        StateVar("l", "l", "coordinate"),
+        StateVar("phi", r"\phi", "coordinate"),
+        StateVar("t_dot", r"\dot{t}", "velocity"),
+        StateVar("l_dot", r"\dot{l}", "velocity"),
+        StateVar("phi_dot", r"\dot{\phi}", "velocity"),
+        StateVar("x", "x", "embedding"),
+        StateVar("y", "y", "embedding"),
+        StateVar("z", "z", "embedding"),
+    ),
+    projections={"embedding3d": ("x", "y", "z"), "phase": ("l", "l_dot")},
+    conserved=(
+        Conserved("E", "E", "stationarity / time translation", expression=_wormhole_energy),
+        Conserved("L", "L", "axial rotation", expression=_wormhole_angular_momentum),
+    ),
+    lenses=("wormholeGeodesic",),
+    data_path="/data/wormhole.json",
+    geometry=_wormhole_geometry,
+    system_kind="wormhole-geodesic",
 )
 
 
@@ -1608,6 +1683,7 @@ SPECS: tuple[SystemSpec, ...] = (
     COUPLED_OSCILLATORS,
     KEPLER,
     SCHWARZSCHILD,
+    WORMHOLE,
     BEAD_ON_HOOP,
     DOUBLE_PENDULUM,
     N_BODY_GRAVITY,

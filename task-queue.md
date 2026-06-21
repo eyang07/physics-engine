@@ -303,18 +303,7 @@ spacetimes, curvature, parallel transport, and orbital structure. Generalizes
 `systems/sphere_geodesic.py`, and gives the viewer curved-space trajectories and
 embedding diagrams._
 
-1. **BE-106: Add a second curved background (wormhole or FLRW)**
-    - Goal: Add one additional fixed-background spacetime — an Ellis-wormhole
-      embedding or an FLRW expansion slice — exercising the general BE-099 module and
-      kept honest as a fixed background (no dynamical gravity).
-    - Scope: `systems/` (new spacetime), generator, `scripts/example_specs.py`, and
-      `tests/`.
-    - Acceptance: geodesics satisfy the geodesic equation for the new metric; a
-      characteristic feature is reproduced (e.g. throat traversal for the wormhole, or
-      redshift along an FLRW null geodesic) to tolerance; the manifest exposes the
-      embedding/curve; focused tests pass and generation is clean.
-
-2. **BE-107: Geodesic-deviation diagnostics for curved backgrounds**
+1. **BE-107: Geodesic-deviation diagnostics for curved backgrounds**
     - Goal: Add measured Jacobi/geodesic-deviation diagnostics for nearby geodesics,
       making curvature-driven focusing or defocusing exportable without viewer-side
       physics.
@@ -323,6 +312,16 @@ embedding diagrams._
     - Acceptance: flat-space deviation is trivial/linear, spherical positive curvature
       produces the expected focusing trend to tolerance, exported separation/focusing
       payloads are labeled `measured`, and focused tests pass.
+
+2. **BE-108: Add coordinate-domain guards for curved backgrounds**
+    - Goal: Validate and export the coordinate/domain assumptions for fixed-background
+      curved examples so invalid presets fail in Python instead of producing ambiguous
+      viewer payloads.
+    - Scope: `systems/schwarzschild.py`, `systems/wormhole.py`, the curved-background
+      generators, `scripts/example_specs.py`, docs, and `tests/`.
+    - Acceptance: invalid Schwarzschild horizon-crossing and invalid wormhole throat
+      parameters are rejected with clear errors; trajectory metadata documents the
+      fixed-background domain assumptions; focused tests and generation pass.
 
 ### Verification track (paused)
 

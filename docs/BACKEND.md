@@ -62,6 +62,10 @@ artifacts.
     exporting measured conserved-energy/angular-momentum residuals, perihelion
     precession for the bound timelike preset, photon-sphere/light-bending
     diagnostics for the null preset, and the GR effective potential.
+  - Ellis wormhole geodesic generator for a fixed equatorial background,
+    exporting an embedding mesh, embedded geodesic curve, measured invariant
+    residuals, and measured throat-traversal diagnostics; it does not solve
+    dynamical gravity.
 - Diagnostics:
   - Invariant residuals.
   - Poincare sections.
@@ -103,6 +107,10 @@ artifacts.
     `turningPointsSource`, and `classificationSource` when a generator exports
     the corresponding backend-owned payload. The Kepler example uses this for
     radial turning points and bound/unbound/critical classification.
+  - Wormhole manifest entries may declare `geometry.kind="wormhole-geodesic"`
+    with sources for an embedding mesh, embedded geodesic, and measured
+    throat-traversal diagnostic under `metadata.wormholeGeometry` /
+    `metadata.diagnostics`.
   - Static-field manifest entries (`systemKind: "static-field"`): systems whose
     payload is a time-independent field export, not a Lagrangian or first-order
     flow, intentionally omit `physics`, `derivation`, and `dynamics`. They expose
@@ -265,6 +273,7 @@ surfaces remain future work.
 - Coupled oscillators
 - Kepler problem
 - Schwarzschild geodesic
+- Ellis wormhole geodesic
 - Bead on a rotating hoop
 - Double pendulum
 - N-body gravity
