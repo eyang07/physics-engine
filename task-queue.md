@@ -194,19 +194,7 @@ spacetimes, curvature, parallel transport, and orbital structure. Generalizes
 `systems/sphere_geodesic.py`, and gives the viewer curved-space trajectories and
 embedding diagrams._
 
-1. **BE-110: Export wormhole radial effective potential and turning points**
-    - Goal: Give the Ellis-wormhole radial geodesics the same effective-potential
-      treatment the Schwarzschild example already has, so the viewer can show the
-      throat barrier, turning points, and a qualitative bound/traversing classification
-      from Python-owned data.
-    - Scope: `systems/wormhole.py`, `scripts/generate_wormhole.py`,
-      `scripts/example_specs.py`, docs, and `tests/`.
-    - Acceptance: the radial effective potential and analytic turning points match the
-      conserved energy/angular-momentum reduction to tolerance, the payload carries a
-      qualitative classification (no raw decimals as the readout), the manifest declares
-      the effective-potential source, and focused tests plus generation pass.
-
-2. **BE-111: Export the Schwarzschild embedding mesh and curvature field**
+1. **BE-111: Export the Schwarzschild embedding mesh and curvature field**
     - Goal: Give the Schwarzschild example the same embedding-mesh + colorable
       curvature treatment the wormhole now has (BE-109), exporting a Flamm-paraboloid
       embedding mesh for the exterior `r > r_s` and a curvature scalar field aligned to
@@ -220,6 +208,19 @@ embedding diagrams._
       Kretschmann is the curvature invariant used), the mesh stays outside the horizon,
       the manifest declares the surface-mesh and scalar-field sources, and focused tests
       plus generation pass.
+
+2. **BE-112: Export a non-radial Ellis-wormhole geodesic preset with turning points**
+    - Goal: Add an angular-momentum (`L != 0`) wormhole geodesic preset so the radial
+      effective potential (BE-110) actually exhibits a reflected geodesic that turns
+      around at the centrifugal barrier without crossing the throat, giving the viewer a
+      concrete reflected/traversing contrast from Python-owned data.
+    - Scope: `systems/wormhole.py` (a non-radial initial-state helper), `scripts/
+      generate_wormhole.py`, `scripts/example_specs.py` (a parameter variant), docs, and
+      `tests/`.
+    - Acceptance: the new preset has nonzero conserved `L`, its analytic turning points
+      match the integrated radial extrema to tolerance, the exported classification reads
+      `reflected`, the measured throat-traversal diagnostic agrees (does not cross), the
+      manifest declares the variant, and focused tests plus generation pass.
 
 ### Verification track (paused)
 

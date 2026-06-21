@@ -189,6 +189,13 @@ def _wormhole_angular_momentum(system):
     return sp.simplify((ell**2 + throat_radius**2) * phi_dot)
 
 
+def _wormhole_effective_potential(system):
+    ell = _first_order_state(system, "l")
+    throat_radius = _first_order_parameter(system, "a")
+    angular_momentum = sp.Symbol("L")
+    return sp.simplify(1 + angular_momentum**2 / (ell**2 + throat_radius**2))
+
+
 def _wormhole_geometry(system):
     return {
         "kind": "wormhole-geodesic",
@@ -365,6 +372,15 @@ LENSES: tuple[Lens, ...] = (
         description="Radial geodesic traversal through an embedded Ellis-wormhole throat.",
         projections=("embedding3d",),
         conserved=("E", "L"),
+    ),
+    Lens(
+        id="wormholeEffectivePotential",
+        title="Throat Effective Potential",
+        kind="effective-potential",
+        description="Ellis radial reduction with the throat barrier, turning points, and traversal class.",
+        projections=("phase",),
+        conserved=("E", "L"),
+        effective_potentials=("wormhole_radial",),
     ),
     Lens(
         id="beadHoop",
@@ -949,8 +965,23 @@ WORMHOLE = SystemSpec(
         Conserved("E", "E", "stationarity / time translation", expression=_wormhole_energy),
         Conserved("L", "L", "axial rotation", expression=_wormhole_angular_momentum),
     ),
-    lenses=("wormholeGeodesic",),
+    lenses=("wormholeGeodesic", "wormholeEffectivePotential"),
     data_path="/data/wormhole.json",
+    effective_potentials=(
+        EffectivePotential(
+            name="wormhole_radial",
+            coordinate="l",
+            latex=r"V_{\mathrm{eff}}^2",
+            conserved="L",
+            conserved_latex="L",
+            expression=_wormhole_effective_potential,
+            plot_source="trajectory.metadata.potentialPlots[name=wormhole_radial]",
+            turning_points_source=(
+                "trajectory.metadata.potentialPlots[name=wormhole_radial].turningPoints"
+            ),
+            classification_source="trajectory.metadata.orbitClassification",
+        ),
+    ),
     geometry=_wormhole_geometry,
     fields=(
         {

@@ -11,11 +11,16 @@ from engine.export import Trajectory
 from engine.numerics import integrate_fixed_step
 from scripts.generation import invariant_residual_records, write_trajectory_outputs
 from systems.wormhole import (
+    WormholeGeodesicKind,
     build_system,
+    classify_radial_geodesic,
+    conserved_constants,
     conserved_series,
     domain_assumptions,
     ellis_wormhole_metric,
     embedding_xyz,
+    geodesic_kind_from_norm,
+    radial_effective_potential_values,
     radial_throat_initial_state,
 )
 
@@ -106,6 +111,62 @@ def _curvature_field(throat_radius: float, *, l_count: int = 73, phi_count: int 
         },
         "evaluation": "symbolic-exact",
     }
+
+
+def _potential_plot(
+    *,
+    l_values: np.ndarray,
+    throat_radius: float,
+    energy: float,
+    angular_momentum: float,
+    kind: WormholeGeodesicKind,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Radial effective potential over ``l`` plus its turning-point classification.
+
+    The plot samples ``V_eff^2(l) = epsilon + L^2/(l^2 + a^2)`` symmetrically about
+    the throat (``l = 0`` is always sampled) so the viewer can draw the throat
+    barrier, the conserved ``E^2`` level, and any turning points without
+    re-deriving the reduction.
+    """
+
+    reduction = classify_radial_geodesic(
+        throat_radius=throat_radius,
+        energy=energy,
+        angular_momentum=angular_momentum,
+        kind=kind,
+    )
+    turning_points = list(reduction.turning_points)
+    extent = max(
+        float(np.max(np.abs(l_values))) * 1.1,
+        3.0 * throat_radius,
+        *(1.2 * abs(point) for point in turning_points),
+    )
+    coordinate_values = np.linspace(-extent, extent, 361)
+    potential_values = radial_effective_potential_values(
+        coordinate_values,
+        throat_radius=throat_radius,
+        angular_momentum=angular_momentum,
+        kind=kind,
+    )
+    return (
+        {
+            "name": "wormhole_radial",
+            "coordinate": "l",
+            "coordinateLatex": "l",
+            "potentialLatex": r"V_{\mathrm{eff}}^2",
+            "coordinateValues": coordinate_values.astype(float).tolist(),
+            "potentialValues": potential_values.astype(float).tolist(),
+            "energy": float(energy**2),
+            "energyKind": "specific-energy-squared",
+            "angularMomentum": float(angular_momentum),
+            "throatBarrier": reduction.throat_barrier,
+            "turningPoints": turning_points,
+            "classification": reduction.classification,
+            "rendererHint": "effective-potential",
+            "evaluation": reduction.evaluation,
+        },
+        reduction.to_dict(),
+    )
 
 
 def _renderer_hints(states: np.ndarray, *, throat_radius: float) -> dict[str, object]:
@@ -202,12 +263,25 @@ def generate_wormhole_trajectory(
     positions = embedding_xyz(intrinsic_states, throat_radius=throat_radius)
     states = np.column_stack([intrinsic_states, positions])
     series = conserved_series(intrinsic_states, throat_radius=throat_radius)
+    energy, angular_momentum = conserved_constants(
+        intrinsic_states[0], throat_radius=throat_radius
+    )
+    kind = geodesic_kind_from_norm(series["metricNorm"][0])
+    potential_plot, classification = _potential_plot(
+        l_values=intrinsic_states[:, 1],
+        throat_radius=throat_radius,
+        energy=energy,
+        angular_momentum=angular_momentum,
+        kind=kind,
+    )
     metadata = {
         "system": "ellis_wormhole",
         "kind": "fixed-background",
         "throatRadius": throat_radius,
         "domain": domain,
         "rendererHints": _renderer_hints(states, throat_radius=throat_radius),
+        "potentialPlots": [potential_plot],
+        "orbitClassification": classification,
         "wormholeGeometry": {
             "kind": "wormhole-geodesic",
             "rendererHint": "wormhole-geodesic",

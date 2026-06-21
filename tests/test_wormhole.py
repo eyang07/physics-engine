@@ -11,9 +11,13 @@ from scripts.example_specs import WORMHOLE
 from scripts.generate_wormhole import generate_wormhole_trajectory, write_wormhole_trajectory
 from systems.wormhole import (
     build_system,
+    classify_radial_geodesic,
     domain_assumptions,
     ellis_wormhole_metric,
+    radial_effective_potential_values,
+    radial_throat_barrier,
     radial_throat_initial_state,
+    radial_turning_points,
 )
 
 
@@ -194,6 +198,113 @@ def test_wormhole_exports_scalar_curvature_field() -> None:
     assert np.isclose(throat["scalarCurvature"], -2.0 / throat_radius**2)
     assert np.isclose(values.min(), -2.0 / throat_radius**2)
     assert float(values[0, 0]) > float(values[values.shape[0] // 2, 0])
+
+
+def test_wormhole_reflected_turning_points_match_effective_potential() -> None:
+    # A geodesic with angular momentum whose specific energy sits below the
+    # throat barrier turns around symmetrically and never crosses the throat.
+    throat_radius = 1.0
+    angular_momentum = 2.0
+    energy = float(np.sqrt(3.0))
+    barrier = radial_throat_barrier(
+        throat_radius=throat_radius, angular_momentum=angular_momentum
+    )
+    assert barrier == 1.0 + angular_momentum**2  # epsilon + L^2/a^2
+
+    reduction = classify_radial_geodesic(
+        throat_radius=throat_radius,
+        energy=energy,
+        angular_momentum=angular_momentum,
+    )
+    assert reduction.classification == "reflected"
+    assert reduction.family == "ellis-wormhole"
+    assert reduction.coordinate == "l"
+
+    turning_points = np.asarray(reduction.turning_points, dtype=float)
+    assert turning_points.shape == (2,)
+    assert np.allclose(turning_points, [-1.0, 1.0])
+    # The potential reaches exactly E^2 at the turning points (l_dot = 0 there).
+    values = radial_effective_potential_values(
+        turning_points,
+        throat_radius=throat_radius,
+        angular_momentum=angular_momentum,
+    )
+    assert np.allclose(values, energy**2)
+
+
+def test_wormhole_radial_geodesic_energy_balance_and_classification() -> None:
+    trajectory = generate_wormhole_trajectory(t_span=(0.0, 32.0), dt=0.02)
+    ell = trajectory.states[:, 1]
+    l_dot = trajectory.states[:, 4]
+    energy = trajectory.metadata["orbitClassification"]["energy"]
+    angular_momentum = trajectory.metadata["orbitClassification"]["angularMomentum"]
+
+    # The default preset is a purely radial traversal: L = 0, so the centrifugal
+    # term vanishes and the throat barrier is the bare timelike rest term.
+    assert abs(angular_momentum) < 1e-12
+    assert radial_turning_points(
+        throat_radius=1.0, energy=energy, angular_momentum=angular_momentum
+    ) == ()
+
+    # The conserved E/L reduction reproduces the integrated radial velocity:
+    # l_dot^2 = E^2 - V_eff^2(l) at every sample, to integration tolerance.
+    potential = radial_effective_potential_values(
+        ell, throat_radius=1.0, angular_momentum=angular_momentum
+    )
+    assert np.allclose(energy**2 - potential, l_dot**2, atol=1e-9)
+
+    classification = trajectory.metadata["orbitClassification"]
+    assert classification["classification"] == "traversing"
+    assert classification["throatBarrier"] == 1.0
+    # The analytic traversal class agrees with the measured rollout diagnostic.
+    assert trajectory.metadata["diagnostics"]["throatTraversal"]["crossesThroat"] is True
+
+
+def test_wormhole_exports_effective_potential_plot() -> None:
+    trajectory = generate_wormhole_trajectory(t_span=(0.0, 32.0), dt=0.02)
+    (plot,) = trajectory.metadata["potentialPlots"]
+
+    assert plot["name"] == "wormhole_radial"
+    assert plot["coordinate"] == "l"
+    assert plot["rendererHint"] == "effective-potential"
+    assert plot["energyKind"] == "specific-energy-squared"
+    assert plot["classification"] == "traversing"
+    assert plot["turningPoints"] == []
+    assert plot["throatBarrier"] == 1.0
+    assert plot["evaluation"] == "analytic-ellis-effective-potential"
+
+    coordinate_values = np.asarray(plot["coordinateValues"], dtype=float)
+    potential_values = np.asarray(plot["potentialValues"], dtype=float)
+    assert coordinate_values.shape == potential_values.shape
+    # The throat (l = 0) is sampled and is the potential maximum (barrier).
+    assert np.isclose(coordinate_values.min(), -coordinate_values.max())
+    throat_index = int(np.argmin(np.abs(coordinate_values)))
+    assert np.isclose(coordinate_values[throat_index], 0.0)
+    assert np.isclose(potential_values[throat_index], plot["throatBarrier"])
+    assert potential_values[throat_index] >= potential_values.max() - 1e-12
+    # The exported curve matches the analytic reduction sample-for-sample.
+    expected = radial_effective_potential_values(
+        coordinate_values, throat_radius=1.0, angular_momentum=plot["angularMomentum"]
+    )
+    assert np.allclose(potential_values, expected)
+
+
+def test_wormhole_manifest_exposes_effective_potential() -> None:
+    entry = system_entry(WORMHOLE)
+    potentials = {item["name"]: item for item in entry["effectivePotentials"]}
+
+    assert "wormhole_radial" in potentials
+    potential = potentials["wormhole_radial"]
+    assert potential["coordinate"] == "l"
+    assert potential["conserved"] == "L"
+    assert potential["plotSource"] == (
+        "trajectory.metadata.potentialPlots[name=wormhole_radial]"
+    )
+    assert potential["turningPointsSource"] == (
+        "trajectory.metadata.potentialPlots[name=wormhole_radial].turningPoints"
+    )
+    assert potential["classificationSource"] == "trajectory.metadata.orbitClassification"
+    assert "wormholeEffectivePotential" in entry["lenses"]
 
 
 def test_wormhole_manifest_declares_curvature_scalar_field() -> None:

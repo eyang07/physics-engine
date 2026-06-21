@@ -68,8 +68,11 @@ artifacts.
   - Ellis wormhole geodesic generator for a fixed equatorial background,
     exporting an embedding mesh, embedded geodesic curve, a deterministic
     scalar-curvature field over the same throat grid (`R = -2a^2/(a^2+l^2)^2`,
-    extremal at the throat `l = 0`), measured invariant residuals, and measured
-    throat-traversal diagnostics; it does not solve dynamical gravity.
+    extremal at the throat `l = 0`), a radial effective potential
+    (`V_eff^2 = epsilon + L^2/(l^2+a^2)`) with the throat barrier, analytic
+    turning points, and a qualitative traversing/reflected classification,
+    measured invariant residuals, and measured throat-traversal diagnostics; it
+    does not solve dynamical gravity.
   - Coordinate-domain guards for fixed curved backgrounds: each system declares
     its chart's validity domain and the generators reject presets that leave it.
     The Schwarzschild generator rejects geodesics that touch or cross the event
@@ -123,7 +126,11 @@ artifacts.
     diagnostics under `metadata.wormholeGeometry` / `metadata.diagnostics`. The
     curvature samples are deterministic symbolic evaluations and the entry also
     exposes the field through a top-level `fields` declaration
-    (`scalarCurvature`, sourced from `metadata.wormholeGeometry.curvature`).
+    (`scalarCurvature`, sourced from `metadata.wormholeGeometry.curvature`). The
+    same entry also carries an `effective-potential` lens whose `plotSource`
+    (`metadata.potentialPlots[name=wormhole_radial]`) and `classificationSource`
+    (`metadata.orbitClassification`) expose the radial throat barrier, turning
+    points, and a qualitative traversing/reflected class.
   - Fixed-background manifest entries may declare a `domain` channel
     (`kind="coordinate-domain"`, `source="trajectory.metadata.domain"`). The
     trajectory payload carries the matching `metadata.domain` descriptor: the
