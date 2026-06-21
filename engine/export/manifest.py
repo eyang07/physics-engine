@@ -198,6 +198,7 @@ class SystemSpec:
     normal_modes: Callable[[Any], Mapping[str, Any]] | None = None
     geometry: Callable[[Any], Mapping[str, Any]] | None = None
     orientation: Mapping[str, Any] | None = None
+    domain: Mapping[str, Any] | None = None
     fields: tuple[Mapping[str, Any], ...] = ()
     system_kind: str = "mechanics"
     variants: tuple[ParameterVariant, ...] = ()
@@ -489,6 +490,8 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
         entry["geometry"] = dict(spec.geometry(system))
     if spec.orientation is not None:
         entry["orientation"] = dict(spec.orientation)
+    if spec.domain is not None:
+        entry["domain"] = dict(spec.domain)
     if spec.fields:
         entry["fields"] = [dict(channel) for channel in spec.fields]
     if spec.variants:
@@ -593,6 +596,8 @@ def first_order_system_entry(spec: SystemSpec, system: FirstOrderSystem) -> dict
         entry["geometry"] = dict(spec.geometry(system))
     if spec.orientation is not None:
         entry["orientation"] = dict(spec.orientation)
+    if spec.domain is not None:
+        entry["domain"] = dict(spec.domain)
     if spec.fields:
         entry["fields"] = [dict(channel) for channel in spec.fields]
     if spec.variants:

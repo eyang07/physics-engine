@@ -71,12 +71,47 @@ def radial_throat_initial_state(
     return [0.0, start_l, 0.0, float(np.sqrt(1.0 + l_dot**2)), l_dot, 0.0]
 
 
+def domain_assumptions(*, throat_radius: float) -> dict[str, object]:
+    """Fixed-background coordinate-domain assumptions for the Ellis chart.
+
+    The proper radial coordinate ``l`` ranges over the whole real line with the
+    throat at ``l = 0`` (proper radius ``a``); the chart stays regular as long as
+    the throat radius is positive. No dynamical gravity is solved.
+    """
+
+    if throat_radius <= 0.0:
+        raise ValueError("throat_radius must be positive")
+    return {
+        "kind": "coordinate-domain",
+        "background": "fixed-ellis-wormhole",
+        "chart": "equatorial",
+        "coordinates": ["t", "l", "phi"],
+        "constraints": [
+            {
+                "quantity": "a",
+                "relation": "greater-than",
+                "value": 0.0,
+                "description": (
+                    "throat radius must be positive to keep the proper-radius chart regular"
+                ),
+            }
+        ],
+        "throatRadius": float(throat_radius),
+        "radialCoordinateRange": "all-real",
+        "note": (
+            "Fixed Ellis-wormhole background; the proper radial coordinate l ranges "
+            "over the whole real line with the throat at l = 0 (proper radius a)."
+        ),
+    }
+
+
 system = build_system()
 
 
 __all__ = [
     "build_system",
     "conserved_series",
+    "domain_assumptions",
     "ellis_wormhole_metric",
     "embedding_xyz",
     "radial_throat_initial_state",

@@ -12,6 +12,7 @@ from scripts.generation import invariant_residual_records, write_trajectory_outp
 from systems.wormhole import (
     build_system,
     conserved_series,
+    domain_assumptions,
     ellis_wormhole_metric,
     embedding_xyz,
     radial_throat_initial_state,
@@ -125,6 +126,7 @@ def generate_wormhole_trajectory(
     t_span: tuple[float, float] = (0.0, 32.0),
     dt: float = 0.02,
 ) -> Trajectory:
+    domain = domain_assumptions(throat_radius=throat_radius)
     system = build_system(throat_radius=throat_radius)
     time, intrinsic_states = integrate_fixed_step(
         system.numerical_rhs(),
@@ -143,6 +145,7 @@ def generate_wormhole_trajectory(
         "system": "ellis_wormhole",
         "kind": "fixed-background",
         "throatRadius": throat_radius,
+        "domain": domain,
         "rendererHints": _renderer_hints(states, throat_radius=throat_radius),
         "wormholeGeometry": {
             "kind": "wormhole-geodesic",

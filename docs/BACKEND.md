@@ -69,6 +69,12 @@ artifacts.
     exporting an embedding mesh, embedded geodesic curve, measured invariant
     residuals, and measured throat-traversal diagnostics; it does not solve
     dynamical gravity.
+  - Coordinate-domain guards for fixed curved backgrounds: each system declares
+    its chart's validity domain and the generators reject presets that leave it.
+    The Schwarzschild generator rejects geodesics that touch or cross the event
+    horizon `r = r_s` (where the exterior coordinates are singular); the wormhole
+    generator rejects a non-positive throat radius. Both attach a
+    `coordinate-domain` descriptor to the trajectory metadata.
 - Diagnostics:
   - Invariant residuals.
   - Poincare sections.
@@ -114,6 +120,13 @@ artifacts.
     with sources for an embedding mesh, embedded geodesic, and measured
     throat-traversal / geodesic-deviation diagnostics under
     `metadata.wormholeGeometry` / `metadata.diagnostics`.
+  - Fixed-background manifest entries may declare a `domain` channel
+    (`kind="coordinate-domain"`, `source="trajectory.metadata.domain"`). The
+    trajectory payload carries the matching `metadata.domain` descriptor: the
+    chart name, coordinate list, the validity constraints (e.g. Schwarzschild
+    `r > r_s`, wormhole throat radius `> 0`), and the relevant reference radii.
+    It documents the fixed-background assumptions; it is not a dynamical
+    solution.
   - Static-field manifest entries (`systemKind: "static-field"`): systems whose
     payload is a time-independent field export, not a Lagrangian or first-order
     flow, intentionally omit `physics`, `derivation`, and `dynamics`. They expose

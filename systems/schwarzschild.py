@@ -223,13 +223,80 @@ def kretschmann_scalar_values(
     return 12.0 * schwarzschild_radius**2 / radii**6
 
 
+def domain_assumptions(*, schwarzschild_radius: float) -> dict[str, object]:
+    """Fixed-background coordinate-domain assumptions for the exterior chart.
+
+    The equatorial Schwarzschild coordinates ``(t, r, phi)`` are singular at the
+    event horizon ``r = r_s``, so geodesics are only exported while ``r > r_s``.
+    No dynamical gravity is solved.
+    """
+
+    if schwarzschild_radius <= 0.0:
+        raise ValueError("schwarzschild_radius must be positive")
+    return {
+        "kind": "coordinate-domain",
+        "background": "fixed-schwarzschild-exterior",
+        "chart": "equatorial",
+        "coordinates": ["t", "r", "phi"],
+        "constraints": [
+            {
+                "quantity": "r",
+                "relation": "greater-than",
+                "value": float(schwarzschild_radius),
+                "description": (
+                    "radial coordinate stays strictly outside the event horizon r = r_s"
+                ),
+            }
+        ],
+        "eventHorizonRadius": float(schwarzschild_radius),
+        "photonSphereRadius": photon_sphere_radius(
+            schwarzschild_radius=schwarzschild_radius
+        ),
+        "note": (
+            "Fixed exterior Schwarzschild background; the coordinates are singular "
+            "at the horizon r = r_s, so geodesics are exported only while r > r_s."
+        ),
+    }
+
+
+def assert_outside_horizon(
+    radius_values: Sequence[float],
+    *,
+    schwarzschild_radius: float,
+    context: str = "geodesic",
+) -> None:
+    """Reject a rollout whose radial coordinate reaches or crosses the horizon.
+
+    Both non-finite radii (a plunge that diverged the chart coordinates) and any
+    sample at or inside ``r = r_s`` are rejected with a clear error so an invalid
+    preset fails in Python instead of producing an ambiguous viewer payload.
+    """
+
+    if schwarzschild_radius <= 0.0:
+        raise ValueError("schwarzschild_radius must be positive")
+    radii = np.asarray(radius_values, dtype=float)
+    if not np.all(np.isfinite(radii)):
+        raise ValueError(
+            f"{context} left the exterior Schwarzschild chart (non-finite radius); "
+            f"the preset crosses the horizon r_s = {schwarzschild_radius:.6g}"
+        )
+    if np.any(radii <= schwarzschild_radius):
+        min_radius = float(np.min(radii))
+        raise ValueError(
+            f"{context} crosses the Schwarzschild horizon: min r = {min_radius:.6g} "
+            f"<= r_s = {schwarzschild_radius:.6g}; the exterior chart is valid only for r > r_s"
+        )
+
+
 system = build_system()
 
 
 __all__ = [
     "SchwarzschildGeodesicKind",
+    "assert_outside_horizon",
     "build_system",
     "conserved_series",
+    "domain_assumptions",
     "embedding_xy",
     "null_light_bending",
     "null_scattering_initial_state",

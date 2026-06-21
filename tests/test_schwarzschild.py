@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import numpy as np
+import pytest
 import sympy as sp
 
 from engine.export.manifest import system_entry
@@ -12,7 +13,9 @@ from scripts.generate_schwarzschild import (
     write_schwarzschild_trajectory,
 )
 from systems.schwarzschild import (
+    assert_outside_horizon,
     build_system,
+    domain_assumptions,
     kretschmann_scalar_values,
     null_light_bending,
     null_scattering_initial_state,
@@ -45,11 +48,57 @@ def test_schwarzschild_system_uses_equatorial_metric_geodesic_flow() -> None:
     assert abs(_metric_norm(n_state, schwarzschild_radius=2.0)) < 1e-12
 
 
+def test_schwarzschild_domain_rejects_horizon_crossing_radii() -> None:
+    assert_outside_horizon([3.0, 10.0, 300.0], schwarzschild_radius=2.0)
+    with pytest.raises(ValueError, match="crosses the Schwarzschild horizon"):
+        assert_outside_horizon([3.0, 2.0], schwarzschild_radius=2.0)
+    with pytest.raises(ValueError, match="non-finite radius"):
+        assert_outside_horizon([3.0, float("nan")], schwarzschild_radius=2.0)
+    with pytest.raises(ValueError, match="schwarzschild_radius must be positive"):
+        domain_assumptions(schwarzschild_radius=0.0)
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_schwarzschild_generator_rejects_plunging_null_geodesic() -> None:
+    # An impact parameter below the critical value 3*sqrt(3) M = b_crit drives the
+    # photon through the horizon; the generator must reject it instead of exporting
+    # a payload that left the exterior chart.
+    with pytest.raises(ValueError, match="horizon"):
+        generate_schwarzschild_trajectory(
+            kind="null",
+            impact_parameter=3.0,
+            start_radius=20.0,
+            t_span=(0.0, 60.0),
+            dt=0.05,
+        )
+
+
+def test_schwarzschild_exports_domain_assumptions() -> None:
+    trajectory = generate_schwarzschild_trajectory(kind="timelike")
+    domain = trajectory.metadata["domain"]
+
+    assert domain["kind"] == "coordinate-domain"
+    assert domain["background"] == "fixed-schwarzschild-exterior"
+    assert domain["coordinates"] == ["t", "r", "phi"]
+    assert domain["eventHorizonRadius"] == 2.0
+    assert domain["photonSphereRadius"] == photon_sphere_radius(schwarzschild_radius=2.0)
+    (constraint,) = domain["constraints"]
+    assert constraint["quantity"] == "r"
+    assert constraint["relation"] == "greater-than"
+    assert constraint["value"] == 2.0
+    radii = trajectory.states[:, 1]
+    assert np.all(radii > domain["eventHorizonRadius"])
+
+
 def test_schwarzschild_manifest_exposes_orbit_and_effective_potential() -> None:
     entry = system_entry(SCHWARZSCHILD)
     potentials = entry["effectivePotentials"]
 
     assert entry["systemKind"] == "schwarzschild-geodesic"
+    assert entry["domain"] == {
+        "kind": "coordinate-domain",
+        "source": "trajectory.metadata.domain",
+    }
     assert {item["name"] for item in entry["conserved"]} == {"E", "L"}
     assert [potential["name"] for potential in potentials] == ["schwarzschild_radial"]
     assert potentials[0]["turningPointsSource"].endswith(".turningPoints")

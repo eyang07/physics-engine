@@ -299,17 +299,7 @@ spacetimes, curvature, parallel transport, and orbital structure. Generalizes
 `systems/sphere_geodesic.py`, and gives the viewer curved-space trajectories and
 embedding diagrams._
 
-1. **BE-108: Add coordinate-domain guards for curved backgrounds**
-    - Goal: Validate and export the coordinate/domain assumptions for fixed-background
-      curved examples so invalid presets fail in Python instead of producing ambiguous
-      viewer payloads.
-    - Scope: `systems/schwarzschild.py`, `systems/wormhole.py`, the curved-background
-      generators, `scripts/example_specs.py`, docs, and `tests/`.
-    - Acceptance: invalid Schwarzschild horizon-crossing and invalid wormhole throat
-      parameters are rejected with clear errors; trajectory metadata documents the
-      fixed-background domain assumptions; focused tests and generation pass.
-
-2. **BE-109: Export wormhole curvature fields**
+1. **BE-109: Export wormhole curvature fields**
     - Goal: Add deterministic curvature scalar samples for the Ellis-wormhole fixed
       background so the curved-background gallery can color the throat geometry from
       Python-owned data.
@@ -318,6 +308,18 @@ embedding diagrams._
     - Acceptance: scalar curvature samples match the `MetricGeometry` symbolic
       expression to tolerance, the throat extremum is sampled, the manifest declares
       the scalar-field source, and focused tests plus generation pass.
+
+2. **BE-110: Export wormhole radial effective potential and turning points**
+    - Goal: Give the Ellis-wormhole radial geodesics the same effective-potential
+      treatment the Schwarzschild example already has, so the viewer can show the
+      throat barrier, turning points, and a qualitative bound/traversing classification
+      from Python-owned data.
+    - Scope: `systems/wormhole.py`, `scripts/generate_wormhole.py`,
+      `scripts/example_specs.py`, docs, and `tests/`.
+    - Acceptance: the radial effective potential and analytic turning points match the
+      conserved energy/angular-momentum reduction to tolerance, the payload carries a
+      qualitative classification (no raw decimals as the readout), the manifest declares
+      the effective-potential source, and focused tests plus generation pass.
 
 ### Verification track (paused)
 

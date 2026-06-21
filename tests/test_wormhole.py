@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import numpy as np
+import pytest
 import sympy as sp
 
 from engine.export.manifest import system_entry
@@ -10,6 +11,7 @@ from scripts.example_specs import WORMHOLE
 from scripts.generate_wormhole import generate_wormhole_trajectory, write_wormhole_trajectory
 from systems.wormhole import (
     build_system,
+    domain_assumptions,
     ellis_wormhole_metric,
     radial_throat_initial_state,
 )
@@ -44,11 +46,41 @@ def test_wormhole_system_uses_ellis_metric_geodesic_flow() -> None:
     assert abs(_metric_norm(initial_state, throat_radius=1.0) + 1.0) < 1e-12
 
 
+def test_wormhole_domain_rejects_nonpositive_throat() -> None:
+    for invalid in (0.0, -1.0):
+        with pytest.raises(ValueError, match="throat_radius must be positive"):
+            domain_assumptions(throat_radius=invalid)
+
+
+def test_wormhole_generator_rejects_invalid_throat() -> None:
+    with pytest.raises(ValueError, match="throat_radius must be positive"):
+        generate_wormhole_trajectory(throat_radius=0.0, t_span=(0.0, 0.2), dt=0.02)
+
+
+def test_wormhole_exports_domain_assumptions() -> None:
+    trajectory = generate_wormhole_trajectory(t_span=(0.0, 0.2), dt=0.02)
+    domain = trajectory.metadata["domain"]
+
+    assert domain["kind"] == "coordinate-domain"
+    assert domain["background"] == "fixed-ellis-wormhole"
+    assert domain["coordinates"] == ["t", "l", "phi"]
+    assert domain["throatRadius"] == 1.0
+    assert domain["radialCoordinateRange"] == "all-real"
+    (constraint,) = domain["constraints"]
+    assert constraint["quantity"] == "a"
+    assert constraint["relation"] == "greater-than"
+    assert constraint["value"] == 0.0
+
+
 def test_wormhole_manifest_exposes_embedding_contract() -> None:
     entry = system_entry(WORMHOLE)
     geometry = entry["geometry"]
 
     assert entry["systemKind"] == "wormhole-geodesic"
+    assert entry["domain"] == {
+        "kind": "coordinate-domain",
+        "source": "trajectory.metadata.domain",
+    }
     assert {item["name"] for item in entry["conserved"]} == {"E", "L"}
     assert geometry["kind"] == "wormhole-geodesic"
     assert geometry["rendererHint"] == "wormhole-geodesic"

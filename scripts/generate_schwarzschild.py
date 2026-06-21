@@ -15,8 +15,10 @@ from engine.numerics import integrate_fixed_step
 from scripts.generation import invariant_residual_records, write_trajectory_outputs
 from systems.schwarzschild import (
     SchwarzschildGeodesicKind,
+    assert_outside_horizon,
     build_system,
     conserved_series,
+    domain_assumptions,
     embedding_xy,
     kretschmann_scalar_values,
     null_light_bending,
@@ -175,12 +177,23 @@ def generate_schwarzschild_trajectory(
     else:
         raise ValueError(f"unknown Schwarzschild geodesic kind: {kind!r}")
 
+    domain = domain_assumptions(schwarzschild_radius=schwarzschild_radius)
+    assert_outside_horizon(
+        [initial_state[1]],
+        schwarzschild_radius=schwarzschild_radius,
+        context=f"{kind} Schwarzschild initial state",
+    )
     system = build_system(schwarzschild_radius=schwarzschild_radius)
     time, intrinsic_states = integrate_fixed_step(
         system.numerical_rhs(),
         initial_state=initial_state,
         t_span=span,
         dt=step,
+    )
+    assert_outside_horizon(
+        intrinsic_states[:, 1],
+        schwarzschild_radius=schwarzschild_radius,
+        context=f"{kind} Schwarzschild geodesic",
     )
     positions = embedding_xy(intrinsic_states)
     states = np.column_stack([intrinsic_states, positions])
@@ -209,6 +222,7 @@ def generate_schwarzschild_trajectory(
         "system": "schwarzschild",
         "kind": kind,
         "schwarzschildRadius": schwarzschild_radius,
+        "domain": domain,
         "parameters": {
             "r_s": schwarzschild_radius,
             "semi_latus_rectum": semi_latus_rectum,

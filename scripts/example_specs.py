@@ -907,6 +907,10 @@ SCHWARZSCHILD = SystemSpec(
             "source": "trajectory.metadata.curvatureScalars.kretschmannScalar",
         },
     ),
+    domain={
+        "kind": "coordinate-domain",
+        "source": "trajectory.metadata.domain",
+    },
     system_kind="schwarzschild-geodesic",
 )
 
@@ -944,6 +948,10 @@ WORMHOLE = SystemSpec(
     lenses=("wormholeGeodesic",),
     data_path="/data/wormhole.json",
     geometry=_wormhole_geometry,
+    domain={
+        "kind": "coordinate-domain",
+        "source": "trajectory.metadata.domain",
+    },
     system_kind="wormhole-geodesic",
 )
 
