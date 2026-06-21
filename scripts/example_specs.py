@@ -201,6 +201,10 @@ def _wormhole_geometry(system):
             "kind": "embedded-polyline",
             "source": "trajectory.metadata.wormholeGeometry.geodesic",
         },
+        "curvature": {
+            "kind": "scalar-field",
+            "source": "trajectory.metadata.wormholeGeometry.curvature",
+        },
         "diagnostics": {
             "throatTraversal": "trajectory.metadata.diagnostics.throatTraversal",
             "geodesicDeviation": "trajectory.metadata.diagnostics.geodesicDeviation",
@@ -948,6 +952,14 @@ WORMHOLE = SystemSpec(
     lenses=("wormholeGeodesic",),
     data_path="/data/wormhole.json",
     geometry=_wormhole_geometry,
+    fields=(
+        {
+            "name": "scalarCurvature",
+            "kind": "scalar-field",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.wormholeGeometry.curvature",
+        },
+    ),
     domain={
         "kind": "coordinate-domain",
         "source": "trajectory.metadata.domain",

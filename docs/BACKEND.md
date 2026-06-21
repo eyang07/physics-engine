@@ -66,9 +66,10 @@ artifacts.
     precession for the bound timelike preset, photon-sphere/light-bending
     diagnostics for the null preset, and the GR effective potential.
   - Ellis wormhole geodesic generator for a fixed equatorial background,
-    exporting an embedding mesh, embedded geodesic curve, measured invariant
-    residuals, and measured throat-traversal diagnostics; it does not solve
-    dynamical gravity.
+    exporting an embedding mesh, embedded geodesic curve, a deterministic
+    scalar-curvature field over the same throat grid (`R = -2a^2/(a^2+l^2)^2`,
+    extremal at the throat `l = 0`), measured invariant residuals, and measured
+    throat-traversal diagnostics; it does not solve dynamical gravity.
   - Coordinate-domain guards for fixed curved backgrounds: each system declares
     its chart's validity domain and the generators reject presets that leave it.
     The Schwarzschild generator rejects geodesics that touch or cross the event
@@ -117,9 +118,12 @@ artifacts.
     the corresponding backend-owned payload. The Kepler example uses this for
     radial turning points and bound/unbound/critical classification.
   - Wormhole manifest entries may declare `geometry.kind="wormhole-geodesic"`
-    with sources for an embedding mesh, embedded geodesic, and measured
-    throat-traversal / geodesic-deviation diagnostics under
-    `metadata.wormholeGeometry` / `metadata.diagnostics`.
+    with sources for an embedding mesh, embedded geodesic, a `scalar-field`
+    `curvature` channel, and measured throat-traversal / geodesic-deviation
+    diagnostics under `metadata.wormholeGeometry` / `metadata.diagnostics`. The
+    curvature samples are deterministic symbolic evaluations and the entry also
+    exposes the field through a top-level `fields` declaration
+    (`scalarCurvature`, sourced from `metadata.wormholeGeometry.curvature`).
   - Fixed-background manifest entries may declare a `domain` channel
     (`kind="coordinate-domain"`, `source="trajectory.metadata.domain"`). The
     trajectory payload carries the matching `metadata.domain` descriptor: the
