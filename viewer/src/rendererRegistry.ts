@@ -32,6 +32,8 @@ export const CANVAS_LENS_IDS = new Set<string>([
   "variableSpeedWavefront",
   "symmetricTopNutationPhase",
   "doublePendulumPhase",
+  "symmetricTopPotential",
+  "schwarzschildEffectivePotential",
 ]);
 
 /** Lens ids drawn by a Three.js scene (`ThreeScene.setVisualization`). */

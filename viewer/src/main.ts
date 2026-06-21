@@ -626,7 +626,7 @@ function render(now: number) {
   } else if (selectedVisualization.id === "pendulumMotionPhase") {
     resize2dCanvas();
     drawPendulumScene(ctx, trajectory, pendulumBounds, current, canvas.clientWidth, canvas.clientHeight);
-  } else if (selectedVisualization.id === "effectivePotential") {
+  } else if (isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "effective-potential") {
     drawEffectivePotentialScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else if (selectedExample && isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "configuration-phase") {
     drawPhaseScene(ctx, trajectory, selectedExample, selectedVisualization, current, canvas.clientWidth, canvas.clientHeight);

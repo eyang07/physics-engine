@@ -254,6 +254,14 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-symmetric-top-nutation.png`) });
 
+    // The nutation effective potential renders on the shared data-driven
+    // effective-potential lens (exported V(theta) curve + energy line).
+    await page.getByRole("button", { name: "Effective Potential" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-symmetric-top-potential.png`) });
+
     // The double pendulum's theta1 phase portrait also renders on the shared 2D
     // phase lens.
     await page.locator("#systemSelect").selectOption("double-pendulum");
@@ -262,6 +270,15 @@ for (const viewport of [
     await page.waitForTimeout(500);
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-double-pendulum-phase.png`) });
+
+    // Schwarzschild's GR effective potential renders from the exported relativistic
+    // V(r) curve, turning points, and orbit classification (same data-driven lens).
+    await page.locator("#systemSelect").selectOption("schwarzschild");
+    await page.getByRole("button", { name: "GR Effective Potential" }).click();
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-schwarzschild-potential.png`) });
 
     // The hard top-level domain menu swaps to the Verification workbench, which
     // renders the exported verification-problem IR read-only.
