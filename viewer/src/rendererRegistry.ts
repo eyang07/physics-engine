@@ -54,6 +54,7 @@ export const THREE_LENS_IDS = new Set<string>([
   "symmetricTopAxis",
   "freeRigidBodyPolhode",
   "nBodyOrbits",
+  "membraneModes",
 ]);
 
 /** Resolve which stage primitive renders a lens, or `fallback` if none yet. */

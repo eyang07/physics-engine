@@ -70,6 +70,7 @@ const threeJsSystems = [
   "henon-heiles",
   "free-rigid-body",
   "n-body-gravity",
+  "membrane",
 ];
 
 for (const viewport of [
@@ -243,7 +244,37 @@ for (const viewport of [
     await page.waitForSelector("#scene.stage__canvas--active");
     await page.waitForTimeout(500);
     await expectCanvasNonBlank(page, "#scene");
+    // FE-048: the wavefront colors its reached fronts by the measured intensity
+    // proxy (bright near caustics), keyed by a qualitative magma legend.
+    await expect(scalarLegend).toBeVisible();
+    await expect(scalarLegend.locator(".scalar-legend__title")).toHaveText("wavefront intensity");
+    await expect(scalarLegend.locator(".scalar-legend__label")).toHaveText(["focused", "spread"]);
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-variable-speed-wavefront.png`) });
+
+    // FE-047: the membrane opens on its mode-surface lens — an animated
+    // displacement surface (FE-039) with a rectangular/circular shape selector.
+    await page.locator("#systemSelect").selectOption("membrane");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    const membraneModes = page.locator("#membraneModesSection");
+    await expect(membraneModes).toBeVisible();
+    await expect(membraneModes.locator(".mode-switch__button")).toHaveCount(2);
+    // Leaving the wavefront for a non-scalar 3D lens hides the intensity legend.
+    await expect(scalarLegend).toBeHidden();
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-membrane-rectangular.png`) });
+
+    // Switching to the circular shape rebuilds the surface from exported data.
+    await page.getByRole("button", { name: "circular displacement" }).click();
+    await page.waitForTimeout(600);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-membrane-circular.png`) });
+
+    // Switching to a system without a membrane hides the shape selector again.
+    await page.locator("#systemSelect").selectOption("free-rigid-body");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(300);
+    await expect(membraneModes).toBeHidden();
 
     // FE-040: the heavy symmetric top opens on its attitude-playback lens, a
     // Three.js scene that spins the body from the exported orientation series.

@@ -10,11 +10,13 @@ import {
   orientationChannel,
   rendererHints,
   rigidBodyGeometry,
+  surfaceFieldSeriesList,
   type NBodyConfig,
   type Orientation,
   type ReferenceGeometryHint,
   type RendererHints,
   type RigidBodyGeometry,
+  type SurfaceFieldSeries,
   type Trajectory,
   type Vector3Tuple,
 } from "./data/trajectory";
@@ -33,9 +35,12 @@ export type ThreeMode =
   | "henonHeilesFlow"
   | "symmetricTopAxis"
   | "freeRigidBodyPolhode"
-  | "nBodyOrbits";
+  | "nBodyOrbits"
+  | "membraneModes";
 
 const PENDULUM_GRAVITY = 9.81;
+// Seconds for one full loop through a membrane displacement series.
+const MEMBRANE_PERIOD = 6;
 
 type LorenzTransform = {
   center: THREE.Vector3;
@@ -1030,6 +1035,57 @@ function makeNBodyGroup(
   return { group, markers, paths };
 }
 
+/**
+ * FE-047 — a 2D membrane mode as an animated displacement surface. The exported
+ * displacement series (a modal superposition over time, BE-095) is lifted into the
+ * shared `FieldSurface` (FE-039): each frame's grid becomes a height field tinted
+ * through the scalar scale, and `update(elapsed)` loops the surface through the
+ * frames. Scene-x maps to the surface's second axis and scene-z to the first, so
+ * the grid drops onto FieldSurface's row/col convention without transposing the
+ * exported data. The viewer plays the exported frames; it never solves the
+ * membrane wave equation.
+ */
+function makeMembraneSurface(series: SurfaceFieldSeries): FieldSurface {
+  const xs = series.axes[1];
+  const zs = series.axes[0];
+  const xMin = Math.min(...xs);
+  const xMax = Math.max(...xs);
+  const zMin = Math.min(...zs);
+  const zMax = Math.max(...zs);
+  const extent = Math.max(xMax - xMin, zMax - zMin, 1e-6);
+  const planar = 2.2 / extent;
+
+  // Peak displacement sets both the height exaggeration and a symmetric color
+  // domain, so the oscillating field reads crest-bright / trough-dark.
+  let amplitude = 0;
+  for (const frame of series.frames) {
+    for (const row of frame) {
+      for (const value of row) {
+        const magnitude = Math.abs(value);
+        if (Number.isFinite(magnitude) && magnitude > amplitude) {
+          amplitude = magnitude;
+        }
+      }
+    }
+  }
+  const heightScale = amplitude > 1e-6 ? 0.5 / amplitude : 1;
+  const domain: [number, number] = amplitude > 1e-6 ? [-amplitude, amplitude] : [-1, 1];
+
+  return new FieldSurface({
+    grid: { xValues: xs, yValues: zs, values: series.frames[0] },
+    frames: series.frames,
+    transform: {
+      scale: [planar, heightScale, planar],
+      offset: [-((xMin + xMax) / 2) * planar, 0, -((zMin + zMax) / 2) * planar],
+    },
+    colormap: viridis,
+    colorDomain: domain,
+    gridLines: true,
+    opacity: 0.62,
+    period: MEMBRANE_PERIOD,
+  });
+}
+
 export class ThreeScene {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
@@ -1049,6 +1105,9 @@ export class ThreeScene {
   private polhodeCurve: THREE.Vector3[] = [];
   private nBodyMarkers: THREE.Mesh[] = [];
   private nBodyPaths: THREE.Vector3[][] = [];
+  private membraneSeries: SurfaceFieldSeries[] = [];
+  private membraneSurface: FieldSurface | null = null;
+  private membraneIndex = 0;
   private motionTrail: THREE.Line | null = null;
   private motionTrailPoints: THREE.Vector3[] = [];
   private flow: FlowField | null = null;
@@ -1125,6 +1184,10 @@ export class ThreeScene {
     this.polhodeCurve = [];
     this.nBodyMarkers = [];
     this.nBodyPaths = [];
+    this.membraneSurface?.dispose();
+    this.membraneSurface = null;
+    this.membraneSeries = [];
+    this.membraneIndex = 0;
     this.marker.visible = true;
     this.motionTrail = null;
     this.motionTrailPoints = [];
@@ -1275,6 +1338,21 @@ export class ThreeScene {
       this.controls.target.set(0, 0, 0);
       this.controls.minDistance = 2.0;
       this.controls.maxDistance = 9.0;
+    } else if (mode === "membraneModes") {
+      this.membraneSeries = surfaceFieldSeriesList(data);
+      this.membraneIndex = 0;
+      // The membrane is a surface, not a point — its own animated mesh stands in
+      // for the shared playback marker.
+      this.marker.visible = false;
+      const series = this.membraneSeries[this.membraneIndex];
+      if (series) {
+        this.membraneSurface = makeMembraneSurface(series);
+        this.root.add(this.membraneSurface.object);
+      }
+      this.camera.position.set(2.6, 2.1, 2.9);
+      this.controls.target.set(0, 0, 0);
+      this.controls.minDistance = 1.6;
+      this.controls.maxDistance = 8.0;
     } else {
       this.henonData = data;
       this.henonHints = hints;
@@ -1304,6 +1382,33 @@ export class ThreeScene {
     this.controls.minDistance = this.homeMinDistance;
     this.controls.maxDistance = this.homeMaxDistance;
     this.controls.update();
+    if (this.active) {
+      this.renderer.render(this.scene, this.camera);
+    }
+  }
+
+  // FE-047 — switch the membrane between its exported shape families (rectangular
+  // / circular) without reloading the trajectory. Rebuilds the displacement
+  // surface for the chosen series; a no-op for any other lens.
+  selectMembraneSurface(index: number) {
+    if (this.mode !== "membraneModes" || this.membraneSeries.length === 0) {
+      return;
+    }
+    const clamped = Math.min(Math.max(0, index), this.membraneSeries.length - 1);
+    if (clamped === this.membraneIndex && this.membraneSurface) {
+      return;
+    }
+    this.membraneIndex = clamped;
+    if (this.membraneSurface) {
+      this.root.remove(this.membraneSurface.object);
+      this.membraneSurface.dispose();
+      this.membraneSurface = null;
+    }
+    const series = this.membraneSeries[clamped];
+    if (series) {
+      this.membraneSurface = makeMembraneSurface(series);
+      this.root.add(this.membraneSurface.object);
+    }
     if (this.active) {
       this.renderer.render(this.scene, this.camera);
     }
@@ -1420,6 +1525,11 @@ export class ThreeScene {
         }
       }
       this.root.rotation.y = Math.sin(elapsed * 0.05) * 0.04;
+    } else if (this.mode === "membraneModes") {
+      // Loop the exported displacement frames; a slow turntable keeps the surface
+      // legible without implying any motion the data does not contain.
+      this.membraneSurface?.update(elapsed);
+      this.root.rotation.y = Math.sin(elapsed * 0.08) * 0.18;
     } else if (this.henonData) {
       const point = henonPoint(state, this.henonData, this.henonHints);
       this.marker.position.copy(point);
