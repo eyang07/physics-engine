@@ -12,6 +12,8 @@ export type Trajectory = {
   states: number[][];
   metadata?: Record<string, unknown>;
   series?: Record<string, number[]>;
+  /** Per-frame body orientation channel, when the system exports one (BE-089). */
+  orientation?: Record<string, unknown>;
 };
 
 export type Vector3Tuple = [number, number, number];
@@ -50,6 +52,23 @@ export type RendererHints = {
     scale?: number | Vector3Tuple;
     offset?: Vector3Tuple;
   };
+};
+
+/**
+ * The body orientation Python exported alongside a rigid-body trajectory
+ * (`trajectory.orientation`, BE-089). The quaternion series is the source of
+ * truth for the body's attitude at each sample; `bodyAxes` is the same rotation
+ * expressed as the body-frame triad in world coordinates. The viewer renders the
+ * exported orientation and never re-integrates Euler's equations.
+ */
+export type Orientation = {
+  /** e.g. "quaternion-wxyz" — the component order of each quaternion entry. */
+  convention: string;
+  rigor?: string;
+  /** Per-frame orientation as [w, x, y, z], one entry per trajectory sample. */
+  quaternion: [number, number, number, number][];
+  /** The body-frame triad expressed in world coordinates, per frame. */
+  bodyAxes?: { e1: Vector3Tuple[]; e2: Vector3Tuple[]; e3: Vector3Tuple[] };
 };
 
 /** Map each state-variable name to its column index in `states`. */
@@ -396,6 +415,62 @@ export function poincareSections(trajectory: Trajectory): PoincareSection[] {
       },
     ];
   });
+}
+
+function isQuaternionTuple(value: unknown): value is [number, number, number, number] {
+  return Array.isArray(value) && value.length === 4 && value.every((item) => typeof item === "number");
+}
+
+function vector3List(value: unknown): Vector3Tuple[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const out: Vector3Tuple[] = [];
+  for (const item of value) {
+    if (!isNumberTuple3(item)) {
+      return null;
+    }
+    out.push(item);
+  }
+  return out;
+}
+
+/**
+ * Read the body orientation channel Python exported with the trajectory. Returns
+ * null when the system carries no orientation (most systems are point masses) or
+ * the channel is malformed, so callers can fall back to point playback.
+ */
+export function orientationChannel(trajectory: Trajectory): Orientation | null {
+  const raw = asRecord(trajectory.orientation);
+  if (!raw || typeof raw.convention !== "string" || !Array.isArray(raw.quaternion)) {
+    return null;
+  }
+  const quaternion: [number, number, number, number][] = [];
+  for (const item of raw.quaternion) {
+    if (!isQuaternionTuple(item)) {
+      return null;
+    }
+    quaternion.push(item);
+  }
+  if (quaternion.length === 0) {
+    return null;
+  }
+  const axes = asRecord(raw.bodyAxes);
+  let bodyAxes: Orientation["bodyAxes"];
+  if (axes) {
+    const e1 = vector3List(axes.e1);
+    const e2 = vector3List(axes.e2);
+    const e3 = vector3List(axes.e3);
+    if (e1 && e2 && e3) {
+      bodyAxes = { e1, e2, e3 };
+    }
+  }
+  return {
+    convention: raw.convention,
+    rigor: typeof raw.rigor === "string" ? raw.rigor : undefined,
+    quaternion,
+    bodyAxes,
+  };
 }
 
 /** Renderer-only scene hints exported by Python alongside the trajectory. */
