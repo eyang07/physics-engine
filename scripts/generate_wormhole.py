@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Sequence
 
 import numpy as np
+import sympy as sp
 
 from engine.export import Trajectory
 from engine.numerics import integrate_fixed_step
@@ -19,9 +20,27 @@ from systems.wormhole import (
 )
 
 
-def _wormhole_mesh(throat_radius: float, *, l_count: int = 73, phi_count: int = 65) -> dict[str, object]:
+def _mesh_axes(
+    throat_radius: float,
+    *,
+    l_count: int = 73,
+    phi_count: int = 65,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Shared (l, phi) sampling for the embedding mesh and the curvature field.
+
+    The proper radial axis is symmetric about the throat with an odd point count,
+    so ``l = 0`` (proper radius ``a``) — where the curvature is extremal — is
+    always one of the samples, and the curvature grid aligns vertex-for-vertex
+    with the embedding mesh the viewer colors.
+    """
+
     l_axis = np.linspace(-6.5 * throat_radius, 6.5 * throat_radius, l_count)
     phi_axis = np.linspace(0.0, 2.0 * np.pi, phi_count)
+    return l_axis, phi_axis
+
+
+def _wormhole_mesh(throat_radius: float, *, l_count: int = 73, phi_count: int = 65) -> dict[str, object]:
+    l_axis, phi_axis = _mesh_axes(throat_radius, l_count=l_count, phi_count=phi_count)
     l_grid, phi_grid = np.meshgrid(l_axis, phi_axis, indexing="ij")
     rho = np.sqrt(l_grid**2 + throat_radius**2)
     z = throat_radius * np.arcsinh(l_grid / throat_radius)
@@ -43,6 +62,48 @@ def _wormhole_mesh(throat_radius: float, *, l_count: int = 73, phi_count: int = 
         "shape": [l_count, phi_count],
         "points": points.astype(float).tolist(),
         "triangles": triangles,
+        "evaluation": "symbolic-exact",
+    }
+
+
+def _curvature_field(throat_radius: float, *, l_count: int = 73, phi_count: int = 65) -> dict[str, object]:
+    """Scalar-curvature samples of the Ellis background over the throat grid.
+
+    The values are exact samples of ``MetricGeometry.scalar_curvature()`` for the
+    fixed background — deterministic given the axes, not measured numerical
+    evidence — so the viewer can color the throat mesh from Python-owned data.
+    The Ellis scalar curvature ``R = -2 a^2 / (a^2 + l^2)^2`` depends only on the
+    proper radial coordinate ``l``; it is broadcast across ``phi`` to match the
+    embedding-mesh grid, and is extremal at the throat (``l = 0``, ``R = -2/a^2``).
+    """
+
+    geometry = ellis_wormhole_metric(throat_radius)
+    _t, ell, phi = geometry.coordinates
+    scalar = geometry.scalar_curvature()
+    function = sp.lambdify((ell, phi), scalar, modules="numpy")
+
+    l_axis, phi_axis = _mesh_axes(throat_radius, l_count=l_count, phi_count=phi_count)
+    l_grid, phi_grid = np.meshgrid(l_axis, phi_axis, indexing="ij")
+    values = np.broadcast_to(
+        np.asarray(function(l_grid, phi_grid), dtype=float),
+        l_grid.shape,
+    ).astype(float)
+
+    throat_index = int(np.argmin(np.abs(l_axis)))
+    return {
+        "kind": "scalar-field",
+        "rendererHint": "scalar-field",
+        "name": "scalarCurvature",
+        "coordinates": ["l", "phi"],
+        "axes": [l_axis.astype(float).tolist(), phi_axis.astype(float).tolist()],
+        "shape": [l_count, phi_count],
+        "values": values.tolist(),
+        "quantity": "scalar curvature",
+        "throat": {
+            "l": float(l_axis[throat_index]),
+            "scalarCurvature": float(values[throat_index, 0]),
+            "description": "curvature extremum at the throat (proper radius a)",
+        },
         "evaluation": "symbolic-exact",
     }
 
@@ -152,6 +213,7 @@ def generate_wormhole_trajectory(
             "rendererHint": "wormhole-geodesic",
             "throatRadius": throat_radius,
             "embeddingMesh": _wormhole_mesh(throat_radius),
+            "curvature": _curvature_field(throat_radius),
             "geodesic": {
                 "kind": "embedded-polyline",
                 "rendererHint": "wormhole-geodesic",

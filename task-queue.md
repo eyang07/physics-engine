@@ -227,17 +227,7 @@ spacetimes, curvature, parallel transport, and orbital structure. Generalizes
 `systems/sphere_geodesic.py`, and gives the viewer curved-space trajectories and
 embedding diagrams._
 
-1. **BE-109: Export wormhole curvature fields**
-    - Goal: Add deterministic curvature scalar samples for the Ellis-wormhole fixed
-      background so the curved-background gallery can color the throat geometry from
-      Python-owned data.
-    - Scope: `systems/wormhole.py`, `scripts/generate_wormhole.py`,
-      `scripts/example_specs.py`, docs, and `tests/`.
-    - Acceptance: scalar curvature samples match the `MetricGeometry` symbolic
-      expression to tolerance, the throat extremum is sampled, the manifest declares
-      the scalar-field source, and focused tests plus generation pass.
-
-2. **BE-110: Export wormhole radial effective potential and turning points**
+1. **BE-110: Export wormhole radial effective potential and turning points**
     - Goal: Give the Ellis-wormhole radial geodesics the same effective-potential
       treatment the Schwarzschild example already has, so the viewer can show the
       throat barrier, turning points, and a qualitative bound/traversing classification
@@ -248,6 +238,21 @@ embedding diagrams._
       conserved energy/angular-momentum reduction to tolerance, the payload carries a
       qualitative classification (no raw decimals as the readout), the manifest declares
       the effective-potential source, and focused tests plus generation pass.
+
+2. **BE-111: Export the Schwarzschild embedding mesh and curvature field**
+    - Goal: Give the Schwarzschild example the same embedding-mesh + colorable
+      curvature treatment the wormhole now has (BE-109), exporting a Flamm-paraboloid
+      embedding mesh for the exterior `r > r_s` and a curvature scalar field aligned to
+      that mesh so the curved-background gallery can render the funnel and color it by
+      curvature from Python-owned data.
+    - Scope: `systems/schwarzschild.py`, `scripts/generate_schwarzschild.py`,
+      `scripts/example_specs.py`, docs, and `tests/`.
+    - Acceptance: the embedding mesh matches the analytic Flamm paraboloid over the
+      exterior domain, the curvature field matches the `MetricGeometry` Kretschmann
+      scalar to tolerance over the mesh grid (the Ricci scalar vanishes in vacuum, so
+      Kretschmann is the curvature invariant used), the mesh stays outside the horizon,
+      the manifest declares the surface-mesh and scalar-field sources, and focused tests
+      plus generation pass.
 
 ### Verification track (paused)
 

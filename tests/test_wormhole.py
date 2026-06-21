@@ -151,3 +151,61 @@ def test_wormhole_script_writes_primary_and_viewer_outputs(tmp_path) -> None:
     assert json.loads(output.read_text(encoding="utf-8")) == json.loads(
         viewer_output.read_text(encoding="utf-8")
     )
+
+
+def test_wormhole_exports_scalar_curvature_field() -> None:
+    throat_radius = 1.3
+    trajectory = generate_wormhole_trajectory(
+        throat_radius=throat_radius, t_span=(0.0, 0.2), dt=0.02
+    )
+    geometry = trajectory.metadata["wormholeGeometry"]
+    curvature = geometry["curvature"]
+    mesh = geometry["embeddingMesh"]
+
+    assert curvature["kind"] == "scalar-field"
+    assert curvature["rendererHint"] == "scalar-field"
+    assert curvature["name"] == "scalarCurvature"
+    assert curvature["coordinates"] == ["l", "phi"]
+    assert curvature["evaluation"] == "symbolic-exact"
+
+    l_axis = np.asarray(curvature["axes"][0], dtype=float)
+    phi_axis = np.asarray(curvature["axes"][1], dtype=float)
+    values = np.asarray(curvature["values"], dtype=float)
+
+    # The curvature grid aligns vertex-for-vertex with the embedding mesh so the
+    # viewer can color the throat surface directly from this field.
+    assert curvature["shape"] == mesh["shape"]
+    assert np.allclose(l_axis, np.asarray(mesh["axes"][0], dtype=float))
+    assert np.allclose(phi_axis, np.asarray(mesh["axes"][1], dtype=float))
+    assert values.shape == (len(l_axis), len(phi_axis))
+
+    # Samples are exact evaluations of the MetricGeometry scalar curvature, with
+    # no phi dependence (broadcast across the azimuthal axis).
+    metric = ellis_wormhole_metric(throat_radius)
+    _t, ell, _phi = metric.coordinates
+    expected_fn = sp.lambdify(ell, metric.scalar_curvature(), modules="numpy")
+    expected = np.asarray(expected_fn(l_axis), dtype=float)
+    assert np.allclose(values, expected[:, None])
+
+    # The throat (l = 0) is sampled and is the curvature extremum R = -2/a^2,
+    # decaying toward zero away from the throat.
+    throat = curvature["throat"]
+    assert throat["l"] == 0.0
+    assert np.isclose(throat["scalarCurvature"], -2.0 / throat_radius**2)
+    assert np.isclose(values.min(), -2.0 / throat_radius**2)
+    assert float(values[0, 0]) > float(values[values.shape[0] // 2, 0])
+
+
+def test_wormhole_manifest_declares_curvature_scalar_field() -> None:
+    entry = system_entry(WORMHOLE)
+
+    assert entry["geometry"]["curvature"] == {
+        "kind": "scalar-field",
+        "source": "trajectory.metadata.wormholeGeometry.curvature",
+    }
+    fields = {item["name"]: item for item in entry["fields"]}
+    assert fields["scalarCurvature"]["kind"] == "scalar-field"
+    assert fields["scalarCurvature"]["rendererHint"] == "scalar-field"
+    assert fields["scalarCurvature"]["source"] == (
+        "trajectory.metadata.wormholeGeometry.curvature"
+    )
