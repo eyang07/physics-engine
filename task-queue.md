@@ -51,46 +51,6 @@ validated. The viewer renders the schema — it never invents UI against unstabl
 absent data. This direction stays decoupled from the Verification domain (no
 cross-links, no Systems-side safety overlay)._
 
-### Foundation — shared rendering vocabulary (do first)
-
-_The foundation block (FE-037, FE-038, FE-039) is complete. FE-037 is the
-renderer-hint registry with a graceful fallback (new backend lenses route to a
-placeholder instead of a blank stage; existing systems render unchanged). FE-038
-added the shared scalar→color scale (`scalarScale` in
-`viewer/src/design/colormaps.ts`) and the reusable on-stage `scalar-legend`
-overlay (`viewer/src/scalarLegend.ts`) — a colormap ramp keyed by qualitative,
-decimal-free endpoints; the potential-contour lens is its first consumer. FE-039
-added the shared field-surface primitive (`viewer/src/fieldSurface.ts`,
-`FieldSurface`): a scalar grid lifted into a colored height surface, plus a
-frame-driven `update(elapsed)` displacement-animation path; the Hénon–Heiles
-potential surface is its first (static-mesh) consumer. The family lenses below
-build on these — FE-044 / FE-048 / FE-050 reuse the scalar legend, and FE-046 /
-FE-047 / FE-048 / FE-049 reuse the field surface (its animated path binds their
-exported displacement grids)._
-
-### Direction A — Rigid-body & many-body rendering
-
-_FE-040 is complete: `viewer/src/attitudeBody.ts` (`AttitudeBody`) is the reusable
-rigid-body primitive — a translucent body shell, a body-fixed axis rod, and the
-body-frame triad, oriented straight from the exported quaternion series
-(`orientationChannel` in `viewer/src/data/trajectory.ts`). The Heavy Symmetric Top's
-`symmetricTopAxis` lens is its first consumer (attitude playback on the precessing
-axis). FE-041 is complete: `freeRigidBodyPolhode` (registered `3d`) composes
-`AttitudeBody` at the centre of the Poinsot construction — the angular-momentum
-sphere, kinetic-energy ellipsoid, and their intersection (the polhode) drawn from
-`metadata.rigidBodyGeometry` via `rigidBodyGeometry()` in
-`viewer/src/data/trajectory.ts`, with the intermediate principal axis highlighted.
-FE-042 is complete: `nBodyOrbits` (registered `3d`) draws one colored orbit trail
-and a live marker per body, framed on the center of mass from the exported
-COM-frame positions (`nBodyConfig()` in `viewer/src/data/trajectory.ts`), keyed by
-the categorical `bodyLegend` overlay (`viewer/src/bodyLegend.ts`) over the shared
-`bodyPalette` (`viewer/src/design/colormaps.ts`); the figure-eight and
-Sun + two-planets variants load in place. FE-043 is complete: `coupledOscillatorModes`
-(registered `2d`) animates an exported mode shape on the canvas
-(`viewer/src/normalModeCanvas.ts`) with a mode selector and a superposition scrub
-in `viewer/src/main.ts`, reading `manifest.normalModes` (`ManifestNormalModes` in
-`viewer/src/data/manifest.ts`). **Direction A is complete (FE-040..FE-043).**_
-
 ### Direction B — Field & wave rendering
 
 1. **FE-044: Scalar-field lens (heatmap / contour)**
@@ -251,17 +211,6 @@ theorem. Keep `systems/` definitions thin and symbolic, reusable logic in
 
 _This direction stays cleanly separated from the verification/CPS track: no
 shared modules, no cross-links, no drone-specific coupling._
-
-### Direction A — Rigid-body & many-body classical mechanics
-
-_From point masses to bodies with extent and to coupled systems: orientation,
-inertia, Euler's equations, chaotic and integrable many-body motion, and normal
-modes. Builds on `engine/mechanics/` (lagrangian, hamiltonian, symmetries) and the
-trajectory/manifest export._
-
-_Complete — all Direction A tasks (BE-081..BE-089) are done and committed. The
-viewer-facing payloads (polhode geometry, normal modes, rigid-body orientation)
-are now exported and ready for the paired frontend lenses (FE-040..FE-043)._
 
 ### Direction B — Fields, waves & continuum
 
