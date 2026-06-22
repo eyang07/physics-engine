@@ -131,23 +131,14 @@ Systems domain renderers, numerical integration, trajectory generation, and
 honesty intact: `external-required`, and measured evidence never rendered as
 proved/certified._
 
-1. **FE-056: Extract framework-free state-space and certificate-lane render routines**
-   - Goal: Lift the pure Canvas 2D drawing logic out of `verificationStage.ts` and
-     `certificateLanes.ts` into framework-free render modules taking
-     `(ctx, problem, selection, phase)`, with no visual change (behavior-preserving).
-   - Scope: `viewer/src/verificationStage.ts`, `viewer/src/certificateLanes.ts`,
-     new `viewer/src/verification/render/`.
-   - Acceptance: verification visual baselines unchanged; `PlaybackClock` usage
-     identical; `npm run build` passes.
-
-2. **FE-057: React wrappers StateSpaceCanvas + CertificateTraces around the extracted renderers**
+1. **FE-057: React wrappers StateSpaceCanvas + CertificateTraces around the extracted renderers**
    - Goal: React components own a `<canvas>` ref and drive the FE-056 renderers via
      `useEffect`/RAF, reusing `PlaybackClock` and trajectory sampling unchanged.
    - Scope: `viewer/src/verification/` components.
    - Acceptance: rollout animates identically to today; a `selection` prop triggers
      a redraw; `npm run build` passes.
 
-3. **FE-058: TopBarIdentity — model, claim, and one overall verdict token**
+2. **FE-058: TopBarIdentity — model, claim, and one overall verdict token**
    - Goal: Derive an overall claim status (`Discharged` / `Certified (numeric)` /
      `Measured only` / `Counterexample` / `Pending external`) in TypeScript from the
      existing per-obligation rigor/status, and render model + claim + a single
@@ -156,14 +147,14 @@ proved/certified._
    - Acceptance: pendulum-safety shows the correct honest verdict at a glance; no
      field overstates status (measured never reads as proved); `npm run build` passes.
 
-4. **FE-059: AssumptionsBlock — active, undischarged assumptions made unmissable**
+3. **FE-059: AssumptionsBlock — active, undischarged assumptions made unmissable**
    - Goal: Render active assumptions (including the disturbance set W) above the
      obligation list, each with its bound (KaTeX) and an "active / undischarged" tag.
    - Scope: `viewer/src/verification/`.
    - Acceptance: every assumption an obligation depends on is visible and tagged
      undischarged; `npm run build` passes.
 
-5. **FE-060: ObligationList with progressive disclosure**
+4. **FE-060: ObligationList with progressive disclosure**
    - Goal: Collapsed row shows obligation name · status badge · signed margin;
      expanding (Radix Collapsible) reveals the formal statement (KaTeX), evidence
      chips, depended-on assumptions, certificate summary, and the action to discharge.
@@ -172,20 +163,20 @@ proved/certified._
      (filled) vs pending (dashed) are visually distinct, including in grayscale;
      `npm run build` passes.
 
-6. **FE-061: ArtifactPanel — IR / package export**
+5. **FE-061: ArtifactPanel — IR / package export**
    - Goal: A compact artifact/export block (IR JSON and package-bundle links) at the
      bottom of the claim panel.
    - Scope: `viewer/src/verification/`.
    - Acceptance: export links resolve to the same artifacts as today; `npm run
      build` passes.
 
-7. **FE-062: DocketRail — verification problem list**
+6. **FE-062: DocketRail — verification problem list**
    - Goal: A narrow, collapsible problem/package list that drives selection.
    - Scope: `viewer/src/verification/`.
    - Acceptance: selecting a problem loads it; the list scales to a multi-package
      catalog without layout breakage; `npm run build` passes.
 
-8. **FE-063: Apply the light-technical visual language and token deltas (drop serif)**
+7. **FE-063: Apply the light-technical visual language and token deltas (drop serif)**
    - Goal: Remove the serif remap in the `tokens.css` `#verificationDomain` block,
      set the UI font to IBM Plex Sans + mono with KaTeX restricted to math spans,
      surface the Tailwind theme from the existing tokens, and add a `--pending`
@@ -196,7 +187,7 @@ proved/certified._
      saturation in the view; `npm run build` passes; verification baselines updated
      intentionally.
 
-9. **FE-064: Replace the four legend overlays with one compact legend and selection linking**
+8. **FE-064: Replace the four legend overlays with one compact legend and selection linking**
     - Goal: Remove `.verif-violation-legend`, `.verif-holds-legend`,
       `.verif-roles-legend`, and `.verif-disturbance-annotation`; add a single
       collapsible legend showing only the marks present, and link obligation
@@ -205,7 +196,7 @@ proved/certified._
     - Acceptance: the plot is readable without a legend-heavy decode; selecting an
       obligation highlights its geometry and margin marker; `npm run build` passes.
 
-10. **FE-065: Move playback and full detail into a collapsible bottom strip**
+9. **FE-065: Move playback and full detail into a collapsible bottom strip**
     - Goal: Relocate the rollout playback controls and the formal detail (dynamics,
       region definitions, enclosure boxes) into a Radix Collapsible bottom strip,
       collapsed by default, with playback behavior preserved exactly.
@@ -213,7 +204,7 @@ proved/certified._
     - Acceptance: playback behaves identically to today; detail is collapsed by
       default; `npm run build` passes.
 
-11. **FE-066: Document the verification UI shell and refresh its visual baselines**
+10. **FE-066: Document the verification UI shell and refresh its visual baselines**
     - Goal: Document the redesigned verification shell and its boundary from the
       physics pipeline, and regenerate the verification-domain visual baselines.
     - Scope: `docs/FRONTEND.md`, `viewer` visual baselines (verification only).
@@ -317,41 +308,14 @@ Tasks are ordered by readiness: foundations first, then the systems that use the
 then export/verification integration. This direction stays decoupled from the
 verification/CPS track (no shared modules, no cross-links)._
 
-1. **BE-114: Land `BACKEND_PHYSICS_ROADMAP.md` at the repo root**
-    - Goal: Commit the staged relativity/electrodynamics/fields roadmap (audit, scope
-      interpretation, ranked candidates, phases, module structure, example systems,
-      tests, verification-export implications, risks/non-goals, checklist) as the
-      source of truth this direction implements against.
-    - Scope: `BACKEND_PHYSICS_ROADMAP.md` (new), optional one-line pointer in
-      `docs/BACKEND.md`.
-    - Acceptance: doc exists at repo root; every file/abstraction it names is real
-      (`engine/dynamics/metric.py` signature-agnostic, `engine/fields/diagnostics.py`
-      measured checks, `invariant_residuals`, IR `AssumptionSpec`/`ObligationSpec`/
-      `CandidateSpec`); near-term tasks vs deferred research are clearly separated; no
-      existing module is modified.
+_Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper) and
+`BE-116` (four-vector value object) have landed; the roadmap lives at
+[`BACKEND_PHYSICS_ROADMAP.md`](BACKEND_PHYSICS_ROADMAP.md), with the helpers at
+`engine/relativity/minkowski.py` and `engine/relativity/four_vectors.py`._
 
 #### Phase 1 — Special-relativity primitives (`engine/relativity/`)
 
-2. **BE-115: Add the Minkowski metric helper**
-    - Goal: Provide a single global signature convention and a Lorentzian metric object
-      (index raise/lower, Minkowski inner product, invariant interval) that reuses
-      `MetricGeometry` rather than re-deriving tensor machinery.
-    - Scope: `engine/relativity/minkowski.py` (new), `engine/relativity/__init__.py`,
-      `tests/test_minkowski.py`.
-    - Acceptance: `eta` has the documented `(-,+,+,+)` signature; raise-then-lower is the
-      identity; the interval of a known timelike/spacelike/null separation matches by
-      hand; `pytest -q` green.
-
-3. **BE-116: Add the four-vector value object**
-    - Goal: A thin typed `FourVector` (contravariant/covariant) with Minkowski norm² and
-      timelike/null/spacelike classification — a value object, **not** a general
-      tensor-calculus engine.
-    - Scope: `engine/relativity/four_vectors.py` (new), `tests/test_four_vectors.py`.
-    - Acceptance: norm² uses the global signature; classification matches the sign of
-      norm²; lowering then contracting reproduces the norm; symbolic and numeric paths
-      agree; focused tests pass.
-
-4. **BE-117: Add Lorentz transformations**
+1. **BE-117: Add Lorentz transformations**
     - Goal: Boosts (by velocity and by rapidity), spatial rotations, their composition,
       and relativistic velocity addition, with invariance checks.
     - Scope: `engine/relativity/lorentz.py` (new), `tests/test_lorentz.py`.
@@ -359,7 +323,7 @@ verification/CPS track (no shared modules, no cross-links)._
       rapidities add for collinear boosts; the velocity-addition formula matches; a
       boost preserves a four-vector's norm²; tests pass.
 
-5. **BE-118: Add the proper-time worldline with four-velocity and four-momentum**
+2. **BE-118: Add the proper-time worldline with four-velocity and four-momentum**
     - Goal: A proper-time-parameterized worldline yielding four-velocity and
       four-momentum and reducing to a `FirstOrderSystem` for integration, with a single
       documented proper-time-vs-coordinate-time convention.
@@ -368,7 +332,7 @@ verification/CPS track (no shared modules, no cross-links)._
       the existing integrators; the affine/proper-time convention is documented in one
       place; tests pass.
 
-6. **BE-119: Add the relativistic free-particle system and export**
+3. **BE-119: Add the relativistic free-particle system and export**
     - Goal: A gallery system whose worldline is a straight Minkowski geodesic, with the
       invariant interval exported as a measured conserved series.
     - Scope: `systems/relativistic_free_particle.py` (new),
@@ -378,7 +342,7 @@ verification/CPS track (no shared modules, no cross-links)._
       `system_kind="relativistic-worldline"`; `invariant_residuals` shows the interval
       conserved to integrator tolerance (labeled measured); the manifest round-trips.
 
-7. **BE-120: Add the twin-paradox proper-time comparison example**
+4. **BE-120: Add the twin-paradox proper-time comparison example**
     - Goal: Two worldlines between shared endpoints whose accumulated proper times
       differ, exported as measured proper-time readouts.
     - Scope: `systems/twin_paradox.py` (new), generator, `scripts/example_specs.py`,
@@ -389,7 +353,7 @@ verification/CPS track (no shared modules, no cross-links)._
 
 #### Phase 2 — Relativistic particle dynamics
 
-8. **BE-121: Add a relativistic particle under an external four-force**
+5. **BE-121: Add a relativistic particle under an external four-force**
     - Goal: Proper-time dynamics `dp^mu/dtau = f^mu` as a `FirstOrderSystem`, with the
       mass-shell `p^mu p_mu + m^2 c^2 = 0` recorded as an `AssumptionSpec` and tracked as
       a measured invariant.
@@ -399,7 +363,7 @@ verification/CPS track (no shared modules, no cross-links)._
       (measured); the spatial-force, low-velocity limit reproduces Newton's second law
       symbolically; tests pass.
 
-9. **BE-122: Add the uniform-proper-acceleration (hyperbolic motion) system**
+6. **BE-122: Add the uniform-proper-acceleration (hyperbolic motion) system**
     - Goal: Constant proper acceleration producing the classic hyperbolic worldline, with
       the analytic rapidity/position relations as measured invariants.
     - Scope: `systems/uniform_proper_acceleration.py` (new), generator,
@@ -407,7 +371,7 @@ verification/CPS track (no shared modules, no cross-links)._
     - Acceptance: the worldline matches the closed-form hyperbola within tolerance;
       four-velocity norm² stays `-c^2`; deterministic export; tests pass.
 
-10. **BE-123: Add a relativistic particle in a static potential**
+7. **BE-123: Add a relativistic particle in a static potential**
     - Goal: A bound/scattering relativistic trajectory under a scalar/vector potential,
       demonstrating relativistic dynamics beyond constant force.
     - Scope: `systems/relativistic_particle_in_potential.py` (new), generator,
@@ -415,7 +379,7 @@ verification/CPS track (no shared modules, no cross-links)._
     - Acceptance: an energy-type invariant and mass-shell are tracked as measured series;
       the non-relativistic limit matches the corresponding Newtonian system; tests pass.
 
-11. **BE-124: Wire four-momentum conservation and mass-shell into verification export**
+8. **BE-124: Wire four-momentum conservation and mass-shell into verification export**
     - Goal: Expose mass-shell and four-momentum conservation as `ObligationSpec`s
       (`rigor="external-required"`) with measured `proofStatuses`, so relativistic
       systems participate in the verification pipeline without claiming proof.
@@ -426,7 +390,7 @@ verification/CPS track (no shared modules, no cross-links)._
 
 #### Phase 3 — Covariant classical electrodynamics (`engine/electrodynamics/`)
 
-12. **BE-125: Add the Faraday field tensor and its invariants**
+9. **BE-125: Add the Faraday field tensor and its invariants**
     - Goal: Build `F_mu_nu` from `(E, B)` (and later from `A_mu`) and expose the two EM
       invariants `F_mu_nu F^mu_nu` and `E . B` (`F *F`).
     - Scope: `engine/electrodynamics/field_tensor.py` (new),
@@ -434,7 +398,7 @@ verification/CPS track (no shared modules, no cross-links)._
     - Acceptance: `F` is antisymmetric by construction; the two invariants match the
       `2(B^2 - E^2)` and `E.B` forms symbolically; tests pass.
 
-13. **BE-126: Add the electromagnetic four-potential and gauge transform**
+10. **BE-126: Add the electromagnetic four-potential and gauge transform**
     - Goal: An `A_mu(x)` container with `F = dA` (exterior derivative) and a gauge
       transform `A_mu -> A_mu + d_mu chi` that leaves `F` invariant.
     - Scope: `engine/electrodynamics/four_potential.py` (new),
@@ -443,7 +407,7 @@ verification/CPS track (no shared modules, no cross-links)._
       symbolic `chi`; the homogeneous Maxwell identity `dF = 0` holds symbolically; tests
       pass.
 
-14. **BE-127: Add the covariant Lorentz force as a first-order system**
+11. **BE-127: Add the covariant Lorentz force as a first-order system**
     - Goal: `dp^mu/dtau = q F^mu_nu u^nu` reduced to a `FirstOrderSystem` on the
       proper-time-parameterized worldline, reusing the Phase-1/2 primitives.
     - Scope: `engine/electrodynamics/lorentz_force.py` (new),
@@ -452,7 +416,7 @@ verification/CPS track (no shared modules, no cross-links)._
       mass-shell (measured); the low-velocity limit reduces to `q(E + v x B)`
       symbolically; tests pass.
 
-15. **BE-128: Add the relativistic cyclotron system (uniform B)**
+12. **BE-128: Add the relativistic cyclotron system (uniform B)**
     - Goal: A charged particle in a uniform magnetic field showing relativistic gyration,
       generalizing — not replacing — `systems/charged_particle.py`.
     - Scope: `systems/relativistic_cyclotron.py` (new), generator,
@@ -460,7 +424,7 @@ verification/CPS track (no shared modules, no cross-links)._
     - Acceptance: the gyrofrequency matches `qB/(gamma m)`; `p_z` and the EM invariants
       are measured-conserved; a new `system_kind="covariant-em"` round-trips; tests pass.
 
-16. **BE-129: Add the crossed-field E x B drift system**
+13. **BE-129: Add the crossed-field E x B drift system**
     - Goal: A charged particle in crossed uniform E and B fields exhibiting the analytic
       `E x B / B^2` drift.
     - Scope: `systems/crossed_eb_drift.py` (new), generator, `scripts/example_specs.py`,
@@ -468,7 +432,7 @@ verification/CPS track (no shared modules, no cross-links)._
     - Acceptance: the measured drift velocity matches `E x B / B^2` within tolerance;
       deterministic export; tests pass.
 
-17. **BE-130: Add the general relativistic charged-particle system**
+14. **BE-130: Add the general relativistic charged-particle system**
     - Goal: A charged particle in a configurable static EM field via the covariant Lorentz
       force, the flagship Phase-3 example; the existing non-relativistic
       `charged_particle.py` is kept as the Newtonian counterpart.
@@ -478,7 +442,7 @@ verification/CPS track (no shared modules, no cross-links)._
       and EM invariants exported as measured series; the non-relativistic limit matches
       `charged_particle.py`; tests pass.
 
-18. **BE-131: Add Maxwell-source constraint diagnostics and EM-invariant obligations**
+15. **BE-131: Add Maxwell-source constraint diagnostics and EM-invariant obligations**
     - Goal: Reuse the existing measured Gauss-flux/planar-Stokes/div-curl checks in
       `engine/fields/diagnostics.py` to report Maxwell source constraints (`div B = 0`,
       `div E = rho/eps0`) for EM systems, and surface EM invariants as external-required
@@ -491,7 +455,7 @@ verification/CPS track (no shared modules, no cross-links)._
 
 #### Phase 4 — Thin field-theoretic abstractions (symbolic + sampled only; no PDE solver)
 
-19. **BE-132: Add a Lagrangian field-density object with symbolic Euler-Lagrange**
+16. **BE-132: Add a Lagrangian field-density object with symbolic Euler-Lagrange**
     - Goal: A minimal field-density value object `L(phi, d_mu phi, x)` that produces the
       symbolic Euler-Lagrange equation for one scalar field — structure only, **no**
       time-stepping PDE integrator.
@@ -499,7 +463,7 @@ verification/CPS track (no shared modules, no cross-links)._
     - Acceptance: the Euler-Lagrange expression for a Klein-Gordon-style density matches
       by hand; the object validates free symbols like the existing fields; tests pass.
 
-20. **BE-133: Add symbolic stress-energy and a measured conservation residual**
+17. **BE-133: Add symbolic stress-energy and a measured conservation residual**
     - Goal: Symbolic `T_mu_nu` for a scalar field density plus a **measured** sampled
       `d_mu T^mu_nu` residual over field configurations, consistent with the rigor ladder
       (sampling is evidence, not a theorem).
@@ -508,7 +472,7 @@ verification/CPS track (no shared modules, no cross-links)._
     - Acceptance: `T_mu_nu` is symmetric for the scalar density; the sampled divergence
       residual is near zero for an on-shell configuration and labeled measured; tests pass.
 
-21. **BE-134: Add the scalar field-density example and export**
+18. **BE-134: Add the scalar field-density example and export**
     - Goal: A Klein-Gordon-style scalar field-density gallery system exporting its
       density, Euler-Lagrange form, and measured `T_mu_nu` conservation residual under a
       new `system_kind="field-density"`.
@@ -519,7 +483,7 @@ verification/CPS track (no shared modules, no cross-links)._
 
 #### Phase 5 — Quantum exploratory (DEFERRED / RESEARCH-GATED — DO NOT START)
 
-22. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
+19. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
     - Goal: Research placeholder only — a finite-dimensional Hilbert state under a unitary
       `FirstOrderSystem` flow (spin precession), with measured norm/probability
       invariants. **No QED, no QFT, no PDE.** Do not implement until Phases 1-3 have landed
