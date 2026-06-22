@@ -171,20 +171,7 @@ spacetimes, curvature, parallel transport, and orbital structure. Generalizes
 `systems/sphere_geodesic.py`, and gives the viewer curved-space trajectories and
 embedding diagrams._
 
-1. **BE-112: Export a non-radial Ellis-wormhole geodesic preset with turning points**
-    - Goal: Add an angular-momentum (`L != 0`) wormhole geodesic preset so the radial
-      effective potential (BE-110) actually exhibits a reflected geodesic that turns
-      around at the centrifugal barrier without crossing the throat, giving the viewer a
-      concrete reflected/traversing contrast from Python-owned data.
-    - Scope: `systems/wormhole.py` (a non-radial initial-state helper), `scripts/
-      generate_wormhole.py`, `scripts/example_specs.py` (a parameter variant), docs, and
-      `tests/`.
-    - Acceptance: the new preset has nonzero conserved `L`, its analytic turning points
-      match the integrated radial extrema to tolerance, the exported classification reads
-      `reflected`, the measured throat-traversal diagnostic agrees (does not cross), the
-      manifest declares the variant, and focused tests plus generation pass.
-
-2. **BE-113: Export a measured geodesic-deviation diagnostic for the Schwarzschild bound orbit**
+1. **BE-113: Export a measured geodesic-deviation diagnostic for the Schwarzschild bound orbit**
     - Goal: Give the Schwarzschild bound-timelike preset the same measured
       geodesic-deviation diagnostic the wormhole already exports, integrating a nearby
       equatorial geodesic and recording the metric separation/focusing series along the
@@ -196,6 +183,20 @@ embedding diagrams._
       block with `rigor="measured"`, the separation series is finite and starts from the
       recorded initial offset, the neighbor stays outside the horizon, the manifest
       declares the diagnostic source, and focused tests plus generation pass.
+
+2. **BE-114: Export a parallel-transport holonomy series for the sphere geodesic**
+    - Goal: Give the sphere-geodesic preset a parallel-transport frame export like the
+      surface-of-revolution geodesic already carries, transporting a tangent vector along
+      the great circle and recording the accumulated rotation so the viewer can show the
+      holonomy angle from Python-owned data.
+    - Scope: `scripts/generate_sphere_geodesic.py` (reuse
+      `MetricGeometry.parallel_transport` from the sphere metric), `scripts/
+      example_specs.py` (declare the parallel-transport source on the sphere geometry),
+      docs, and `tests/`.
+    - Acceptance: the trajectory carries a `parallelTransport` block whose transported
+      frame stays unit-norm under the metric to tolerance, the closed-loop holonomy angle
+      matches the analytic solid-angle prediction for a latitude circle to tolerance, the
+      manifest declares the source, and focused tests plus generation pass.
 
 ### Verification track (paused)
 

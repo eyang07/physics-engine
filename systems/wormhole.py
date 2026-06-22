@@ -74,6 +74,31 @@ def radial_throat_initial_state(
     return [0.0, start_l, 0.0, float(np.sqrt(1.0 + l_dot**2)), l_dot, 0.0]
 
 
+def angular_reflected_initial_state(
+    *,
+    throat_radius: float = 1.0,
+    start_l: float = -6.0,
+    l_dot: float = 0.4,
+    phi_dot: float = 0.04,
+) -> list[float]:
+    """Non-radial (``L != 0``) timelike state that reflects off the barrier.
+
+    Angular momentum raises the throat barrier ``V_eff^2(0) = 1 + L^2/a^2`` above
+    the conserved energy, so a geodesic launched inward from one mouth turns
+    around at the centrifugal turning point ``l = -sqrt(L^2/(E^2-1) - a^2)``
+    without ever reaching the throat — the reflected contrast to the radial
+    traversing preset. The proper-time normalization fixes
+    ``t_dot = sqrt(1 + l_dot^2 + (l^2 + a^2) phi_dot^2)`` so the conserved metric
+    norm is ``-1``.
+    """
+
+    if throat_radius <= 0.0:
+        raise ValueError("throat_radius must be positive")
+    rho_squared = start_l**2 + throat_radius**2
+    t_dot = float(np.sqrt(1.0 + l_dot**2 + rho_squared * phi_dot**2))
+    return [0.0, float(start_l), 0.0, t_dot, float(l_dot), float(phi_dot)]
+
+
 def domain_assumptions(*, throat_radius: float) -> dict[str, object]:
     """Fixed-background coordinate-domain assumptions for the Ellis chart.
 
@@ -307,6 +332,7 @@ system = build_system()
 __all__ = [
     "WormholeGeodesicKind",
     "WormholeRadialReduction",
+    "angular_reflected_initial_state",
     "build_system",
     "classify_radial_geodesic",
     "conserved_constants",

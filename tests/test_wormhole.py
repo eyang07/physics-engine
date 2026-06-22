@@ -260,6 +260,64 @@ def test_wormhole_radial_geodesic_energy_balance_and_classification() -> None:
     assert trajectory.metadata["diagnostics"]["throatTraversal"]["crossesThroat"] is True
 
 
+def test_wormhole_angular_reflected_preset_turns_at_barrier() -> None:
+    # A non-radial (L != 0) preset whose specific energy sits below the throat
+    # barrier reflects off the centrifugal barrier and never crosses the throat.
+    trajectory = generate_wormhole_trajectory(phi_dot=0.04, t_span=(0.0, 32.0), dt=0.02)
+    classification = trajectory.metadata["orbitClassification"]
+    traversal = trajectory.metadata["diagnostics"]["throatTraversal"]
+    plot = trajectory.metadata["potentialPlots"][0]
+    ell = trajectory.states[:, 1]
+    l_dot = trajectory.states[:, 4]
+
+    angular_momentum = classification["angularMomentum"]
+    energy = classification["energy"]
+    assert abs(angular_momentum) > 1e-6
+    assert classification["classification"] == "reflected"
+    assert plot["classification"] == "reflected"
+
+    # The analytic turning points bracket the integrated radial motion: the
+    # reflected geodesic approaches the throat-side turning point and turns back,
+    # never reaching l = 0.
+    turning_points = radial_turning_points(
+        throat_radius=1.0, energy=energy, angular_momentum=angular_momentum
+    )
+    assert len(turning_points) == 2
+    inner_turning_point = max(turning_points)  # the throat-side (negative-l) reflection
+    assert np.isclose(float(ell.max()), -inner_turning_point, atol=1e-3)
+    assert ell.max() < 0.0  # stays entirely on the launch side of the throat
+
+    # The measured rollout diagnostic agrees with the analytic class: no crossing.
+    assert traversal["crossesThroat"] is False
+    assert traversal["rigor"] == "measured"
+    assert traversal["minAbsL"] > 1e-3
+
+    # The conserved E/L reduction reproduces the integrated radial velocity.
+    potential = radial_effective_potential_values(
+        ell, throat_radius=1.0, angular_momentum=angular_momentum
+    )
+    assert np.allclose(energy**2 - potential, l_dot**2, atol=1e-9)
+
+
+def test_wormhole_manifest_declares_radial_and_angular_variants() -> None:
+    entry = system_entry(WORMHOLE)
+    variants = {variant["id"]: variant for variant in entry["variants"]}
+
+    assert set(variants) == {"radial-traversing", "angular-reflected"}
+    assert variants["radial-traversing"]["dataPath"] == "/data/wormhole.json"
+    assert variants["radial-traversing"]["parameters"]["phi_dot0"] == 0.0
+    assert variants["angular-reflected"]["dataPath"] == (
+        "/data/wormhole_angular_reflected.json"
+    )
+    assert variants["angular-reflected"]["parameters"]["phi_dot0"] != 0.0
+    assert {parameter["name"] for parameter in entry["parameters"]} >= {
+        "a",
+        "l0",
+        "l_dot0",
+        "phi_dot0",
+    }
+
+
 def test_wormhole_exports_effective_potential_plot() -> None:
     trajectory = generate_wormhole_trajectory(t_span=(0.0, 32.0), dt=0.02)
     (plot,) = trajectory.metadata["potentialPlots"]

@@ -34,7 +34,10 @@ from scripts.generate_uniform_gravity import write_uniform_gravity_trajectory
 from scripts.generate_variable_speed_wavefront import write_variable_speed_wavefront
 from scripts.generate_vibrating_string import write_vibrating_string
 from scripts.generate_wave_packet import write_wave_packet
-from scripts.generate_wormhole import write_wormhole_trajectory
+from scripts.generate_wormhole import (
+    write_wormhole_trajectory,
+    write_wormhole_variant_trajectories,
+)
 
 
 def main() -> None:
@@ -81,6 +84,10 @@ def main() -> None:
     write_wormhole_trajectory(
         Path("data/generated/wormhole.json"),
         viewer_output=Path("viewer/public/data/wormhole.json"),
+    )
+    write_wormhole_variant_trajectories(
+        Path("data/generated"),
+        viewer_output_dir=Path("viewer/public/data"),
     )
     write_bead_on_hoop_trajectory(
         Path("data/generated/bead_on_hoop.json"),

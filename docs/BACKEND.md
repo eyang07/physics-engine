@@ -79,7 +79,11 @@ artifacts.
     (`V_eff^2 = epsilon + L^2/(l^2+a^2)`) with the throat barrier, analytic
     turning points, and a qualitative traversing/reflected classification,
     measured invariant residuals, and measured throat-traversal diagnostics; it
-    does not solve dynamical gravity.
+    does not solve dynamical gravity. Two presets ship as manifest variants: the
+    default radial traversal (`L = 0`, clears the throat) and an angular preset
+    (`phi_dot0 != 0`, `L != 0`) whose energy sits below the centrifugal barrier
+    so it reflects at the analytic turning point and never crosses the throat —
+    the measured throat-traversal diagnostic reports `crossesThroat=false`.
   - Coordinate-domain guards for fixed curved backgrounds: each system declares
     its chart's validity domain and the generators reject presets that leave it.
     The Schwarzschild generator rejects geodesics that touch or cross the event

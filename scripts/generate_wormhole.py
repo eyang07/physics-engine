@@ -8,10 +8,16 @@ import numpy as np
 import sympy as sp
 
 from engine.export import Trajectory
+from engine.export.manifest import ParameterVariant
 from engine.numerics import integrate_fixed_step
-from scripts.generation import invariant_residual_records, write_trajectory_outputs
+from scripts.generation import (
+    invariant_residual_records,
+    write_parameter_variant_trajectories,
+    write_trajectory_outputs,
+)
 from systems.wormhole import (
     WormholeGeodesicKind,
+    angular_reflected_initial_state,
     build_system,
     classify_radial_geodesic,
     conserved_constants,
@@ -245,18 +251,28 @@ def generate_wormhole_trajectory(
     throat_radius: float = 1.0,
     initial_l: float = -6.0,
     l_dot: float = 0.4,
+    phi_dot: float = 0.0,
     t_span: tuple[float, float] = (0.0, 32.0),
     dt: float = 0.02,
 ) -> Trajectory:
     domain = domain_assumptions(throat_radius=throat_radius)
     system = build_system(throat_radius=throat_radius)
-    time, intrinsic_states = integrate_fixed_step(
-        system.numerical_rhs(),
-        initial_state=radial_throat_initial_state(
+    if phi_dot == 0.0:
+        initial_state = radial_throat_initial_state(
             throat_radius=throat_radius,
             start_l=initial_l,
             l_dot=l_dot,
-        ),
+        )
+    else:
+        initial_state = angular_reflected_initial_state(
+            throat_radius=throat_radius,
+            start_l=initial_l,
+            l_dot=l_dot,
+            phi_dot=phi_dot,
+        )
+    time, intrinsic_states = integrate_fixed_step(
+        system.numerical_rhs(),
+        initial_state=initial_state,
         t_span=t_span,
         dt=dt,
     )
@@ -320,9 +336,50 @@ def write_wormhole_trajectory(
     output: Path,
     *,
     viewer_output: Path | None = None,
+    throat_radius: float = 1.0,
+    initial_l: float = -6.0,
+    l_dot: float = 0.4,
+    phi_dot: float = 0.0,
 ) -> Trajectory:
-    trajectory = generate_wormhole_trajectory()
+    trajectory = generate_wormhole_trajectory(
+        throat_radius=throat_radius,
+        initial_l=initial_l,
+        l_dot=l_dot,
+        phi_dot=phi_dot,
+    )
     return write_trajectory_outputs(trajectory, output, viewer_output)
+
+
+def _write_wormhole_variant(
+    variant: ParameterVariant,
+    output: Path,
+    viewer_output: Path | None,
+) -> Trajectory:
+    parameters = variant.parameters
+    return write_wormhole_trajectory(
+        output,
+        viewer_output=viewer_output,
+        throat_radius=parameters["a"],
+        initial_l=parameters["l0"],
+        l_dot=parameters["l_dot0"],
+        phi_dot=parameters.get("phi_dot0", 0.0),
+    )
+
+
+def write_wormhole_variant_trajectories(
+    output_dir: Path,
+    *,
+    viewer_output_dir: Path | None = None,
+) -> list[Trajectory]:
+    from scripts.example_specs import WORMHOLE
+
+    return write_parameter_variant_trajectories(
+        WORMHOLE,
+        output_dir,
+        write_variant=_write_wormhole_variant,
+        viewer_output_dir=viewer_output_dir,
+        system_name="Ellis wormhole",
+    )
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

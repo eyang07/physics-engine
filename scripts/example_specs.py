@@ -968,6 +968,7 @@ WORMHOLE = SystemSpec(
         Parameter("a", "a", 1.0, 0.4, 3.0),
         Parameter("l0", "l_0", -6.0, -10.0, -0.5, role="initial"),
         Parameter("l_dot0", r"\dot{l}_0", 0.4, 0.1, 1.2, role="initial"),
+        Parameter("phi_dot0", r"\dot{\phi}_0", 0.0, 0.0, 0.3, role="initial"),
     ),
     state=(
         StateVar("t", "t", "coordinate"),
@@ -987,6 +988,30 @@ WORMHOLE = SystemSpec(
     ),
     lenses=("wormholeGeodesic", "wormholeEffectivePotential"),
     data_path="/data/wormhole.json",
+    variants=(
+        ParameterVariant(
+            id="radial-traversing",
+            label="Radial traversal (L = 0)",
+            parameters={
+                "a": 1.0,
+                "l0": -6.0,
+                "l_dot0": 0.4,
+                "phi_dot0": 0.0,
+            },
+            data_path="/data/wormhole.json",
+        ),
+        ParameterVariant(
+            id="angular-reflected",
+            label="Angular reflection (L != 0)",
+            parameters={
+                "a": 1.0,
+                "l0": -6.0,
+                "l_dot0": 0.4,
+                "phi_dot0": 0.04,
+            },
+            data_path="/data/wormhole_angular_reflected.json",
+        ),
+    ),
     effective_potentials=(
         EffectivePotential(
             name="wormhole_radial",
