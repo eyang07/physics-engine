@@ -38,6 +38,7 @@ import {
   scalarField,
   scalarFieldSeriesList,
   surfaceFieldSeriesList,
+  surfaceGeodesicGeometry,
   type ScalarFieldSeries,
   type SurfaceFieldSeries,
   vectorField,
@@ -731,6 +732,11 @@ function applyVisualization() {
     // The wavefront lens (FE-048) colors the front by the measured intensity proxy;
     // the legend keys the magma ramp qualitatively (spread → focused at caustics).
     scalarLegend.setColormap(magma, "wavefront intensity", "spread", "focused");
+    scalarLegend.show();
+  } else if (selectedVisualization.id === "surfaceGeodesic" && surfaceGeodesicGeometry(trajectory)?.curvature) {
+    // FE-050: the surface mesh is tinted by exported Gaussian curvature; the legend
+    // keys the viridis ramp qualitatively (saddle K<0 → dome K>0, flat in between).
+    scalarLegend.setColormap(viridis, "Gaussian curvature", "saddle", "dome");
     scalarLegend.show();
   } else {
     scalarLegend.hide();

@@ -919,12 +919,53 @@ export type SurfaceMesh = {
   triangles: [number, number, number][];
 };
 
+/**
+ * The curvature scalar field sampled on the same `(u, phi)` grid as the mesh
+ * (BE-105), flattened per-vertex to align with `SurfaceMesh.points`. The
+ * surface-geodesic lens (FE-050) colors the mesh by this field; the values are
+ * Python's symbolic-exact Gaussian curvature, never recomputed in the viewer.
+ */
+export type SurfaceCurvature = {
+  /** Field source name, e.g. "gaussianCurvature". */
+  name: string;
+  /** Human-readable quantity, e.g. "Gaussian curvature". */
+  quantity?: string;
+  /** Per-vertex values, flattened row-major (u over phi), aligned with mesh.points. */
+  values: number[];
+  /** `[min, max]` over the finite values, for the color scale's domain. */
+  range: [number, number];
+};
+
 export type SurfaceGeodesicGeometry = {
   family: string;
   mesh: SurfaceMesh;
   /** Geodesic polyline drawn on the surface, in embedding coordinates. */
   geodesic: Vector3Tuple[];
+  /** Curvature scalar field over the mesh, when exported (BE-105). */
+  curvature?: SurfaceCurvature;
 };
+
+// Flatten a `values[u][phi]` grid (validated against the mesh shape) into a
+// per-vertex array in the same row-major order as the mesh points, returning
+// null when the grid is ragged or mis-shaped.
+function flattenSurfaceField(
+  raw: Record<string, unknown>,
+  uCount: number,
+  phiCount: number,
+): number[] | null {
+  const values = raw.values;
+  if (!Array.isArray(values) || values.length !== uCount) {
+    return null;
+  }
+  const flat: number[] = [];
+  for (const row of values) {
+    if (!isNumberArray(row) || row.length !== phiCount) {
+      return null;
+    }
+    flat.push(...row);
+  }
+  return flat;
+}
 
 /**
  * Read the surface-embedding mesh + geodesic Python exported under
@@ -994,11 +1035,39 @@ export function surfaceGeodesicGeometry(trajectory: Trajectory): SurfaceGeodesic
     return null;
   }
   const family = typeof raw.family === "string" ? raw.family : "surface";
-  return {
+  const geometry: SurfaceGeodesicGeometry = {
     family,
     mesh: { family, shape: [uCount, phiCount], points, triangles },
     geodesic,
   };
+
+  // Curvature is optional: an absent or mis-shaped field just leaves the mesh
+  // uncolored rather than failing the whole lens.
+  const curvatureRaw = asRecord(raw.curvature);
+  if (curvatureRaw) {
+    const flat = flattenSurfaceField(curvatureRaw, uCount, phiCount);
+    if (flat) {
+      let min = Infinity;
+      let max = -Infinity;
+      for (const value of flat) {
+        if (!Number.isFinite(value)) {
+          continue;
+        }
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
+      if (Number.isFinite(min) && Number.isFinite(max)) {
+        geometry.curvature = {
+          name: typeof curvatureRaw.name === "string" ? curvatureRaw.name : "curvature",
+          quantity: typeof curvatureRaw.quantity === "string" ? curvatureRaw.quantity : undefined,
+          values: flat,
+          range: [min, max],
+        };
+      }
+    }
+  }
+
+  return geometry;
 }
 
 /**

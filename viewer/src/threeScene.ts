@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { AttitudeBody } from "./attitudeBody";
-import { bodyColor, viridis } from "./design/colormaps";
+import { bodyColor, scalarScale, viridis } from "./design/colormaps";
 import { theme } from "./design/theme";
 import { FieldSurface } from "./fieldSurface";
 import { FlowField } from "./flow";
@@ -361,6 +361,12 @@ function makeSphereGeodesicGroup(data: Trajectory, hints: RendererHints): THREE.
  * from `metadata.surfaceGeometry`; nothing about the surface or the geodesic is
  * recomputed here, so a sphere's geodesics read as great circles, a torus's wind
  * around the tube, etc. — whatever Python integrated and embedded.
+ *
+ * FE-050 — when the export carries a curvature scalar field (BE-105), the mesh is
+ * tinted per-vertex through the shared scalar scale (FE-038): saddle (K<0) reads
+ * dark, flat (K≈0) mid-ramp, and dome (K>0) bright, so curvature is visible on the
+ * surface. The colors are the exported curvature, never recomputed here; the
+ * matching legend is keyed in `main.ts`.
  */
 function makeSurfaceGeodesicGroup(geometry: SurfaceGeodesicGeometry): THREE.Group {
   const group = new THREE.Group();
@@ -381,12 +387,30 @@ function makeSurfaceGeodesicGroup(geometry: SurfaceGeodesicGeometry): THREE.Grou
   meshGeometry.setIndex(indices);
   meshGeometry.computeVertexNormals();
 
+  // FE-050: paint each vertex by its exported curvature (when present). The
+  // surface goes more opaque when colored so the field reads, rather than the
+  // faint neutral shell used when no curvature is exported.
+  const curvature = geometry.curvature;
+  const colored = curvature !== undefined && curvature.values.length === points.length;
+  if (colored && curvature) {
+    const scale = scalarScale(viridis, curvature.range);
+    const colors = new Float32Array(points.length * 3);
+    for (let i = 0; i < points.length; i += 1) {
+      const [r, g, b] = scale.atUnit(curvature.values[i]);
+      colors[i * 3] = r;
+      colors[i * 3 + 1] = g;
+      colors[i * 3 + 2] = b;
+    }
+    meshGeometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  }
+
   const surface = new THREE.Mesh(
     meshGeometry,
     new THREE.MeshStandardMaterial({
-      color: 0xdbe8f0,
+      color: colored ? 0xffffff : 0xdbe8f0,
+      vertexColors: colored,
       transparent: true,
-      opacity: 0.4,
+      opacity: colored ? 0.86 : 0.4,
       roughness: 0.72,
       metalness: 0.02,
       side: THREE.DoubleSide,
