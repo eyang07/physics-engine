@@ -28,6 +28,7 @@ import { drawVectorFieldOverlay, robustMagnitudeMax } from "./vectorFieldCanvas"
 import { drawWaveScene } from "./waveCanvas";
 import { VerificationPanel } from "./verificationPanel";
 import { VerificationStage } from "./verificationStage";
+import { mountVerificationApp, unmountVerificationApp } from "./verification/mount";
 import { resolveRendererSurface } from "./rendererRegistry";
 import { createScalarLegend } from "./scalarLegend";
 import { createBodyLegend } from "./bodyLegend";
@@ -691,6 +692,14 @@ function setDomain(domain: Domain) {
     systemsActive && selectedVisualization !== null && isThreeMode(selectedVisualization.id),
   );
   verificationStage.setActive(!systemsActive);
+  // The Verification domain owns a React root (FE-055); it only runs while that
+  // domain is visible, so mount it on entry and tear it down on exit. The legacy
+  // vanilla panel continues to render alongside it for now.
+  if (systemsActive) {
+    unmountVerificationApp();
+  } else {
+    mountVerificationApp(verificationDomain);
+  }
   if (systemsActive) {
     resize2dCanvas();
     threeScene.resize();

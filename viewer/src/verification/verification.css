@@ -1,0 +1,11 @@
+/*
+ * Tailwind entry for the Verification-domain React shell.
+ *
+ * Preflight is disabled in `tailwind.config.js`, so `@tailwind base` emits no
+ * global element reset; only the utilities used inside `src/verification/` are
+ * generated. This keeps the Systems domain's vanilla styling — and its visual
+ * baselines — untouched.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
