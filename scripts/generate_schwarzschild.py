@@ -9,6 +9,7 @@ import numpy as np
 from engine.dynamics import (
     classify_schwarzschild_orbit,
     schwarzschild_effective_potential_values,
+    schwarzschild_equatorial_metric,
 )
 from engine.export import Trajectory
 from engine.numerics import integrate_fixed_step
@@ -291,6 +292,44 @@ def _schwarzschild_geometry(
     }
 
 
+def _geodesic_deviation_payload(
+    time: np.ndarray,
+    intrinsic_states: np.ndarray,
+    *,
+    schwarzschild_radius: float,
+    azimuthal_offset: float = 0.03,
+) -> dict[str, object]:
+    """Measured tidal separation between the bound orbit and a nearby geodesic.
+
+    A neighbor launched from the same state but offset slightly in the azimuthal
+    angle ``phi`` traces a congruent bound orbit; the metric separation breathes
+    with the radius, converging at periapsis and diverging toward apoapsis. The
+    reduction reuses ``MetricGeometry.geodesic_deviation_diagnostic`` on the
+    equatorial Schwarzschild metric and is a finite-rollout diagnostic, not a
+    symbolic Jacobi-field proof.
+    """
+
+    initial = intrinsic_states[0].copy()
+    initial[2] += azimuthal_offset
+    system = build_system(schwarzschild_radius=schwarzschild_radius)
+    _neighbor_time, neighboring = integrate_fixed_step(
+        system.numerical_rhs(),
+        initial_state=initial,
+        t_span=(float(time[0]), float(time[-1])),
+        dt=float(time[1] - time[0]),
+    )
+    assert_outside_horizon(
+        neighboring[:, 1],
+        schwarzschild_radius=schwarzschild_radius,
+        context="timelike Schwarzschild neighbor geodesic",
+    )
+    payload = schwarzschild_equatorial_metric(
+        schwarzschild_radius
+    ).geodesic_deviation_diagnostic(time, intrinsic_states, neighboring)
+    payload["neighborInitialOffset"] = {"phi": azimuthal_offset}
+    return payload
+
+
 def generate_schwarzschild_trajectory(
     *,
     kind: SchwarzschildGeodesicKind = "timelike",
@@ -362,6 +401,11 @@ def generate_schwarzschild_trajectory(
             semi_latus_rectum=semi_latus_rectum
         )
         diagnostics["perihelionPrecession"] = precession
+        diagnostics["geodesicDeviation"] = _geodesic_deviation_payload(
+            time,
+            intrinsic_states,
+            schwarzschild_radius=schwarzschild_radius,
+        )
     else:
         diagnostics["lightBending"] = null_light_bending(
             schwarzschild_radius=schwarzschild_radius,

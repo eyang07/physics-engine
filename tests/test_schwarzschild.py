@@ -145,6 +145,52 @@ def test_timelike_schwarzschild_exports_precession_and_measured_invariants() -> 
     )
 
 
+def test_timelike_schwarzschild_exports_geodesic_deviation() -> None:
+    trajectory = generate_schwarzschild_trajectory(kind="timelike")
+    deviation = trajectory.metadata["diagnostics"]["geodesicDeviation"]
+    separation = np.asarray(deviation["separation"], dtype=float)
+    coordinate_delta = np.asarray(deviation["coordinateDelta"], dtype=float)
+
+    assert deviation["kind"] == "geodesic-deviation"
+    assert deviation["rigor"] == "measured"
+    assert deviation["coordinates"] == ["t", "r", "phi"]
+    assert deviation["neighborInitialOffset"] == {"phi": 0.03}
+
+    # The separation series is finite and starts from the recorded metric offset.
+    assert np.all(np.isfinite(separation))
+    assert deviation["initialSeparation"] > 0.0
+    assert np.isclose(separation[0], deviation["initialSeparation"])
+    # The neighbor is offset purely in phi by the recorded amount.
+    assert np.allclose(coordinate_delta[0], [0.0, 0.0, 0.03])
+
+    # The bound orbit starts at periapsis, so the tidal separation breathes with
+    # the radius: it diverges toward apoapsis (max relative > 1) and never
+    # converges below the periapsis baseline.
+    assert deviation["minRelativeSeparation"] >= 1.0 - 1e-9
+    assert deviation["maxRelativeSeparation"] > 1.0
+
+    # The neighbor geodesic stays outside the horizon (it would have raised
+    # otherwise); confirm directly from the reference radii bound.
+    assert_outside_horizon(
+        trajectory.states[:, 1],
+        schwarzschild_radius=2.0,
+        context="timelike reference geodesic",
+    )
+
+
+def test_schwarzschild_manifest_declares_geodesic_deviation_source() -> None:
+    entry = system_entry(SCHWARZSCHILD)
+
+    assert entry["geometry"]["diagnostics"]["geodesicDeviation"] == (
+        "trajectory.metadata.diagnostics.geodesicDeviation"
+    )
+
+
+def test_null_schwarzschild_has_no_geodesic_deviation() -> None:
+    trajectory = generate_schwarzschild_trajectory(kind="null")
+    assert "geodesicDeviation" not in trajectory.metadata["diagnostics"]
+
+
 def test_null_schwarzschild_exports_light_bending_and_photon_sphere() -> None:
     trajectory = generate_schwarzschild_trajectory(kind="null")
     residuals = {

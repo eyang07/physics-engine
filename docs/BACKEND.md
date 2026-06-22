@@ -70,8 +70,12 @@ artifacts.
     points, and qualitative orbit classification for renderer consumption.
   - Schwarzschild geodesic generator for equatorial timelike and null geodesics,
     exporting measured conserved-energy/angular-momentum residuals, perihelion
-    precession for the bound timelike preset, photon-sphere/light-bending
-    diagnostics for the null preset, and the GR effective potential.
+    precession and a measured geodesic-deviation (tidal separation) diagnostic
+    for the bound timelike preset, photon-sphere/light-bending diagnostics for
+    the null preset, and the GR effective potential. The geodesic-deviation block
+    integrates a nearby equatorial geodesic and records the metric separation
+    along the orbit (`rigor="measured"`), reusing the same
+    `MetricGeometry.geodesic_deviation_diagnostic` the wormhole preset uses.
   - Ellis wormhole geodesic generator for a fixed equatorial background,
     exporting an embedding mesh, embedded geodesic curve, a deterministic
     scalar-curvature field over the same throat grid (`R = -2a^2/(a^2+l^2)^2`,
@@ -150,7 +154,10 @@ artifacts.
     are deterministic symbolic evaluations sharing one `(r, phi)` grid; the mesh
     stays strictly outside the horizon (`r > r_s`). The 1D radial Ricci /
     Kretschmann profiles under `metadata.curvatureScalars` remain available as
-    top-level `fields`.
+    top-level `fields`. The bound timelike entry also declares
+    `geometry.diagnostics.geodesicDeviation`
+    (`metadata.diagnostics.geodesicDeviation`): a measured tidal-separation series
+    against a nearby equatorial geodesic.
   - Fixed-background manifest entries may declare a `domain` channel
     (`kind="coordinate-domain"`, `source="trajectory.metadata.domain"`). The
     trajectory payload carries the matching `metadata.domain` descriptor: the

@@ -166,6 +166,9 @@ def _schwarzschild_geometry(system):
             "kind": "scalar-field",
             "source": "trajectory.metadata.schwarzschildGeometry.curvature",
         },
+        "diagnostics": {
+            "geodesicDeviation": "trajectory.metadata.diagnostics.geodesicDeviation",
+        },
     }
 
 

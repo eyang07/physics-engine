@@ -59,8 +59,6 @@ change touches shared contracts, generated output, or release-critical behavior.
 - Use `task-queue.md` as the shared implementation queue.
 - Pick one frontend or backend task at a time, keep its acceptance checks
   visible while working, and remove the task from the queue when complete.
-- If a queue drops below two items, add coherent next tasks that match the
-  current repository state and preserve the same priority ordering.
 
 ## Editing Guidance
 

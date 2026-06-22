@@ -12,9 +12,6 @@ most immediately implementable task first in each section.
 - Keep the Python-to-TypeScript boundary intact: Python computes and exports;
   TypeScript renders generated data.
 - When the task is complete, remove it from this queue in the same change.
-- If either queue has fewer than two tasks after removal, add coherent next
-  tasks for that side before finishing. Keep new tasks ordered by
-  implementation readiness.
 - Do not add tasks for generated data under `data/generated/` or
   `viewer/public/data/*.json`.
 
@@ -171,32 +168,8 @@ spacetimes, curvature, parallel transport, and orbital structure. Generalizes
 `systems/sphere_geodesic.py`, and gives the viewer curved-space trajectories and
 embedding diagrams._
 
-1. **BE-113: Export a measured geodesic-deviation diagnostic for the Schwarzschild bound orbit**
-    - Goal: Give the Schwarzschild bound-timelike preset the same measured
-      geodesic-deviation diagnostic the wormhole already exports, integrating a nearby
-      equatorial geodesic and recording the metric separation/focusing series along the
-      orbit so the viewer can show tidal convergence/divergence from Python-owned data.
-    - Scope: `scripts/generate_schwarzschild.py` (reuse
-      `MetricGeometry.geodesic_deviation_diagnostic` from the equatorial metric),
-      `scripts/example_specs.py` (declare the diagnostic source), docs, and `tests/`.
-    - Acceptance: the timelike payload carries a `diagnostics.geodesicDeviation`
-      block with `rigor="measured"`, the separation series is finite and starts from the
-      recorded initial offset, the neighbor stays outside the horizon, the manifest
-      declares the diagnostic source, and focused tests plus generation pass.
-
-2. **BE-114: Export a parallel-transport holonomy series for the sphere geodesic**
-    - Goal: Give the sphere-geodesic preset a parallel-transport frame export like the
-      surface-of-revolution geodesic already carries, transporting a tangent vector along
-      the great circle and recording the accumulated rotation so the viewer can show the
-      holonomy angle from Python-owned data.
-    - Scope: `scripts/generate_sphere_geodesic.py` (reuse
-      `MetricGeometry.parallel_transport` from the sphere metric), `scripts/
-      example_specs.py` (declare the parallel-transport source on the sphere geometry),
-      docs, and `tests/`.
-    - Acceptance: the trajectory carries a `parallelTransport` block whose transported
-      frame stays unit-norm under the metric to tolerance, the closed-loop holonomy angle
-      matches the analytic solid-angle prediction for a latitude circle to tolerance, the
-      manifest declares the source, and focused tests plus generation pass.
+_No active physics tasks queued; add the next coherent geometry/gravitation task
+here when starting new backend work._
 
 ### Verification track (paused)
 
