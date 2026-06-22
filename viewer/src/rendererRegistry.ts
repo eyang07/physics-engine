@@ -45,6 +45,7 @@ export const THREE_LENS_IDS = new Set<string>([
   "pendulumHamiltonian",
   "sphereGeodesic",
   "surfaceGeodesic",
+  "wormholeGeodesic",
   "chargedParticle",
   "uniformGravity",
   "idealSpring",

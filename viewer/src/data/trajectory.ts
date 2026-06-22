@@ -968,17 +968,22 @@ function flattenSurfaceField(
 }
 
 /**
- * Read the surface-embedding mesh + geodesic Python exported under
- * `metadata.surfaceGeometry`. Returns null when the trajectory carries no such
- * geometry or any channel is malformed, so the lens can fall back gracefully
- * instead of drawing a broken mesh.
+ * Parse a surface-embedding mesh + geodesic container in the shared `surface-mesh`
+ * schema. The 2-sphere/torus geodesic lens reads it from `metadata.surfaceGeometry`
+ * (mesh key `surfaceMesh`); the Ellis wormhole (FE-053) reads the same schema from
+ * `metadata.wormholeGeometry` (mesh key `embeddingMesh`). `includeCurvature` lets
+ * the wormhole funnel stay a neutral shell (no unkeyed colormap) while the surface
+ * lens keeps its FE-050 curvature tint.
  */
-export function surfaceGeodesicGeometry(trajectory: Trajectory): SurfaceGeodesicGeometry | null {
-  const raw = asRecord(trajectory.metadata?.surfaceGeometry);
+function parseSurfaceGeodesicGeometry(
+  raw: Record<string, unknown> | undefined,
+  meshKey: string,
+  options: { defaultFamily: string; includeCurvature: boolean },
+): SurfaceGeodesicGeometry | null {
   if (!raw) {
     return null;
   }
-  const meshRaw = asRecord(raw.surfaceMesh);
+  const meshRaw = asRecord(raw[meshKey]);
   const geodesicRaw = asRecord(raw.geodesic);
   if (!meshRaw || !geodesicRaw) {
     return null;
@@ -1034,7 +1039,7 @@ export function surfaceGeodesicGeometry(trajectory: Trajectory): SurfaceGeodesic
   if (!geodesic || geodesic.length < 2) {
     return null;
   }
-  const family = typeof raw.family === "string" ? raw.family : "surface";
+  const family = typeof raw.family === "string" ? raw.family : options.defaultFamily;
   const geometry: SurfaceGeodesicGeometry = {
     family,
     mesh: { family, shape: [uCount, phiCount], points, triangles },
@@ -1043,7 +1048,7 @@ export function surfaceGeodesicGeometry(trajectory: Trajectory): SurfaceGeodesic
 
   // Curvature is optional: an absent or mis-shaped field just leaves the mesh
   // uncolored rather than failing the whole lens.
-  const curvatureRaw = asRecord(raw.curvature);
+  const curvatureRaw = options.includeCurvature ? asRecord(raw.curvature) : undefined;
   if (curvatureRaw) {
     const flat = flattenSurfaceField(curvatureRaw, uCount, phiCount);
     if (flat) {
@@ -1068,6 +1073,34 @@ export function surfaceGeodesicGeometry(trajectory: Trajectory): SurfaceGeodesic
   }
 
   return geometry;
+}
+
+/**
+ * Read the surface-embedding mesh + geodesic Python exported under
+ * `metadata.surfaceGeometry`. Returns null when the trajectory carries no such
+ * geometry or any channel is malformed, so the lens can fall back gracefully
+ * instead of drawing a broken mesh.
+ */
+export function surfaceGeodesicGeometry(trajectory: Trajectory): SurfaceGeodesicGeometry | null {
+  return parseSurfaceGeodesicGeometry(asRecord(trajectory.metadata?.surfaceGeometry), "surfaceMesh", {
+    defaultFamily: "surface",
+    includeCurvature: true,
+  });
+}
+
+/**
+ * Read the Ellis-wormhole embedding funnel + geodesic Python exported under
+ * `metadata.wormholeGeometry` (BE-109/BE-110), reusing the same `surface-mesh`
+ * schema as the surface-geodesic lens — the mesh just lives under `embeddingMesh`.
+ * The funnel is left a neutral shell (curvature omitted) so the throat and the
+ * geodesic-on-surface are the focus. Returns null when no well-formed wormhole
+ * geometry is present.
+ */
+export function wormholeGeodesicGeometry(trajectory: Trajectory): SurfaceGeodesicGeometry | null {
+  return parseSurfaceGeodesicGeometry(asRecord(trajectory.metadata?.wormholeGeometry), "embeddingMesh", {
+    defaultFamily: "wormhole",
+    includeCurvature: false,
+  });
 }
 
 /**

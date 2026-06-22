@@ -50,23 +50,7 @@ cross-links, no Systems-side safety overlay)._
 
 ### Direction C — Curved-geometry rendering
 
-1. **FE-053: Wormhole embedding funnel with the geodesic on the surface**
-    - Goal: Render the exported Ellis-wormhole embedding mesh (the funnel through the
-      throat) with the geodesic drawn on the surface, reusing the surface-geodesic
-      mesh primitive (FE-049) so reflected vs traversing geodesics read from the data.
-    - Scope: extend the surface-geodesic lens (or a thin wormhole variant) in
-      `viewer/src/threeScene.ts`, `viewer/src/data/trajectory.ts` to read
-      `metadata.wormholeGeometry` (`embeddingMesh` + `geodesic`, the same `surface-mesh`
-      schema FE-049 already parses), `viewer/src/rendererRegistry.ts`, and the viewer
-      visual test.
-    - Acceptance: the funnel mesh and the geodesic-on-surface draw from exported data
-      only; the throat is visible; a reflected geodesic turns back without crossing the
-      throat while a traversing one passes through; `npm run build` and the visual test
-      pass.
-    - Depends on: BE-109/BE-110 (wormhole embedding + radial potential), BE-112
-      (non-radial reflected preset); reuses FE-049.
-
-3. **FE-054: Measured tidal geodesic-deviation readout**
+1. **FE-054: Measured tidal geodesic-deviation readout**
     - Goal: Surface the exported measured geodesic-deviation diagnostic (neighbor
       separation / tidal focusing) along a GR orbit, so tidal convergence/divergence is
       legible as an honest measured series, never a proof.

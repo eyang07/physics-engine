@@ -62,6 +62,7 @@ async function expectFitToSystemKeepsSceneRendered(page: Page) {
 const threeJsSystems = [
   "sphere-geodesic",
   "surface-geodesic",
+  "wormhole",
   "charged-particle",
   "uniform-gravity",
   "ideal-spring",
@@ -347,6 +348,24 @@ for (const viewport of [
     await page.waitForTimeout(500);
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-schwarzschild-potential.png`) });
+
+    // FE-053: the Ellis wormhole opens on its embedding-funnel lens — the exported
+    // surface mesh (the funnel through the throat) with the geodesic drawn on the
+    // surface, reusing the FE-049 surface-geodesic primitive. The default radial
+    // variant traverses the throat (passes through to the far sheet).
+    await page.locator("#systemSelect").selectOption("wormhole");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-wormhole-traversing.png`) });
+
+    // The angular-reflection variant loads its backend-generated geodesic in place:
+    // the curve turns back at the throat instead of crossing, read from the data.
+    await page.getByRole("button", { name: "Angular reflection" }).click();
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-wormhole-reflected.png`) });
 
     // FE-041: the free asymmetric top opens on its polhode lens — the
     // momentum-sphere ∩ energy-ellipsoid construction with the tumbling body,

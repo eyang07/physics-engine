@@ -13,6 +13,7 @@ import {
   surfaceFieldSeriesList,
   surfaceGeodesicGeometry,
   surfaceParallelTransport,
+  wormholeGeodesicGeometry,
   type NBodyConfig,
   type Orientation,
   type ReferenceGeometryHint,
@@ -31,6 +32,7 @@ export type ThreeMode =
   | "pendulumHamiltonian"
   | "sphereGeodesic"
   | "surfaceGeodesic"
+  | "wormholeGeodesic"
   | "chargedParticle"
   | "uniformGravity"
   | "idealSpring"
@@ -436,6 +438,70 @@ function makeSurfaceGeodesicGroup(geometry: SurfaceGeodesicGeometry): THREE.Grou
   group.add(geodesicLine);
 
   return group;
+}
+
+// Locate the embedding [x, y, z] state columns by name, falling back to the last
+// three columns. Used to ride the live marker along the exported geodesic surface.
+function embeddingColumnsOf(data: Trajectory): [number, number, number] {
+  const ix = data.state_names.indexOf("x");
+  const iy = data.state_names.indexOf("y");
+  const iz = data.state_names.indexOf("z");
+  if (ix >= 0 && iy >= 0 && iz >= 0) {
+    return [ix, iy, iz];
+  }
+  const width = data.states[0]?.length ?? 3;
+  return [width - 3, width - 2, width - 1];
+}
+
+/**
+ * FE-053 — the Ellis-wormhole embedding lens. Reuses the surface-geodesic mesh
+ * primitive (FE-049) for the funnel surface + geodesic-on-surface, then highlights
+ * the throat: the narrowest circle of the funnel, where a reflected geodesic turns
+ * back and a traversing one passes through to the far sheet. Whether the exported
+ * geodesic reflects or traverses reads straight off the curve on the surface.
+ */
+function makeWormholeEmbeddingGroup(geometry: SurfaceGeodesicGeometry): THREE.Group {
+  const group = makeSurfaceGeodesicGroup(geometry);
+  const throat = makeWormholeThroatRing(geometry.mesh.points, geometry.mesh.shape);
+  if (throat) {
+    group.add(throat);
+  }
+  return group;
+}
+
+// Find the funnel's throat — the mesh row (constant u) with the smallest mean
+// cylindrical radius — and draw it as a closed ring, so the narrowest circle the
+// geodesic must cross to traverse the wormhole is visible on the surface.
+function makeWormholeThroatRing(
+  points: Vector3Tuple[],
+  shape: [number, number],
+): THREE.Line | null {
+  const [uCount, phiCount] = shape;
+  if (uCount < 1 || phiCount < 2) {
+    return null;
+  }
+  let throatRow = 0;
+  let throatRadius = Infinity;
+  for (let u = 0; u < uCount; u += 1) {
+    let sum = 0;
+    for (let phi = 0; phi < phiCount; phi += 1) {
+      const [x, y] = points[u * phiCount + phi];
+      sum += Math.hypot(x, y);
+    }
+    const meanRadius = sum / phiCount;
+    if (meanRadius < throatRadius) {
+      throatRadius = meanRadius;
+      throatRow = u;
+    }
+  }
+  const ring: THREE.Vector3[] = [];
+  for (let phi = 0; phi < phiCount; phi += 1) {
+    ring.push(vectorFromTuple(points[throatRow * phiCount + phi]));
+  }
+  ring.push(ring[0].clone());
+  const line = lineFromPoints(ring, new THREE.Color(theme.accent), 0.95);
+  drawOnTop(line, 3);
+  return line;
 }
 
 // Force an object (and its children) to render over the surface regardless of
@@ -1297,6 +1363,9 @@ export class ThreeScene {
   private transportVectors: THREE.Vector3[] = [];
   private motionTrail: THREE.Line | null = null;
   private motionTrailPoints: THREE.Vector3[] = [];
+  // The state columns holding the embedding [x, y, z] of the wormhole geodesic, so
+  // the live marker rides the funnel surface without assuming a fixed layout.
+  private embeddingColumns: [number, number, number] = [0, 1, 2];
   private flow: FlowField | null = null;
   private active = false;
   private mode: ThreeMode | null = null;
@@ -1414,6 +1483,21 @@ export class ThreeScene {
       }
       this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[4], state[5], state[6])), 110);
       this.applyCameraHints(hints, [3.4, -3.6, 2.8], [0, 0, 0]);
+    } else if (mode === "wormholeGeodesic") {
+      const geometry = wormholeGeodesicGeometry(data);
+      if (geometry) {
+        this.root.add(makeWormholeEmbeddingGroup(geometry));
+      }
+      // The geodesic's embedding [x, y, z] is the trajectory's named columns; the
+      // marker rides those so it stays on the funnel surface.
+      const [ix, iy, iz] = embeddingColumnsOf(data);
+      this.embeddingColumns = [ix, iy, iz];
+      this.setMotionTrail(
+        data.states.map((state) => new THREE.Vector3(state[ix], state[iy], state[iz])),
+        130,
+      );
+      this.controls.maxDistance = 32;
+      this.applyCameraHints(hints, [9.6, -11.0, 5.5], [0, 0, 0]);
     } else if (mode === "chargedParticle") {
       this.root.add(makeChargedParticleGroup(data, hints));
       this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[0], state[2] * 0.62, state[1])), 110);
@@ -1677,6 +1761,10 @@ export class ThreeScene {
         this.transportArrow.setDirection(this.transportVectors[index].clone().normalize());
       }
       this.root.rotation.y = Math.sin(elapsed * 0.1) * 0.12;
+    } else if (this.mode === "wormholeGeodesic") {
+      const [ix, iy, iz] = this.embeddingColumns;
+      this.marker.position.set(state[ix], state[iy], state[iz]);
+      this.root.rotation.y = Math.sin(elapsed * 0.08) * 0.1;
     } else if (this.mode === "chargedParticle") {
       this.marker.position.set(state[0], state[2] * 0.62, state[1]);
       this.root.rotation.y = Math.sin(elapsed * 0.1) * 0.08;
