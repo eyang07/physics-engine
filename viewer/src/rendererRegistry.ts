@@ -44,6 +44,7 @@ export const CANVAS_LENS_IDS = new Set<string>([
 export const THREE_LENS_IDS = new Set<string>([
   "pendulumHamiltonian",
   "sphereGeodesic",
+  "surfaceGeodesic",
   "chargedParticle",
   "uniformGravity",
   "idealSpring",

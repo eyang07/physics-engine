@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { AttitudeBody } from "./attitudeBody";
-import { bodyColor, viridis } from "./design/colormaps";
+import { bodyColor, scalarScale, viridis } from "./design/colormaps";
 import { theme } from "./design/theme";
 import { FieldSurface } from "./fieldSurface";
 import { FlowField } from "./flow";
@@ -11,12 +11,16 @@ import {
   rendererHints,
   rigidBodyGeometry,
   surfaceFieldSeriesList,
+  surfaceGeodesicGeometry,
+  surfaceParallelTransport,
   type NBodyConfig,
   type Orientation,
   type ReferenceGeometryHint,
   type RendererHints,
   type RigidBodyGeometry,
   type SurfaceFieldSeries,
+  type SurfaceGeodesicGeometry,
+  type SurfaceParallelTransport,
   type Trajectory,
   type Vector3Tuple,
 } from "./data/trajectory";
@@ -26,6 +30,7 @@ export type { Trajectory };
 export type ThreeMode =
   | "pendulumHamiltonian"
   | "sphereGeodesic"
+  | "surfaceGeodesic"
   | "chargedParticle"
   | "uniformGravity"
   | "idealSpring"
@@ -349,6 +354,185 @@ function makeSphereGeodesicGroup(data: Trajectory, hints: RendererHints): THREE.
   north.position.copy(northHint?.position ? vectorFromTuple(northHint.position) : new THREE.Vector3(0, 1.28 * radius, 0));
   group.add(north);
   return group;
+}
+
+/**
+ * FE-049 — the surface-geodesic lens. Renders the exported surface-of-revolution
+ * embedding mesh (BE-100/BE-101) with the geodesic drawn on the surface in
+ * embedded coordinates. Both the mesh and the geodesic polyline come straight
+ * from `metadata.surfaceGeometry`; nothing about the surface or the geodesic is
+ * recomputed here, so a sphere's geodesics read as great circles, a torus's wind
+ * around the tube, etc. — whatever Python integrated and embedded.
+ *
+ * FE-050 — when the export carries a curvature scalar field (BE-105), the mesh is
+ * tinted per-vertex through the shared scalar scale (FE-038): saddle (K<0) reads
+ * dark, flat (K≈0) mid-ramp, and dome (K>0) bright, so curvature is visible on the
+ * surface. The colors are the exported curvature, never recomputed here; the
+ * matching legend is keyed in `main.ts`.
+ */
+function makeSurfaceGeodesicGroup(geometry: SurfaceGeodesicGeometry): THREE.Group {
+  const group = new THREE.Group();
+  const { points, triangles, shape } = geometry.mesh;
+
+  const positions = new Float32Array(points.length * 3);
+  for (let i = 0; i < points.length; i += 1) {
+    positions[i * 3] = points[i][0];
+    positions[i * 3 + 1] = points[i][1];
+    positions[i * 3 + 2] = points[i][2];
+  }
+  const indices: number[] = [];
+  for (const [a, b, c] of triangles) {
+    indices.push(a, b, c);
+  }
+  const meshGeometry = new THREE.BufferGeometry();
+  meshGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  meshGeometry.setIndex(indices);
+  meshGeometry.computeVertexNormals();
+
+  // FE-050: paint each vertex by its exported curvature (when present). The
+  // surface goes more opaque when colored so the field reads, rather than the
+  // faint neutral shell used when no curvature is exported.
+  const curvature = geometry.curvature;
+  const colored = curvature !== undefined && curvature.values.length === points.length;
+  if (colored && curvature) {
+    const scale = scalarScale(viridis, curvature.range);
+    const colors = new Float32Array(points.length * 3);
+    for (let i = 0; i < points.length; i += 1) {
+      const [r, g, b] = scale.atUnit(curvature.values[i]);
+      colors[i * 3] = r;
+      colors[i * 3 + 1] = g;
+      colors[i * 3 + 2] = b;
+    }
+    meshGeometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  }
+
+  const surface = new THREE.Mesh(
+    meshGeometry,
+    new THREE.MeshStandardMaterial({
+      color: colored ? 0xffffff : 0xdbe8f0,
+      vertexColors: colored,
+      transparent: true,
+      opacity: colored ? 0.74 : 0.4,
+      roughness: 0.72,
+      metalness: 0.02,
+      side: THREE.DoubleSide,
+    }),
+  );
+  group.add(surface);
+
+  // Coarse parameter curves (every few u / phi grid lines) make the surface's
+  // shape legible without drawing the full dense triangle wireframe.
+  group.add(makeSurfaceGuideLines(points, shape));
+
+  // The geodesic, drawn on the surface from the exported embedded polyline. It
+  // renders on top of the (opaque, curvature-colored) surface so the curve stays
+  // legible; a near-white line keeps contrast across the whole viridis ramp.
+  const geodesicLine = lineFromPoints(
+    geometry.geodesic.map(vectorFromTuple),
+    new THREE.Color(colored ? theme.textPrimary : theme.accentStrong),
+    0.95,
+  );
+  drawOnTop(geodesicLine, 2);
+  group.add(geodesicLine);
+
+  return group;
+}
+
+// Force an object (and its children) to render over the surface regardless of
+// depth, so curves and frames drawn on an opaque surface stay visible.
+function drawOnTop(object: THREE.Object3D, renderOrder: number): void {
+  object.renderOrder = renderOrder;
+  object.traverse((node) => {
+    const candidate = node as THREE.Mesh | THREE.Line;
+    const material = candidate.material;
+    if (!material) {
+      return;
+    }
+    for (const entry of Array.isArray(material) ? material : [material]) {
+      entry.depthTest = false;
+      entry.transparent = true;
+    }
+  });
+}
+
+// Build faint u/phi parameter curves from the flattened (u outer, phi inner)
+// mesh grid so a translucent surface reads as a shaped surface, not a blob.
+function makeSurfaceGuideLines(points: Vector3Tuple[], shape: [number, number]): THREE.LineSegments {
+  const [uCount, phiCount] = shape;
+  const at = (u: number, phi: number): THREE.Vector3 => vectorFromTuple(points[u * phiCount + phi]);
+  const segments: THREE.Vector3[] = [];
+  const uStep = Math.max(1, Math.floor(uCount / 12));
+  const phiStep = Math.max(1, Math.floor(phiCount / 12));
+  for (let u = 0; u < uCount; u += uStep) {
+    for (let phi = 0; phi < phiCount - 1; phi += 1) {
+      segments.push(at(u, phi), at(u, phi + 1));
+    }
+  }
+  for (let phi = 0; phi < phiCount; phi += phiStep) {
+    for (let u = 0; u < uCount - 1; u += 1) {
+      segments.push(at(u, phi), at(u + 1, phi));
+    }
+  }
+  return new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(segments),
+    new THREE.LineBasicMaterial({
+      color: new THREE.Color(theme.textFaint),
+      transparent: true,
+      opacity: 0.16,
+    }),
+  );
+}
+
+// On-stage display length for the (unit-length) transported frame vectors.
+const TRANSPORT_ARROW_LENGTH = 0.62;
+
+/**
+ * FE-051 — the parallel-transport frame overlay for the surface-geodesic lens.
+ * Draws the exported transported frame (BE-104) as a faint comb of vectors along
+ * the whole curve plus an anchored arrow at the start, and returns a live arrow
+ * the scene glides along the curve as playback advances. Because the vectors are
+ * rendered exactly as exported, the frame's turning reflects the surface's
+ * curvature: it locks to a straight path on a flat surface (no rotation) and the
+ * gap between the start anchor and the curve's end frame is the holonomy angle
+ * (directly legible when the curve closes into a loop).
+ */
+function makeParallelTransportGroup(
+  positions: THREE.Vector3[],
+  transport: SurfaceParallelTransport,
+): { group: THREE.Group; arrow: THREE.ArrowHelper; positions: THREE.Vector3[]; vectors: THREE.Vector3[] } {
+  const group = new THREE.Group();
+  const allVectors = transport.embeddedVectors.map(vectorFromTuple);
+  const count = Math.min(positions.length, allVectors.length);
+  const curve = positions.slice(0, count);
+  const vectors = allVectors.slice(0, count);
+  const color = new THREE.Color(theme.cool);
+
+  // Comb: the transported field sampled along the curve, so the frame's turning
+  // along the path reads at a glance.
+  const step = Math.max(1, Math.floor(count / 20));
+  for (let i = 0; i < count; i += step) {
+    group.add(vectorArrow(curve[i], vectors[i].clone().multiplyScalar(TRANSPORT_ARROW_LENGTH), color, 0.45));
+  }
+  // The initial transported frame, anchored at the start as the holonomy
+  // reference the end frame is compared against.
+  group.add(vectorArrow(curve[0], vectors[0].clone().multiplyScalar(TRANSPORT_ARROW_LENGTH), color, 0.9));
+
+  // The live transported frame that glides along the curve during playback —
+  // larger and fully opaque so it reads as the active frame against the comb.
+  const arrow = new THREE.ArrowHelper(
+    vectors[0].clone().normalize(),
+    curve[0].clone(),
+    TRANSPORT_ARROW_LENGTH,
+    color.getHex(),
+    0.22,
+    0.14,
+  );
+  group.add(arrow);
+
+  // The transported frame sits on the surface; draw it over the (opaque) mesh so
+  // the comb and the live arrow stay legible.
+  drawOnTop(group, 3);
+  return { group, arrow, positions: curve, vectors };
 }
 
 function makeChargedParticleGroup(data: Trajectory, hints: RendererHints): THREE.Group {
@@ -1108,6 +1292,9 @@ export class ThreeScene {
   private membraneSeries: SurfaceFieldSeries[] = [];
   private membraneSurface: FieldSurface | null = null;
   private membraneIndex = 0;
+  private transportArrow: THREE.ArrowHelper | null = null;
+  private transportPositions: THREE.Vector3[] = [];
+  private transportVectors: THREE.Vector3[] = [];
   private motionTrail: THREE.Line | null = null;
   private motionTrailPoints: THREE.Vector3[] = [];
   private flow: FlowField | null = null;
@@ -1188,6 +1375,9 @@ export class ThreeScene {
     this.membraneSurface = null;
     this.membraneSeries = [];
     this.membraneIndex = 0;
+    this.transportArrow = null;
+    this.transportPositions = [];
+    this.transportVectors = [];
     this.marker.visible = true;
     this.motionTrail = null;
     this.motionTrailPoints = [];
@@ -1208,6 +1398,22 @@ export class ThreeScene {
       this.root.add(makeSphereGeodesicGroup(data, hints));
       this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[4], state[5], state[6])), 90);
       this.applyCameraHints(hints, [2.5, 1.6, 3.2], [0, 0, 0]);
+    } else if (mode === "surfaceGeodesic") {
+      const geometry = surfaceGeodesicGeometry(data);
+      if (geometry) {
+        this.root.add(makeSurfaceGeodesicGroup(geometry));
+      }
+      const transport = surfaceParallelTransport(data);
+      if (transport) {
+        const positions = data.states.map((state) => new THREE.Vector3(state[4], state[5], state[6]));
+        const built = makeParallelTransportGroup(positions, transport);
+        this.root.add(built.group);
+        this.transportArrow = built.arrow;
+        this.transportPositions = built.positions;
+        this.transportVectors = built.vectors;
+      }
+      this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[4], state[5], state[6])), 110);
+      this.applyCameraHints(hints, [3.4, -3.6, 2.8], [0, 0, 0]);
     } else if (mode === "chargedParticle") {
       this.root.add(makeChargedParticleGroup(data, hints));
       this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[0], state[2] * 0.62, state[1])), 110);
@@ -1461,6 +1667,16 @@ export class ThreeScene {
     } else if (this.mode === "sphereGeodesic") {
       this.marker.position.set(state[4], state[5], state[6]);
       this.root.rotation.y = Math.sin(elapsed * 0.12) * 0.12;
+    } else if (this.mode === "surfaceGeodesic") {
+      this.marker.position.set(state[4], state[5], state[6]);
+      // FE-051: glide the live transported frame along the curve, keeping its
+      // exported direction so the holonomy turning reads off the data.
+      if (this.transportArrow && this.transportVectors.length > 0) {
+        const index = Math.min(Math.max(0, sampleIndex), this.transportVectors.length - 1);
+        this.transportArrow.position.copy(this.transportPositions[index]);
+        this.transportArrow.setDirection(this.transportVectors[index].clone().normalize());
+      }
+      this.root.rotation.y = Math.sin(elapsed * 0.1) * 0.12;
     } else if (this.mode === "chargedParticle") {
       this.marker.position.set(state[0], state[2] * 0.62, state[1]);
       this.root.rotation.y = Math.sin(elapsed * 0.1) * 0.08;

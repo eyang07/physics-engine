@@ -61,6 +61,7 @@ async function expectFitToSystemKeepsSceneRendered(page: Page) {
 
 const threeJsSystems = [
   "sphere-geodesic",
+  "surface-geodesic",
   "charged-particle",
   "uniform-gravity",
   "ideal-spring",
@@ -118,7 +119,31 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#hamiltonianScene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-sphere-geodesic.png`) });
 
+    // FE-049: the surface-geodesic lens draws the exported surface-of-revolution
+    // embedding mesh with the geodesic drawn on the surface (here a torus).
+    // FE-050: the mesh is tinted by the exported Gaussian curvature, keyed by a
+    // qualitative viridis legend (saddle → dome) with no raw decimals.
+    await page.locator("#systemSelect").selectOption("surface-geodesic");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    const curvatureLegend = page.locator("#systemsDomain .scalar-legend--top-right");
+    await expect(curvatureLegend).toBeVisible();
+    await expect(curvatureLegend.locator(".scalar-legend__title")).toHaveText("Gaussian curvature");
+    await expect(curvatureLegend.locator(".scalar-legend__label")).toHaveText(["dome", "saddle"]);
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-surface-geodesic.png`) });
+
+    // FE-051: the parallel-transported frame animates along the curve. Let
+    // playback advance and capture a second frame; the scene must keep rendering
+    // (the transport-arrow animation runs without breaking the render loop).
+    await page.waitForTimeout(1200);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-surface-geodesic-transport.png`) });
+
     await page.locator("#systemSelect").selectOption("charged-particle");
+    // Leaving the curvature-colored surface for a plain 3D lens hides the legend.
+    await expect(curvatureLegend).toBeHidden();
     await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
     await page.waitForTimeout(800);
 

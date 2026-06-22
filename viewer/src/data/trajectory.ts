@@ -900,6 +900,227 @@ export function surfaceFieldSeriesList(trajectory: Trajectory): SurfaceFieldSeri
 }
 
 /**
+ * A surface-of-revolution embedding mesh and the geodesic drawn on it, exported
+ * under `metadata.surfaceGeometry` (BE-100/BE-101). `mesh.points` is the surface
+ * sampled on a `(u, phi)` grid and flattened row-major (u outer, phi inner), in
+ * embedding `[x, y, z]` coordinates; `mesh.triangles` indexes those points.
+ * `geodesic` is the integrated geodesic as an embedded polyline. The surface-
+ * geodesic lens (FE-049) draws both as exported; it never re-derives the surface
+ * or re-integrates the geodesic.
+ */
+export type SurfaceMesh = {
+  /** Surface family name, e.g. "torus", "sphere". */
+  family: string;
+  /** Grid dimensions [along u, along phi]. */
+  shape: [number, number];
+  /** Vertex positions in embedding coordinates, flattened row-major (u over phi). */
+  points: Vector3Tuple[];
+  /** Triangle vertex-index triples into `points`. */
+  triangles: [number, number, number][];
+};
+
+/**
+ * The curvature scalar field sampled on the same `(u, phi)` grid as the mesh
+ * (BE-105), flattened per-vertex to align with `SurfaceMesh.points`. The
+ * surface-geodesic lens (FE-050) colors the mesh by this field; the values are
+ * Python's symbolic-exact Gaussian curvature, never recomputed in the viewer.
+ */
+export type SurfaceCurvature = {
+  /** Field source name, e.g. "gaussianCurvature". */
+  name: string;
+  /** Human-readable quantity, e.g. "Gaussian curvature". */
+  quantity?: string;
+  /** Per-vertex values, flattened row-major (u over phi), aligned with mesh.points. */
+  values: number[];
+  /** `[min, max]` over the finite values, for the color scale's domain. */
+  range: [number, number];
+};
+
+export type SurfaceGeodesicGeometry = {
+  family: string;
+  mesh: SurfaceMesh;
+  /** Geodesic polyline drawn on the surface, in embedding coordinates. */
+  geodesic: Vector3Tuple[];
+  /** Curvature scalar field over the mesh, when exported (BE-105). */
+  curvature?: SurfaceCurvature;
+};
+
+// Flatten a `values[u][phi]` grid (validated against the mesh shape) into a
+// per-vertex array in the same row-major order as the mesh points, returning
+// null when the grid is ragged or mis-shaped.
+function flattenSurfaceField(
+  raw: Record<string, unknown>,
+  uCount: number,
+  phiCount: number,
+): number[] | null {
+  const values = raw.values;
+  if (!Array.isArray(values) || values.length !== uCount) {
+    return null;
+  }
+  const flat: number[] = [];
+  for (const row of values) {
+    if (!isNumberArray(row) || row.length !== phiCount) {
+      return null;
+    }
+    flat.push(...row);
+  }
+  return flat;
+}
+
+/**
+ * Read the surface-embedding mesh + geodesic Python exported under
+ * `metadata.surfaceGeometry`. Returns null when the trajectory carries no such
+ * geometry or any channel is malformed, so the lens can fall back gracefully
+ * instead of drawing a broken mesh.
+ */
+export function surfaceGeodesicGeometry(trajectory: Trajectory): SurfaceGeodesicGeometry | null {
+  const raw = asRecord(trajectory.metadata?.surfaceGeometry);
+  if (!raw) {
+    return null;
+  }
+  const meshRaw = asRecord(raw.surfaceMesh);
+  const geodesicRaw = asRecord(raw.geodesic);
+  if (!meshRaw || !geodesicRaw) {
+    return null;
+  }
+  const shape = meshRaw.shape;
+  if (
+    !Array.isArray(shape) ||
+    shape.length !== 2 ||
+    !shape.every((item) => typeof item === "number")
+  ) {
+    return null;
+  }
+  const [uCount, phiCount] = shape as [number, number];
+  if (uCount < 2 || phiCount < 2) {
+    return null;
+  }
+  // points: number[][][] sampled on the (u, phi) grid -> flat Vector3Tuple[] in
+  // row-major (u outer, phi inner) order, matching the triangle indexing.
+  const pointsRaw = meshRaw.points;
+  if (!Array.isArray(pointsRaw) || pointsRaw.length !== uCount) {
+    return null;
+  }
+  const points: Vector3Tuple[] = [];
+  for (const row of pointsRaw) {
+    if (!Array.isArray(row) || row.length !== phiCount) {
+      return null;
+    }
+    for (const point of row) {
+      if (!isNumberTuple3(point)) {
+        return null;
+      }
+      points.push(point);
+    }
+  }
+  const trianglesRaw = meshRaw.triangles;
+  if (!Array.isArray(trianglesRaw)) {
+    return null;
+  }
+  const triangles: [number, number, number][] = [];
+  for (const triangle of trianglesRaw) {
+    if (!isNumberArray(triangle) || triangle.length !== 3) {
+      return null;
+    }
+    if (triangle.some((index) => index < 0 || index >= points.length)) {
+      return null;
+    }
+    triangles.push([triangle[0], triangle[1], triangle[2]]);
+  }
+  if (triangles.length === 0) {
+    return null;
+  }
+  const geodesic = vector3List(geodesicRaw.points);
+  if (!geodesic || geodesic.length < 2) {
+    return null;
+  }
+  const family = typeof raw.family === "string" ? raw.family : "surface";
+  const geometry: SurfaceGeodesicGeometry = {
+    family,
+    mesh: { family, shape: [uCount, phiCount], points, triangles },
+    geodesic,
+  };
+
+  // Curvature is optional: an absent or mis-shaped field just leaves the mesh
+  // uncolored rather than failing the whole lens.
+  const curvatureRaw = asRecord(raw.curvature);
+  if (curvatureRaw) {
+    const flat = flattenSurfaceField(curvatureRaw, uCount, phiCount);
+    if (flat) {
+      let min = Infinity;
+      let max = -Infinity;
+      for (const value of flat) {
+        if (!Number.isFinite(value)) {
+          continue;
+        }
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
+      if (Number.isFinite(min) && Number.isFinite(max)) {
+        geometry.curvature = {
+          name: typeof curvatureRaw.name === "string" ? curvatureRaw.name : "curvature",
+          quantity: typeof curvatureRaw.quantity === "string" ? curvatureRaw.quantity : undefined,
+          values: flat,
+          range: [min, max],
+        };
+      }
+    }
+  }
+
+  return geometry;
+}
+
+/**
+ * The parallel-transported frame Python integrated along the geodesic curve and
+ * exported under `metadata.parallelTransport` (BE-104). `embeddedVectors[i]` is
+ * the transported vector at curve sample `i`, expressed in embedding `[x, y, z]`
+ * coordinates (the same frame as the mesh and geodesic), so the lens can draw it
+ * directly on the surface. The surface-geodesic lens (FE-051) animates this frame
+ * along the curve; the transport is Python's measured sampled integration, never
+ * recomputed in the viewer. Parallel transport preserves the vector's length, so
+ * a flat surface yields a frame that never rotates relative to the path and a
+ * closed loop reveals the holonomy angle between the start and end frames.
+ */
+export type SurfaceParallelTransport = {
+  /** Curve parameter (time) per sample, aligned with the trajectory samples. */
+  parameter: number[];
+  /** Transported vector embedded in 3D per sample. */
+  embeddedVectors: Vector3Tuple[];
+  /** The initial transported vector, in intrinsic `(u, phi)` components. */
+  initialVector: number[];
+  /** Rigor label Python attached (the sampled transport stays `measured`). */
+  rigor?: string;
+};
+
+/**
+ * Read the parallel-transport frame Python exported with the trajectory. Returns
+ * null when the trajectory carries no transport channel or it is malformed, so
+ * the lens can skip the frame animation gracefully.
+ */
+export function surfaceParallelTransport(trajectory: Trajectory): SurfaceParallelTransport | null {
+  const raw = asRecord(trajectory.metadata?.parallelTransport);
+  if (!raw) {
+    return null;
+  }
+  const parameter = raw.parameter;
+  const embeddedVectors = vector3List(raw.embeddedVectors);
+  if (
+    !isNumberArray(parameter) ||
+    !embeddedVectors ||
+    embeddedVectors.length !== parameter.length ||
+    embeddedVectors.length < 2
+  ) {
+    return null;
+  }
+  return {
+    parameter,
+    embeddedVectors,
+    initialVector: isNumberArray(raw.initialVector) ? raw.initialVector : [],
+    rigor: typeof raw.rigor === "string" ? raw.rigor : undefined,
+  };
+}
+
+/**
  * One sampled wavefront from the variable-speed ray bundle (BE-097): the ray
  * positions along the front at a snapshot time, with the measured intensity proxy
  * for each segment between adjacent rays. Where neighbouring rays converge toward a
