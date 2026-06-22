@@ -61,6 +61,7 @@ async function expectFitToSystemKeepsSceneRendered(page: Page) {
 
 const threeJsSystems = [
   "sphere-geodesic",
+  "surface-geodesic",
   "charged-particle",
   "uniform-gravity",
   "ideal-spring",
@@ -117,6 +118,15 @@ for (const viewport of [
 
     await expectCanvasNonBlank(page, "#hamiltonianScene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-sphere-geodesic.png`) });
+
+    // FE-049: the surface-geodesic lens draws the exported surface-of-revolution
+    // embedding mesh with the geodesic drawn on the surface (here a torus).
+    await page.locator("#systemSelect").selectOption("surface-geodesic");
+    await page.waitForSelector("#hamiltonianScene.stage__canvas--active");
+    await page.waitForTimeout(800);
+
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-surface-geodesic.png`) });
 
     await page.locator("#systemSelect").selectOption("charged-particle");
     await page.waitForSelector("#hamiltonianScene.stage__canvas--active");

@@ -11,12 +11,14 @@ import {
   rendererHints,
   rigidBodyGeometry,
   surfaceFieldSeriesList,
+  surfaceGeodesicGeometry,
   type NBodyConfig,
   type Orientation,
   type ReferenceGeometryHint,
   type RendererHints,
   type RigidBodyGeometry,
   type SurfaceFieldSeries,
+  type SurfaceGeodesicGeometry,
   type Trajectory,
   type Vector3Tuple,
 } from "./data/trajectory";
@@ -26,6 +28,7 @@ export type { Trajectory };
 export type ThreeMode =
   | "pendulumHamiltonian"
   | "sphereGeodesic"
+  | "surfaceGeodesic"
   | "chargedParticle"
   | "uniformGravity"
   | "idealSpring"
@@ -349,6 +352,84 @@ function makeSphereGeodesicGroup(data: Trajectory, hints: RendererHints): THREE.
   north.position.copy(northHint?.position ? vectorFromTuple(northHint.position) : new THREE.Vector3(0, 1.28 * radius, 0));
   group.add(north);
   return group;
+}
+
+/**
+ * FE-049 — the surface-geodesic lens. Renders the exported surface-of-revolution
+ * embedding mesh (BE-100/BE-101) with the geodesic drawn on the surface in
+ * embedded coordinates. Both the mesh and the geodesic polyline come straight
+ * from `metadata.surfaceGeometry`; nothing about the surface or the geodesic is
+ * recomputed here, so a sphere's geodesics read as great circles, a torus's wind
+ * around the tube, etc. — whatever Python integrated and embedded.
+ */
+function makeSurfaceGeodesicGroup(geometry: SurfaceGeodesicGeometry): THREE.Group {
+  const group = new THREE.Group();
+  const { points, triangles, shape } = geometry.mesh;
+
+  const positions = new Float32Array(points.length * 3);
+  for (let i = 0; i < points.length; i += 1) {
+    positions[i * 3] = points[i][0];
+    positions[i * 3 + 1] = points[i][1];
+    positions[i * 3 + 2] = points[i][2];
+  }
+  const indices: number[] = [];
+  for (const [a, b, c] of triangles) {
+    indices.push(a, b, c);
+  }
+  const meshGeometry = new THREE.BufferGeometry();
+  meshGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  meshGeometry.setIndex(indices);
+  meshGeometry.computeVertexNormals();
+
+  const surface = new THREE.Mesh(
+    meshGeometry,
+    new THREE.MeshStandardMaterial({
+      color: 0xdbe8f0,
+      transparent: true,
+      opacity: 0.4,
+      roughness: 0.72,
+      metalness: 0.02,
+      side: THREE.DoubleSide,
+    }),
+  );
+  group.add(surface);
+
+  // Coarse parameter curves (every few u / phi grid lines) make the surface's
+  // shape legible without drawing the full dense triangle wireframe.
+  group.add(makeSurfaceGuideLines(points, shape));
+
+  // The geodesic, drawn on the surface from the exported embedded polyline.
+  group.add(lineFromPoints(geometry.geodesic.map(vectorFromTuple), new THREE.Color(theme.accentStrong), 0.92));
+
+  return group;
+}
+
+// Build faint u/phi parameter curves from the flattened (u outer, phi inner)
+// mesh grid so a translucent surface reads as a shaped surface, not a blob.
+function makeSurfaceGuideLines(points: Vector3Tuple[], shape: [number, number]): THREE.LineSegments {
+  const [uCount, phiCount] = shape;
+  const at = (u: number, phi: number): THREE.Vector3 => vectorFromTuple(points[u * phiCount + phi]);
+  const segments: THREE.Vector3[] = [];
+  const uStep = Math.max(1, Math.floor(uCount / 12));
+  const phiStep = Math.max(1, Math.floor(phiCount / 12));
+  for (let u = 0; u < uCount; u += uStep) {
+    for (let phi = 0; phi < phiCount - 1; phi += 1) {
+      segments.push(at(u, phi), at(u, phi + 1));
+    }
+  }
+  for (let phi = 0; phi < phiCount; phi += phiStep) {
+    for (let u = 0; u < uCount - 1; u += 1) {
+      segments.push(at(u, phi), at(u + 1, phi));
+    }
+  }
+  return new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(segments),
+    new THREE.LineBasicMaterial({
+      color: new THREE.Color(theme.textFaint),
+      transparent: true,
+      opacity: 0.16,
+    }),
+  );
 }
 
 function makeChargedParticleGroup(data: Trajectory, hints: RendererHints): THREE.Group {
@@ -1208,6 +1289,13 @@ export class ThreeScene {
       this.root.add(makeSphereGeodesicGroup(data, hints));
       this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[4], state[5], state[6])), 90);
       this.applyCameraHints(hints, [2.5, 1.6, 3.2], [0, 0, 0]);
+    } else if (mode === "surfaceGeodesic") {
+      const geometry = surfaceGeodesicGeometry(data);
+      if (geometry) {
+        this.root.add(makeSurfaceGeodesicGroup(geometry));
+      }
+      this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[4], state[5], state[6])), 110);
+      this.applyCameraHints(hints, [3.4, -3.6, 2.8], [0, 0, 0]);
     } else if (mode === "chargedParticle") {
       this.root.add(makeChargedParticleGroup(data, hints));
       this.setMotionTrail(data.states.map((state) => new THREE.Vector3(state[0], state[2] * 0.62, state[1])), 110);
@@ -1461,6 +1549,9 @@ export class ThreeScene {
     } else if (this.mode === "sphereGeodesic") {
       this.marker.position.set(state[4], state[5], state[6]);
       this.root.rotation.y = Math.sin(elapsed * 0.12) * 0.12;
+    } else if (this.mode === "surfaceGeodesic") {
+      this.marker.position.set(state[4], state[5], state[6]);
+      this.root.rotation.y = Math.sin(elapsed * 0.1) * 0.12;
     } else if (this.mode === "chargedParticle") {
       this.marker.position.set(state[0], state[2] * 0.62, state[1]);
       this.root.rotation.y = Math.sin(elapsed * 0.1) * 0.08;

@@ -900,6 +900,108 @@ export function surfaceFieldSeriesList(trajectory: Trajectory): SurfaceFieldSeri
 }
 
 /**
+ * A surface-of-revolution embedding mesh and the geodesic drawn on it, exported
+ * under `metadata.surfaceGeometry` (BE-100/BE-101). `mesh.points` is the surface
+ * sampled on a `(u, phi)` grid and flattened row-major (u outer, phi inner), in
+ * embedding `[x, y, z]` coordinates; `mesh.triangles` indexes those points.
+ * `geodesic` is the integrated geodesic as an embedded polyline. The surface-
+ * geodesic lens (FE-049) draws both as exported; it never re-derives the surface
+ * or re-integrates the geodesic.
+ */
+export type SurfaceMesh = {
+  /** Surface family name, e.g. "torus", "sphere". */
+  family: string;
+  /** Grid dimensions [along u, along phi]. */
+  shape: [number, number];
+  /** Vertex positions in embedding coordinates, flattened row-major (u over phi). */
+  points: Vector3Tuple[];
+  /** Triangle vertex-index triples into `points`. */
+  triangles: [number, number, number][];
+};
+
+export type SurfaceGeodesicGeometry = {
+  family: string;
+  mesh: SurfaceMesh;
+  /** Geodesic polyline drawn on the surface, in embedding coordinates. */
+  geodesic: Vector3Tuple[];
+};
+
+/**
+ * Read the surface-embedding mesh + geodesic Python exported under
+ * `metadata.surfaceGeometry`. Returns null when the trajectory carries no such
+ * geometry or any channel is malformed, so the lens can fall back gracefully
+ * instead of drawing a broken mesh.
+ */
+export function surfaceGeodesicGeometry(trajectory: Trajectory): SurfaceGeodesicGeometry | null {
+  const raw = asRecord(trajectory.metadata?.surfaceGeometry);
+  if (!raw) {
+    return null;
+  }
+  const meshRaw = asRecord(raw.surfaceMesh);
+  const geodesicRaw = asRecord(raw.geodesic);
+  if (!meshRaw || !geodesicRaw) {
+    return null;
+  }
+  const shape = meshRaw.shape;
+  if (
+    !Array.isArray(shape) ||
+    shape.length !== 2 ||
+    !shape.every((item) => typeof item === "number")
+  ) {
+    return null;
+  }
+  const [uCount, phiCount] = shape as [number, number];
+  if (uCount < 2 || phiCount < 2) {
+    return null;
+  }
+  // points: number[][][] sampled on the (u, phi) grid -> flat Vector3Tuple[] in
+  // row-major (u outer, phi inner) order, matching the triangle indexing.
+  const pointsRaw = meshRaw.points;
+  if (!Array.isArray(pointsRaw) || pointsRaw.length !== uCount) {
+    return null;
+  }
+  const points: Vector3Tuple[] = [];
+  for (const row of pointsRaw) {
+    if (!Array.isArray(row) || row.length !== phiCount) {
+      return null;
+    }
+    for (const point of row) {
+      if (!isNumberTuple3(point)) {
+        return null;
+      }
+      points.push(point);
+    }
+  }
+  const trianglesRaw = meshRaw.triangles;
+  if (!Array.isArray(trianglesRaw)) {
+    return null;
+  }
+  const triangles: [number, number, number][] = [];
+  for (const triangle of trianglesRaw) {
+    if (!isNumberArray(triangle) || triangle.length !== 3) {
+      return null;
+    }
+    if (triangle.some((index) => index < 0 || index >= points.length)) {
+      return null;
+    }
+    triangles.push([triangle[0], triangle[1], triangle[2]]);
+  }
+  if (triangles.length === 0) {
+    return null;
+  }
+  const geodesic = vector3List(geodesicRaw.points);
+  if (!geodesic || geodesic.length < 2) {
+    return null;
+  }
+  const family = typeof raw.family === "string" ? raw.family : "surface";
+  return {
+    family,
+    mesh: { family, shape: [uCount, phiCount], points, triangles },
+    geodesic,
+  };
+}
+
+/**
  * One sampled wavefront from the variable-speed ray bundle (BE-097): the ray
  * positions along the front at a snapshot time, with the measured intensity proxy
  * for each segment between adjacent rays. Where neighbouring rays converge toward a

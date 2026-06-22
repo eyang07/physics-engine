@@ -53,18 +53,7 @@ cross-links, no Systems-side safety overlay)._
 
 ### Direction C — Curved-geometry rendering
 
-1. **FE-049: Surface-embedding mesh with geodesic drawn on the surface**
-    - Goal: Render an exported surface-of-revolution embedding mesh with the geodesic
-      polyline drawn on the surface in embedded coordinates.
-    - Scope: a surface-geodesic lens in `viewer/src/threeScene.ts`, `viewer/src/data/
-      manifest.ts` / `trajectory.ts` for the mesh and embedded curve, renderer-hint
-      framing, and the viewer visual test.
-    - Acceptance: the mesh and the geodesic-on-surface draw from exported data only;
-      great circles render correctly on the sphere; `npm run build` and the visual
-      test pass.
-    - Depends on: BE-100 (surface geodesics), BE-101 (embedding export schema).
-
-2. **FE-050: Curvature coloring on the surface mesh**
+1. **FE-050: Curvature coloring on the surface mesh**
     - Goal: Color the surface-embedding mesh by the exported curvature scalar field
       using the FE-038 color+legend layer, making curvature visible.
     - Scope: the surface-geodesic lens, `viewer/src/data/manifest.ts` for the
@@ -74,7 +63,7 @@ cross-links, no Systems-side safety overlay)._
       visual test pass.
     - Depends on: BE-105 (curvature scalar-field export); reuses FE-049.
 
-3. **FE-051: Parallel-transport frame animation (holonomy)**
+2. **FE-051: Parallel-transport frame animation (holonomy)**
     - Goal: Animate the exported transported frame along a curve / closed loop on a
       curved surface, making the holonomy angle legible.
     - Scope: the surface-geodesic lens, `viewer/src/playback.ts`, `viewer/src/data/
@@ -84,7 +73,7 @@ cross-links, no Systems-side safety overlay)._
       `npm run build` and the visual test pass.
     - Depends on: BE-104 (parallel transport / holonomy export).
 
-4. **FE-052: Effective-potential and orbit lens for Kepler / Schwarzschild**
+3. **FE-052: Effective-potential and orbit lens for Kepler / Schwarzschild**
     - Goal: Render the exported effective potential with turning points alongside the
       orbit, surfacing bound/unbound/precessing classification for central-force and
       GR orbits.
@@ -102,7 +91,7 @@ _These two verification-view tasks predate the direction change and are kept for
 continuity. They are **deprioritized** while the frontend follows the physics
 directions; pick them up only on explicit request._
 
-5. **FE-035: Draw the certified enclosure box on the phase-plane stage**
+4. **FE-035: Draw the certified enclosure box on the phase-plane stage**
     - Goal: An obligation's certified-numeric enclosure (FE-032) records the box it
       is sound over in state-variable coordinates, but the stage never shows where
       on the phase plane that box lies. Draw a read-only certified-box overlay on
@@ -118,7 +107,7 @@ directions; pick them up only on explicit request._
       rollout/region rendering is otherwise unchanged; nothing reads as proved;
       `npm run build` and the visual test pass.
 
-6. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
+5. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
     - Goal: The catalog lists every package's region/obligation/candidate counts
       and Tier/regime, but not how many of its obligations reach level 2. Once the
       discovery index carries a per-package certified-numeric count, surface it as
