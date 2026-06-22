@@ -134,6 +134,13 @@ for (const viewport of [
     await expect(curvatureLegend.locator(".scalar-legend__label")).toHaveText(["dome", "saddle"]);
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-surface-geodesic.png`) });
 
+    // FE-051: the parallel-transported frame animates along the curve. Let
+    // playback advance and capture a second frame; the scene must keep rendering
+    // (the transport-arrow animation runs without breaking the render loop).
+    await page.waitForTimeout(1200);
+    await expectCanvasNonBlank(page, "#hamiltonianScene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-surface-geodesic-transport.png`) });
+
     await page.locator("#systemSelect").selectOption("charged-particle");
     // Leaving the curvature-colored surface for a plain 3D lens hides the legend.
     await expect(curvatureLegend).toBeHidden();

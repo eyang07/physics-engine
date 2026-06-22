@@ -1071,6 +1071,56 @@ export function surfaceGeodesicGeometry(trajectory: Trajectory): SurfaceGeodesic
 }
 
 /**
+ * The parallel-transported frame Python integrated along the geodesic curve and
+ * exported under `metadata.parallelTransport` (BE-104). `embeddedVectors[i]` is
+ * the transported vector at curve sample `i`, expressed in embedding `[x, y, z]`
+ * coordinates (the same frame as the mesh and geodesic), so the lens can draw it
+ * directly on the surface. The surface-geodesic lens (FE-051) animates this frame
+ * along the curve; the transport is Python's measured sampled integration, never
+ * recomputed in the viewer. Parallel transport preserves the vector's length, so
+ * a flat surface yields a frame that never rotates relative to the path and a
+ * closed loop reveals the holonomy angle between the start and end frames.
+ */
+export type SurfaceParallelTransport = {
+  /** Curve parameter (time) per sample, aligned with the trajectory samples. */
+  parameter: number[];
+  /** Transported vector embedded in 3D per sample. */
+  embeddedVectors: Vector3Tuple[];
+  /** The initial transported vector, in intrinsic `(u, phi)` components. */
+  initialVector: number[];
+  /** Rigor label Python attached (the sampled transport stays `measured`). */
+  rigor?: string;
+};
+
+/**
+ * Read the parallel-transport frame Python exported with the trajectory. Returns
+ * null when the trajectory carries no transport channel or it is malformed, so
+ * the lens can skip the frame animation gracefully.
+ */
+export function surfaceParallelTransport(trajectory: Trajectory): SurfaceParallelTransport | null {
+  const raw = asRecord(trajectory.metadata?.parallelTransport);
+  if (!raw) {
+    return null;
+  }
+  const parameter = raw.parameter;
+  const embeddedVectors = vector3List(raw.embeddedVectors);
+  if (
+    !isNumberArray(parameter) ||
+    !embeddedVectors ||
+    embeddedVectors.length !== parameter.length ||
+    embeddedVectors.length < 2
+  ) {
+    return null;
+  }
+  return {
+    parameter,
+    embeddedVectors,
+    initialVector: isNumberArray(raw.initialVector) ? raw.initialVector : [],
+    rigor: typeof raw.rigor === "string" ? raw.rigor : undefined,
+  };
+}
+
+/**
  * One sampled wavefront from the variable-speed ray bundle (BE-097): the ray
  * positions along the front at a snapshot time, with the measured intensity proxy
  * for each segment between adjacent rays. Where neighbouring rays converge toward a
