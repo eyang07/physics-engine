@@ -369,6 +369,71 @@ export function lyapunovDiagnostic(trajectory: Trajectory): LyapunovDiagnostic |
   };
 }
 
+/**
+ * The measured geodesic-deviation diagnostic Python exported under
+ * `metadata.diagnostics.geodesicDeviation` (wormhole, BE-113 Schwarzschild): a
+ * nearby neighbor geodesic is launched with a small initial offset and integrated
+ * alongside the main one; `separation` is the measured neighbor separation along
+ * the affine `parameter`, and `relativeSeparation` is that separation normalized to
+ * its initial value (so it starts at 1). Tidal focusing reads as relative
+ * separation falling below 1 (converging) or rising above it (diverging). This is a
+ * `measured` rollout diagnostic — never a proof of geodesic deviation.
+ */
+export type GeodesicDeviationDiagnostic = {
+  /** Affine parameter (proper time) per sample. */
+  parameter: number[];
+  /** Measured neighbor separation along the curve. */
+  separation: number[];
+  /** Separation normalized to its initial value (starts at 1). */
+  relativeSeparation: number[];
+  initialSeparation: number;
+  finalSeparation: number;
+  /** The neighbor's initial coordinate offset, e.g. `{ phi: 0.03 }`. */
+  neighborInitialOffset: Record<string, number>;
+  rigor?: string;
+  note?: string;
+  evaluation?: string;
+};
+
+/** Read the measured geodesic-deviation diagnostic Python attached, or null. */
+export function geodesicDeviation(trajectory: Trajectory): GeodesicDeviationDiagnostic | null {
+  const diagnostics = asRecord(trajectory.metadata?.diagnostics);
+  const raw = asRecord(diagnostics?.geodesicDeviation);
+  if (!raw) {
+    return null;
+  }
+  const { parameter, separation, relativeSeparation } = raw;
+  if (
+    !isNumberArray(parameter) ||
+    !isNumberArray(separation) ||
+    !isNumberArray(relativeSeparation) ||
+    relativeSeparation.length < 2 ||
+    separation.length !== relativeSeparation.length
+  ) {
+    return null;
+  }
+  const offsetRaw = asRecord(raw.neighborInitialOffset);
+  const neighborInitialOffset: Record<string, number> = {};
+  if (offsetRaw) {
+    for (const [key, value] of Object.entries(offsetRaw)) {
+      if (typeof value === "number") {
+        neighborInitialOffset[key] = value;
+      }
+    }
+  }
+  return {
+    parameter,
+    separation,
+    relativeSeparation,
+    initialSeparation: asNumber(raw.initialSeparation) ?? separation[0],
+    finalSeparation: asNumber(raw.finalSeparation) ?? separation[separation.length - 1],
+    neighborInitialOffset,
+    rigor: typeof raw.rigor === "string" ? raw.rigor : undefined,
+    note: typeof raw.note === "string" ? raw.note : undefined,
+    evaluation: typeof raw.evaluation === "string" ? raw.evaluation : undefined,
+  };
+}
+
 /** Read the invariant-residual diagnostics Python attached to the trajectory. */
 export function invariantResiduals(trajectory: Trajectory): InvariantResidual[] {
   const raw = trajectory.metadata?.invariantResiduals;

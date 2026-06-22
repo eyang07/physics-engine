@@ -20,9 +20,11 @@ import katex from "katex";
 import { theme } from "./design/theme";
 import { magma } from "./design/colormaps";
 import {
+  geodesicDeviation,
   invariantResiduals,
   lyapunovDiagnostic,
   poincareSections,
+  type GeodesicDeviationDiagnostic,
   type InvariantResidual,
   type PoincareSection,
   type Trajectory,
@@ -43,6 +45,15 @@ type ResidualLane = {
   // The drift r(t) = q(t) - reference, computed once from exported data.
   residual: number[];
   amplitude: number;
+};
+
+type DeviationLane = {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  // The exported relative neighbor separation s(τ)/s(0) (starts at 1).
+  series: number[];
+  domainMin: number;
+  domainMax: number;
 };
 
 type SectionPlot = {
@@ -123,6 +134,7 @@ export class DiagnosticsPanel {
   private lyapunovLane: LyapunovLane | null = null;
   private sectionPlots: SectionPlot[] = [];
   private residualLanes: ResidualLane[] = [];
+  private deviationLanes: DeviationLane[] = [];
 
   constructor(
     private readonly section: HTMLElement,
@@ -134,6 +146,7 @@ export class DiagnosticsPanel {
     this.lyapunovLane = null;
     this.sectionPlots = [];
     this.residualLanes = [];
+    this.deviationLanes = [];
     this.section.hidden = true;
   }
 
@@ -141,11 +154,13 @@ export class DiagnosticsPanel {
     this.clear();
     this.renderLyapunov(data);
     this.renderResiduals(data);
+    this.renderGeodesicDeviation(data);
     this.renderSections(data);
     this.section.hidden =
       this.lyapunovLane === null &&
       this.sectionPlots.length === 0 &&
-      this.residualLanes.length === 0;
+      this.residualLanes.length === 0 &&
+      this.deviationLanes.length === 0;
   }
 
   update(phase: number): void {
@@ -153,6 +168,7 @@ export class DiagnosticsPanel {
       drawLyapunovLane(this.lyapunovLane, phase);
     }
     this.residualLanes.forEach((lane) => drawResidualLane(lane, phase));
+    this.deviationLanes.forEach((lane) => drawDeviationLane(lane, phase));
     this.sectionPlots.forEach((plot) => drawSectionPlot(plot, phase));
   }
 
@@ -197,6 +213,70 @@ export class DiagnosticsPanel {
     const laneCtx = lane.getContext("2d");
     if (laneCtx) {
       this.residualLanes.push({ canvas: lane, ctx: laneCtx, residual: drift, amplitude });
+    }
+  }
+
+  // The measured tidal geodesic-deviation diagnostic: a neighbor geodesic's
+  // relative separation along a GR geodesic, drawn against the s/s0 = 1 baseline
+  // (neighbors stay equidistant). Above the baseline reads as tidal divergence,
+  // below it as focusing — labeled `measured` and never a proof.
+  private renderGeodesicDeviation(data: Trajectory): void {
+    const diagnostic = geodesicDeviation(data);
+    if (!diagnostic) {
+      return;
+    }
+
+    const row = document.createElement("div");
+    row.className = "diagnostic";
+
+    const head = document.createElement("div");
+    head.className = "diagnostic__head";
+    const symbol = document.createElement("span");
+    symbol.className = "diagnostic__symbol";
+    renderLatex(symbol, "\\xi");
+    const caption = document.createElement("span");
+    caption.className = "diagnostic__caption";
+    caption.textContent = deviationTrend(diagnostic);
+    const measured = document.createElement("span");
+    measured.className = "diagnostic__measured";
+    measured.textContent = "measured";
+    head.append(symbol, caption, measured);
+
+    const lane = document.createElement("canvas");
+    lane.className = "diagnostic__deviation";
+
+    const offset = document.createElement("div");
+    offset.className = "diagnostic__offset";
+    renderLatex(offset, neighborOffsetLatex(diagnostic.neighborInitialOffset));
+
+    row.append(head, lane, offset);
+    this.content.append(row);
+
+    const laneCtx = lane.getContext("2d");
+    if (laneCtx) {
+      let min = Infinity;
+      let max = -Infinity;
+      for (const value of diagnostic.relativeSeparation) {
+        if (!Number.isFinite(value)) {
+          continue;
+        }
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
+      // Always keep the s/s0 = 1 baseline in frame so "diverges above" vs "focuses
+      // below" reads honestly, mirroring the Lyapunov lane's neutral baseline.
+      min = Math.min(min, 1);
+      max = Math.max(max, 1);
+      if (max - min < 1e-9) {
+        max = min + 1e-9;
+      }
+      this.deviationLanes.push({
+        canvas: lane,
+        ctx: laneCtx,
+        series: diagnostic.relativeSeparation,
+        domainMin: min,
+        domainMax: max,
+      });
     }
   }
 
@@ -308,6 +388,37 @@ function lyapunovCaption(kind?: string, method?: string): string {
   const words = (kind ?? "").split("-").filter(Boolean);
   const phrase = words.length > 0 ? words.join(" ") : "lyapunov";
   return method?.includes("variational") ? `${phrase} · variational` : phrase;
+}
+
+// The qualitative endpoint of the measured deviation: did the neighbor end up
+// farther (diverging) or nearer (converging) than it started? Read straight from
+// the exported initial/final separation, never classified by a computed threshold.
+function deviationTrend(diagnostic: GeodesicDeviationDiagnostic): string {
+  const ratio =
+    diagnostic.initialSeparation !== 0
+      ? diagnostic.finalSeparation / diagnostic.initialSeparation
+      : 1;
+  const eps = 1e-3;
+  if (ratio > 1 + eps) {
+    return "diverging";
+  }
+  if (ratio < 1 - eps) {
+    return "converging";
+  }
+  return "neutral";
+}
+
+// The neighbor's initial coordinate offset, as a structural input constant (the
+// chosen experiment condition) — the same category as a Poincaré section's
+// `y = 0`, not a measured outcome.
+function neighborOffsetLatex(offset: Record<string, number>): string {
+  const parts = Object.entries(offset).map(
+    ([coordinate, value]) => `\\delta ${invariantSymbolLatex(coordinate)}_{0} = ${constantLatex(value)}`,
+  );
+  if (parts.length === 0) {
+    return "\\text{nearby neighbor geodesic}";
+  }
+  return `\\text{neighbor: }\\ ${parts.join(",\\ ")}`;
 }
 
 function axisLatex(axis: string): string {
@@ -468,6 +579,73 @@ function drawResidualLane(lane: ResidualLane, phase: number): void {
   ctx.shadowBlur = 8;
   ctx.beginPath();
   ctx.arc(clamp(phase, 0, 1) * width, yOf(residual[playIndex]), 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+// The measured relative neighbor separation s(τ)/s(0) along a GR geodesic, drawn
+// against the s/s0 = 1 baseline (neighbors equidistant). The shaded gap is the
+// qualitative tidal magnitude — divergence above, focusing below — never a number.
+function drawDeviationLane(lane: DeviationLane, phase: number): void {
+  const { canvas, ctx, series, domainMin, domainMax } = lane;
+  const { width, height } = prepareCanvas(canvas, ctx);
+
+  const count = series.length;
+  if (count === 0) {
+    return;
+  }
+  const pad = 5;
+  const span = domainMax - domainMin || 1;
+  const yOf = (value: number) =>
+    clamp(height - pad - ((value - domainMin) / span) * (height - 2 * pad), pad, height - pad);
+  const xOf = (index: number) => (count <= 1 ? 0 : (index / (count - 1)) * width);
+  const baselineY = yOf(1);
+  const step = Math.max(1, Math.floor(count / 320));
+
+  // Shaded gap between the separation curve and the baseline: the area is the
+  // qualitative tidal magnitude, never a printed number.
+  ctx.beginPath();
+  ctx.moveTo(0, baselineY);
+  for (let index = 0; index < count; index += step) {
+    ctx.lineTo(xOf(index), yOf(series[index]));
+  }
+  ctx.lineTo(xOf(count - 1), baselineY);
+  ctx.closePath();
+  ctx.fillStyle = magma.css(0.72, 0.16);
+  ctx.fill();
+
+  // Baseline s/s0 = 1 (neighbors equidistant), faint dashed, no label.
+  ctx.save();
+  ctx.setLineDash([3, 4]);
+  ctx.strokeStyle = theme.hairlineStrong;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, baselineY);
+  ctx.lineTo(width, baselineY);
+  ctx.stroke();
+  ctx.restore();
+
+  // The measured relative separation itself.
+  ctx.strokeStyle = theme.cool;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let index = 0; index < count; index += step) {
+    const x = xOf(index);
+    const y = yOf(series[index]);
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  ctx.stroke();
+
+  const playIndex = clamp(Math.round(phase * (count - 1)), 0, count - 1);
+  ctx.fillStyle = theme.cool;
+  ctx.shadowColor = theme.cool;
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(clamp(phase, 0, 1) * width, yOf(series[playIndex]), 3.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.shadowBlur = 0;
 }

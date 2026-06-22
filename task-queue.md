@@ -50,19 +50,8 @@ cross-links, no Systems-side safety overlay)._
 
 ### Direction C — Curved-geometry rendering
 
-1. **FE-054: Measured tidal geodesic-deviation readout**
-    - Goal: Surface the exported measured geodesic-deviation diagnostic (neighbor
-      separation / tidal focusing) along a GR orbit, so tidal convergence/divergence is
-      legible as an honest measured series, never a proof.
-    - Scope: a small diagnostics lane/overlay reusing existing diagnostics-panel
-      primitives, `viewer/src/data/trajectory.ts` for
-      `metadata.diagnostics.geodesicDeviation` (separation + relative-separation series),
-      and the viewer visual test.
-    - Acceptance: the separation series draws from exported data with a `measured`
-      label and qualitative endpoints (converging / diverging), the neighbor's initial
-      offset is shown, nothing reads as proved; `npm run build` and the visual test pass.
-    - Depends on: wormhole `diagnostics.geodesicDeviation` (landed), BE-113
-      (Schwarzschild geodesic-deviation diagnostic).
+_No active curved-geometry rendering tasks queued; add the next coherent
+geometry/gravitation rendering task here when starting new frontend work._
 
 ### Verification track (paused)
 

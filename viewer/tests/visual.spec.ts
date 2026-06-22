@@ -349,6 +349,22 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#scene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-schwarzschild-potential.png`) });
 
+    // FE-054: the Schwarzschild orbit carries a measured geodesic-deviation lane —
+    // the neighbor's relative separation along the geodesic, labeled "measured"
+    // with a qualitative trend (diverging/converging) and the neighbor's initial
+    // offset. It is honest measured evidence of tidal focusing, never a proof.
+    const deviationLane = page.locator("#diagnostics .diagnostic__deviation");
+    await expect(deviationLane).toHaveCount(1);
+    await expectCanvasNonBlank(page, "#diagnostics .diagnostic__deviation >> nth=0");
+    const deviationRow = page
+      .locator("#diagnostics .diagnostic")
+      .filter({ has: page.locator(".diagnostic__deviation") });
+    await expect(deviationRow.locator(".diagnostic__measured")).toHaveText("measured");
+    await expect(deviationRow.locator(".diagnostic__caption")).toHaveText(
+      /diverging|converging|neutral/,
+    );
+    await expect(deviationRow.locator(".diagnostic__offset")).toContainText("neighbor");
+
     // FE-053: the Ellis wormhole opens on its embedding-funnel lens — the exported
     // surface mesh (the funnel through the throat) with the geodesic drawn on the
     // surface, reusing the FE-049 surface-geodesic primitive. The default radial
