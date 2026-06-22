@@ -50,19 +50,7 @@ cross-links, no Systems-side safety overlay)._
 
 ### Direction C — Curved-geometry rendering
 
-1. **FE-052: Effective-potential and orbit lens for Kepler / Schwarzschild**
-    - Goal: Render the exported effective potential with turning points alongside the
-      orbit, surfacing bound/unbound/precessing classification for central-force and
-      GR orbits.
-    - Scope: extend `viewer/src/effectivePotentialCanvas.ts` and/or
-      `viewer/src/phasePotentialCanvas.ts`, `viewer/src/data/manifest.ts` for the
-      effective-potential / turning-point channel, and the viewer visual test.
-    - Acceptance: the effective potential, turning points, and orbit draw from
-      exported data; precession is visible for the GR case; the orbit class displays
-      qualitatively; `npm run build` and the visual test pass.
-    - Depends on: BE-102 (orbit classification), BE-103 (Schwarzschild geodesics).
-
-2. **FE-053: Wormhole embedding funnel with the geodesic on the surface**
+1. **FE-053: Wormhole embedding funnel with the geodesic on the surface**
     - Goal: Render the exported Ellis-wormhole embedding mesh (the funnel through the
       throat) with the geodesic drawn on the surface, reusing the surface-geodesic
       mesh primitive (FE-049) so reflected vs traversing geodesics read from the data.

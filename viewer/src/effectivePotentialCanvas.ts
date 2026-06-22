@@ -135,6 +135,84 @@ function columnIndex(data: Trajectory, name: string): number {
   return data.state_names.indexOf(name);
 }
 
+/**
+ * True when Python exported a measured perihelion-precession diagnostic with a
+ * non-negligible per-orbit advance — the qualitative signal that a bound orbit
+ * precesses (a GR rosette) rather than closing on itself (a Kepler ellipse). The
+ * number stays in the diagnostic; here we only read whether it is present and
+ * non-zero so the lens can label the orbit "precessing" without a raw decimal.
+ */
+function orbitPrecesses(data: Trajectory): boolean {
+  const diagnostics = data.metadata?.diagnostics as
+    | { perihelionPrecession?: { precessionPerOrbit?: unknown } }
+    | undefined;
+  const perOrbit = diagnostics?.perihelionPrecession?.precessionPerOrbit;
+  return typeof perOrbit === "number" && Math.abs(perOrbit) > 1e-3;
+}
+
+// Draw the exported orbit (the planar x-y trajectory) in its own panel, with the
+// central body at the origin and the current position marked. This is rendering
+// the exported state columns, not re-deriving the orbit: a Kepler ellipse closes
+// on itself while a Schwarzschild orbit traces a precessing rosette.
+function drawOrbitPanel(
+  ctx: CanvasRenderingContext2D,
+  area: DOMRect,
+  orbit: [number, number][],
+  current: [number, number],
+): void {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const [x, y] of orbit) {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  // Keep the central body (origin) in frame so the focus reads correctly.
+  minX = Math.min(minX, 0);
+  maxX = Math.max(maxX, 0);
+  minY = Math.min(minY, 0);
+  maxY = Math.max(maxY, 0);
+  const spanX = maxX - minX || 1;
+  const spanY = maxY - minY || 1;
+  // Preserve aspect ratio so the orbit's shape (and its precession) is honest.
+  const scale = Math.min(area.width / spanX, area.height / spanY) * 0.86;
+  const cx = area.x + area.width / 2 - ((minX + maxX) / 2) * scale;
+  const cy = area.y + area.height / 2 + ((minY + maxY) / 2) * scale;
+  const mapX = (x: number) => cx + x * scale;
+  const mapY = (y: number) => cy - y * scale;
+
+  // The central body the orbit is bound to.
+  ctx.fillStyle = theme.textFaint;
+  ctx.beginPath();
+  ctx.arc(mapX(0), mapY(0), 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = theme.cool;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  orbit.forEach(([x, y], index) => {
+    const px = mapX(x);
+    const py = mapY(y);
+    if (index === 0) {
+      ctx.moveTo(px, py);
+    } else {
+      ctx.lineTo(px, py);
+    }
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = theme.accentStrong;
+  ctx.shadowColor = theme.accent;
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.arc(mapX(current[0]), mapY(current[1]), 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
 export function drawEffectivePotentialScene(
   ctx: CanvasRenderingContext2D,
   data: Trajectory,
@@ -172,9 +250,22 @@ export function drawEffectivePotentialScene(
     coordDotIndex >= 0 ? data.states.map((state) => state[coordDotIndex]) : null;
   const bounds = computeBounds(plot, coordDotValues);
 
-  const hasPhase = coordDotValues !== null && coordIndex >= 0;
-  const left = plotArea(width * 0.08, height * 0.16, width * (hasPhase ? 0.5 : 0.84), height * 0.68);
-  const right = plotArea(width * 0.66, height * 0.2, width * 0.25, height * 0.58);
+  // Central-force / GR orbits export a classification and a planar (x, y) trace:
+  // for those we draw the orbit itself alongside the potential, so the orbit's
+  // shape — a closed Kepler ellipse vs a precessing Schwarzschild rosette — is
+  // visible next to its energy level. Other effective-potential systems (the
+  // symmetric top) keep the reduced-coordinate phase portrait.
+  const xIndex = columnIndex(data, "x");
+  const yIndex = columnIndex(data, "y");
+  const hasOrbit = Boolean(plot.classification) && xIndex >= 0 && yIndex >= 0;
+  const orbit = hasOrbit
+    ? data.states.map((state) => [state[xIndex], state[yIndex]] as [number, number])
+    : null;
+
+  const hasPhase = !hasOrbit && coordDotValues !== null && coordIndex >= 0;
+  const useRight = hasOrbit || hasPhase;
+  const left = plotArea(width * 0.08, height * 0.16, width * (useRight ? 0.5 : 0.84), height * 0.68);
+  const right = plotArea(width * 0.62, height * 0.18, width * 0.3, height * 0.64);
 
   const mapC = (coordinate: number, area: DOMRect) =>
     area.x + ((coordinate - bounds.minC) / (bounds.maxC - bounds.minC || 1)) * area.width;
@@ -234,6 +325,11 @@ export function drawEffectivePotentialScene(
     ctx.fill();
   }
 
+  // The exported orbit itself (x, y), when this is a central-force / GR orbit.
+  if (hasOrbit && orbit) {
+    drawOrbitPanel(ctx, right, orbit, [sample.state[xIndex], sample.state[yIndex]]);
+  }
+
   // The reduced-coordinate phase trajectory (coordinate vs its rate).
   if (hasPhase && coordDotValues) {
     ctx.strokeStyle = theme.textFaint;
@@ -281,11 +377,20 @@ export function drawEffectivePotentialScene(
     drawLabel(ctx, coordinateLabel, right.x + right.width - 12, right.y + right.height + 22);
     drawLabel(ctx, mathLabel(`\\dot{${plot.coordinateLatex ?? plot.coordinate}}`), right.x + 8, right.y + 18);
   }
+  if (hasOrbit) {
+    drawLabel(ctx, "orbit", right.x + 8, right.y + 16);
+  }
 
-  // The exported orbit classification, kept qualitative (no raw decimals).
+  // The exported orbit classification, kept qualitative (no raw decimals). When a
+  // measured precession diagnostic is present (the GR rosette), tag it alongside
+  // the bound/unbound class so the precessing case reads distinctly from Kepler.
   if (plot.classification) {
+    const precessing = hasOrbit && orbitPrecesses(data);
+    const label = precessing
+      ? `${plot.classification.replace(/[-_]/g, " ")} · precessing`
+      : plot.classification.replace(/[-_]/g, " ");
     ctx.fillStyle = theme.textPrimary;
     ctx.font = '600 13px "IBM Plex Sans", system-ui, sans-serif';
-    ctx.fillText(plot.classification.replace(/[-_]/g, " "), left.x, left.y - 6);
+    ctx.fillText(label, left.x, left.y - 6);
   }
 }

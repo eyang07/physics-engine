@@ -189,6 +189,9 @@ for (const viewport of [
     await expectCanvasNonBlank(page, "#hamiltonianScene");
     await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-kepler.png`) });
 
+    // FE-052: the effective-potential lens draws the exported V(r) curve, energy
+    // line, and turning points alongside the orbit itself (the closed Kepler
+    // ellipse) with its qualitative class — all from exported data, never re-derived.
     await page.getByRole("button", { name: "Effective Potential" }).click();
     await page.waitForSelector("#scene.stage__canvas--active");
     await page.waitForTimeout(500);
@@ -336,6 +339,8 @@ for (const viewport of [
 
     // Schwarzschild's GR effective potential renders from the exported relativistic
     // V(r) curve, turning points, and orbit classification (same data-driven lens).
+    // FE-052: the lens also draws the precessing GR orbit (a rosette) next to the
+    // potential, so the precession is visible against the closed Kepler ellipse.
     await page.locator("#systemSelect").selectOption("schwarzschild");
     await page.getByRole("button", { name: "GR Effective Potential" }).click();
     await page.waitForSelector("#scene.stage__canvas--active");
