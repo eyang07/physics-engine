@@ -240,7 +240,7 @@ Phase 1:
 
 Phase 2:
 - [x] BE-121 — relativistic particle under an external four-force.
-- [ ] BE-122 — uniform-proper-acceleration (hyperbolic motion) system.
+- [x] BE-122 — uniform-proper-acceleration (hyperbolic motion) system.
 - [ ] BE-123 — relativistic particle in a static potential.
 - [ ] BE-124 — four-momentum/mass-shell verification export.
 

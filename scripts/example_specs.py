@@ -60,6 +60,10 @@ from systems.symmetric_top import (
     effective_potential as symmetric_top_effective_potential,
 )
 from systems.twin_paradox import build_system as build_twin_paradox
+from systems.uniform_proper_acceleration import (
+    build_system as build_uniform_proper_acceleration,
+    interval_rate_expression as uniform_proper_acceleration_interval_rate,
+)
 from systems.uniform_gravity import build_system as build_uniform_gravity
 from systems.variable_speed_wavefront import build_system as build_variable_speed_wavefront
 from systems.vibrating_string import build_system as build_vibrating_string
@@ -1859,6 +1863,39 @@ TWIN_PARADOX = SystemSpec(
 )
 
 
+UNIFORM_PROPER_ACCELERATION = SystemSpec(
+    id="uniform-proper-acceleration",
+    title="Uniform Proper Acceleration",
+    category="Relativity",
+    description=(
+        "A constant-proper-acceleration particle tracing the classic hyperbolic "
+        "worldline in flat Minkowski spacetime."
+    ),
+    build=build_uniform_proper_acceleration,
+    parameters=(
+        Parameter("a", "a", 0.35, 0.05, 1.0, role="physical"),
+    ),
+    state=(
+        StateVar("x0", "x^0", "coordinate"),
+        StateVar("x1", "x^1", "coordinate"),
+        StateVar("x0_dot", "u^0", "velocity"),
+        StateVar("x1_dot", "u^1", "velocity"),
+    ),
+    projections={"spacetime": ("x0", "x1")},
+    conserved=(
+        Conserved(
+            "proper_interval_rate",
+            r"\eta_{\mu\nu}u^\mu u^\nu",
+            "proper-time normalization",
+            expression=uniform_proper_acceleration_interval_rate,
+        ),
+    ),
+    lenses=("relativisticWorldline",),
+    data_path="/data/uniform_proper_acceleration.json",
+    system_kind="relativistic-worldline",
+)
+
+
 SPECS: tuple[SystemSpec, ...] = (
     PENDULUM,
     SPHERE_GEODESIC,
@@ -1884,4 +1921,5 @@ SPECS: tuple[SystemSpec, ...] = (
     VARIABLE_SPEED_WAVEFRONT,
     RELATIVISTIC_FREE_PARTICLE,
     TWIN_PARADOX,
+    UNIFORM_PROPER_ACCELERATION,
 )
