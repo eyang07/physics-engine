@@ -188,8 +188,10 @@ artifacts.
     (`systemKind: "relativistic-worldline"`): proper-time worldlines whose
     trajectory payload carries backend-computed spacetime points, four-velocity
     samples, renderer hints for a Minkowski spacetime diagram, and measured
-    invariant residuals such as `proper_interval_rate`. These are sampled
-    diagnostics, not proof or certification.
+    invariant residuals such as `proper_interval_rate`. Comparison examples may
+    carry multiple endpoint-sharing worldlines plus measured proper-time totals
+    under `metadata.worldlines` / `metadata.properTimeComparison`. These are
+    sampled diagnostics, not proof or certification.
   - Field-line / streamline integration (`engine/fields/field_lines.py`): integral
     curves of a vector field's direction (`dx/ds = V/|V|`, unit arc length) via the
     shared RK4 step, with deterministic segment seeding, optional forward+backward

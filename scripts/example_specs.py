@@ -59,6 +59,7 @@ from systems.symmetric_top import (
     build_system as build_symmetric_top,
     effective_potential as symmetric_top_effective_potential,
 )
+from systems.twin_paradox import build_system as build_twin_paradox
 from systems.uniform_gravity import build_system as build_uniform_gravity
 from systems.variable_speed_wavefront import build_system as build_variable_speed_wavefront
 from systems.vibrating_string import build_system as build_vibrating_string
@@ -569,6 +570,13 @@ LENSES: tuple[Lens, ...] = (
         description="A proper-time worldline plotted in flat spacetime with light-cone reference geometry.",
         projections=("spacetime",),
         conserved=("proper_interval_rate",),
+    ),
+    Lens(
+        id="twinParadoxWorldlines",
+        title="Twin Worldlines",
+        kind="spacetime-diagram-comparison",
+        description="Two endpoint-sharing worldlines with backend-computed proper-time readouts.",
+        projections=("spacetime",),
     ),
 )
 
@@ -1824,6 +1832,33 @@ RELATIVISTIC_FREE_PARTICLE = SystemSpec(
 )
 
 
+TWIN_PARADOX = SystemSpec(
+    id="twin-paradox",
+    title="Twin Paradox",
+    category="Relativity",
+    description=(
+        "Two endpoint-sharing flat-spacetime worldlines whose accumulated "
+        "proper times differ."
+    ),
+    build=build_twin_paradox,
+    parameters=(
+        Parameter("coordinate_duration", r"\Delta t", 8.0, 2.0, 16.0, role="initial"),
+        Parameter("travel_speed", r"\beta", 0.6, 0.1, 0.9, role="initial"),
+    ),
+    state=(
+        StateVar("x0", "x^0", "coordinate"),
+        StateVar("x1", "x^1", "coordinate"),
+        StateVar("x0_dot", "u^0", "velocity"),
+        StateVar("x1_dot", "u^1", "velocity"),
+    ),
+    projections={"spacetime": ("x0", "x1")},
+    conserved=(),
+    lenses=("twinParadoxWorldlines",),
+    data_path="/data/twin_paradox.json",
+    system_kind="relativistic-worldline",
+)
+
+
 SPECS: tuple[SystemSpec, ...] = (
     PENDULUM,
     SPHERE_GEODESIC,
@@ -1848,4 +1883,5 @@ SPECS: tuple[SystemSpec, ...] = (
     WAVE_PACKET,
     VARIABLE_SPEED_WAVEFRONT,
     RELATIVISTIC_FREE_PARTICLE,
+    TWIN_PARADOX,
 )
