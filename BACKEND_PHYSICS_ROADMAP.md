@@ -235,11 +235,11 @@ Phase 1:
 - [x] BE-116 — four-vector value object (`engine/relativity/four_vectors.py`).
 - [x] BE-117 — Lorentz transformations (`engine/relativity/lorentz.py`).
 - [x] BE-118 — proper-time worldline with four-velocity/four-momentum (`engine/relativity/worldline.py`).
-- [ ] BE-119 — relativistic free-particle system + export.
-- [ ] BE-120 — twin-paradox proper-time comparison example.
+- [x] BE-119 — relativistic free-particle system + export.
+- [x] BE-120 — twin-paradox proper-time comparison example.
 
 Phase 2:
-- [ ] BE-121 — relativistic particle under an external four-force.
+- [x] BE-121 — relativistic particle under an external four-force.
 - [ ] BE-122 — uniform-proper-acceleration (hyperbolic motion) system.
 - [ ] BE-123 — relativistic particle in a static potential.
 - [ ] BE-124 — four-momentum/mass-shell verification export.

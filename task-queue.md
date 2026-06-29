@@ -319,17 +319,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
 
 #### Phase 2 — Relativistic particle dynamics
 
-1. **BE-121: Add a relativistic particle under an external four-force**
-    - Goal: Proper-time dynamics `dp^mu/dtau = f^mu` as a `FirstOrderSystem`, with the
-      mass-shell `p^mu p_mu + m^2 c^2 = 0` recorded as an `AssumptionSpec` and tracked as
-      a measured invariant.
-    - Scope: `engine/relativity/worldline.py` (extend),
-      `tests/test_relativistic_dynamics.py`.
-    - Acceptance: integrating a four-force preserves the mass-shell to tolerance
-      (measured); the spatial-force, low-velocity limit reproduces Newton's second law
-      symbolically; tests pass.
-
-2. **BE-122: Add the uniform-proper-acceleration (hyperbolic motion) system**
+1. **BE-122: Add the uniform-proper-acceleration (hyperbolic motion) system**
     - Goal: Constant proper acceleration producing the classic hyperbolic worldline, with
       the analytic rapidity/position relations as measured invariants.
     - Scope: `systems/uniform_proper_acceleration.py` (new), generator,
@@ -337,7 +327,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
     - Acceptance: the worldline matches the closed-form hyperbola within tolerance;
       four-velocity norm² stays `-c^2`; deterministic export; tests pass.
 
-3. **BE-123: Add a relativistic particle in a static potential**
+2. **BE-123: Add a relativistic particle in a static potential**
     - Goal: A bound/scattering relativistic trajectory under a scalar/vector potential,
       demonstrating relativistic dynamics beyond constant force.
     - Scope: `systems/relativistic_particle_in_potential.py` (new), generator,
@@ -345,7 +335,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
     - Acceptance: an energy-type invariant and mass-shell are tracked as measured series;
       the non-relativistic limit matches the corresponding Newtonian system; tests pass.
 
-4. **BE-124: Wire four-momentum conservation and mass-shell into verification export**
+3. **BE-124: Wire four-momentum conservation and mass-shell into verification export**
     - Goal: Expose mass-shell and four-momentum conservation as `ObligationSpec`s
       (`rigor="external-required"`) with measured `proofStatuses`, so relativistic
       systems participate in the verification pipeline without claiming proof.
@@ -356,7 +346,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
 
 #### Phase 3 — Covariant classical electrodynamics (`engine/electrodynamics/`)
 
-5. **BE-125: Add the Faraday field tensor and its invariants**
+4. **BE-125: Add the Faraday field tensor and its invariants**
     - Goal: Build `F_mu_nu` from `(E, B)` (and later from `A_mu`) and expose the two EM
       invariants `F_mu_nu F^mu_nu` and `E . B` (`F *F`).
     - Scope: `engine/electrodynamics/field_tensor.py` (new),
@@ -364,7 +354,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
     - Acceptance: `F` is antisymmetric by construction; the two invariants match the
       `2(B^2 - E^2)` and `E.B` forms symbolically; tests pass.
 
-6. **BE-126: Add the electromagnetic four-potential and gauge transform**
+5. **BE-126: Add the electromagnetic four-potential and gauge transform**
     - Goal: An `A_mu(x)` container with `F = dA` (exterior derivative) and a gauge
       transform `A_mu -> A_mu + d_mu chi` that leaves `F` invariant.
     - Scope: `engine/electrodynamics/four_potential.py` (new),
@@ -373,7 +363,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
       symbolic `chi`; the homogeneous Maxwell identity `dF = 0` holds symbolically; tests
       pass.
 
-7. **BE-127: Add the covariant Lorentz force as a first-order system**
+6. **BE-127: Add the covariant Lorentz force as a first-order system**
     - Goal: `dp^mu/dtau = q F^mu_nu u^nu` reduced to a `FirstOrderSystem` on the
       proper-time-parameterized worldline, reusing the Phase-1/2 primitives.
     - Scope: `engine/electrodynamics/lorentz_force.py` (new),
@@ -382,7 +372,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
       mass-shell (measured); the low-velocity limit reduces to `q(E + v x B)`
       symbolically; tests pass.
 
-8. **BE-128: Add the relativistic cyclotron system (uniform B)**
+7. **BE-128: Add the relativistic cyclotron system (uniform B)**
     - Goal: A charged particle in a uniform magnetic field showing relativistic gyration,
       generalizing — not replacing — `systems/charged_particle.py`.
     - Scope: `systems/relativistic_cyclotron.py` (new), generator,
@@ -390,7 +380,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
     - Acceptance: the gyrofrequency matches `qB/(gamma m)`; `p_z` and the EM invariants
       are measured-conserved; a new `system_kind="covariant-em"` round-trips; tests pass.
 
-9. **BE-129: Add the crossed-field E x B drift system**
+8. **BE-129: Add the crossed-field E x B drift system**
     - Goal: A charged particle in crossed uniform E and B fields exhibiting the analytic
       `E x B / B^2` drift.
     - Scope: `systems/crossed_eb_drift.py` (new), generator, `scripts/example_specs.py`,
@@ -398,7 +388,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
     - Acceptance: the measured drift velocity matches `E x B / B^2` within tolerance;
       deterministic export; tests pass.
 
-10. **BE-130: Add the general relativistic charged-particle system**
+9. **BE-130: Add the general relativistic charged-particle system**
     - Goal: A charged particle in a configurable static EM field via the covariant Lorentz
       force, the flagship Phase-3 example; the existing non-relativistic
       `charged_particle.py` is kept as the Newtonian counterpart.
@@ -408,7 +398,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
       and EM invariants exported as measured series; the non-relativistic limit matches
       `charged_particle.py`; tests pass.
 
-11. **BE-131: Add Maxwell-source constraint diagnostics and EM-invariant obligations**
+10. **BE-131: Add Maxwell-source constraint diagnostics and EM-invariant obligations**
     - Goal: Reuse the existing measured Gauss-flux/planar-Stokes/div-curl checks in
       `engine/fields/diagnostics.py` to report Maxwell source constraints (`div B = 0`,
       `div E = rho/eps0`) for EM systems, and surface EM invariants as external-required
@@ -421,7 +411,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
 
 #### Phase 4 — Thin field-theoretic abstractions (symbolic + sampled only; no PDE solver)
 
-12. **BE-132: Add a Lagrangian field-density object with symbolic Euler-Lagrange**
+11. **BE-132: Add a Lagrangian field-density object with symbolic Euler-Lagrange**
     - Goal: A minimal field-density value object `L(phi, d_mu phi, x)` that produces the
       symbolic Euler-Lagrange equation for one scalar field — structure only, **no**
       time-stepping PDE integrator.
@@ -429,7 +419,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
     - Acceptance: the Euler-Lagrange expression for a Klein-Gordon-style density matches
       by hand; the object validates free symbols like the existing fields; tests pass.
 
-13. **BE-133: Add symbolic stress-energy and a measured conservation residual**
+12. **BE-133: Add symbolic stress-energy and a measured conservation residual**
     - Goal: Symbolic `T_mu_nu` for a scalar field density plus a **measured** sampled
       `d_mu T^mu_nu` residual over field configurations, consistent with the rigor ladder
       (sampling is evidence, not a theorem).
@@ -438,7 +428,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
     - Acceptance: `T_mu_nu` is symmetric for the scalar density; the sampled divergence
       residual is near zero for an on-shell configuration and labeled measured; tests pass.
 
-14. **BE-134: Add the scalar field-density example and export**
+13. **BE-134: Add the scalar field-density example and export**
     - Goal: A Klein-Gordon-style scalar field-density gallery system exporting its
       density, Euler-Lagrange form, and measured `T_mu_nu` conservation residual under a
       new `system_kind="field-density"`.
@@ -449,7 +439,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
 
 #### Phase 5 — Quantum exploratory (DEFERRED / RESEARCH-GATED — DO NOT START)
 
-15. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
+14. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
     - Goal: Research placeholder only — a finite-dimensional Hilbert state under a unitary
       `FirstOrderSystem` flow (spin precession), with measured norm/probability
       invariants. **No QED, no QFT, no PDE.** Do not implement until Phases 1-3 have landed
