@@ -48,6 +48,10 @@ from systems.n_body_gravity import (
     total_momentum_y,
 )
 from systems.pendulum import build_system as build_pendulum
+from systems.relativistic_free_particle import (
+    build_system as build_relativistic_free_particle,
+    interval_rate_expression as relativistic_free_particle_interval_rate,
+)
 from systems.sphere_geodesic import build_system as build_sphere_geodesic
 from systems.surface_geodesic import build_system as build_surface_geodesic
 from systems.schwarzschild import build_system as build_schwarzschild
@@ -557,6 +561,14 @@ LENSES: tuple[Lens, ...] = (
         title="Dispersive Wave Packet",
         kind="field-evolution",
         description="Amplitude and intensity fields for a Gaussian packet under quadratic dispersion.",
+    ),
+    Lens(
+        id="relativisticWorldline",
+        title="Minkowski Worldline",
+        kind="spacetime-diagram",
+        description="A proper-time worldline plotted in flat spacetime with light-cone reference geometry.",
+        projections=("spacetime",),
+        conserved=("proper_interval_rate",),
     ),
 )
 
@@ -1776,6 +1788,42 @@ VARIABLE_SPEED_WAVEFRONT = SystemSpec(
 )
 
 
+RELATIVISTIC_FREE_PARTICLE = SystemSpec(
+    id="relativistic-free-particle",
+    title="Relativistic Free Particle",
+    category="Relativity",
+    description=(
+        "A proper-time-parameterized free particle tracing a straight timelike "
+        "worldline in flat Minkowski spacetime."
+    ),
+    build=build_relativistic_free_particle,
+    parameters=(
+        Parameter("beta_x", r"\beta_x", 0.55, -0.9, 0.9, role="initial"),
+        Parameter("beta_y", r"\beta_y", 0.18, -0.9, 0.9, role="initial"),
+    ),
+    state=(
+        StateVar("x0", "x^0", "coordinate"),
+        StateVar("x1", "x^1", "coordinate"),
+        StateVar("x2", "x^2", "coordinate"),
+        StateVar("x0_dot", "u^0", "velocity"),
+        StateVar("x1_dot", "u^1", "velocity"),
+        StateVar("x2_dot", "u^2", "velocity"),
+    ),
+    projections={"spacetime": ("x0", "x1", "x2")},
+    conserved=(
+        Conserved(
+            "proper_interval_rate",
+            r"\eta_{\mu\nu}u^\mu u^\nu",
+            "proper-time normalization",
+            expression=relativistic_free_particle_interval_rate,
+        ),
+    ),
+    lenses=("relativisticWorldline",),
+    data_path="/data/relativistic_free_particle.json",
+    system_kind="relativistic-worldline",
+)
+
+
 SPECS: tuple[SystemSpec, ...] = (
     PENDULUM,
     SPHERE_GEODESIC,
@@ -1799,4 +1847,5 @@ SPECS: tuple[SystemSpec, ...] = (
     MEMBRANE,
     WAVE_PACKET,
     VARIABLE_SPEED_WAVEFRONT,
+    RELATIVISTIC_FREE_PARTICLE,
 )

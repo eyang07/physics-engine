@@ -26,6 +26,9 @@ from scripts.generate_n_body_gravity import (
     write_n_body_variant_trajectories,
 )
 from scripts.generate_pendulum import write_pendulum_trajectory
+from scripts.generate_relativistic_free_particle import (
+    write_relativistic_free_particle_trajectory,
+)
 from scripts.generate_schwarzschild import write_schwarzschild_trajectory
 from scripts.generate_sphere_geodesic import write_sphere_geodesic_trajectory
 from scripts.generate_surface_geodesic import write_surface_geodesic_trajectory
@@ -148,6 +151,10 @@ def main() -> None:
     write_variable_speed_wavefront(
         Path("data/generated/variable_speed_wavefront.json"),
         viewer_output=Path("viewer/public/data/variable_speed_wavefront.json"),
+    )
+    write_relativistic_free_particle_trajectory(
+        Path("data/generated/relativistic_free_particle.json"),
+        viewer_output=Path("viewer/public/data/relativistic_free_particle.json"),
     )
     write_manifest(
         SPECS,

@@ -184,6 +184,12 @@ artifacts.
     dispersive wave-packet example exports analytic amplitude/intensity fields
     under a quadratic dispersion relation, with measured phase/group velocity and
     envelope-spreading diagnostics.
+  - Relativistic-worldline manifest entries
+    (`systemKind: "relativistic-worldline"`): proper-time worldlines whose
+    trajectory payload carries backend-computed spacetime points, four-velocity
+    samples, renderer hints for a Minkowski spacetime diagram, and measured
+    invariant residuals such as `proper_interval_rate`. These are sampled
+    diagnostics, not proof or certification.
   - Field-line / streamline integration (`engine/fields/field_lines.py`): integral
     curves of a vector field's direction (`dx/ds = V/|V|`, unit arc length) via the
     shared RK4 step, with deterministic segment seeding, optional forward+backward
@@ -388,6 +394,9 @@ Generated outputs under `data/generated/` and `viewer/public/data/*.json` are
 ignored and should not be committed.
 
 ## Next Work
+
+The staged relativity/electrodynamics/fields direction is specified in
+[`BACKEND_PHYSICS_ROADMAP.md`](../BACKEND_PHYSICS_ROADMAP.md) at the repo root.
 
 1. Continue hardening backend verification foundations: richer target-specific
    adapter checks and robustness tests before adding more case-study breadth.
