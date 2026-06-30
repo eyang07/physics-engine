@@ -131,29 +131,20 @@ Systems domain renderers, numerical integration, trajectory generation, and
 honesty intact: `external-required`, and measured evidence never rendered as
 proved/certified._
 
-1. **FE-060: ObligationList with progressive disclosure**
-   - Goal: Collapsed row shows obligation name · status badge · signed margin;
-     expanding (Radix Collapsible) reveals the formal statement (KaTeX), evidence
-     chips, depended-on assumptions, certificate summary, and the action to discharge.
-   - Scope: `viewer/src/verification/`.
-   - Acceptance: obligations are scannable; measured (outline) vs proved/certified
-     (filled) vs pending (dashed) are visually distinct, including in grayscale;
-     `npm run build` passes.
-
-2. **FE-061: ArtifactPanel — IR / package export**
+1. **FE-061: ArtifactPanel — IR / package export**
    - Goal: A compact artifact/export block (IR JSON and package-bundle links) at the
      bottom of the claim panel.
    - Scope: `viewer/src/verification/`.
    - Acceptance: export links resolve to the same artifacts as today; `npm run
      build` passes.
 
-3. **FE-062: DocketRail — verification problem list**
+2. **FE-062: DocketRail — verification problem list**
    - Goal: A narrow, collapsible problem/package list that drives selection.
    - Scope: `viewer/src/verification/`.
    - Acceptance: selecting a problem loads it; the list scales to a multi-package
      catalog without layout breakage; `npm run build` passes.
 
-4. **FE-063: Apply the light-technical visual language and token deltas (drop serif)**
+3. **FE-063: Apply the light-technical visual language and token deltas (drop serif)**
    - Goal: Remove the serif remap in the `tokens.css` `#verificationDomain` block,
      set the UI font to IBM Plex Sans + mono with KaTeX restricted to math spans,
      surface the Tailwind theme from the existing tokens, and add a `--pending`
@@ -164,7 +155,7 @@ proved/certified._
      saturation in the view; `npm run build` passes; verification baselines updated
      intentionally.
 
-5. **FE-064: Replace the four legend overlays with one compact legend and selection linking**
+4. **FE-064: Replace the four legend overlays with one compact legend and selection linking**
     - Goal: Remove `.verif-violation-legend`, `.verif-holds-legend`,
       `.verif-roles-legend`, and `.verif-disturbance-annotation`; add a single
       collapsible legend showing only the marks present, and link obligation
@@ -173,7 +164,7 @@ proved/certified._
     - Acceptance: the plot is readable without a legend-heavy decode; selecting an
       obligation highlights its geometry and margin marker; `npm run build` passes.
 
-6. **FE-065: Move playback and full detail into a collapsible bottom strip**
+5. **FE-065: Move playback and full detail into a collapsible bottom strip**
     - Goal: Relocate the rollout playback controls and the formal detail (dynamics,
       region definitions, enclosure boxes) into a Radix Collapsible bottom strip,
       collapsed by default, with playback behavior preserved exactly.
@@ -181,7 +172,7 @@ proved/certified._
     - Acceptance: playback behaves identically to today; detail is collapsed by
       default; `npm run build` passes.
 
-7. **FE-066: Document the verification UI shell and refresh its visual baselines**
+6. **FE-066: Document the verification UI shell and refresh its visual baselines**
     - Goal: Document the redesigned verification shell and its boundary from the
       physics pipeline, and regenerate the verification-domain visual baselines.
     - Scope: `docs/FRONTEND.md`, `viewer` visual baselines (verification only).
