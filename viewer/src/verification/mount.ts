@@ -16,7 +16,11 @@ import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { VerificationApp } from "./VerificationApp";
-import type { PackageManifest, VerificationProblem } from "../data/verification";
+import type {
+  PackageManifest,
+  PackageRegime,
+  VerificationProblem,
+} from "../data/verification";
 import "./verification.css";
 
 /**
@@ -31,17 +35,43 @@ export interface VerificationArtifacts {
   packageManifest: PackageManifest | null;
 }
 
+/**
+ * One docket entry: a problem the workbench can open, grounded in the discovery
+ * index (model · status · counts · Tier/regime) so the rail is scannable without
+ * loading each problem. Mirrors the legacy catalog rail's resolved fields.
+ */
+export interface DocketEntry {
+  id: string;
+  name: string;
+  model: string | null;
+  status: string;
+  counts: { regions: number; obligations: number; candidates: number };
+  regime: PackageRegime | null;
+}
+
+/** The docket state: the entries, the open problem, and the host's load handler. */
+export interface VerificationDocket {
+  entries: DocketEntry[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}
+
 const CONTAINER_ID = "verificationReactRoot";
 
 let root: Root | null = null;
 let container: HTMLElement | null = null;
 let currentProblem: VerificationProblem | null = null;
 let currentArtifacts: VerificationArtifacts | null = null;
+let currentDocket: VerificationDocket | null = null;
 
 function renderRoot(): void {
   if (root) {
     root.render(
-      createElement(VerificationApp, { problem: currentProblem, artifacts: currentArtifacts }),
+      createElement(VerificationApp, {
+        problem: currentProblem,
+        artifacts: currentArtifacts,
+        docket: currentDocket,
+      }),
     );
   }
 }
@@ -80,5 +110,15 @@ export function setVerificationProblem(
 ): void {
   currentProblem = problem;
   currentArtifacts = artifacts;
+  renderRoot();
+}
+
+/**
+ * Set the docket (problem list + selection) the React shell's rail renders.
+ * Retained across unmount like the active problem, so re-entering the domain
+ * re-draws the rail. Passing null clears it.
+ */
+export function setVerificationDocket(docket: VerificationDocket | null): void {
+  currentDocket = docket;
   renderRoot();
 }

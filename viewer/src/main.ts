@@ -30,8 +30,10 @@ import { VerificationPanel } from "./verificationPanel";
 import { VerificationStage } from "./verificationStage";
 import {
   mountVerificationApp,
+  setVerificationDocket,
   setVerificationProblem,
   unmountVerificationApp,
+  type DocketEntry,
 } from "./verification/mount";
 import { resolveRendererSurface } from "./rendererRegistry";
 import { createScalarLegend } from "./scalarLegend";
@@ -373,6 +375,30 @@ function renderVerificationCatalog() {
     });
     verificationCatalog.append(button);
   });
+  refreshVerificationDocket();
+}
+
+// The React docket (FE-062) mirrors the legacy catalog rail: the same problems,
+// resolved against the discovery index (model · status · counts · regime), with
+// selection driving the same loader. Kept in sync from both the catalog render
+// and the active-selection update so the two rails never disagree.
+function refreshVerificationDocket() {
+  const entries: DocketEntry[] = verificationProblems.map((problem) => {
+    const indexEntry = verificationPackageIndex.get(problem.id);
+    return {
+      id: problem.id,
+      name: problem.name,
+      model: indexEntry?.model ?? problem.model,
+      status: indexEntry?.status ?? problem.status,
+      counts: indexEntry?.counts ?? problem.counts,
+      regime: indexEntry?.regime ?? null,
+    };
+  });
+  setVerificationDocket({
+    entries,
+    selectedId: selectedProblemId,
+    onSelect: (id) => void selectVerificationProblem(id),
+  });
 }
 
 // The package status as a small chip (e.g. "candidate"), read from the listing —
@@ -414,6 +440,7 @@ function updateVerificationCatalogActive() {
   verificationCatalog.querySelectorAll<HTMLButtonElement>(".catalog-item").forEach((item) => {
     item.classList.toggle("catalog-item--active", item.dataset.problemId === selectedProblemId);
   });
+  refreshVerificationDocket();
 }
 
 async function selectVerificationProblem(problemId: string) {
