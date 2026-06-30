@@ -16,18 +16,33 @@ import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { VerificationApp } from "./VerificationApp";
-import type { VerificationProblem } from "../data/verification";
+import type { PackageManifest, VerificationProblem } from "../data/verification";
 import "./verification.css";
+
+/**
+ * The downloadable artifacts the host published for the active problem: the
+ * backend-agnostic IR file and, when the export bundled one, the self-contained
+ * package (its manifest and the path to assemble the bundle from). The React
+ * shell renders these as the artifact panel; missing ones simply omit.
+ */
+export interface VerificationArtifacts {
+  irPath: string | null;
+  packagePath: string | null;
+  packageManifest: PackageManifest | null;
+}
 
 const CONTAINER_ID = "verificationReactRoot";
 
 let root: Root | null = null;
 let container: HTMLElement | null = null;
 let currentProblem: VerificationProblem | null = null;
+let currentArtifacts: VerificationArtifacts | null = null;
 
 function renderRoot(): void {
   if (root) {
-    root.render(createElement(VerificationApp, { problem: currentProblem }));
+    root.render(
+      createElement(VerificationApp, { problem: currentProblem, artifacts: currentArtifacts }),
+    );
   }
 }
 
@@ -54,11 +69,16 @@ export function unmountVerificationApp(): void {
 }
 
 /**
- * Set the active verification problem the React shell renders. Safe to call
- * while the root is unmounted (Systems domain active): the value is retained and
- * drawn on the next mount.
+ * Set the active verification problem (and its downloadable artifacts) the React
+ * shell renders. Safe to call while the root is unmounted (Systems domain
+ * active): the values are retained and drawn on the next mount. Passing no
+ * artifacts clears them, so an error/empty state shows no stale export links.
  */
-export function setVerificationProblem(problem: VerificationProblem | null): void {
+export function setVerificationProblem(
+  problem: VerificationProblem | null,
+  artifacts: VerificationArtifacts | null = null,
+): void {
   currentProblem = problem;
+  currentArtifacts = artifacts;
   renderRoot();
 }

@@ -445,7 +445,11 @@ async function selectVerificationProblem(problemId: string) {
     if (selectedProblemId === summary.id) {
       verificationStage.show(problem);
       verificationPanel.render(problem, summary.irPath, pkg, stubs, regime);
-      setVerificationProblem(problem);
+      setVerificationProblem(problem, {
+        irPath: summary.irPath,
+        packagePath: summary.packagePath,
+        packageManifest: pkg?.manifest ?? null,
+      });
       setFigureCaption(problem);
     }
   } catch (error) {

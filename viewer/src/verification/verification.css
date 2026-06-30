@@ -510,3 +510,69 @@
   line-height: 1.45;
   color: var(--text-muted);
 }
+
+/*
+ * ArtifactPanel (FE-061) — IR / package export at the foot of the claim chain.
+ *
+ * Compact and restrained: the two artifacts as a link and a button, plus the
+ * standing honesty note (an export discharges nothing). Same light-technical
+ * voice as the rest of the shell.
+ */
+#verificationReactRoot .vf-artifacts {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--hairline);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+#verificationReactRoot .vf-artifacts__head {
+  margin-bottom: var(--space-2);
+}
+
+#verificationReactRoot .vf-artifacts__title {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+#verificationReactRoot .vf-artifacts__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+#verificationReactRoot .vf-artifacts__ir,
+#verificationReactRoot .vf-artifacts__package {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-frost);
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+#verificationReactRoot .vf-artifacts__ir:hover,
+#verificationReactRoot .vf-artifacts__package:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+#verificationReactRoot .vf-artifacts__package:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+#verificationReactRoot .vf-artifacts__note {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--text-faint);
+}
