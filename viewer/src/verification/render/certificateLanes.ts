@@ -8,6 +8,7 @@
  * are identical to the previous in-class `drawLane`.
  */
 import { dossier } from "../../design/dossier";
+import type { CertificateSeries } from "../../data/trajectory";
 import { clamp } from "../../util";
 
 /** The tightest sampled record for one obligation (BE-036): its signed worst
@@ -125,4 +126,145 @@ export function drawCertificateLane(lane: CertificateLaneRender, phase: number):
   ctx.beginPath();
   ctx.arc(clamp(phase, 0, 1) * width, yOf(values[playIndex]), 3, 0, Math.PI * 2);
   ctx.fill();
+}
+
+// ---------------------------------------------------------------------------
+// Lane preparation (FE-057)
+//
+// The pure classification/labelling and metric logic that turns an exported
+// `CertificateSeries` into a renderable lane descriptor, shared by the vanilla
+// `CertificateLanes` (DOM rows) and the React `CertificateTraces` wrapper so
+// neither re-derives the labels. These name the series; they classify nothing.
+// ---------------------------------------------------------------------------
+
+const COMPARISON_LATEX: Record<string, string> = {
+  "<=": "\\le",
+  "<": "<",
+  ">=": "\\ge",
+  ">": ">",
+  "==": "=",
+  "=": "=",
+};
+
+// A structural constant (the obligation threshold), trimmed — not a measured
+// magnitude.
+function constantLatex(value: number): string {
+  if (Object.is(value, -0) || Math.abs(value) < 1e-12) {
+    return "0";
+  }
+  return Number(value.toFixed(3))
+    .toString()
+    .replace(/\.?0+$/, "");
+}
+
+// A Lyapunov candidate reads as V, a barrier (the default) as B. Derived from
+// the exported candidate id — the lane labels the series, it does not classify.
+function baseSymbol(record: CertificateSeries): string {
+  return (record.candidateId ?? "").toLowerCase().includes("lyapunov") ? "V" : "B";
+}
+
+// A safe-set barrier lane: a candidate-value series for a barrier that bears on
+// at least one obligation. When a package carries two or more of these together,
+// its safe set is their intersection (FE-027).
+function isSafeSetBarrierLane(record: CertificateSeries): boolean {
+  return (
+    record.kind === "candidate-value" &&
+    record.obligationIds.length > 0 &&
+    baseSymbol(record) === "B"
+  );
+}
+
+// A readable name for a barrier lane, humanized from the exported candidate id
+// (e.g. `geofence-box-barrier` -> `geofence box`). Labels the series; it does
+// not reclassify it.
+function barrierLabel(record: CertificateSeries): string {
+  const id = record.candidateId ?? "";
+  const trimmed = id.replace(/-?barrier$/i, "").replace(/[-_]+/g, " ").trim();
+  return trimmed || id || "barrier";
+}
+
+function symbolLatex(record: CertificateSeries): string {
+  const base = baseSymbol(record);
+  return record.kind === "flow-derivative" ? `\\dot{${base}}` : base;
+}
+
+// Show `symbol <comparison> rhs` when one comparison applies (e.g. the
+// non-increase obligation `\dot B \le 0`). Region-conditional value obligations
+// impose more than one, so there the threshold is ambiguous and we omit it.
+function captionLatex(record: CertificateSeries): string | null {
+  const comparisons = new Set(record.comparisonBaselines.map((baseline) => baseline.comparison));
+  if (comparisons.size !== 1) {
+    return null;
+  }
+  const baseline = record.comparisonBaselines[0];
+  const comparison = COMPARISON_LATEX[baseline.comparison] ?? baseline.comparison;
+  return `${symbolLatex(record)} ${comparison} ${constantLatex(baseline.rhs)}`;
+}
+
+// The lane's vertical excursion from its threshold baseline, used to auto-scale
+// the trace so its sign and shape relative to the threshold read clearly.
+function laneAmplitude(values: number[], baseline: number): number {
+  let amplitude = 0;
+  for (const value of values) {
+    amplitude = Math.max(amplitude, Math.abs(value - baseline));
+  }
+  return amplitude;
+}
+
+/** A renderable certificate lane: the measured series plus its labels and the
+ * auto-scaling metrics, derived once from an exported `CertificateSeries`. */
+export type CertificateLaneDescriptor = {
+  /** The trajectory series key this lane plots. */
+  series: string;
+  obligationIds: string[];
+  values: number[];
+  baseline: number;
+  amplitude: number;
+  symbolLatex: string;
+  /** The `symbol <cmp> rhs` caption, or null when the threshold is ambiguous. */
+  captionLatex: string | null;
+  /** The plain caption shown when `captionLatex` is null. */
+  captionFallback: string;
+  /** The humanized barrier name, set only for intersection-named barrier lanes. */
+  barrierLabel: string | null;
+};
+
+export type PreparedCertificateLanes = {
+  lanes: CertificateLaneDescriptor[];
+  /** True when the package carries two or more safe-set barrier lanes, whose
+   * safe set is their intersection (FE-027). */
+  isIntersection: boolean;
+};
+
+/** Turn a problem's certificate series + records into renderable lane
+ * descriptors. Records whose series carry no values are dropped, mirroring the
+ * vanilla lane builder. */
+export function prepareCertificateLanes(
+  series: Record<string, number[]>,
+  records: CertificateSeries[],
+): PreparedCertificateLanes {
+  // An intersection safe set carries two or more safe-set barrier lanes
+  // together; only then do the lanes name each barrier and state the
+  // intersection semantics, leaving single-barrier packages unchanged.
+  const isIntersection = records.filter(isSafeSetBarrierLane).length >= 2;
+  const lanes: CertificateLaneDescriptor[] = [];
+  for (const record of records) {
+    const values = series[record.series];
+    if (!values || values.length === 0) {
+      continue;
+    }
+    const baseline = record.comparisonBaselines[0]?.rhs ?? 0;
+    lanes.push({
+      series: record.series,
+      obligationIds: record.obligationIds,
+      values,
+      baseline,
+      amplitude: laneAmplitude(values, baseline),
+      symbolLatex: symbolLatex(record),
+      captionLatex: captionLatex(record),
+      captionFallback: record.kind === "flow-derivative" ? "flow derivative" : "candidate value",
+      barrierLabel: isIntersection && isSafeSetBarrierLane(record) ? barrierLabel(record) : null,
+    });
+  }
+  return { lanes, isIntersection };
 }

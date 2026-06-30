@@ -13,12 +13,14 @@ import type { CertificateSeries } from "./data/trajectory";
 import { formatSignedMeasured } from "./util";
 import {
   drawCertificateLane,
+  prepareCertificateLanes,
+  type CertificateLaneDescriptor,
   type ObligationWorst,
 } from "./verification/render/certificateLanes";
 
-// The pure lane drawing now lives in the framework-free render module (FE-056);
-// re-export its `ObligationWorst` so existing importers (e.g. the stage) keep
-// their `./certificateLanes` import path.
+// The pure lane drawing and preparation now live in the framework-free render
+// module (FE-056/FE-057); re-export `ObligationWorst` so existing importers
+// (e.g. the stage) keep their `./certificateLanes` import path.
 export type { ObligationWorst };
 
 type Lane = {
@@ -36,72 +38,8 @@ type Lane = {
   selectedWorst: ObligationWorst | null;
 };
 
-const COMPARISON_LATEX: Record<string, string> = {
-  "<=": "\\le",
-  "<": "<",
-  ">=": "\\ge",
-  ">": ">",
-  "==": "=",
-  "=": "=",
-};
-
 function renderLatex(element: HTMLElement, latex: string): void {
   katex.render(latex, element, { throwOnError: false, displayMode: false });
-}
-
-// A structural constant (the obligation threshold), trimmed — not a measured
-// magnitude.
-function constantLatex(value: number): string {
-  if (Object.is(value, -0) || Math.abs(value) < 1e-12) {
-    return "0";
-  }
-  return Number(value.toFixed(3))
-    .toString()
-    .replace(/\.?0+$/, "");
-}
-
-// A Lyapunov candidate reads as V, a barrier (the default) as B. Derived from
-// the exported candidate id — the lane labels the series, it does not classify.
-function baseSymbol(record: CertificateSeries): string {
-  return (record.candidateId ?? "").toLowerCase().includes("lyapunov") ? "V" : "B";
-}
-
-// A safe-set barrier lane: a candidate-value series for a barrier that bears on
-// at least one obligation. When a package carries two or more of these together,
-// its safe set is their intersection (FE-027).
-function isSafeSetBarrierLane(record: CertificateSeries): boolean {
-  return (
-    record.kind === "candidate-value" &&
-    record.obligationIds.length > 0 &&
-    baseSymbol(record) === "B"
-  );
-}
-
-// A readable name for a barrier lane, humanized from the exported candidate id
-// (e.g. `geofence-box-barrier` -> `geofence box`). Labels the series; it does
-// not reclassify it.
-function barrierLabel(record: CertificateSeries): string {
-  const id = record.candidateId ?? "";
-  const trimmed = id.replace(/-?barrier$/i, "").replace(/[-_]+/g, " ").trim();
-  return trimmed || id || "barrier";
-}
-
-function symbolLatex(record: CertificateSeries): string {
-  const base = baseSymbol(record);
-  return record.kind === "flow-derivative" ? `\\dot{${base}}` : base;
-}
-
-// Show `symbol <comparison> rhs` when one comparison applies (e.g. the
-// non-increase obligation `\dot B \le 0`). Region-conditional value obligations
-// impose more than one, so there the threshold is ambiguous and we omit it.
-function captionLatex(record: CertificateSeries): string | null {
-  const comparisons = new Set(record.comparisonBaselines.map((baseline) => baseline.comparison));
-  if (comparisons.size !== 1) {
-    return null;
-  }
-  const baseline = record.comparisonBaselines[0];
-  const comparison = COMPARISON_LATEX[baseline.comparison] ?? baseline.comparison;
-  return `${symbolLatex(record)} ${comparison} ${constantLatex(baseline.rhs)}`;
 }
 
 export class CertificateLanes {
@@ -135,13 +73,8 @@ export class CertificateLanes {
   ): void {
     this.clear();
     this.worstByObligation = worstByObligation;
-    // An intersection safe set carries two or more safe-set barrier lanes
-    // together; only then do the lanes name each barrier and state the
-    // intersection semantics, leaving single-barrier packages unchanged.
-    const isIntersection = records.filter(isSafeSetBarrierLane).length >= 2;
-    records.forEach((record) =>
-      this.buildRow(record, series, isIntersection && isSafeSetBarrierLane(record)),
-    );
+    const { lanes, isIntersection } = prepareCertificateLanes(series, records);
+    lanes.forEach((descriptor) => this.buildRow(descriptor));
     if (this.lanes.length === 0) {
       // Make the absence legible: a problem can simply carry no measured
       // certificate series. State that rather than leaving an empty panel.
@@ -238,36 +171,23 @@ export class CertificateLanes {
     lane.readout.hidden = false;
   }
 
-  private buildRow(
-    record: CertificateSeries,
-    series: Record<string, number[]>,
-    named: boolean,
-  ): void {
-    const values = series[record.series];
-    if (!values || values.length === 0) {
-      return;
-    }
-    const baseline = record.comparisonBaselines[0]?.rhs ?? 0;
-    let amplitude = 0;
-    for (const value of values) {
-      amplitude = Math.max(amplitude, Math.abs(value - baseline));
-    }
-
+  private buildRow(descriptor: CertificateLaneDescriptor): void {
+    const { obligationIds } = descriptor;
     const row = document.createElement("div");
     row.className = "diagnostic";
-    row.dataset.obligations = record.obligationIds.join(" ");
+    row.dataset.obligations = obligationIds.join(" ");
     // A lane that bears on obligations is selectable: activating it reveals which
     // obligations the measured signal supports. Lanes with none stay inert.
-    if (record.obligationIds.length > 0) {
+    if (obligationIds.length > 0) {
       row.classList.add("diagnostic--selectable");
       row.setAttribute("role", "button");
       row.setAttribute("aria-pressed", "false");
       row.tabIndex = 0;
-      row.addEventListener("click", () => this.toggleSelect(row, record.obligationIds));
+      row.addEventListener("click", () => this.toggleSelect(row, obligationIds));
       row.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          this.toggleSelect(row, record.obligationIds);
+          this.toggleSelect(row, obligationIds);
         }
       });
     }
@@ -276,23 +196,22 @@ export class CertificateLanes {
     head.className = "diagnostic__head";
     const symbol = document.createElement("span");
     symbol.className = "diagnostic__symbol";
-    renderLatex(symbol, symbolLatex(record));
+    renderLatex(symbol, descriptor.symbolLatex);
     const caption = document.createElement("span");
     caption.className = "diagnostic__caption";
-    const latex = captionLatex(record);
-    if (latex) {
-      renderLatex(caption, latex);
+    if (descriptor.captionLatex) {
+      renderLatex(caption, descriptor.captionLatex);
     } else {
-      caption.textContent = record.kind === "flow-derivative" ? "flow derivative" : "candidate value";
+      caption.textContent = descriptor.captionFallback;
     }
     head.append(symbol, caption);
     // In an intersection package, name which barrier this lane is (box vs
     // keep-out), so a reader can tell the two candidate barriers apart. It stays
     // a candidate label — the lane certifies nothing.
-    if (named) {
+    if (descriptor.barrierLabel) {
       const barrier = document.createElement("span");
       barrier.className = "diagnostic__barrier";
-      barrier.textContent = barrierLabel(record);
+      barrier.textContent = descriptor.barrierLabel;
       head.append(barrier);
     }
 
@@ -310,13 +229,13 @@ export class CertificateLanes {
     if (laneCtx) {
       this.lanes.push({
         row,
-        obligationIds: record.obligationIds,
+        obligationIds,
         canvas: lane,
         ctx: laneCtx,
         readout,
-        values,
-        baseline,
-        amplitude,
+        values: descriptor.values,
+        baseline: descriptor.baseline,
+        amplitude: descriptor.amplitude,
         selectedWorst: null,
       });
     }

@@ -131,14 +131,7 @@ Systems domain renderers, numerical integration, trajectory generation, and
 honesty intact: `external-required`, and measured evidence never rendered as
 proved/certified._
 
-1. **FE-057: React wrappers StateSpaceCanvas + CertificateTraces around the extracted renderers**
-   - Goal: React components own a `<canvas>` ref and drive the FE-056 renderers via
-     `useEffect`/RAF, reusing `PlaybackClock` and trajectory sampling unchanged.
-   - Scope: `viewer/src/verification/` components.
-   - Acceptance: rollout animates identically to today; a `selection` prop triggers
-     a redraw; `npm run build` passes.
-
-2. **FE-058: TopBarIdentity — model, claim, and one overall verdict token**
+1. **FE-058: TopBarIdentity — model, claim, and one overall verdict token**
    - Goal: Derive an overall claim status (`Discharged` / `Certified (numeric)` /
      `Measured only` / `Counterexample` / `Pending external`) in TypeScript from the
      existing per-obligation rigor/status, and render model + claim + a single
@@ -147,14 +140,14 @@ proved/certified._
    - Acceptance: pendulum-safety shows the correct honest verdict at a glance; no
      field overstates status (measured never reads as proved); `npm run build` passes.
 
-3. **FE-059: AssumptionsBlock — active, undischarged assumptions made unmissable**
+2. **FE-059: AssumptionsBlock — active, undischarged assumptions made unmissable**
    - Goal: Render active assumptions (including the disturbance set W) above the
      obligation list, each with its bound (KaTeX) and an "active / undischarged" tag.
    - Scope: `viewer/src/verification/`.
    - Acceptance: every assumption an obligation depends on is visible and tagged
      undischarged; `npm run build` passes.
 
-4. **FE-060: ObligationList with progressive disclosure**
+3. **FE-060: ObligationList with progressive disclosure**
    - Goal: Collapsed row shows obligation name · status badge · signed margin;
      expanding (Radix Collapsible) reveals the formal statement (KaTeX), evidence
      chips, depended-on assumptions, certificate summary, and the action to discharge.
@@ -163,20 +156,20 @@ proved/certified._
      (filled) vs pending (dashed) are visually distinct, including in grayscale;
      `npm run build` passes.
 
-5. **FE-061: ArtifactPanel — IR / package export**
+4. **FE-061: ArtifactPanel — IR / package export**
    - Goal: A compact artifact/export block (IR JSON and package-bundle links) at the
      bottom of the claim panel.
    - Scope: `viewer/src/verification/`.
    - Acceptance: export links resolve to the same artifacts as today; `npm run
      build` passes.
 
-6. **FE-062: DocketRail — verification problem list**
+5. **FE-062: DocketRail — verification problem list**
    - Goal: A narrow, collapsible problem/package list that drives selection.
    - Scope: `viewer/src/verification/`.
    - Acceptance: selecting a problem loads it; the list scales to a multi-package
      catalog without layout breakage; `npm run build` passes.
 
-7. **FE-063: Apply the light-technical visual language and token deltas (drop serif)**
+6. **FE-063: Apply the light-technical visual language and token deltas (drop serif)**
    - Goal: Remove the serif remap in the `tokens.css` `#verificationDomain` block,
      set the UI font to IBM Plex Sans + mono with KaTeX restricted to math spans,
      surface the Tailwind theme from the existing tokens, and add a `--pending`
@@ -187,7 +180,7 @@ proved/certified._
      saturation in the view; `npm run build` passes; verification baselines updated
      intentionally.
 
-8. **FE-064: Replace the four legend overlays with one compact legend and selection linking**
+7. **FE-064: Replace the four legend overlays with one compact legend and selection linking**
     - Goal: Remove `.verif-violation-legend`, `.verif-holds-legend`,
       `.verif-roles-legend`, and `.verif-disturbance-annotation`; add a single
       collapsible legend showing only the marks present, and link obligation
@@ -196,7 +189,7 @@ proved/certified._
     - Acceptance: the plot is readable without a legend-heavy decode; selecting an
       obligation highlights its geometry and margin marker; `npm run build` passes.
 
-9. **FE-065: Move playback and full detail into a collapsible bottom strip**
+8. **FE-065: Move playback and full detail into a collapsible bottom strip**
     - Goal: Relocate the rollout playback controls and the formal detail (dynamics,
       region definitions, enclosure boxes) into a Radix Collapsible bottom strip,
       collapsed by default, with playback behavior preserved exactly.
@@ -204,7 +197,7 @@ proved/certified._
     - Acceptance: playback behaves identically to today; detail is collapsed by
       default; `npm run build` passes.
 
-10. **FE-066: Document the verification UI shell and refresh its visual baselines**
+9. **FE-066: Document the verification UI shell and refresh its visual baselines**
     - Goal: Document the redesigned verification shell and its boundary from the
       physics pipeline, and regenerate the verification-domain visual baselines.
     - Scope: `docs/FRONTEND.md`, `viewer` visual baselines (verification only).
