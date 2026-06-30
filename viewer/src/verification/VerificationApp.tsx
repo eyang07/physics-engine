@@ -1,13 +1,23 @@
 /**
  * Root component for the Verification-domain React shell.
  *
- * FE-055 only stands up the React + Tailwind + Radix toolchain and proves the
- * root mounts/unmounts on domain switch. The shell renders nothing yet: the
- * legacy vanilla verification panel still draws the view, living alongside this
- * (empty) root inside `#verificationDomain`. Later tasks (FE-056+) migrate the
- * masthead, obligation list, assumptions block, plot wrappers, and artifact
- * panel into this tree.
+ * FE-055 stood up the React + Tailwind + Radix toolchain with an empty root.
+ * FE-058 renders the first real piece — `TopBarIdentity` (model · claim · one
+ * overall verdict token) — driven by the active problem the host hands in via
+ * `setVerificationProblem`. The legacy vanilla verification panel still draws the
+ * rest of the view alongside this tree; later tasks (FE-059+) migrate the
+ * assumptions block, obligation list, plot wrappers, and artifact panel here.
  */
-export function VerificationApp(): null {
-  return null;
+import { TopBarIdentity } from "./TopBarIdentity";
+import type { VerificationProblem } from "../data/verification";
+
+export type VerificationAppProps = {
+  problem: VerificationProblem | null;
+};
+
+export function VerificationApp({ problem }: VerificationAppProps): JSX.Element | null {
+  if (!problem) {
+    return null;
+  }
+  return <TopBarIdentity problem={problem} />;
 }

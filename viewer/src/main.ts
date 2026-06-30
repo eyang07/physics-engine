@@ -28,7 +28,11 @@ import { drawVectorFieldOverlay, robustMagnitudeMax } from "./vectorFieldCanvas"
 import { drawWaveScene } from "./waveCanvas";
 import { VerificationPanel } from "./verificationPanel";
 import { VerificationStage } from "./verificationStage";
-import { mountVerificationApp, unmountVerificationApp } from "./verification/mount";
+import {
+  mountVerificationApp,
+  setVerificationProblem,
+  unmountVerificationApp,
+} from "./verification/mount";
 import { resolveRendererSurface } from "./rendererRegistry";
 import { createScalarLegend } from "./scalarLegend";
 import { createBodyLegend } from "./bodyLegend";
@@ -441,11 +445,13 @@ async function selectVerificationProblem(problemId: string) {
     if (selectedProblemId === summary.id) {
       verificationStage.show(problem);
       verificationPanel.render(problem, summary.irPath, pkg, stubs, regime);
+      setVerificationProblem(problem);
       setFigureCaption(problem);
     }
   } catch (error) {
     console.warn("Verification problem unavailable:", error);
     verificationStage.clear();
+    setVerificationProblem(null);
     verificationFigureCaption.textContent = "";
     verificationPanel.renderEmpty(
       `Could not load ${summary.name}. Regenerate with "python -m scripts.generate_verification_problems".`,
@@ -994,6 +1000,7 @@ async function initializeVerification() {
   renderVerificationCatalog();
   if (verificationProblems.length === 0) {
     verificationStage.clear();
+    setVerificationProblem(null);
     verificationPanel.renderEmpty(
       'No verification problems found. Generate them with "python -m scripts.generate_verification_problems".',
     );
