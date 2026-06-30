@@ -813,7 +813,7 @@ select {
 
 .verif-masthead__title {
   margin: 2px 0 0;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 25px;
   font-weight: 700;
   line-height: 1.1;
@@ -2015,7 +2015,7 @@ select {
 }
 
 #verificationDomain .catalog-item strong {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 15px;
   font-weight: 700;
 }

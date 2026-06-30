@@ -137,6 +137,11 @@
   --candidate-tint: rgba(138, 90, 34, 0.1);
   --required-tint: rgba(80, 69, 126, 0.1);
   --violated-tint: rgba(158, 56, 44, 0.1);
+  /* Pending (FE-063): graphite — an obligation with no measured or certified
+     evidence yet. Drawn dashed/outline so "nothing established" never reads as a
+     filled (proved) standing, and stays distinct in grayscale. */
+  --pending: #586573;
+  --pending-tint: rgba(88, 101, 115, 0.1);
 
   /* "Accent" is mapped to measured-teal; structural cool -> required-indigo.
      No glow on paper. */
@@ -151,15 +156,17 @@
   --shadow-panel: 0 18px 48px rgba(22, 33, 43, 0.12);
   --shadow-card: 0 8px 22px rgba(22, 33, 43, 0.08);
 
-  /* The dossier is set in Computer Modern (same face as the math via KaTeX):
-     prose and headings adopt the serif, identifiers/data stay mono. Remapping
-     the display/sans tokens flips every shared rule in this domain to the serif
-     voice without touching each selector; --font-mono is left untouched. */
-  --font-serif: "KaTeX_Main", Georgia, "Times New Roman", serif;
-  --font-display: "KaTeX_Main", Georgia, "Times New Roman", serif;
-  --font-sans: "KaTeX_Main", Georgia, "Times New Roman", serif;
+  /* Light-technical voice (FE-063): the verification workbench is set in IBM
+     Plex Sans + Mono, not a serif paper face. KaTeX (Computer Modern) is
+     restricted to actual math spans (`.verif-math`, the React `MathSpan`), never
+     UI prose. The display token drops the global Space Grotesk for the same Plex
+     Sans, so the shell holds one type scale with no ornament; --font-mono is left
+     untouched. Remapping the display/sans tokens flips every shared rule in this
+     domain to the sans voice without touching each selector. */
+  --font-display: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
 
   color: var(--text-primary);
   background: var(--paper-bg);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
 }

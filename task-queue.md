@@ -131,18 +131,7 @@ Systems domain renderers, numerical integration, trajectory generation, and
 honesty intact: `external-required`, and measured evidence never rendered as
 proved/certified._
 
-1. **FE-063: Apply the light-technical visual language and token deltas (drop serif)**
-   - Goal: Remove the serif remap in the `tokens.css` `#verificationDomain` block,
-     set the UI font to IBM Plex Sans + mono with KaTeX restricted to math spans,
-     surface the Tailwind theme from the existing tokens, and add a `--pending`
-     (graphite, dashed) status plus fill/outline variants for proved-vs-measured.
-   - Scope: `viewer/src/design/tokens.css`, Tailwind theme config,
-     `viewer/src/styles.css` (verification block).
-   - Acceptance: no serif prose remains; one type scale; status color is the only
-     saturation in the view; `npm run build` passes; verification baselines updated
-     intentionally.
-
-2. **FE-064: Replace the four legend overlays with one compact legend and selection linking**
+1. **FE-064: Replace the four legend overlays with one compact legend and selection linking**
     - Goal: Remove `.verif-violation-legend`, `.verif-holds-legend`,
       `.verif-roles-legend`, and `.verif-disturbance-annotation`; add a single
       collapsible legend showing only the marks present, and link obligation
@@ -151,7 +140,7 @@ proved/certified._
     - Acceptance: the plot is readable without a legend-heavy decode; selecting an
       obligation highlights its geometry and margin marker; `npm run build` passes.
 
-3. **FE-065: Move playback and full detail into a collapsible bottom strip**
+2. **FE-065: Move playback and full detail into a collapsible bottom strip**
     - Goal: Relocate the rollout playback controls and the formal detail (dynamics,
       region definitions, enclosure boxes) into a Radix Collapsible bottom strip,
       collapsed by default, with playback behavior preserved exactly.
@@ -159,7 +148,7 @@ proved/certified._
     - Acceptance: playback behaves identically to today; detail is collapsed by
       default; `npm run build` passes.
 
-4. **FE-066: Document the verification UI shell and refresh its visual baselines**
+3. **FE-066: Document the verification UI shell and refresh its visual baselines**
     - Goal: Document the redesigned verification shell and its boundary from the
       physics pipeline, and regenerate the verification-domain visual baselines.
     - Scope: `docs/FRONTEND.md`, `viewer` visual baselines (verification only).
