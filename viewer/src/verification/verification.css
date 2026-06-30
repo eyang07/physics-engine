@@ -128,3 +128,133 @@
   background: transparent;
   border: 1.5px dashed var(--text-muted);
 }
+
+/*
+ * AssumptionsBlock (FE-059) — active, undischarged preconditions, unmissable.
+ *
+ * An amber rail and amber tags mark these as the conditions the whole claim
+ * leans on; the `undischarged` tag says verbatim that nothing here is
+ * established. Same light-technical voice as the top bar (explicit IBM Plex,
+ * ahead of the FE-063 token migration).
+ */
+#verificationReactRoot .vf-assumptions {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--candidate-tint);
+  border-left: 3px solid var(--candidate);
+  border-radius: var(--radius-md);
+  background: var(--candidate-tint);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+#verificationReactRoot .vf-assumptions__head {
+  margin-bottom: var(--space-2);
+}
+
+#verificationReactRoot .vf-assumptions__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.02em;
+  color: var(--candidate);
+}
+
+#verificationReactRoot .vf-assumptions__note {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+#verificationReactRoot .vf-assumptions__list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#verificationReactRoot .vf-assumption {
+  display: grid;
+  gap: 6px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--paper-bg, #fff);
+}
+
+#verificationReactRoot .vf-assumption__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+#verificationReactRoot .vf-assumption__id {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+}
+
+#verificationReactRoot .vf-tag {
+  padding: 1px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+#verificationReactRoot .vf-tag--active {
+  color: var(--paper-bg, #fff);
+  background: var(--candidate);
+}
+
+#verificationReactRoot .vf-tag--undischarged {
+  color: var(--candidate);
+  border-color: var(--candidate);
+  background: transparent;
+}
+
+#verificationReactRoot .vf-tag--disturbance {
+  color: var(--cool);
+  border-color: var(--cool);
+  background: var(--cool-dim);
+  text-transform: none;
+}
+
+#verificationReactRoot .vf-assumption__bound {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+#verificationReactRoot .vf-assumption__desc {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+#verificationReactRoot .vf-assumption__deps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+#verificationReactRoot .vf-assumption__deps-label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+#verificationReactRoot .vf-assumption__dep {
+  padding: 1px 7px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}

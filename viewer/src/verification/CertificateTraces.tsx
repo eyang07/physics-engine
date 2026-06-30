@@ -9,10 +9,10 @@
  * lanes that bear on it — measured evidence, never a proof.
  */
 import { useCallback, useEffect, useMemo, useRef, type MutableRefObject } from "react";
-import katex from "katex";
 
 import type { CertificateSeries } from "../data/trajectory";
 import { formatSignedMeasured } from "../util";
+import { MathSpan } from "./MathSpan";
 import {
   drawCertificateLane,
   prepareCertificateLanes,
@@ -35,18 +35,6 @@ export type CertificateTracesProps = {
   /** Whether the rollout animation loop should run. */
   active: boolean;
 };
-
-// Render a KaTeX expression into an inline span. Math stays in KaTeX; the
-// surrounding labels are plain text.
-function MathSpan({ latex, className }: { latex: string; className?: string }): JSX.Element {
-  const ref = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (ref.current) {
-      katex.render(latex, ref.current, { throwOnError: false, displayMode: false });
-    }
-  }, [latex]);
-  return <span ref={ref} className={className} />;
-}
 
 // The intersection-safe-set semantics, stated once above the named barrier
 // lanes: a state is safe only where every candidate barrier holds. Both barriers
