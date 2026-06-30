@@ -21,7 +21,7 @@ export type StateSpaceCanvasProps = {
   /** The prepared scene (from `prepareStateSpaceScene`), or null for the
    * empty-state plate. */
   scene: StateSpaceScene | null;
-  /** Which violation marker is focused (drives emphasis/dimming). */
+  /** Which obligation is selected (drives margin-marker emphasis/dimming). */
   selection: StateSpaceSelection;
   /** The shared rollout phase in [0, 1], advanced by `useRolloutPhase`. */
   phaseRef: MutableRefObject<number>;

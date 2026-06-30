@@ -32,6 +32,9 @@ export type Bounds = {
 export type ViolationMarker = {
   x: number;
   y: number;
+  // The obligation this marker belongs to, so an obligation selected in the
+  // panel can highlight (and dim the rest of) its margin marker on the figure.
+  obligationId: string;
   label: string;
   worstValue: number | null;
   // The signed worst margin (BE-036), negative for a violation: the depth the
@@ -44,7 +47,13 @@ export type ViolationMarker = {
 // A measured-holds closest-approach annotation: the worst (tightest) sampled
 // point and its signed margin to the obligation boundary. Measured slack, never
 // a discharge.
-export type HoldsMarker = { x: number; y: number; label: string; margin: number | null };
+export type HoldsMarker = {
+  x: number;
+  y: number;
+  obligationId: string;
+  label: string;
+  margin: number | null;
+};
 
 /** The renderable form of a verification problem's phase-plane figure. */
 export type StateSpaceScene = {
@@ -55,9 +64,11 @@ export type StateSpaceScene = {
   holds: HoldsMarker[];
 };
 
-/** What the stage selection contributes to the figure: the focused violation
- * marker, emphasised and with the rest dimmed (null = no focus). */
-export type StateSpaceSelection = { focusedViolation: number | null };
+/** What the stage selection contributes to the figure: the obligation selected
+ * in the panel, whose margin marker is emphasised and the rest dimmed (null = no
+ * selection). Selection is keyed by obligation id, not marker index, so it links
+ * directly to the obligation list rather than to a legend's marker numbering. */
+export type StateSpaceSelection = { focusedObligationId: string | null };
 
 const VIOLATION_RGBA = dossier.violated;
 const HOLDS_RGBA = dossier.measured;
@@ -159,6 +170,7 @@ function violationMarkers(
     markers.push({
       x: placed.x,
       y: placed.y,
+      obligationId: status.obligationId,
       label,
       worstValue: status.worstValue,
       margin: status.worstMargin,
@@ -209,28 +221,34 @@ function holdsMarkers(
       continue;
     }
     const label = obligationName.get(status.obligationId) ?? status.obligationId;
-    markers.push({ x: placed.x, y: placed.y, label, margin: status.worstMargin });
+    markers.push({
+      x: placed.x,
+      y: placed.y,
+      obligationId: status.obligationId,
+      label,
+      margin: status.worstMargin,
+    });
   }
   return markers;
 }
 
 // A worst-violation sample, drawn as a haloed red ring with an inner cross so it
 // reads as an annotation distinct from the region outlines, the trajectory, and
-// the moving playhead. A small index tag ties each marker to its legend entry.
-// When one marker is focused from the legend, it gains an emphasis halo and the
-// others are dimmed so the named violation stands out on the phase plane.
+// the moving playhead. When an obligation is selected in the panel, its marker
+// gains an emphasis halo and the others are dimmed so the named violation stands
+// out on the phase plane.
 function drawViolationMarkers(
   ctx: CanvasRenderingContext2D,
   markers: ViolationMarker[],
   mapX: (value: number) => number,
   mapY: (value: number) => number,
-  focusedIndex: number | null,
+  focusedObligationId: string | null,
 ): void {
   markers.forEach((marker, index) => {
     const cx = mapX(marker.x);
     const cy = mapY(marker.y);
-    const focused = focusedIndex === index;
-    const dimmed = focusedIndex !== null && !focused;
+    const focused = focusedObligationId === marker.obligationId;
+    const dimmed = focusedObligationId !== null && !focused;
     ctx.save();
     ctx.globalAlpha = dimmed ? 0.35 : 1;
     if (focused) {
@@ -270,12 +288,15 @@ function drawViolationMarkers(
 // A closest-approach sample, drawn as a hollow measured-teal *diamond* with a
 // paper halo — deliberately distinct from the red ringed cross of a violation,
 // so a holding obligation's tightest sample reads as measured slack rather than
-// a breach. A small index tag ties each marker to its legend entry.
+// a breach. When an obligation is selected in the panel, its diamond gains an
+// emphasis halo and the others are dimmed so the selected obligation's margin
+// marker stands out — the same selection link as the violation markers.
 function drawHoldsMarkers(
   ctx: CanvasRenderingContext2D,
   markers: HoldsMarker[],
   mapX: (value: number) => number,
   mapY: (value: number) => number,
+  focusedObligationId: string | null,
 ): void {
   const diamond = (cx: number, cy: number, radius: number): void => {
     ctx.beginPath();
@@ -288,7 +309,19 @@ function drawHoldsMarkers(
   markers.forEach((marker, index) => {
     const cx = mapX(marker.x);
     const cy = mapY(marker.y);
+    const focused = focusedObligationId === marker.obligationId;
+    const dimmed = focusedObligationId !== null && !focused;
     ctx.save();
+    ctx.globalAlpha = dimmed ? 0.35 : 1;
+    if (focused) {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = HOLDS_RGBA;
+      ctx.shadowColor = HOLDS_RGBA;
+      ctx.shadowBlur = 12;
+      diamond(cx, cy, 12);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
     // Paper halo so the diamond stays legible over the set washes and rollout.
     ctx.lineWidth = 4;
     ctx.strokeStyle = "rgba(250, 251, 252, 0.9)";
@@ -495,8 +528,8 @@ export function renderStateSpace(
 
   // Holding closest-approach markers under the violation markers, so a breach
   // (if any) always reads on top of measured slack.
-  drawHoldsMarkers(ctx, holds, mapX, mapY);
-  drawViolationMarkers(ctx, violations, mapX, mapY, selection.focusedViolation);
+  drawHoldsMarkers(ctx, holds, mapX, mapY, selection.focusedObligationId);
+  drawViolationMarkers(ctx, violations, mapX, mapY, selection.focusedObligationId);
 
   // Axis labels in the figure's own state names, set in mono.
   ctx.fillStyle = dossier.graphite;

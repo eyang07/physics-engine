@@ -11,8 +11,9 @@ import katex from "katex";
 
 import { PlaybackClock, sampleTrajectory, trajectoryDuration } from "./playback";
 import { CertificateLanes } from "./certificateLanes";
-import type { RegionGeometry, VerificationProblem } from "./data/verification";
-import { formatMeasured, formatSignedMeasured } from "./util";
+import type { VerificationProblem } from "./data/verification";
+import { formatMeasured } from "./util";
+import { dossier } from "./design/dossier";
 import {
   prepareStateSpaceScene,
   renderStateSpace,
@@ -21,9 +22,7 @@ import {
   worstByObligation,
   ROLE_DRAW_ORDER,
   TRAJECTORY_COLOR,
-  type HoldsMarker,
   type StateSpaceScene,
-  type ViolationMarker,
 } from "./verification/render/stateSpace";
 
 const COMPARISON_LATEX: Record<string, string> = {
@@ -58,14 +57,18 @@ export class VerificationStage {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly clock = new PlaybackClock();
   private readonly certificateLanes: CertificateLanes;
+  // One compact legend overlaying the figure (FE-064), replacing the four
+  // free-floating overlays. It keys only the marks actually present in the
+  // current problem and collapses on demand.
   private readonly legend: HTMLElement;
-  private readonly holdsLegend: HTMLElement;
-  private readonly rolesLegend: HTMLElement;
-  private readonly disturbanceLegend: HTMLElement;
+  private legendCollapsed = false;
   // The renderable phase-plane scene for the current problem (FE-056): derived
   // once in show(), drawn each frame in render(). Null when no trajectory.
   private scene: StateSpaceScene | null = null;
-  private focusedViolation: number | null = null;
+  // The obligation selected in the panel, whose margin marker the figure
+  // emphasises and the rest dims (null = none). Linked from the obligation list
+  // via focusObligation, so selection lives in the panel, not on the legend.
+  private focusedObligationId: string | null = null;
   private active = false;
   private running = false;
 
@@ -81,30 +84,13 @@ export class VerificationStage {
     }
     this.ctx = context;
     this.certificateLanes = new CertificateLanes(certificateContainer);
-    // The violation legend overlays the stage workspace (the canvas's parent),
-    // hidden until a measured violation is actually drawn.
+    // One compact legend overlays the figure (the canvas's parent), hidden until
+    // a problem with marks to key is on the stage. It replaces the four
+    // free-floating overlays the stage used to stack on the plot.
     this.legend = document.createElement("div");
-    this.legend.className = "verif-violation-legend";
+    this.legend.className = "verif-legend";
     this.legend.hidden = true;
     canvas.parentElement?.append(this.legend);
-    // The closest-approach legend names each holding obligation's tightest sample
-    // and its signed margin; hidden until at least one holds marker is drawn.
-    this.holdsLegend = document.createElement("div");
-    this.holdsLegend.className = "verif-holds-legend";
-    this.holdsLegend.hidden = true;
-    canvas.parentElement?.append(this.holdsLegend);
-    // A small key for the phase-plane colors (region roles + trajectory), shown
-    // whenever a problem is on the stage.
-    this.rolesLegend = document.createElement("div");
-    this.rolesLegend.className = "verif-roles-legend";
-    this.rolesLegend.hidden = true;
-    canvas.parentElement?.append(this.rolesLegend);
-    // The Tier-3 disturbance-set annotation: the wind box the robust claim is
-    // quantified over, shown only for packages that carry a disturbance spec.
-    this.disturbanceLegend = document.createElement("div");
-    this.disturbanceLegend.className = "verif-disturbance-annotation";
-    this.disturbanceLegend.hidden = true;
-    canvas.parentElement?.append(this.disturbanceLegend);
     this.playButton.addEventListener("click", () => this.togglePlay());
   }
 
@@ -115,18 +101,17 @@ export class VerificationStage {
     this.clock.reset();
     const scene = prepareStateSpaceScene(problem);
     this.scene = scene;
+    // A new problem replaces the marker set, so any prior obligation selection no
+    // longer refers to a drawn marker.
+    this.focusObligation(null);
     if (!scene || !vt) {
-      this.renderRolesLegend([]);
-      this.renderDisturbanceAnnotation(null);
-      this.setViolations([]);
-      this.setHolds([]);
+      this.setMarkerCounts(0, 0);
+      this.buildLegend(null, null);
       this.syncPlayButton();
       return;
     }
-    this.renderRolesLegend(problem.regionGeometry);
-    this.renderDisturbanceAnnotation(disturbanceBoundLatex(problem));
-    this.setViolations(scene.violations);
-    this.setHolds(scene.holds);
+    this.setMarkerCounts(scene.violations.length, scene.holds.length);
+    this.buildLegend(problem, scene);
     this.certificateLanes.show(
       vt.series,
       vt.certificateSeries,
@@ -136,195 +121,118 @@ export class VerificationStage {
     this.resize();
   }
 
-  // Keep a test-visible count of drawn violation markers on the canvas so visual
-  // coverage can assert the marker / no-marker paths without pixel diffing, and
-  // mirror the markers into the legend. Any prior focus is dropped: the marker
-  // set has changed, so the previously named marker may no longer exist.
-  private setViolations(markers: ViolationMarker[]): void {
-    this.canvas.dataset.violationMarkers = String(markers.length);
-    this.setFocusedViolation(null);
-    this.renderLegend(markers);
+  // Mirror the drawn marker counts onto the canvas dataset so visual coverage can
+  // assert the marker / no-marker paths without pixel diffing. The legend no
+  // longer enumerates markers — it only keys the kinds present — so the counts
+  // live solely on the dataset.
+  private setMarkerCounts(violations: number, holds: number): void {
+    this.canvas.dataset.violationMarkers = String(violations);
+    this.canvas.dataset.holdsMarkers = String(holds);
   }
 
-  // Mirror the closest-approach markers onto the canvas dataset (so visual
-  // coverage can assert the marker / no-marker paths without pixel diffing) and
-  // into the legend.
-  private setHolds(markers: HoldsMarker[]): void {
-    this.canvas.dataset.holdsMarkers = String(markers.length);
-    this.renderHoldsLegend(markers);
+  /**
+   * Select (or clear) the obligation whose margin marker the figure emphasises.
+   * Linked from the obligation list (FE-064): the figure dims every other marker
+   * so the selected obligation's geometry stands out. The selected id rides on
+   * the canvas dataset so visual coverage can assert selection without pixel
+   * diffing; the per-frame render reads `focusedObligationId` directly.
+   */
+  focusObligation(obligationId: string | null): void {
+    this.focusedObligationId = obligationId;
+    this.canvas.dataset.focusedObligation = obligationId ?? "";
   }
 
-  // Focus (or clear focus on) a single drawn violation so the stage emphasizes
-  // its marker and the legend marks the matching entry. The focused index rides
-  // on the canvas dataset so visual coverage can assert focus/clear without
-  // pixel diffing, and the legend is restyled to reflect the selection.
-  private setFocusedViolation(index: number | null): void {
-    this.focusedViolation = index;
-    this.canvas.dataset.focusedViolation = index === null ? "" : String(index + 1);
+  // Collapse/expand the single legend. Collapsed hides the body and keeps just
+  // the toggle, so the figure can be read with no overlay at all.
+  private toggleLegend(): void {
+    this.legendCollapsed = !this.legendCollapsed;
+    this.legend.dataset.collapsed = String(this.legendCollapsed);
     this.legend
-      .querySelectorAll<HTMLButtonElement>(".verif-violation-legend__entry")
-      .forEach((entry, entryIndex) => {
-        const focused = entryIndex === index;
-        entry.classList.toggle("verif-violation-legend__entry--focused", focused);
-        entry.setAttribute("aria-pressed", String(focused));
-      });
+      .querySelector(".verif-legend__toggle")
+      ?.setAttribute("aria-expanded", String(!this.legendCollapsed));
   }
 
-  // The legend names each drawn violation by its obligation, keyed to the marker
-  // index. It exists only while at least one marker is on the stage, and each
-  // entry is a toggle that focuses its matching stage marker.
-  private renderLegend(markers: ViolationMarker[]): void {
+  // Build the one compact legend for the current scene: a collapsible key of
+  // only the marks actually present — the region roles, the rollout, the
+  // violation / closest-approach margin markers, and (for a robust package) the
+  // disturbance box the claim is quantified over. Replaces the four stacked
+  // overlays the stage used to draw.
+  private buildLegend(problem: VerificationProblem | null, scene: StateSpaceScene | null): void {
     this.legend.replaceChildren();
-    if (markers.length === 0) {
+    if (!scene) {
       this.legend.hidden = true;
       return;
     }
-    const title = document.createElement("p");
-    title.className = "verif-violation-legend__title";
-    title.textContent = "measured violations";
-    this.legend.append(title);
-    markers.forEach((marker, index) => {
-      const entry = document.createElement("button");
-      entry.type = "button";
-      entry.className = "verif-violation-legend__entry";
-      entry.setAttribute("aria-pressed", "false");
-      const tag = document.createElement("span");
-      tag.className = "verif-violation-legend__tag";
-      tag.textContent = String(index + 1);
-      const name = document.createElement("span");
-      name.className = "verif-violation-legend__name";
-      name.textContent = marker.label;
-      entry.append(tag, name);
-      // The signed negative margin (BE-036): how far the run crossed the
-      // obligation boundary into the unsafe set. This is the headline of the
-      // violation — measured evidence, never a disproof of safety.
-      if (marker.margin !== null) {
-        const margin = document.createElement("span");
-        margin.className = "verif-violation-legend__margin";
-        margin.textContent = formatSignedMeasured(marker.margin);
-        margin.title = "signed worst margin (negative = entered the unsafe set) — measured, not a proof";
-        entry.append(margin);
-      } else if (marker.worstValue !== null) {
-        // Fall back to the worst value when no signed margin was exported.
-        const value = document.createElement("span");
-        value.className = "verif-violation-legend__value";
-        value.textContent = formatMeasured(marker.worstValue);
-        value.title = "worst measured value";
-        entry.append(value);
-      }
-      // When in the rollout the run crossed into the unsafe set (BE-056). A
-      // read-only time annotation from the exported worst.time; omitted for a
-      // worst record that carries no time (e.g. a region-grid sample).
-      if (marker.time !== null && Number.isFinite(marker.time)) {
-        const time = document.createElement("span");
-        time.className = "verif-violation-legend__time";
-        time.textContent = `entered at t = ${formatMeasured(marker.time)}`;
-        time.title = "the rollout time the simulated run crossed into the unsafe set — measured, not a proof";
-        entry.append(time);
-      }
-      entry.addEventListener("click", () => {
-        this.setFocusedViolation(this.focusedViolation === index ? null : index);
-      });
-      this.legend.append(entry);
-    });
-    // The honest framing: a measured run reached the unsafe set on these
-    // samples. That is evidence the controller can be driven out — never a
-    // disproof of safety, and it leaves every obligation external-required.
-    const note = document.createElement("p");
-    note.className = "verif-violation-legend__note";
-    note.textContent =
-      "This simulated run entered the unsafe set — measured evidence, not a disproof of safety.";
-    this.legend.append(note);
-    this.legend.hidden = false;
-  }
-
-  // The closest-approach legend names each holding obligation by its tightest
-  // sample and shows the signed measured margin (BE-036) — read-only, since a
-  // holding sample is measured slack, not a breach to focus on. Hidden when no
-  // holds marker is on the stage.
-  private renderHoldsLegend(markers: HoldsMarker[]): void {
-    this.holdsLegend.replaceChildren();
-    if (markers.length === 0) {
-      this.holdsLegend.hidden = true;
+    const roles = ROLE_DRAW_ORDER.filter((role) =>
+      scene.regions.some((region) => region.role === role),
+    );
+    const hasViolations = scene.violations.length > 0;
+    const hasHolds = scene.holds.length > 0;
+    const disturbance = problem ? disturbanceBoundLatex(problem) : null;
+    if (roles.length === 0 && !hasViolations && !hasHolds && !disturbance) {
+      this.legend.hidden = true;
       return;
     }
-    const title = document.createElement("p");
-    title.className = "verif-holds-legend__title";
-    title.textContent = "measured closest approach";
-    this.holdsLegend.append(title);
-    markers.forEach((marker, index) => {
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "verif-legend__toggle";
+    toggle.textContent = "Legend";
+    toggle.setAttribute("aria-expanded", String(!this.legendCollapsed));
+    toggle.addEventListener("click", () => this.toggleLegend());
+    this.legend.append(toggle);
+
+    const body = document.createElement("div");
+    body.className = "verif-legend__body";
+
+    // One keyed row: a swatch (its shape carries the mark's meaning) and a label.
+    const row = (swatchClass: string, color: string, label: string): void => {
       const entry = document.createElement("div");
-      entry.className = "verif-holds-legend__entry";
-      const tag = document.createElement("span");
-      tag.className = "verif-holds-legend__tag";
-      tag.textContent = String(index + 1);
-      const name = document.createElement("span");
-      name.className = "verif-holds-legend__name";
-      name.textContent = marker.label;
-      entry.append(tag, name);
-      // Show the signed margin (the closest the evidence came to the boundary)
-      // when the backend exported one. A missing margin simply omits the chip.
-      if (marker.margin !== null) {
-        const value = document.createElement("span");
-        value.className = "verif-holds-legend__value";
-        value.textContent = formatSignedMeasured(marker.margin);
-        value.title = "worst measured margin (signed slack to the boundary)";
-        entry.append(value);
-      }
-      this.holdsLegend.append(entry);
-    });
-    this.holdsLegend.hidden = false;
-  }
-
-  // A small key for the phase-plane colors: each region role present plus the
-  // trajectory, so a reader can tell the safe corridor from the unsafe set.
-  private renderRolesLegend(regions: RegionGeometry[]): void {
-    this.rolesLegend.replaceChildren();
-    const roles = ROLE_DRAW_ORDER.filter((role) => regions.some((region) => region.role === role));
-    if (roles.length === 0) {
-      this.rolesLegend.hidden = true;
-      return;
-    }
-    const entry = (color: string, label: string): HTMLElement => {
-      const row = document.createElement("div");
-      row.className = "verif-roles-legend__entry";
+      entry.className = "verif-legend__entry";
       const swatch = document.createElement("span");
-      swatch.className = "verif-roles-legend__swatch";
-      swatch.style.background = color;
+      swatch.className = `verif-legend__swatch ${swatchClass}`;
+      // The marker glyphs are drawn as outlines, so they take the role color on
+      // their border; the filled region/rollout swatches take it as background.
+      if (swatchClass.includes("--ring") || swatchClass.includes("--diamond")) {
+        swatch.style.borderColor = color;
+      } else {
+        swatch.style.background = color;
+      }
       const name = document.createElement("span");
-      name.className = "verif-roles-legend__name";
+      name.className = "verif-legend__name";
       name.textContent = label;
-      row.append(swatch, name);
-      return row;
+      entry.append(swatch, name);
+      body.append(entry);
     };
-    roles.forEach((role) => this.rolesLegend.append(entry(roleStyle(role).stroke, role)));
-    this.rolesLegend.append(entry(TRAJECTORY_COLOR, "rollout"));
-    this.rolesLegend.hidden = false;
-  }
 
-  // The Tier-3 disturbance-set annotation: the wind box `W` the robust claim is
-  // quantified over, rendered verbatim from the disturbance assumption. Hidden
-  // for nominal packages (no disturbance spec). Read-only and honest — it states
-  // what the robustness is against, never that anything is discharged.
-  private renderDisturbanceAnnotation(boundLatex: string | null): void {
-    this.disturbanceLegend.replaceChildren();
-    if (!boundLatex) {
-      this.disturbanceLegend.hidden = true;
-      return;
+    roles.forEach((role) => row("verif-legend__swatch--box", roleStyle(role).stroke, role));
+    row("verif-legend__swatch--line", TRAJECTORY_COLOR, "rollout");
+    if (hasHolds) {
+      row("verif-legend__swatch--diamond", dossier.measured, "closest approach");
     }
-    const title = document.createElement("p");
-    title.className = "verif-disturbance-annotation__title";
-    title.textContent = "disturbance set W";
-    this.disturbanceLegend.append(title);
-    const bound = document.createElement("div");
-    bound.className = "verif-disturbance-annotation__bound";
-    katex.render(boundLatex, bound, { throwOnError: false });
-    this.disturbanceLegend.append(bound);
-    const note = document.createElement("p");
-    note.className = "verif-disturbance-annotation__note";
-    note.textContent = "the wind box the robust claim is quantified over — assumed, not discharged";
-    this.disturbanceLegend.append(note);
-    this.disturbanceLegend.hidden = false;
+    if (hasViolations) {
+      row("verif-legend__swatch--ring", dossier.violated, "measured violation");
+    }
+
+    // The Tier-3 disturbance box, folded into the same legend rather than a
+    // separate overlay. Read-only and honest — what the robustness is quantified
+    // over, never that anything is discharged.
+    if (disturbance) {
+      const note = document.createElement("div");
+      note.className = "verif-legend__disturbance";
+      const label = document.createElement("span");
+      label.className = "verif-legend__disturbance-label";
+      label.textContent = "disturbance set W";
+      const bound = document.createElement("span");
+      bound.className = "verif-legend__disturbance-bound";
+      katex.render(disturbance, bound, { throwOnError: false });
+      note.append(label, bound);
+      body.append(note);
+    }
+
+    this.legend.append(body);
+    this.legend.dataset.collapsed = String(this.legendCollapsed);
+    this.legend.hidden = false;
   }
 
   /** Emphasize the certificate lanes bearing on an obligation (null clears). */
@@ -343,10 +251,9 @@ export class VerificationStage {
     this.clock.reset();
     this.clock.pause();
     this.scene = null;
-    this.renderRolesLegend([]);
-    this.renderDisturbanceAnnotation(null);
-    this.setViolations([]);
-    this.setHolds([]);
+    this.focusObligation(null);
+    this.setMarkerCounts(0, 0);
+    this.buildLegend(null, null);
     this.syncPlayButton();
     this.resize();
   }
@@ -411,7 +318,7 @@ export class VerificationStage {
     renderStateSpace(
       this.ctx,
       this.scene,
-      { focusedViolation: this.focusedViolation },
+      { focusedObligationId: this.focusedObligationId },
       sample.phase,
       width,
       height,

@@ -464,273 +464,126 @@ select {
   font-size: var(--text-xs);
 }
 
-.verif-violation-legend {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 2;
-  display: grid;
-  gap: 5px;
-  max-width: 220px;
-  padding: 9px 11px;
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface-frost-strong);
-  backdrop-filter: blur(20px);
-  pointer-events: none;
-}
-
-.verif-violation-legend[hidden] {
-  display: none;
-}
-
-.verif-roles-legend {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  z-index: 2;
-  display: grid;
-  gap: 4px;
-  padding: 8px 10px;
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface-frost-strong);
-  backdrop-filter: blur(20px);
-  pointer-events: none;
-}
-
-.verif-roles-legend[hidden] {
-  display: none;
-}
-
-/* Tier-3 disturbance-set annotation: the wind box the robust claim is quantified
-   over, in the free bottom-left corner of the stage. Read-only, like the other
-   legends. */
-.verif-disturbance-annotation {
+/* FE-064: one compact, collapsible legend in the bottom-left corner, replacing
+   the four stacked overlays. It keys only the marks present in the current
+   problem; the obligation list (not the legend) drives marker selection. */
+.verif-legend {
   position: absolute;
   left: 14px;
   bottom: 14px;
   z-index: 2;
   display: grid;
-  gap: 4px;
-  max-width: 240px;
-  padding: 8px 11px;
-  border: 1px solid var(--cool-dim);
-  border-left: 2px solid var(--cool);
+  gap: 7px;
+  max-width: 230px;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-sm);
   background: var(--surface-frost-strong);
   backdrop-filter: blur(20px);
-  pointer-events: none;
 }
 
-.verif-disturbance-annotation[hidden] {
+.verif-legend[hidden] {
   display: none;
 }
 
-.verif-disturbance-annotation__title {
+.verif-legend__toggle {
+  justify-self: start;
   margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.verif-legend__toggle::before {
+  content: "▾ ";
+  display: inline-block;
+}
+
+.verif-legend[data-collapsed="true"] .verif-legend__toggle::before {
+  content: "▸ ";
+}
+
+.verif-legend[data-collapsed="true"] .verif-legend__body {
+  display: none;
+}
+
+.verif-legend__body {
+  display: grid;
+  gap: 5px;
+}
+
+.verif-legend__entry {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.verif-legend__swatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+
+.verif-legend__swatch--box {
+  border-radius: 3px;
+}
+
+/* The rollout key: a short ink line, matching the figure's trajectory stroke. */
+.verif-legend__swatch--line {
+  height: 3px;
+  border-radius: 2px;
+}
+
+/* Marker keys are hollow glyphs colored on their border, mirroring the
+   ring/diamond margin markers drawn on the figure. */
+.verif-legend__swatch--ring {
+  background: none;
+  border: 2px solid;
+  border-radius: var(--radius-pill);
+}
+
+.verif-legend__swatch--diamond {
+  background: none;
+  border: 2px solid;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  width: 10px;
+  height: 10px;
+}
+
+.verif-legend__name {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: lowercase;
+}
+
+/* The Tier-3 disturbance box, folded into the same legend. Read-only, honest —
+   what the robustness is quantified over, never that anything is discharged. */
+.verif-legend__disturbance {
+  display: grid;
+  gap: 2px;
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--hairline);
+}
+
+.verif-legend__disturbance-label {
   color: var(--text-muted);
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
-.verif-disturbance-annotation__bound {
+.verif-legend__disturbance-bound {
   color: var(--cool);
   font-size: var(--text-sm);
-}
-
-.verif-disturbance-annotation__note {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  line-height: 1.45;
-}
-
-.verif-roles-legend__entry {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.verif-roles-legend__swatch {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-}
-
-.verif-roles-legend__name {
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  text-transform: lowercase;
-}
-
-.verif-violation-legend__title {
-  margin: 0;
-  color: var(--text-faint);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-eyebrow);
-  text-transform: uppercase;
-}
-
-.verif-violation-legend__entry {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 3px 7px;
-  width: 100%;
-  margin: 0;
-  padding: 3px 5px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: none;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  pointer-events: auto;
-  transition: background 120ms ease, border-color 120ms ease;
-}
-
-.verif-violation-legend__entry:hover {
-  background: var(--surface-frost);
-}
-
-.verif-violation-legend__entry:focus-visible {
-  outline: none;
-  border-color: rgba(232, 86, 70, 0.6);
-}
-
-.verif-violation-legend__entry--focused {
-  border-color: rgba(232, 86, 70, 0.9);
-  background: rgba(232, 86, 70, 0.14);
-}
-
-.verif-violation-legend__tag {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--radius-pill);
-  background: rgba(232, 86, 70, 0.95);
-  color: #fff;
-  font-size: 10px;
-  font-weight: var(--weight-bold);
-}
-
-.verif-violation-legend__name {
-  flex: 1;
-  color: var(--text-primary);
-  font-size: var(--text-xs);
-  line-height: 1.2;
-  word-break: break-word;
-}
-
-.verif-violation-legend__value,
-.verif-violation-legend__margin {
-  flex: none;
-  color: rgba(232, 86, 70, 0.95);
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.verif-violation-legend__margin {
-  font-weight: 600;
-}
-
-/* When the run entered the unsafe set, on its own line under the named
-   violation. Read-only, measured. */
-.verif-violation-legend__time {
-  flex-basis: 100%;
-  padding-left: 17px;
-  color: var(--text-muted);
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-}
-
-/* The honest framing: a measured run reached the unsafe set — not a disproof of
-   safety. Sits under the named violations. */
-.verif-violation-legend__note {
-  margin: 4px 0 0;
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.4;
-}
-
-/* Closest-approach (measured-holds) legend: bottom-right so it never collides
-   with the violation legend (top-right) or the roles key (top-left), with a
-   measured-teal accent to match its diamond markers. Read-only. */
-.verif-holds-legend {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
-  z-index: 2;
-  display: grid;
-  gap: 5px;
-  max-width: 240px;
-  padding: 9px 11px;
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface-frost-strong);
-  backdrop-filter: blur(20px);
-  pointer-events: none;
-}
-
-.verif-holds-legend[hidden] {
-  display: none;
-}
-
-.verif-holds-legend__title {
-  margin: 0;
-  color: var(--text-faint);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-eyebrow);
-  text-transform: uppercase;
-}
-
-.verif-holds-legend__entry {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  width: 100%;
-}
-
-.verif-holds-legend__tag {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--radius-pill);
-  background: rgba(21, 112, 107, 0.95);
-  color: #fff;
-  font-size: 10px;
-  font-weight: var(--weight-bold);
-}
-
-.verif-holds-legend__name {
-  flex: 1;
-  color: var(--text-primary);
-  font-size: var(--text-xs);
-  line-height: 1.2;
-  word-break: break-word;
-}
-
-.verif-holds-legend__value {
-  flex: none;
-  color: rgba(21, 112, 107, 0.95);
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .verif-stage__controls {

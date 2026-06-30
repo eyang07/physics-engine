@@ -63,6 +63,7 @@ let container: HTMLElement | null = null;
 let currentProblem: VerificationProblem | null = null;
 let currentArtifacts: VerificationArtifacts | null = null;
 let currentDocket: VerificationDocket | null = null;
+let onObligationSelect: ((obligationId: string | null) => void) | undefined;
 
 function renderRoot(): void {
   if (root) {
@@ -71,6 +72,7 @@ function renderRoot(): void {
         problem: currentProblem,
         artifacts: currentArtifacts,
         docket: currentDocket,
+        onObligationSelect,
       }),
     );
   }
@@ -120,5 +122,19 @@ export function setVerificationProblem(
  */
 export function setVerificationDocket(docket: VerificationDocket | null): void {
   currentDocket = docket;
+  renderRoot();
+}
+
+/**
+ * Register the handler invoked when an obligation is selected (expanded) in the
+ * list, so the host can link the selection to the figure (FE-064): the selected
+ * obligation id, or null when the selection is cleared. Stable across problems,
+ * so the host registers it once; it is retained across unmount like the rest of
+ * the shell state.
+ */
+export function setVerificationObligationSelect(
+  handler: (obligationId: string | null) => void,
+): void {
+  onObligationSelect = handler;
   renderRoot();
 }

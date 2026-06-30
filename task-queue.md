@@ -131,16 +131,7 @@ Systems domain renderers, numerical integration, trajectory generation, and
 honesty intact: `external-required`, and measured evidence never rendered as
 proved/certified._
 
-1. **FE-064: Replace the four legend overlays with one compact legend and selection linking**
-    - Goal: Remove `.verif-violation-legend`, `.verif-holds-legend`,
-      `.verif-roles-legend`, and `.verif-disturbance-annotation`; add a single
-      collapsible legend showing only the marks present, and link obligation
-      selection to plot highlighting (region + margin marker).
-    - Scope: `viewer/src/verification/`, `viewer/src/verificationStage.ts` render hooks.
-    - Acceptance: the plot is readable without a legend-heavy decode; selecting an
-      obligation highlights its geometry and margin marker; `npm run build` passes.
-
-2. **FE-065: Move playback and full detail into a collapsible bottom strip**
+1. **FE-065: Move playback and full detail into a collapsible bottom strip**
     - Goal: Relocate the rollout playback controls and the formal detail (dynamics,
       region definitions, enclosure boxes) into a Radix Collapsible bottom strip,
       collapsed by default, with playback behavior preserved exactly.
@@ -148,7 +139,7 @@ proved/certified._
     - Acceptance: playback behaves identically to today; detail is collapsed by
       default; `npm run build` passes.
 
-3. **FE-066: Document the verification UI shell and refresh its visual baselines**
+2. **FE-066: Document the verification UI shell and refresh its visual baselines**
     - Goal: Document the redesigned verification shell and its boundary from the
       physics pipeline, and regenerate the verification-domain visual baselines.
     - Scope: `docs/FRONTEND.md`, `viewer` visual baselines (verification only).
@@ -161,7 +152,7 @@ _These two verification-view tasks predate the direction change and are kept for
 continuity. They are **deprioritized** while the frontend follows the physics
 directions; pick them up only on explicit request._
 
-4. **FE-035: Draw the certified enclosure box on the phase-plane stage**
+3. **FE-035: Draw the certified enclosure box on the phase-plane stage**
     - Goal: An obligation's certified-numeric enclosure (FE-032) records the box it
       is sound over in state-variable coordinates, but the stage never shows where
       on the phase plane that box lies. Draw a read-only certified-box overlay on
@@ -177,7 +168,7 @@ directions; pick them up only on explicit request._
       rollout/region rendering is otherwise unchanged; nothing reads as proved;
       `npm run build` and the visual test pass.
 
-5. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
+4. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
     - Goal: The catalog lists every package's region/obligation/candidate counts
       and Tier/regime, but not how many of its obligations reach level 2. Once the
       discovery index carries a per-package certified-numeric count, surface it as

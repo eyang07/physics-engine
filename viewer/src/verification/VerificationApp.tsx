@@ -24,12 +24,17 @@ export type VerificationAppProps = {
   problem: VerificationProblem | null;
   artifacts: VerificationArtifacts | null;
   docket: VerificationDocket | null;
+  // Selecting (expanding) an obligation row reports its id here, or null when
+  // collapsed, so the host can link the selection to the state-space figure
+  // (FE-064). Optional: the shell renders standalone without the link.
+  onObligationSelect?: (obligationId: string | null) => void;
 };
 
 export function VerificationApp({
   problem,
   artifacts,
   docket,
+  onObligationSelect,
 }: VerificationAppProps): JSX.Element | null {
   // The docket can render before any problem loads; the claim chain only renders
   // once a problem is active.
@@ -43,7 +48,7 @@ export function VerificationApp({
         <>
           <TopBarIdentity problem={problem} />
           <AssumptionsBlock problem={problem} />
-          <ObligationList problem={problem} />
+          <ObligationList problem={problem} onSelect={onObligationSelect} />
           <ArtifactPanel problem={problem} artifacts={artifacts} />
         </>
       )}

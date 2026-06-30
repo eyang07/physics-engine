@@ -13,6 +13,7 @@
  * `external-required`. The "to discharge" line states what is still required.
  */
 import * as Collapsible from "@radix-ui/react-collapsible";
+import { useState } from "react";
 
 import type {
   IrCandidate,
@@ -66,18 +67,20 @@ function ObligationRow({
   problem,
   regionName,
   candidates,
+  onOpenChange,
 }: {
   obligation: IrObligation;
   problem: VerificationProblem;
   regionName: Map<string, string>;
   candidates: IrCandidate[];
+  onOpenChange?: (open: boolean) => void;
 }): JSX.Element {
   const status = deriveObligationStatus(obligation, problem);
   const statement = statementLatex(obligation);
   const region = obligation.regionId ? regionName.get(obligation.regionId) ?? obligation.regionId : null;
 
   return (
-    <Collapsible.Root className="vf-ob" data-status={status.kind}>
+    <Collapsible.Root className="vf-ob" data-status={status.kind} onOpenChange={onOpenChange}>
       <Collapsible.Trigger className="vf-ob__trigger">
         <span className="vf-ob__caret" aria-hidden="true" />
         <code className="vf-ob__name">{obligation.name}</code>
@@ -153,12 +156,30 @@ function ObligationRow({
 
 export type ObligationListProps = {
   problem: VerificationProblem;
+  // Reports the obligation selected (expanded) for plot linking (FE-064): the
+  // expanded obligation's id, or null when the active selection collapses.
+  onSelect?: (obligationId: string | null) => void;
 };
 
-export function ObligationList({ problem }: ObligationListProps): JSX.Element | null {
+export function ObligationList({ problem, onSelect }: ObligationListProps): JSX.Element | null {
+  // Track which obligation currently drives the figure highlight, so collapsing
+  // a *different* (already-collapsed-from-the-figure's-view) row never clears the
+  // active selection. Opening a row makes it the selection; collapsing the
+  // selected row clears it.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
   if (problem.obligations.length === 0) {
     return null;
   }
+  const select = (obligationId: string, open: boolean): void => {
+    if (open) {
+      setSelectedId(obligationId);
+      onSelect?.(obligationId);
+    } else if (selectedId === obligationId) {
+      setSelectedId(null);
+      onSelect?.(null);
+    }
+  };
   const regionName = new Map<string, string>(
     problem.regions.map((region: IrRegion) => [region.id, region.name]),
   );
@@ -190,6 +211,7 @@ export function ObligationList({ problem }: ObligationListProps): JSX.Element | 
             problem={problem}
             regionName={regionName}
             candidates={candidatesByObligation.get(obligation.id) ?? []}
+            onOpenChange={(open) => select(obligation.id, open)}
           />
         ))}
       </div>

@@ -31,6 +31,7 @@ import { VerificationStage } from "./verificationStage";
 import {
   mountVerificationApp,
   setVerificationDocket,
+  setVerificationObligationSelect,
   setVerificationProblem,
   unmountVerificationApp,
   type DocketEntry,
@@ -185,6 +186,11 @@ verificationPanel.onEvidenceSelect = (obligationId) =>
 // it bears on in the document.
 verificationStage.setOnCertificateSelect((obligationIds) =>
   verificationPanel.emphasizeObligations(obligationIds),
+);
+// Selecting (expanding) an obligation in the React obligation list highlights its
+// margin marker on the figure and dims the rest (FE-064).
+setVerificationObligationSelect((obligationId) =>
+  verificationStage.focusObligation(obligationId),
 );
 const clock = new PlaybackClock();
 
