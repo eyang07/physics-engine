@@ -48,11 +48,6 @@ validated. The viewer renders the schema — it never invents UI against unstabl
 absent data. This direction stays decoupled from the Verification domain (no
 cross-links, no Systems-side safety overlay)._
 
-### Direction C — Curved-geometry rendering
-
-_No active curved-geometry rendering tasks queued; add the next coherent
-geometry/gravitation rendering task here when starting new frontend work._
-
 ### Direction D — Relativity & electrodynamics rendering
 
 _Render the special-relativity, relativistic-dynamics, and covariant-electrodynamics
@@ -173,17 +168,6 @@ phenomena. Builds on `engine/dynamics/media.py`, `ray_bundle.py`, `ray_diagnosti
 and `variable_speed_wavefront`, and gives the viewer genuinely new visual primitives
 (scalar fields, vector glyphs, field lines, mode shapes, wavefront surfaces)._
 
-### Direction C — Geometry & gravitation (geometric mechanics / relativity)
-
-_Deepen the differential-geometry strand: geodesics on curved surfaces and
-spacetimes, curvature, parallel transport, and orbital structure. Generalizes
-`engine/dynamics/metric.py` (today the 2-sphere and equatorial Schwarzschild) and
-`systems/sphere_geodesic.py`, and gives the viewer curved-space trajectories and
-embedding diagrams._
-
-_No active physics tasks queued; add the next coherent geometry/gravitation task
-here when starting new backend work._
-
 ### Direction D — Relativity, relativistic dynamics & electrodynamics
 
 _Add covariant physics depth along the staged path in `BACKEND_PHYSICS_ROADMAP.md`:
@@ -209,8 +193,6 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
 [`BACKEND_PHYSICS_ROADMAP.md`](BACKEND_PHYSICS_ROADMAP.md), with the helpers at
 `engine/relativity/minkowski.py`, `engine/relativity/four_vectors.py`,
 `engine/relativity/lorentz.py`, and `engine/relativity/worldline.py`._
-
-#### Phase 1 — Special-relativity primitives (`engine/relativity/`)
 
 #### Phase 2 — Relativistic particle dynamics
 
