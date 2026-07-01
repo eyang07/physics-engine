@@ -106,28 +106,6 @@ stays decoupled from the Verification domain (no cross-links, no safety overlay)
    - Acceptance: the field-density surface renders from BE-134 export; the conservation
      residual is shown as measured evidence; `npm run build` and the visual test pass.
 
-### Verification UI redesign — minimal formal-methods workbench
-
-_Reconfigure the Verification domain shell from the decorative "dossier" register
-into a minimal, precise verification workbench. Full design rationale, layout,
-vocabulary, visual language, and acceptance criteria live in
-[`UI_RECONFIGURATION_PLAN.md`](UI_RECONFIGURATION_PLAN.md). Direction: migrate the
-verification shell to **React + Tailwind + Radix** with a **light technical (no
-serif)** theme. Each module below is self-contained and should leave `npm run
-build` green on its own; pick them up in order (later modules depend on earlier
-ones). **Hard constraint:** do not touch the physics animation system — the
-Systems domain renderers, numerical integration, trajectory generation, and
-`PlaybackClock` playback semantics must behave exactly as today. Keep verification
-honesty intact: `external-required`, and measured evidence never rendered as
-proved/certified._
-
-1. **FE-066: Document the verification UI shell and refresh its visual baselines**
-    - Goal: Document the redesigned verification shell and its boundary from the
-      physics pipeline, and regenerate the verification-domain visual baselines.
-    - Scope: `docs/FRONTEND.md`, `viewer` visual baselines (verification only).
-    - Acceptance: `pytest -q`, `npm run build`, and `npm run test:visual` pass;
-      Systems baselines unchanged; verification baselines updated deliberately.
-
 ### Verification track (paused)
 
 _These two verification-view tasks predate the direction change and are kept for

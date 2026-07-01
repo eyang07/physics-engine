@@ -11,22 +11,41 @@ and trajectory data; it must not re-derive physics.
   into the Systems workbench — no splash gate.
 - Systems domain laid out as a three-pane workbench: an always-visible catalog
   rail that swaps the stage directly, the visualization stage, and an inspector.
-- Verification domain laid out as a verdict-first dashboard: a problem catalog
-  rail, a large animated phase-plane **hero** (framed to the trajectory plus its
-  safe/initial sets, with a color→role legend), a concise **summary** rail
-  (compact rigor-level chip, the "safety properties (measured)" ledger,
-  candidate-certificate lanes, and a backend-agnostic IR download), and a
-  collapsed **"Problem details (IR)"** band holding the full IR: dynamics,
-  regions, candidate certificates, proof obligations, measured statuses,
-  assumptions, and the four-level rigor ladder. Every claim renders with KaTeX
-  and every status is labeled honestly by rigor (`candidate` /
-  `external-required` / measured, never "proved"). Cross-links navigate within the
-  document (and auto-open the collapsed details), and selecting an obligation's
-  evidence ↔ a certificate lane emphasizes the matching counterpart. Data comes
-  from `scripts/generate_verification_problems.py`
+- Verification domain rendered by a **React + Tailwind + Radix** shell in a
+  light-technical (no-serif) theme (FE-055..FE-065). It reads exported
+  verification-problem IR only; it computes no physics and records no proof
+  results. The shell is composed of:
+  - a **docket rail** listing the problems the workbench can open, grounded in the
+    package discovery index (model · status · region/obligation/candidate counts ·
+    Tier/regime);
+  - a **top-bar identity** line (model · claim · one overall verdict token) and an
+    unmissable **active-assumptions** block (the undischarged preconditions every
+    obligation is conditional on);
+  - a scannable **proof-obligation list** with progressive disclosure — each row
+    reads name · status · signed margin and expands (Radix Collapsible) to its
+    formal statement, evidence chips, dependencies, and what would discharge it;
+  - an **artifact/export panel** offering the backend-agnostic IR and, when the
+    export bundled one, a self-contained verification-package bundle;
+  - a **state-space diagnostic stage** (Canvas 2D): the safe/unsafe/initial/domain
+    region boundaries, the rollout, the measured closest-approach and violation
+    markers, and — for a disturbance-robust (Tier-3) package — the assumed wind box
+    `W`, all keyed by **one compact, collapsible on-stage legend** that shows only
+    the marks actually present (FE-064). The legend keys kinds, not individual
+    markers, and carries no raw decimals; marker counts ride the canvas dataset
+    (`data-violation-markers` / `data-holds-markers`) for coverage;
+  - a **collapsible bottom strip** (Radix Collapsible, collapsed by default,
+    FE-065) holding the rollout playback controls and the full formal detail
+    (dynamics, region definitions, candidate certificates, proof obligations,
+    measured statuses, assumptions, and the four-level rigor ladder).
+  Every claim renders with KaTeX and every status is labeled honestly by rigor
+  (`candidate` / `external-required` / measured, never "proved"); a clean sample is
+  evidence, never a discharge. Cross-links navigate within the document (opening
+  the bottom strip to reveal the target card). Data comes from
+  `scripts/generate_verification_problems.py`
   (`viewer/public/data/verification/`).
-- Playback controls; both the Systems and Verification stages loop continuously
-  (a finished run wraps and restarts rather than pausing at the end).
+- Playback controls (now inside the Verification bottom strip); both the Systems
+  and Verification stages loop continuously (a finished run wraps and restarts
+  rather than pausing at the end), driven by the shared `PlaybackClock`.
 - Parameter-family switch: for systems exporting manifest `variants` (e.g. the
   Lorenz rho family and ideal-spring stiffness family), the inspector loads each
   backend-generated variant's data in place — no browser-side regeneration.
@@ -117,7 +136,14 @@ The Vite main-bundle chunk-size warning is known and non-fatal.
 
 ## Next Work
 
-1. Make the hero slot pluggable so a richer renderer (e.g. a drone's physical
+1. Finish assembling the redesigned verification layout: the React shell and the
+   legacy dossier panel still both render, so the shell overlays the legacy stage
+   for pointer hit-testing (interaction tests dispatch clicks programmatically to
+   work around it). Complete the §3 grid assembly in
+   [`UI_RECONFIGURATION_PLAN.md`](../UI_RECONFIGURATION_PLAN.md) — wire the React
+   state-space stage and retire the legacy panel — so every affordance is directly
+   clickable.
+2. Make the hero slot pluggable so a richer renderer (e.g. a drone's physical
    motion with geofence/obstacles + brief verification stats) can replace the
    phase-plane animation per system, driven by each problem's declared
    projection/state axes.
