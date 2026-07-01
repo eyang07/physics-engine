@@ -29,6 +29,9 @@ from scripts.generate_pendulum import write_pendulum_trajectory
 from scripts.generate_relativistic_free_particle import (
     write_relativistic_free_particle_trajectory,
 )
+from scripts.generate_relativistic_particle_in_potential import (
+    write_relativistic_particle_in_potential_trajectory,
+)
 from scripts.generate_schwarzschild import write_schwarzschild_trajectory
 from scripts.generate_sphere_geodesic import write_sphere_geodesic_trajectory
 from scripts.generate_surface_geodesic import write_surface_geodesic_trajectory
@@ -159,6 +162,10 @@ def main() -> None:
     write_relativistic_free_particle_trajectory(
         Path("data/generated/relativistic_free_particle.json"),
         viewer_output=Path("viewer/public/data/relativistic_free_particle.json"),
+    )
+    write_relativistic_particle_in_potential_trajectory(
+        Path("data/generated/relativistic_particle_in_potential.json"),
+        viewer_output=Path("viewer/public/data/relativistic_particle_in_potential.json"),
     )
     write_twin_paradox_trajectory(
         Path("data/generated/twin_paradox.json"),

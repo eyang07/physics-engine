@@ -52,6 +52,12 @@ from systems.relativistic_free_particle import (
     build_system as build_relativistic_free_particle,
     interval_rate_expression as relativistic_free_particle_interval_rate,
 )
+from systems.relativistic_particle_in_potential import (
+    build_system as build_relativistic_particle_in_potential,
+    mass_shell_expression as relativistic_particle_mass_shell,
+    proper_interval_rate_expression as relativistic_particle_interval_rate,
+    total_energy_expression as relativistic_particle_total_energy,
+)
 from systems.sphere_geodesic import build_system as build_sphere_geodesic
 from systems.surface_geodesic import build_system as build_surface_geodesic
 from systems.schwarzschild import build_system as build_schwarzschild
@@ -1836,6 +1842,55 @@ RELATIVISTIC_FREE_PARTICLE = SystemSpec(
 )
 
 
+RELATIVISTIC_PARTICLE_IN_POTENTIAL = SystemSpec(
+    id="relativistic-particle-in-potential",
+    title="Relativistic Particle in a Potential",
+    category="Relativity",
+    description=(
+        "A coordinate-time relativistic particle bound by a static scalar "
+        "potential, exporting energy and mass-shell as measured series."
+    ),
+    build=build_relativistic_particle_in_potential,
+    parameters=(
+        Parameter("m", "m", 1.0, 0.2, 3.0),
+        Parameter("c", "c", 1.0, 0.5, 3.0),
+        Parameter("k", "k", 0.35, 0.05, 2.0),
+        Parameter("x1_0", "x^1_0", 0.9, -2.0, 2.0, role="initial"),
+        Parameter("p_x1_0", "p^1_0", 0.32, -2.0, 2.0, role="initial"),
+    ),
+    state=(
+        StateVar("x0", "x^0", "coordinate"),
+        StateVar("x1", "x^1", "coordinate"),
+        StateVar("p_x0", "p^0", "momentum"),
+        StateVar("p_x1", "p^1", "momentum"),
+    ),
+    projections={"spacetime": ("x0", "x1")},
+    conserved=(
+        Conserved(
+            "proper_interval_rate",
+            r"\eta_{\mu\nu}u^\mu u^\nu",
+            "proper-time normalization",
+            expression=relativistic_particle_interval_rate,
+        ),
+        Conserved(
+            "total_energy",
+            r"E",
+            "static potential / coordinate-time translation",
+            expression=relativistic_particle_total_energy,
+        ),
+        Conserved(
+            "mass_shell",
+            r"p^\mu p_\mu + m^2 c^2",
+            "mass-shell constraint",
+            expression=relativistic_particle_mass_shell,
+        ),
+    ),
+    lenses=("relativisticWorldline",),
+    data_path="/data/relativistic_particle_in_potential.json",
+    system_kind="relativistic-worldline",
+)
+
+
 TWIN_PARADOX = SystemSpec(
     id="twin-paradox",
     title="Twin Paradox",
@@ -1920,6 +1975,7 @@ SPECS: tuple[SystemSpec, ...] = (
     WAVE_PACKET,
     VARIABLE_SPEED_WAVEFRONT,
     RELATIVISTIC_FREE_PARTICLE,
+    RELATIVISTIC_PARTICLE_IN_POTENTIAL,
     TWIN_PARADOX,
     UNIFORM_PROPER_ACCELERATION,
 )
