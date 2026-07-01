@@ -509,6 +509,17 @@ for (const viewport of [
     await page.waitForTimeout(300);
     await expect(waveSeries).toBeHidden();
 
+    // FE-067: the relativistic free particle opens on its Minkowski spacetime
+    // diagram — the backend worldline (BE-119) plotted on a light-cone reference
+    // frame with coordinate time running up the vertical axis. No physics is
+    // recomputed here; the worldline, apex, and signal speed are read from the
+    // export.
+    await page.locator("#systemSelect").selectOption("relativistic-free-particle");
+    await page.waitForSelector("#scene.stage__canvas--active");
+    await page.waitForTimeout(500);
+    await expectCanvasNonBlank(page, "#scene");
+    await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-relativistic-worldline.png`) });
+
     // The hard top-level domain menu swaps to the Verification workbench, which
     // renders the exported verification-problem IR read-only.
     await page.getByRole("button", { name: "Verification" }).click();

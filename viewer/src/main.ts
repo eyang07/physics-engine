@@ -21,6 +21,7 @@ import { drawPhaseScene, drawPotentialContourScene, drawPotentialScene } from ".
 import { StructurePanel } from "./structurePanel";
 import { DiagnosticsPanel } from "./diagnosticsPanel";
 import { drawWavefrontScene } from "./wavefrontCanvas";
+import { drawSpacetimeScene } from "./spacetimeCanvas";
 import { drawPoincareSectionScene } from "./poincareSectionCanvas";
 import { drawNormalModeScene } from "./normalModeCanvas";
 import { drawScalarFieldScene, fieldPlotArea } from "./scalarFieldCanvas";
@@ -81,7 +82,8 @@ type CanvasMode =
   | "variableSpeedWavefront"
   | "electromagneticField"
   | "vibratingString"
-  | "wavePacket";
+  | "wavePacket"
+  | "relativisticWorldline";
 
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -971,6 +973,9 @@ function render(now: number) {
     }
   } else if (selectedVisualization.id === "variableSpeedWavefront") {
     drawWavefrontScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
+  } else if (selectedVisualization.id === "relativisticWorldline") {
+    resize2dCanvas();
+    drawSpacetimeScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else if (selectedVisualization.id === "henonHeilesPoincare") {
     drawPoincareSectionScene(ctx, trajectory, current, canvas.clientWidth, canvas.clientHeight);
   } else if (isCanvasMode(selectedVisualization.id) && selectedVisualization.kind === "field-evolution") {

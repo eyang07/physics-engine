@@ -38,6 +38,7 @@ export const CANVAS_LENS_IDS = new Set<string>([
   "electromagneticField",
   "vibratingString",
   "wavePacket",
+  "relativisticWorldline",
 ]);
 
 /** Lens ids drawn by a Three.js scene (`ThreeScene.setVisualization`). */

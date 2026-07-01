@@ -66,17 +66,7 @@ the existing honesty discipline: qualitative on-stage legends, no raw decimal du
 renderer-hint-driven framing; measured invariants are shown as measured. This direction
 stays decoupled from the Verification domain (no cross-links, no safety overlay)._
 
-1. **FE-067: Render the relativistic free-particle worldline on a Minkowski spacetime diagram (consumes BE-119)**
-   - Goal: Draw a 1+1 (or 2+1) Minkowski spacetime diagram with light cones and the
-     backend worldline plotted on it, framed by renderer hints — no physics recomputed
-     in the viewer.
-   - Scope: a new Systems-domain renderer for `system_kind="relativistic-worldline"`,
-     viewer manifest/trajectory consumption, `viewer` visual test.
-   - Acceptance: the worldline and light cones render from BE-119 export; the diagram
-     reads as a spacetime plot (time axis labeled); `npm run build` and the visual test
-     pass; no values are recomputed client-side.
-
-2. **FE-068: Surface proper-time vs coordinate-time and the invariant interval readout (consumes BE-118/BE-119)**
+1. **FE-068: Surface proper-time vs coordinate-time and the invariant interval readout (consumes BE-118/BE-119)**
    - Goal: Show an honest, qualitative readout of accumulated proper time vs coordinate
      time and the conserved (measured) invariant interval along the worldline.
    - Scope: Systems-domain readout panel/legend, viewer data plumbing, visual test.
@@ -84,7 +74,7 @@ stays decoupled from the Verification domain (no cross-links, no safety overlay)
      proper vs coordinate time are visually distinct; `npm run build` and the visual
      test pass.
 
-3. **FE-069: Render the twin-paradox dual-worldline comparison (consumes BE-120)**
+2. **FE-069: Render the twin-paradox dual-worldline comparison (consumes BE-120)**
    - Goal: Draw both twin worldlines between shared endpoints with their measured
      proper-time totals contrasted.
    - Scope: reuse the FE-067 spacetime renderer for two worldlines, comparison readout,
@@ -92,7 +82,7 @@ stays decoupled from the Verification domain (no cross-links, no safety overlay)
    - Acceptance: the accelerated twin's shorter proper time is visible and labeled
      measured; both worldlines share one diagram; `npm run build` and the visual test pass.
 
-4. **FE-070: Render the relativistic charged-particle / cyclotron / E×B trajectories with field glyphs (consumes BE-128/BE-129/BE-130)**
+3. **FE-070: Render the relativistic charged-particle / cyclotron / E×B trajectories with field glyphs (consumes BE-128/BE-129/BE-130)**
    - Goal: Draw the relativistic charged-particle trajectories alongside the static
      E/B field using the existing vector-glyph/field-line rendering vocabulary.
    - Scope: Systems-domain renderer for `system_kind="covariant-em"`, reuse of existing
@@ -101,14 +91,14 @@ stays decoupled from the Verification domain (no cross-links, no safety overlay)
      backend export; the viewer does not recompute the trajectory or fields; `npm run
      build` and the visual test pass.
 
-5. **FE-071: Surface the Faraday invariants and mass-shell as qualitative readouts (consumes BE-125/BE-131)**
+4. **FE-071: Surface the Faraday invariants and mass-shell as qualitative readouts (consumes BE-125/BE-131)**
    - Goal: Show the EM invariants (`F_mu_nu F^mu_nu`, `E·B`) and the mass-shell residual
      as measured, qualitative on-stage readouts with no raw decimal dumps.
    - Scope: Systems-domain legend/readout, viewer data plumbing, visual test.
    - Acceptance: invariants render as measured conserved quantities; nothing reads as
      proved or certified; `npm run build` and the visual test pass.
 
-6. **FE-072: Render the scalar field-density mode/surface and its measured conservation readout (consumes BE-134)**
+5. **FE-072: Render the scalar field-density mode/surface and its measured conservation readout (consumes BE-134)**
    - Goal: Draw the scalar field-density configuration (mode surface) and surface the
      measured stress-energy conservation residual honestly.
    - Scope: Systems-domain renderer for `system_kind="field-density"`, reuse of existing
