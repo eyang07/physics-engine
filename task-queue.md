@@ -121,15 +121,7 @@ Systems domain renderers, numerical integration, trajectory generation, and
 honesty intact: `external-required`, and measured evidence never rendered as
 proved/certified._
 
-1. **FE-065: Move playback and full detail into a collapsible bottom strip**
-    - Goal: Relocate the rollout playback controls and the formal detail (dynamics,
-      region definitions, enclosure boxes) into a Radix Collapsible bottom strip,
-      collapsed by default, with playback behavior preserved exactly.
-    - Scope: `viewer/src/verification/`.
-    - Acceptance: playback behaves identically to today; detail is collapsed by
-      default; `npm run build` passes.
-
-2. **FE-066: Document the verification UI shell and refresh its visual baselines**
+1. **FE-066: Document the verification UI shell and refresh its visual baselines**
     - Goal: Document the redesigned verification shell and its boundary from the
       physics pipeline, and regenerate the verification-domain visual baselines.
     - Scope: `docs/FRONTEND.md`, `viewer` visual baselines (verification only).

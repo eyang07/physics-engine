@@ -44,8 +44,18 @@ async function expectCanvasNonBlank(page: Page, selector: string) {
 }
 
 // The verbose IR (obligation/candidate/assumption cards, evidence toggles) lives
-// in a collapsed <details>; open it before interacting with those elements.
+// in a collapsed <details> inside the collapsed bottom strip (FE-065); open the
+// strip, then the inner <details>, before interacting with those elements.
 async function openVerificationDetails(page: Page) {
+  const trigger = page.locator(".verif-bottom-strip__trigger");
+  if (await trigger.count()) {
+    const state = await page.locator(".verif-bottom-strip").getAttribute("data-state");
+    if (state === "closed") {
+      // Dispatch the click straight to the trigger element so it toggles the
+      // Radix strip open regardless of the surrounding shell layout.
+      await trigger.evaluate((node) => (node as HTMLButtonElement).click());
+    }
+  }
   await page.locator(".verif-details").evaluate((node) => {
     (node as HTMLDetailsElement).open = true;
   });

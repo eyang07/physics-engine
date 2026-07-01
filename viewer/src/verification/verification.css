@@ -719,3 +719,86 @@
   color: var(--text-faint);
   border: 1px solid var(--hairline-strong);
 }
+
+/*
+ * BottomStrip (FE-065) — the collapsible playback + full-detail strip pinned to
+ * the bottom of the inspector (the `details` grid area). Collapsed by default;
+ * the force-mounted content is hidden with CSS (not React unmounting) so the
+ * adopted legacy playback + detail nodes persist across open/close.
+ */
+#verificationBottomStrip {
+  grid-area: details;
+  min-width: 0;
+}
+
+.verif-bottom-strip {
+  border-top: 1px solid var(--hairline);
+  background: var(--paper);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+.verif-bottom-strip__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 12px 24px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.verif-bottom-strip__trigger:hover {
+  color: var(--text-primary);
+}
+
+.verif-bottom-strip__caret {
+  width: 0;
+  height: 0;
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 120ms ease;
+}
+
+.verif-bottom-strip[data-state="open"] .verif-bottom-strip__caret {
+  transform: rotate(90deg);
+}
+
+.verif-bottom-strip__hint {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-weight: var(--weight-medium);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.verif-bottom-strip__content {
+  display: grid;
+  gap: var(--space-4);
+  padding: 4px 24px 24px;
+}
+
+.verif-bottom-strip__content[data-state="closed"] {
+  display: none;
+}
+
+.verif-bottom-strip__section {
+  min-width: 0;
+}
+
+/* The adopted detail band no longer needs its own top rule inside the strip. */
+.verif-bottom-strip__section .verif-details {
+  border-top: 0;
+}
+
+.verif-bottom-strip__section .verif-details__summary {
+  padding-left: 0;
+  padding-right: 0;
+}

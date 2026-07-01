@@ -1085,7 +1085,9 @@ export class VerificationPanel {
 
   // Scroll a referenced card into view and re-trigger a brief pulse so the
   // navigated-to card is locatable. A missing card is a no-op. Cards live inside
-  // the collapsible details, so open any closed <details> ancestor first.
+  // the collapsible details, so open any closed <details> ancestor first; the
+  // detail band now also sits inside the collapsed bottom strip (FE-065), so
+  // open that too before scrolling.
   private emphasizeCard(card: HTMLElement | undefined): void {
     if (!card) {
       return;
@@ -1095,7 +1097,19 @@ export class VerificationPanel {
         node.open = true;
       }
     }
-    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    const strip = card.closest<HTMLElement>(".verif-bottom-strip");
+    const stripClosed = strip?.getAttribute("data-state") === "closed";
+    if (stripClosed) {
+      strip?.querySelector<HTMLButtonElement>(".verif-bottom-strip__trigger")?.click();
+    }
+    const scroll = () => card.scrollIntoView({ behavior: "smooth", block: "center" });
+    // When the strip had to be opened, defer the scroll a frame so the newly
+    // revealed content has layout; otherwise scroll immediately.
+    if (stripClosed) {
+      requestAnimationFrame(scroll);
+    } else {
+      scroll();
+    }
     card.classList.remove("verif-card--targeted");
     void card.offsetWidth; // restart the pulse animation if re-triggered
     card.classList.add("verif-card--targeted");

@@ -15,6 +15,7 @@
 import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
+import { BottomStrip } from "./BottomStrip";
 import { VerificationApp } from "./VerificationApp";
 import type {
   PackageManifest,
@@ -57,9 +58,12 @@ export interface VerificationDocket {
 }
 
 const CONTAINER_ID = "verificationReactRoot";
+const BOTTOM_STRIP_ID = "verificationBottomStrip";
 
 let root: Root | null = null;
 let container: HTMLElement | null = null;
+let stripRoot: Root | null = null;
+let stripContainer: HTMLElement | null = null;
 let currentProblem: VerificationProblem | null = null;
 let currentArtifacts: VerificationArtifacts | null = null;
 let currentDocket: VerificationDocket | null = null;
@@ -87,9 +91,32 @@ export function mountVerificationApp(host: HTMLElement): void {
   host.prepend(container);
   root = createRoot(container);
   renderRoot();
+
+  // The bottom strip (FE-065) is its own root appended inside the inspector so it
+  // sits at the very bottom (the `details` grid area) and adopts the legacy
+  // playback + detail nodes. It renders only when the static inspector markup is
+  // present; the strip itself carries no problem-dependent state.
+  const stage = host.querySelector<HTMLElement>(".verif-stage");
+  if (stage) {
+    stripContainer = document.createElement("div");
+    stripContainer.id = BOTTOM_STRIP_ID;
+    stage.appendChild(stripContainer);
+    stripRoot = createRoot(stripContainer);
+    stripRoot.render(createElement(BottomStrip));
+  }
 }
 
 export function unmountVerificationApp(): void {
+  // Unmount the strip first so its cleanup restores the adopted playback + detail
+  // nodes into the static markup before the container is removed.
+  if (stripRoot) {
+    stripRoot.unmount();
+    stripRoot = null;
+  }
+  if (stripContainer) {
+    stripContainer.remove();
+    stripContainer = null;
+  }
   if (root) {
     root.unmount();
     root = null;
