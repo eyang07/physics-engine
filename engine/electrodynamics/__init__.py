@@ -11,11 +11,21 @@ from engine.electrodynamics.four_potential import (
     FourPotential,
     four_potential,
 )
+from engine.electrodynamics.lorentz_force import (
+    CovariantLorentzForce,
+    lorentz_force_operator,
+    lorentz_force_system,
+    lorentz_four_force,
+)
 
 __all__ = [
+    "CovariantLorentzForce",
     "FaradayTensor",
     "FourPotential",
     "electromagnetic_invariants",
     "faraday_tensor",
     "four_potential",
+    "lorentz_force_operator",
+    "lorentz_force_system",
+    "lorentz_four_force",
 ]
