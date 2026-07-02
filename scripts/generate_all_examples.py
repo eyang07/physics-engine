@@ -33,6 +33,9 @@ from scripts.generate_relativistic_free_particle import (
 from scripts.generate_relativistic_cyclotron import (
     write_relativistic_cyclotron_trajectory,
 )
+from scripts.generate_relativistic_charged_particle import (
+    write_relativistic_charged_particle_trajectory,
+)
 from scripts.generate_relativistic_particle_in_potential import (
     write_relativistic_particle_in_potential_trajectory,
 )
@@ -178,6 +181,10 @@ def main() -> None:
     write_crossed_eb_drift_trajectory(
         Path("data/generated/crossed_eb_drift.json"),
         viewer_output=Path("viewer/public/data/crossed_eb_drift.json"),
+    )
+    write_relativistic_charged_particle_trajectory(
+        Path("data/generated/relativistic_charged_particle.json"),
+        viewer_output=Path("viewer/public/data/relativistic_charged_particle.json"),
     )
     write_twin_paradox_trajectory(
         Path("data/generated/twin_paradox.json"),

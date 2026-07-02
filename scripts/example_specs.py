@@ -70,6 +70,13 @@ from systems.relativistic_cyclotron import (
     mass_shell_expression as relativistic_cyclotron_mass_shell,
     p_z_expression as relativistic_cyclotron_p_z,
 )
+from systems.relativistic_charged_particle import (
+    build_system as build_relativistic_charged_particle,
+    electric_magnetic_invariant_expression as relativistic_charged_particle_e_dot_b,
+    faraday_scalar_expression as relativistic_charged_particle_faraday_scalar,
+    four_velocity_norm_expression as relativistic_charged_particle_four_velocity_norm,
+    mass_shell_expression as relativistic_charged_particle_mass_shell,
+)
 from systems.relativistic_particle_in_potential import (
     build_system as build_relativistic_particle_in_potential,
     mass_shell_expression as relativistic_particle_mass_shell,
@@ -264,6 +271,14 @@ def _crossed_eb_drift_geometry(system):
         "kind": "covariant-em",
         "driftVelocityY": str(crossed_eb_drift_velocity_y(system)),
         "driftSource": "trajectory.metadata.drift",
+    }
+
+
+def _relativistic_charged_particle_geometry(system):
+    return {
+        "kind": "covariant-em",
+        "fieldSource": "trajectory.metadata.fields",
+        "worldlineSource": "trajectory.metadata.worldline",
     }
 
 
@@ -646,6 +661,19 @@ LENSES: tuple[Lens, ...] = (
             "mass_shell",
             "four_velocity_norm",
             "p_z",
+            "faraday_scalar",
+            "electric_magnetic",
+        ),
+    ),
+    Lens(
+        id="relativisticChargedParticle",
+        title="Covariant EM Particle",
+        kind="covariant-em-trajectory",
+        description="Configurable static-field charged-particle worldline with measured invariants.",
+        projections=("spacetime", "momentumSpace"),
+        conserved=(
+            "mass_shell",
+            "four_velocity_norm",
             "faraday_scalar",
             "electric_magnetic",
         ),
@@ -2124,6 +2152,94 @@ CROSSED_EB_DRIFT = SystemSpec(
 )
 
 
+RELATIVISTIC_CHARGED_PARTICLE = SystemSpec(
+    id="relativistic-charged-particle",
+    title="Relativistic Charged Particle",
+    category="Relativity",
+    description=(
+        "A proper-time charged-particle worldline in a configurable static "
+        "uniform electromagnetic field."
+    ),
+    build=build_relativistic_charged_particle,
+    parameters=(
+        Parameter("m", "m", 1.0, 0.2, 3.0),
+        Parameter("q", "q", 1.0, -3.0, 3.0),
+        Parameter("E_x", "E_x", 0.08, -1.0, 1.0),
+        Parameter("E_y", "E_y", -0.03, -1.0, 1.0),
+        Parameter("E_z", "E_z", 0.0, -1.0, 1.0),
+        Parameter("B_x", "B_x", 0.0, -3.0, 3.0),
+        Parameter("B_y", "B_y", 0.0, -3.0, 3.0),
+        Parameter("B_z", "B_z", 0.9, -3.0, 3.0),
+        Parameter("x0_0", "x^0_0", 0.0, -2.0, 2.0, role="initial"),
+        Parameter("x1_0", "x^1_0", 0.35, -2.0, 2.0, role="initial"),
+        Parameter("x2_0", "x^2_0", -0.2, -2.0, 2.0, role="initial"),
+        Parameter("x3_0", "x^3_0", -0.9, -2.0, 2.0, role="initial"),
+        Parameter("beta_x0", r"\beta^1_0", 0.08, -0.9, 0.9, role="initial"),
+        Parameter("beta_y0", r"\beta^2_0", 0.32, -0.9, 0.9, role="initial"),
+        Parameter("beta_z0", r"\beta^3_0", 0.16, -0.9, 0.9, role="initial"),
+    ),
+    state=(
+        StateVar("x0", "x^0", "coordinate"),
+        StateVar("x1", "x^1", "coordinate"),
+        StateVar("x2", "x^2", "coordinate"),
+        StateVar("x3", "x^3", "coordinate"),
+        StateVar("p_x0", "p^0", "momentum"),
+        StateVar("p_x1", "p^1", "momentum"),
+        StateVar("p_x2", "p^2", "momentum"),
+        StateVar("p_x3", "p^3", "momentum"),
+    ),
+    projections={
+        "spacetime": ("x0", "x1", "x2", "x3"),
+        "embedding3d": ("x1", "x2", "x3"),
+        "momentumSpace": ("p_x1", "p_x2", "p_x3"),
+    },
+    conserved=(
+        Conserved(
+            "mass_shell",
+            r"p^\mu p_\mu + m^2",
+            "mass-shell constraint",
+            expression=relativistic_charged_particle_mass_shell,
+        ),
+        Conserved(
+            "four_velocity_norm",
+            r"u^\mu u_\mu",
+            "proper-time normalization",
+            expression=relativistic_charged_particle_four_velocity_norm,
+        ),
+        Conserved(
+            "faraday_scalar",
+            r"F_{\mu\nu}F^{\mu\nu}",
+            "static electromagnetic field invariant",
+            expression=relativistic_charged_particle_faraday_scalar,
+        ),
+        Conserved(
+            "electric_magnetic",
+            r"E\cdot B",
+            "static electromagnetic field invariant",
+            expression=relativistic_charged_particle_e_dot_b,
+        ),
+    ),
+    lenses=("relativisticChargedParticle",),
+    data_path="/data/relativistic_charged_particle.json",
+    fields=(
+        {
+            "name": "uniformElectricField",
+            "kind": "vector-field",
+            "rendererHint": VECTOR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.electric",
+        },
+        {
+            "name": "uniformMagneticField",
+            "kind": "vector-field",
+            "rendererHint": VECTOR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.magnetic",
+        },
+    ),
+    geometry=_relativistic_charged_particle_geometry,
+    system_kind="covariant-em",
+)
+
+
 TWIN_PARADOX = SystemSpec(
     id="twin-paradox",
     title="Twin Paradox",
@@ -2211,6 +2327,7 @@ SPECS: tuple[SystemSpec, ...] = (
     RELATIVISTIC_PARTICLE_IN_POTENTIAL,
     RELATIVISTIC_CYCLOTRON,
     CROSSED_EB_DRIFT,
+    RELATIVISTIC_CHARGED_PARTICLE,
     TWIN_PARADOX,
     UNIFORM_PROPER_ACCELERATION,
 )
