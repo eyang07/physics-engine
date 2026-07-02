@@ -83,6 +83,7 @@ from systems.relativistic_particle_in_potential import (
     proper_interval_rate_expression as relativistic_particle_interval_rate,
     total_energy_expression as relativistic_particle_total_energy,
 )
+from systems.scalar_field_density import build_system as build_scalar_field_density
 from systems.sphere_geodesic import build_system as build_sphere_geodesic
 from systems.surface_geodesic import build_system as build_surface_geodesic
 from systems.schwarzschild import build_system as build_schwarzschild
@@ -677,6 +678,12 @@ LENSES: tuple[Lens, ...] = (
             "faraday_scalar",
             "electric_magnetic",
         ),
+    ),
+    Lens(
+        id="scalarFieldDensity",
+        title="Scalar Field Density",
+        kind="field-density",
+        description="A Klein-Gordon field-density surface with measured stress-energy residual.",
     ),
 )
 
@@ -1857,6 +1864,43 @@ WAVE_PACKET = SystemSpec(
 )
 
 
+SCALAR_FIELD_DENSITY = SystemSpec(
+    id="scalar-field-density",
+    title="Scalar Field Density",
+    category="Field Theory",
+    description=(
+        "A Klein-Gordon-style scalar field density exporting its symbolic "
+        "Euler-Lagrange form and measured stress-energy conservation residual."
+    ),
+    build=build_scalar_field_density,
+    parameters=(
+        Parameter("A", "A", 0.35, 0.05, 1.0),
+        Parameter("k", "k", 1.25, 0.2, 3.0),
+        Parameter("m", "m", 1.0, 0.0, 3.0),
+    ),
+    state=(),
+    projections={},
+    conserved=(),
+    lenses=("scalarFieldDensity",),
+    data_path="/data/scalar_field_density.json",
+    fields=(
+        {
+            "name": "fieldConfiguration",
+            "kind": "scalar-field-series",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.fieldConfiguration",
+        },
+        {
+            "name": "stressEnergyConservation",
+            "kind": "field-diagnostic-grid",
+            "rendererHint": SCALAR_FIELD_HINT,
+            "source": "trajectory.metadata.diagnostics.stressEnergyConservation",
+        },
+    ),
+    system_kind="field-density",
+)
+
+
 VARIABLE_SPEED_WAVEFRONT = SystemSpec(
     id="variable-speed-wavefront",
     title="Variable-Speed Wavefront",
@@ -2322,6 +2366,7 @@ SPECS: tuple[SystemSpec, ...] = (
     VIBRATING_STRING,
     MEMBRANE,
     WAVE_PACKET,
+    SCALAR_FIELD_DENSITY,
     VARIABLE_SPEED_WAVEFRONT,
     RELATIVISTIC_FREE_PARTICLE,
     RELATIVISTIC_PARTICLE_IN_POTENTIAL,

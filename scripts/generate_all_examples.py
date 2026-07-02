@@ -39,6 +39,7 @@ from scripts.generate_relativistic_charged_particle import (
 from scripts.generate_relativistic_particle_in_potential import (
     write_relativistic_particle_in_potential_trajectory,
 )
+from scripts.generate_scalar_field_density import write_scalar_field_density
 from scripts.generate_schwarzschild import write_schwarzschild_trajectory
 from scripts.generate_sphere_geodesic import write_sphere_geodesic_trajectory
 from scripts.generate_surface_geodesic import write_surface_geodesic_trajectory
@@ -161,6 +162,10 @@ def main() -> None:
     write_wave_packet(
         Path("data/generated/wave_packet.json"),
         viewer_output=Path("viewer/public/data/wave_packet.json"),
+    )
+    write_scalar_field_density(
+        Path("data/generated/scalar_field_density.json"),
+        viewer_output=Path("viewer/public/data/scalar_field_density.json"),
     )
     write_variable_speed_wavefront(
         Path("data/generated/variable_speed_wavefront.json"),

@@ -162,7 +162,7 @@ def test_state_schema_matches_system(spec) -> None:
     """The coordinate/velocity prefix of the state must match the system's q, qdot."""
 
     system = spec.build()
-    if spec.system_kind in {"static-field", "field-evolution"}:
+    if spec.system_kind in {"static-field", "field-evolution", "field-density"}:
         assert spec.state == ()
         assert spec.fields
         return
@@ -212,7 +212,7 @@ def test_physical_parameters_appear_in_lagrangian(spec) -> None:
             if parameter.role == "physical":
                 assert parameter.name in field_parameters
         return
-    if spec.system_kind == "field-evolution":
+    if spec.system_kind in {"field-evolution", "field-density"}:
         expressions = system.parameter_expressions()
         field_parameters = {
             symbol.name for expression in expressions for symbol in expression.free_symbols
@@ -394,10 +394,11 @@ def test_entry_carries_symbolic_physics(spec) -> None:
         assert entry["lenses"], "every system needs at least one visualization lens"
         assert entry["dataPath"].startswith("/data/")
         return
-    if entry.get("systemKind") == "field-evolution":
+    if entry.get("systemKind") in {"field-evolution", "field-density"}:
         assert "physics" not in entry
         assert "dynamics" not in entry
         assert entry["fields"] and all(channel["source"] for channel in entry["fields"])
+        assert entry["fieldModel"]["kind"]
         if "normalModes" in entry:
             assert entry["normalModes"]["method"].startswith("analytic-")
         assert entry["lenses"], "every system needs at least one visualization lens"
@@ -453,7 +454,7 @@ def test_effective_potentials_render_when_declared(spec) -> None:
 @pytest.mark.parametrize("spec", SPECS, ids=[spec.id for spec in SPECS])
 def test_entry_carries_structured_derivation(spec) -> None:
     entry = system_entry(spec)
-    if entry.get("systemKind") in {"static-field", "field-evolution"}:
+    if entry.get("systemKind") in {"static-field", "field-evolution", "field-density"}:
         assert "derivation" not in entry
         assert "physics" not in entry
         assert "dynamics" not in entry

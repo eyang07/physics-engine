@@ -412,7 +412,7 @@ def system_entry(spec: SystemSpec) -> dict[str, Any]:
     """Build one manifest entry, deriving the symbolic physics from the engine."""
 
     system = spec.build()
-    if spec.system_kind in {"static-field", "field-evolution"}:
+    if spec.system_kind in {"static-field", "field-evolution", "field-density"}:
         return field_system_entry(spec, system)
     if isinstance(system, FirstOrderSystem):
         return first_order_system_entry(spec, system)

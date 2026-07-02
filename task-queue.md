@@ -162,18 +162,25 @@ mass-shell/four-momentum obligation glue at
 
 #### Phase 4 — Thin field-theoretic abstractions (symbolic + sampled only; no PDE solver)
 
-1. **BE-134: Add the scalar field-density example and export**
-    - Goal: A Klein-Gordon-style scalar field-density gallery system exporting its
-      density, Euler-Lagrange form, and measured `T_mu_nu` conservation residual under a
-      new `system_kind="field-density"`.
-    - Scope: `systems/scalar_field_density.py` (new), generator, `scripts/example_specs.py`,
-      `tests/`.
-    - Acceptance: deterministic export; the manifest round-trips the new `system_kind`;
-      the measured conservation residual is surfaced honestly; tests pass.
+#### Phase 4 follow-up — Backend export contract hardening
+
+1. **BE-136: Add explicit backend schema validation for field-density exports**
+    - Goal: Validate the `system_kind="field-density"` manifest and trajectory metadata
+      contract with reusable backend assertions before frontend work consumes it.
+    - Scope: `engine/export/`, `tests/`.
+    - Acceptance: field-density payloads reject missing symbolic density, sampled field,
+      or measured residual metadata; existing exports still pass.
+
+2. **BE-137: Document backend field-density export semantics**
+    - Goal: Record the scalar field-density manifest/trajectory contract and its rigor
+      limits so future systems preserve the Python-to-TypeScript boundary.
+    - Scope: `docs/BACKEND.md`, `docs/FRONTEND.md`, tests if docs references are checked.
+    - Acceptance: docs distinguish symbolic Euler-Lagrange/stress-energy structure from
+      measured sampled residuals and explicitly state that no PDE solver is exported.
 
 #### Phase 5 — Quantum exploratory (DEFERRED / RESEARCH-GATED — DO NOT START)
 
-2. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
+3. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
     - Goal: Research placeholder only — a finite-dimensional Hilbert state under a unitary
       `FirstOrderSystem` flow (spin precession), with measured norm/probability
       invariants. **No QED, no QFT, no PDE.** Do not implement until Phases 1-3 have landed
