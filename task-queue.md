@@ -162,16 +162,7 @@ mass-shell/four-momentum obligation glue at
 
 #### Phase 3 — Covariant classical electrodynamics (`engine/electrodynamics/`)
 
-1. **BE-126: Add the electromagnetic four-potential and gauge transform**
-    - Goal: An `A_mu(x)` container with `F = dA` (exterior derivative) and a gauge
-      transform `A_mu -> A_mu + d_mu chi` that leaves `F` invariant.
-    - Scope: `engine/electrodynamics/four_potential.py` (new),
-      `tests/test_four_potential.py`.
-    - Acceptance: `F` derived from `A` is antisymmetric and gauge-invariant under a
-      symbolic `chi`; the homogeneous Maxwell identity `dF = 0` holds symbolically; tests
-      pass.
-
-2. **BE-127: Add the covariant Lorentz force as a first-order system**
+1. **BE-127: Add the covariant Lorentz force as a first-order system**
     - Goal: `dp^mu/dtau = q F^mu_nu u^nu` reduced to a `FirstOrderSystem` on the
       proper-time-parameterized worldline, reusing the Phase-1/2 primitives.
     - Scope: `engine/electrodynamics/lorentz_force.py` (new),
@@ -180,7 +171,7 @@ mass-shell/four-momentum obligation glue at
       mass-shell (measured); the low-velocity limit reduces to `q(E + v x B)`
       symbolically; tests pass.
 
-3. **BE-128: Add the relativistic cyclotron system (uniform B)**
+2. **BE-128: Add the relativistic cyclotron system (uniform B)**
     - Goal: A charged particle in a uniform magnetic field showing relativistic gyration,
       generalizing — not replacing — `systems/charged_particle.py`.
     - Scope: `systems/relativistic_cyclotron.py` (new), generator,
@@ -188,7 +179,7 @@ mass-shell/four-momentum obligation glue at
     - Acceptance: the gyrofrequency matches `qB/(gamma m)`; `p_z` and the EM invariants
       are measured-conserved; a new `system_kind="covariant-em"` round-trips; tests pass.
 
-4. **BE-129: Add the crossed-field E x B drift system**
+3. **BE-129: Add the crossed-field E x B drift system**
     - Goal: A charged particle in crossed uniform E and B fields exhibiting the analytic
       `E x B / B^2` drift.
     - Scope: `systems/crossed_eb_drift.py` (new), generator, `scripts/example_specs.py`,
@@ -196,7 +187,7 @@ mass-shell/four-momentum obligation glue at
     - Acceptance: the measured drift velocity matches `E x B / B^2` within tolerance;
       deterministic export; tests pass.
 
-5. **BE-130: Add the general relativistic charged-particle system**
+4. **BE-130: Add the general relativistic charged-particle system**
     - Goal: A charged particle in a configurable static EM field via the covariant Lorentz
       force, the flagship Phase-3 example; the existing non-relativistic
       `charged_particle.py` is kept as the Newtonian counterpart.
@@ -206,7 +197,7 @@ mass-shell/four-momentum obligation glue at
       and EM invariants exported as measured series; the non-relativistic limit matches
       `charged_particle.py`; tests pass.
 
-6. **BE-131: Add Maxwell-source constraint diagnostics and EM-invariant obligations**
+5. **BE-131: Add Maxwell-source constraint diagnostics and EM-invariant obligations**
     - Goal: Reuse the existing measured Gauss-flux/planar-Stokes/div-curl checks in
       `engine/fields/diagnostics.py` to report Maxwell source constraints (`div B = 0`,
       `div E = rho/eps0`) for EM systems, and surface EM invariants as external-required
@@ -219,7 +210,7 @@ mass-shell/four-momentum obligation glue at
 
 #### Phase 4 — Thin field-theoretic abstractions (symbolic + sampled only; no PDE solver)
 
-7. **BE-132: Add a Lagrangian field-density object with symbolic Euler-Lagrange**
+6. **BE-132: Add a Lagrangian field-density object with symbolic Euler-Lagrange**
     - Goal: A minimal field-density value object `L(phi, d_mu phi, x)` that produces the
       symbolic Euler-Lagrange equation for one scalar field — structure only, **no**
       time-stepping PDE integrator.
@@ -227,7 +218,7 @@ mass-shell/four-momentum obligation glue at
     - Acceptance: the Euler-Lagrange expression for a Klein-Gordon-style density matches
       by hand; the object validates free symbols like the existing fields; tests pass.
 
-8. **BE-133: Add symbolic stress-energy and a measured conservation residual**
+7. **BE-133: Add symbolic stress-energy and a measured conservation residual**
     - Goal: Symbolic `T_mu_nu` for a scalar field density plus a **measured** sampled
       `d_mu T^mu_nu` residual over field configurations, consistent with the rigor ladder
       (sampling is evidence, not a theorem).
@@ -236,7 +227,7 @@ mass-shell/four-momentum obligation glue at
     - Acceptance: `T_mu_nu` is symmetric for the scalar density; the sampled divergence
       residual is near zero for an on-shell configuration and labeled measured; tests pass.
 
-9. **BE-134: Add the scalar field-density example and export**
+8. **BE-134: Add the scalar field-density example and export**
     - Goal: A Klein-Gordon-style scalar field-density gallery system exporting its
       density, Euler-Lagrange form, and measured `T_mu_nu` conservation residual under a
       new `system_kind="field-density"`.
@@ -247,7 +238,7 @@ mass-shell/four-momentum obligation glue at
 
 #### Phase 5 — Quantum exploratory (DEFERRED / RESEARCH-GATED — DO NOT START)
 
-10. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
+9. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
     - Goal: Research placeholder only — a finite-dimensional Hilbert state under a unitary
       `FirstOrderSystem` flow (spin precession), with measured norm/probability
       invariants. **No QED, no QFT, no PDE.** Do not implement until Phases 1-3 have landed
