@@ -6,8 +6,10 @@ from typing import Sequence
 
 import sympy as sp
 
+from engine.electrodynamics import maxwell_source_constraint_diagnostics
 from engine.export import Trajectory
 from engine.numerics import integrate_fixed_step
+from engine.verification import VerificationProblem, em_invariant_verification_problem
 from scripts.generation import invariant_residual_records, write_trajectory_outputs
 from systems.relativistic_charged_particle import (
     coordinate_time_series,
@@ -66,6 +68,27 @@ def generate_relativistic_charged_particle(
         electric=electric_components,
         magnetic=magnetic_components,
     )
+    em_verification = em_invariant_verification_problem(
+        id="relativistic-charged-particle-em-invariants",
+        name="Relativistic charged-particle EM invariant obligations",
+        system_id="relativistic_charged_particle",
+        system=system,
+        invariant_values={
+            "faraday_scalar": em_invariants["faraday_scalar"][0],
+            "electric_magnetic": em_invariants["electric_magnetic"][0],
+        },
+        time=time,
+        states=states,
+        tolerance=1e-9,
+        metadata={
+            "system": "relativistic_charged_particle",
+            "kind": "covariant-em",
+            "note": (
+                "EM invariant obligations remain external-required; measured "
+                "statuses are rollout evidence only."
+            ),
+        },
+    )
     series = {
         "mass_shell": mass_shell,
         "four_velocity_norm": four_velocity_norm,
@@ -95,6 +118,12 @@ def generate_relativistic_charged_particle(
                 "components": list(magnetic_components),
             },
         },
+        "maxwellSourceDiagnostics": maxwell_source_constraint_diagnostics(
+            electric=electric_components,
+            magnetic=magnetic_components,
+            rho_over_epsilon0=0,
+        ),
+        "verificationProblems": [em_verification.to_dict()],
         "worldline": worldline_payload(time, states, mass=mass),
         "rendererHints": spacetime_renderer_hints(states),
         "invariantResiduals": invariant_residual_records(
@@ -115,6 +144,12 @@ def generate_relativistic_charged_particle(
     )
 
 
+def generate_relativistic_charged_particle_verification() -> VerificationProblem:
+    trajectory = generate_relativistic_charged_particle()
+    payload = trajectory.metadata["verificationProblems"][0]
+    return VerificationProblem.from_dict(payload)
+
+
 def write_relativistic_charged_particle_trajectory(
     output: Path,
     *,
@@ -122,6 +157,18 @@ def write_relativistic_charged_particle_trajectory(
 ) -> Trajectory:
     trajectory = generate_relativistic_charged_particle()
     return write_trajectory_outputs(trajectory, output, viewer_output)
+
+
+def write_relativistic_charged_particle_verification(
+    output: Path,
+    *,
+    viewer_output: Path | None = None,
+) -> VerificationProblem:
+    problem = generate_relativistic_charged_particle_verification()
+    problem.write_json(output)
+    if viewer_output is not None:
+        problem.write_json(viewer_output)
+    return problem
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -138,6 +185,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=Path,
         default=Path("viewer/public/data/relativistic_charged_particle.json"),
     )
+    parser.add_argument(
+        "--verification-output",
+        type=Path,
+        default=Path("data/generated/relativistic_charged_particle_verification.json"),
+    )
+    parser.add_argument(
+        "--verification-viewer-output",
+        type=Path,
+        default=Path("viewer/public/data/relativistic_charged_particle_verification.json"),
+    )
     return parser.parse_args(argv)
 
 
@@ -148,6 +205,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         viewer_output=args.viewer_output,
     )
     print(f"Wrote trajectory to {args.output}")
+    write_relativistic_charged_particle_verification(
+        args.verification_output,
+        viewer_output=args.verification_viewer_output,
+    )
+    print(f"Wrote verification problem to {args.verification_output}")
 
 
 if __name__ == "__main__":

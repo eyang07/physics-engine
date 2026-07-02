@@ -17,6 +17,9 @@ from engine.electrodynamics.lorentz_force import (
     lorentz_force_system,
     lorentz_four_force,
 )
+from engine.electrodynamics.maxwell_diagnostics import (
+    maxwell_source_constraint_diagnostics,
+)
 
 __all__ = [
     "CovariantLorentzForce",
@@ -28,4 +31,5 @@ __all__ = [
     "lorentz_force_operator",
     "lorentz_force_system",
     "lorentz_four_force",
+    "maxwell_source_constraint_diagnostics",
 ]

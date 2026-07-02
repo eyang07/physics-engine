@@ -251,7 +251,7 @@ Phase 3:
 - [x] BE-128 — relativistic cyclotron (uniform B).
 - [x] BE-129 — crossed-field E×B drift.
 - [x] BE-130 — general relativistic charged-particle system.
-- [ ] BE-131 — Maxwell source-constraint diagnostics + EM-invariant obligations.
+- [x] BE-131 — Maxwell source-constraint diagnostics + EM-invariant obligations.
 
 Phase 4:
 - [ ] BE-132 — Lagrangian field-density + symbolic Euler–Lagrange.

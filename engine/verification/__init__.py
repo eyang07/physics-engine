@@ -50,6 +50,10 @@ from engine.verification.enclosure import (
     decode_expression,
     enclose_expression,
 )
+from engine.verification.electrodynamics_adapter import (
+    em_invariant_obligations,
+    em_invariant_verification_problem,
+)
 from engine.verification.reachability import (
     REACHABILITY_HANDOFF_INDEX_FILENAME,
     REACHABILITY_HANDOFF_INDEX_SCHEMA_VERSION,
@@ -148,6 +152,8 @@ __all__ = [
     "DIAGNOSTIC_STATUSES",
     "DYNAMICS_KINDS",
     "DynamicsSpec",
+    "em_invariant_obligations",
+    "em_invariant_verification_problem",
     "EnclosureDomainConstraintSpec",
     "EnclosurePartition",
     "EnclosureStatusSpec",
