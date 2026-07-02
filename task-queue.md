@@ -162,16 +162,7 @@ mass-shell/four-momentum obligation glue at
 
 #### Phase 4 — Thin field-theoretic abstractions (symbolic + sampled only; no PDE solver)
 
-1. **BE-133: Add symbolic stress-energy and a measured conservation residual**
-    - Goal: Symbolic `T_mu_nu` for a scalar field density plus a **measured** sampled
-      `d_mu T^mu_nu` residual over field configurations, consistent with the rigor ladder
-      (sampling is evidence, not a theorem).
-    - Scope: `engine/fieldtheory/` (extend), `engine/fields/diagnostics.py` reuse,
-      `tests/`.
-    - Acceptance: `T_mu_nu` is symmetric for the scalar density; the sampled divergence
-      residual is near zero for an on-shell configuration and labeled measured; tests pass.
-
-2. **BE-134: Add the scalar field-density example and export**
+1. **BE-134: Add the scalar field-density example and export**
     - Goal: A Klein-Gordon-style scalar field-density gallery system exporting its
       density, Euler-Lagrange form, and measured `T_mu_nu` conservation residual under a
       new `system_kind="field-density"`.
@@ -182,7 +173,7 @@ mass-shell/four-momentum obligation glue at
 
 #### Phase 5 — Quantum exploratory (DEFERRED / RESEARCH-GATED — DO NOT START)
 
-3. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
+2. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
     - Goal: Research placeholder only — a finite-dimensional Hilbert state under a unitary
       `FirstOrderSystem` flow (spin precession), with measured norm/probability
       invariants. **No QED, no QFT, no PDE.** Do not implement until Phases 1-3 have landed

@@ -255,7 +255,7 @@ Phase 3:
 
 Phase 4:
 - [x] BE-132 — Lagrangian field-density + symbolic Euler–Lagrange.
-- [ ] BE-133 — symbolic stress-energy + measured conservation residual.
+- [x] BE-133 — symbolic stress-energy + measured conservation residual.
 - [ ] BE-134 — scalar field-density example + export.
 
 Deferred / research-gated (DO NOT START):
