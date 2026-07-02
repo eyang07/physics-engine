@@ -101,42 +101,6 @@ stays decoupled from the Verification domain (no cross-links, no safety overlay)
    - Acceptance: the field-density surface renders from BE-134 export; the conservation
      residual is shown as measured evidence; `npm run build` and the visual test pass.
 
-### Verification track (paused)
-
-_These two verification-view tasks predate the direction change and are kept for
-continuity. They are **deprioritized** while the frontend follows the physics
-directions; pick them up only on explicit request._
-
-3. **FE-035: Draw the certified enclosure box on the phase-plane stage**
-    - Goal: An obligation's certified-numeric enclosure (FE-032) records the box it
-      is sound over in state-variable coordinates, but the stage never shows where
-      on the phase plane that box lies. Draw a read-only certified-box overlay on
-      the (q1, v1) stage for obligations whose enclosure box is plane-expressible,
-      so a reader can see the region the obligation was certified sound over. Draw
-      nothing for obligations with no certified enclosure or a non-plane box.
-      Honest — "sound over this box under this model", never "safe".
-    - Scope: `viewer/src/verificationStage.ts` (certified-box overlay),
-      `viewer/src/data/verification.ts` if the box needs exposure to the stage,
-      `viewer/src/styles.css`, and the viewer visual test.
-    - Acceptance: a package with a plane-expressible certified box shows the box
-      overlay on the stage; a package with no certified enclosure shows none; the
-      rollout/region rendering is otherwise unchanged; nothing reads as proved;
-      `npm run build` and the visual test pass.
-
-4. **FE-036: Surface certified-numeric coverage in the catalog (after a discovery-index certified count)**
-    - Goal: The catalog lists every package's region/obligation/candidate counts
-      and Tier/regime, but not how many of its obligations reach level 2. Once the
-      discovery index carries a per-package certified-numeric count, surface it as
-      an honest catalog readout (e.g. "2/4 certified-numeric") so a reader can tell
-      which packages climb the rigor ladder without opening them. Read only the
-      index count; certified-numeric is a sound enclosure, never proved or safe.
-    - Scope: `viewer/src/data/verification.ts` (read the certified count from the
-      discovery index), `viewer/src/main.ts` (catalog readout), `viewer/src/
-      styles.css`, and the viewer visual test.
-    - Acceptance: each catalog entry shows its certified-numeric coverage from the
-      index; entries without the count show none; nothing reads as proved;
-      `npm run build` and the visual test pass.
-
 ## Backend Queue
 
 _**Direction change — back to the physics engine for visualizations (VISION §3,
@@ -187,35 +151,18 @@ Tasks are ordered by readiness: foundations first, then the systems that use the
 then export/verification integration. This direction stays decoupled from the
 verification/CPS track (no shared modules, no cross-links)._
 
-_Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
-`BE-116` (four-vector value object), `BE-117` (Lorentz transformations), and
-`BE-118` (proper-time worldline) have landed; the roadmap lives at
+_Phase 0 (`BE-114`, roadmap), Phase 1 (`BE-115`..`BE-120`), and Phase 2
+(`BE-121`..`BE-124`, relativistic particle dynamics + mass-shell/four-momentum
+verification export) have landed; the roadmap lives at
 [`BACKEND_PHYSICS_ROADMAP.md`](BACKEND_PHYSICS_ROADMAP.md), with the helpers at
 `engine/relativity/minkowski.py`, `engine/relativity/four_vectors.py`,
-`engine/relativity/lorentz.py`, and `engine/relativity/worldline.py`._
-
-#### Phase 2 — Relativistic particle dynamics
-
-1. **BE-124: Wire four-momentum conservation and mass-shell into verification export**
-    - Goal: Expose mass-shell and four-momentum conservation as `ObligationSpec`s
-      (`rigor="external-required"`) with measured `proofStatuses`, so relativistic
-      systems participate in the verification pipeline without claiming proof.
-    - Scope: `engine/verification/` integration glue, generator, `tests/`.
-    - Acceptance: a relativistic system emits a verification problem whose obligations are
-      external-required with measured-holds statuses along the trajectory; nothing reads
-      as proved or certified; tests pass.
+`engine/relativity/lorentz.py`, and `engine/relativity/worldline.py`, and the
+mass-shell/four-momentum obligation glue at
+`engine/verification/relativity_adapter.py`._
 
 #### Phase 3 — Covariant classical electrodynamics (`engine/electrodynamics/`)
 
-2. **BE-125: Add the Faraday field tensor and its invariants**
-    - Goal: Build `F_mu_nu` from `(E, B)` (and later from `A_mu`) and expose the two EM
-      invariants `F_mu_nu F^mu_nu` and `E . B` (`F *F`).
-    - Scope: `engine/electrodynamics/field_tensor.py` (new),
-      `engine/electrodynamics/__init__.py`, `tests/test_field_tensor.py`.
-    - Acceptance: `F` is antisymmetric by construction; the two invariants match the
-      `2(B^2 - E^2)` and `E.B` forms symbolically; tests pass.
-
-3. **BE-126: Add the electromagnetic four-potential and gauge transform**
+1. **BE-126: Add the electromagnetic four-potential and gauge transform**
     - Goal: An `A_mu(x)` container with `F = dA` (exterior derivative) and a gauge
       transform `A_mu -> A_mu + d_mu chi` that leaves `F` invariant.
     - Scope: `engine/electrodynamics/four_potential.py` (new),
@@ -224,7 +171,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
       symbolic `chi`; the homogeneous Maxwell identity `dF = 0` holds symbolically; tests
       pass.
 
-4. **BE-127: Add the covariant Lorentz force as a first-order system**
+2. **BE-127: Add the covariant Lorentz force as a first-order system**
     - Goal: `dp^mu/dtau = q F^mu_nu u^nu` reduced to a `FirstOrderSystem` on the
       proper-time-parameterized worldline, reusing the Phase-1/2 primitives.
     - Scope: `engine/electrodynamics/lorentz_force.py` (new),
@@ -233,7 +180,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
       mass-shell (measured); the low-velocity limit reduces to `q(E + v x B)`
       symbolically; tests pass.
 
-5. **BE-128: Add the relativistic cyclotron system (uniform B)**
+3. **BE-128: Add the relativistic cyclotron system (uniform B)**
     - Goal: A charged particle in a uniform magnetic field showing relativistic gyration,
       generalizing — not replacing — `systems/charged_particle.py`.
     - Scope: `systems/relativistic_cyclotron.py` (new), generator,
@@ -241,7 +188,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
     - Acceptance: the gyrofrequency matches `qB/(gamma m)`; `p_z` and the EM invariants
       are measured-conserved; a new `system_kind="covariant-em"` round-trips; tests pass.
 
-6. **BE-129: Add the crossed-field E x B drift system**
+4. **BE-129: Add the crossed-field E x B drift system**
     - Goal: A charged particle in crossed uniform E and B fields exhibiting the analytic
       `E x B / B^2` drift.
     - Scope: `systems/crossed_eb_drift.py` (new), generator, `scripts/example_specs.py`,
@@ -249,7 +196,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
     - Acceptance: the measured drift velocity matches `E x B / B^2` within tolerance;
       deterministic export; tests pass.
 
-7. **BE-130: Add the general relativistic charged-particle system**
+5. **BE-130: Add the general relativistic charged-particle system**
     - Goal: A charged particle in a configurable static EM field via the covariant Lorentz
       force, the flagship Phase-3 example; the existing non-relativistic
       `charged_particle.py` is kept as the Newtonian counterpart.
@@ -259,7 +206,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
       and EM invariants exported as measured series; the non-relativistic limit matches
       `charged_particle.py`; tests pass.
 
-8. **BE-131: Add Maxwell-source constraint diagnostics and EM-invariant obligations**
+6. **BE-131: Add Maxwell-source constraint diagnostics and EM-invariant obligations**
     - Goal: Reuse the existing measured Gauss-flux/planar-Stokes/div-curl checks in
       `engine/fields/diagnostics.py` to report Maxwell source constraints (`div B = 0`,
       `div E = rho/eps0`) for EM systems, and surface EM invariants as external-required
@@ -272,7 +219,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
 
 #### Phase 4 — Thin field-theoretic abstractions (symbolic + sampled only; no PDE solver)
 
-9. **BE-132: Add a Lagrangian field-density object with symbolic Euler-Lagrange**
+7. **BE-132: Add a Lagrangian field-density object with symbolic Euler-Lagrange**
     - Goal: A minimal field-density value object `L(phi, d_mu phi, x)` that produces the
       symbolic Euler-Lagrange equation for one scalar field — structure only, **no**
       time-stepping PDE integrator.
@@ -280,7 +227,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
     - Acceptance: the Euler-Lagrange expression for a Klein-Gordon-style density matches
       by hand; the object validates free symbols like the existing fields; tests pass.
 
-10. **BE-133: Add symbolic stress-energy and a measured conservation residual**
+8. **BE-133: Add symbolic stress-energy and a measured conservation residual**
     - Goal: Symbolic `T_mu_nu` for a scalar field density plus a **measured** sampled
       `d_mu T^mu_nu` residual over field configurations, consistent with the rigor ladder
       (sampling is evidence, not a theorem).
@@ -289,7 +236,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
     - Acceptance: `T_mu_nu` is symmetric for the scalar density; the sampled divergence
       residual is near zero for an on-shell configuration and labeled measured; tests pass.
 
-11. **BE-134: Add the scalar field-density example and export**
+9. **BE-134: Add the scalar field-density example and export**
     - Goal: A Klein-Gordon-style scalar field-density gallery system exporting its
       density, Euler-Lagrange form, and measured `T_mu_nu` conservation residual under a
       new `system_kind="field-density"`.
@@ -300,7 +247,7 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
 
 #### Phase 5 — Quantum exploratory (DEFERRED / RESEARCH-GATED — DO NOT START)
 
-12. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
+10. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
     - Goal: Research placeholder only — a finite-dimensional Hilbert state under a unitary
       `FirstOrderSystem` flow (spin precession), with measured norm/probability
       invariants. **No QED, no QFT, no PDE.** Do not implement until Phases 1-3 have landed
@@ -308,34 +255,3 @@ _Phase 0 (`BE-114`, roadmap) and Phase 1 `BE-115` (Minkowski metric helper),
     - Scope: none yet (the design sketch lives in `BACKEND_PHYSICS_ROADMAP.md`).
     - Acceptance: this task stays unstarted; it is promoted to a real task only with an
       explicit go-ahead and a stated justification recorded in the roadmap.
-
-### Verification track (paused)
-
-_These two verification/CPS tasks predate the direction change above and are kept
-for continuity. They are **deprioritized** while the backend focuses on the physics
-directions; pick them up only if the physics queue is blocked or on explicit
-request._
-
-3. **BE-079: Cross-check reachability handoff coverage against certified coverage**
-    - Goal: Ensure the reachability handoff inventory stays aligned with the
-      certified-status coverage report: every handoff-backed obligation is a real
-      certified-numeric obligation, and missing handoffs are reported rather than
-      silently ignored.
-    - Scope: `engine/export/verification_package.py`,
-      `engine/verification/reachability.py`, and `tests/`.
-    - Acceptance: a backend validator reports certified obligations with and without
-      reachability handoffs; it rejects a handoff for a non-certified obligation; no
-      report claims proof or external discharge; focused tests pass.
-
-4. **BE-080: Add a reachability handoff dependency index**
-    - Goal: Make each package's reachability handoff prerequisites inspectable
-      without opening every artifact, by publishing a deterministic dependency
-      index that maps handoffs to obligation ids, enclosure status ids, assumption
-      ids, and domain-constraint counts.
-    - Scope: `engine/verification/reachability.py`,
-      `engine/export/verification_package.py`, and `tests/`.
-    - Acceptance: the reachability index lists each artifact's obligation id,
-      enclosure status id, obligation assumption ids, domain-constraint count,
-      `discharges=false`, and `externalStatus="external-required"`; package
-      readback validates the dependency index against the artifacts and IR; no
-      entry claims proof, certification, or discharge; focused tests pass.

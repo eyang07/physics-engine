@@ -241,11 +241,11 @@ Phase 1:
 Phase 2:
 - [x] BE-121 — relativistic particle under an external four-force.
 - [x] BE-122 — uniform-proper-acceleration (hyperbolic motion) system.
-- [ ] BE-123 — relativistic particle in a static potential.
-- [ ] BE-124 — four-momentum/mass-shell verification export.
+- [x] BE-123 — relativistic particle in a static potential.
+- [x] BE-124 — four-momentum/mass-shell verification export.
 
 Phase 3:
-- [ ] BE-125 — Faraday field tensor + invariants.
+- [x] BE-125 — Faraday field tensor + invariants.
 - [ ] BE-126 — four-potential + gauge transform.
 - [ ] BE-127 — covariant Lorentz force as a first-order system.
 - [ ] BE-128 — relativistic cyclotron (uniform B).

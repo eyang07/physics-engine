@@ -98,6 +98,11 @@ from engine.verification.region_geometry import (
     scalar_field_region_geometries,
     scalar_field_region_geometry,
 )
+from engine.verification.relativity_adapter import (
+    four_momentum_conservation_obligations,
+    mass_shell_conservation_obligation,
+    worldline_conservation_verification_problem,
+)
 from engine.verification.safety_adapter import (
     verification_problem_from_barrier,
     verification_problem_from_controlled_discrete_barrier,
@@ -151,6 +156,7 @@ __all__ = [
     "InspectionAdapterReport",
     "InspectionArtifact",
     "INSPECTION_ARTIFACT_KINDS",
+    "mass_shell_conservation_obligation",
     "MALFORMED_OBLIGATION_TARGETS",
     "OBLIGATION_SHAPE_FEATURES",
     "OBLIGATION_TARGETS",
@@ -189,6 +195,7 @@ __all__ = [
     "dynamics_spec_from_discrete",
     "dynamics_spec_from_system",
     "expression_spec",
+    "four_momentum_conservation_obligations",
     "inspection_diagnostics",
     "obligation_adapter_stubs",
     "robust_obligation_disturbances",
@@ -212,6 +219,7 @@ __all__ = [
     "verification_problem_from_lyapunov",
     "verification_problem_from_obligations",
     "validate_inspection_artifact_index",
+    "worldline_conservation_verification_problem",
     "write_inspection_artifacts",
     "write_reachability_handoff",
 ]
