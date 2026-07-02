@@ -29,6 +29,9 @@ from scripts.generate_pendulum import write_pendulum_trajectory
 from scripts.generate_relativistic_free_particle import (
     write_relativistic_free_particle_trajectory,
 )
+from scripts.generate_relativistic_cyclotron import (
+    write_relativistic_cyclotron_trajectory,
+)
 from scripts.generate_relativistic_particle_in_potential import (
     write_relativistic_particle_in_potential_trajectory,
 )
@@ -166,6 +169,10 @@ def main() -> None:
     write_relativistic_particle_in_potential_trajectory(
         Path("data/generated/relativistic_particle_in_potential.json"),
         viewer_output=Path("viewer/public/data/relativistic_particle_in_potential.json"),
+    )
+    write_relativistic_cyclotron_trajectory(
+        Path("data/generated/relativistic_cyclotron.json"),
+        viewer_output=Path("viewer/public/data/relativistic_cyclotron.json"),
     )
     write_twin_paradox_trajectory(
         Path("data/generated/twin_paradox.json"),

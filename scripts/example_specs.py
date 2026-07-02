@@ -52,6 +52,15 @@ from systems.relativistic_free_particle import (
     build_system as build_relativistic_free_particle,
     interval_rate_expression as relativistic_free_particle_interval_rate,
 )
+from systems.relativistic_cyclotron import (
+    build_system as build_relativistic_cyclotron,
+    electric_magnetic_invariant_expression as relativistic_cyclotron_e_dot_b,
+    faraday_scalar_expression as relativistic_cyclotron_faraday_scalar,
+    four_velocity_norm_expression as relativistic_cyclotron_four_velocity_norm,
+    gyrofrequency_expression as relativistic_cyclotron_gyrofrequency,
+    mass_shell_expression as relativistic_cyclotron_mass_shell,
+    p_z_expression as relativistic_cyclotron_p_z,
+)
 from systems.relativistic_particle_in_potential import (
     build_system as build_relativistic_particle_in_potential,
     mass_shell_expression as relativistic_particle_mass_shell,
@@ -231,6 +240,14 @@ def _wormhole_effective_potential(system):
     throat_radius = _first_order_parameter(system, "a")
     angular_momentum = sp.Symbol("L")
     return sp.simplify(1 + angular_momentum**2 / (ell**2 + throat_radius**2))
+
+
+def _relativistic_cyclotron_geometry(system):
+    return {
+        "kind": "covariant-em",
+        "gyrofrequency": str(relativistic_cyclotron_gyrofrequency(system)),
+        "gyrofrequencySource": "trajectory.metadata.gyrofrequency",
+    }
 
 
 def _wormhole_geometry(system):
@@ -587,6 +604,20 @@ LENSES: tuple[Lens, ...] = (
         kind="spacetime-diagram-comparison",
         description="Two endpoint-sharing worldlines with backend-computed proper-time readouts.",
         projections=("spacetime",),
+    ),
+    Lens(
+        id="relativisticCyclotron",
+        title="Relativistic Cyclotron",
+        kind="covariant-em-trajectory",
+        description="Uniform-B charged-particle worldline with backend-computed EM invariants.",
+        projections=("spacetime", "momentumPlane"),
+        conserved=(
+            "mass_shell",
+            "four_velocity_norm",
+            "p_z",
+            "faraday_scalar",
+            "electric_magnetic",
+        ),
     ),
 )
 
@@ -1891,6 +1922,89 @@ RELATIVISTIC_PARTICLE_IN_POTENTIAL = SystemSpec(
 )
 
 
+RELATIVISTIC_CYCLOTRON = SystemSpec(
+    id="relativistic-cyclotron",
+    title="Relativistic Cyclotron",
+    category="Relativity",
+    description=(
+        "A proper-time charged-particle worldline in a uniform magnetic field, "
+        "exporting measured mass-shell, longitudinal momentum, and EM invariants."
+    ),
+    build=build_relativistic_cyclotron,
+    parameters=(
+        Parameter("m", "m", 1.0, 0.2, 3.0),
+        Parameter("q", "q", 1.0, -3.0, 3.0),
+        Parameter("B_z", "B_z", 0.9, -3.0, 3.0),
+        Parameter("x0_0", "x^0_0", 0.0, -2.0, 2.0, role="initial"),
+        Parameter("x1_0", "x^1_0", 0.85, -2.0, 2.0, role="initial"),
+        Parameter("x2_0", "x^2_0", 0.0, -2.0, 2.0, role="initial"),
+        Parameter("x3_0", "x^3_0", -1.2, -2.0, 2.0, role="initial"),
+        Parameter("beta_x0", r"\beta^1_0", 0.0, -0.9, 0.9, role="initial"),
+        Parameter("beta_y0", r"\beta^2_0", 0.42, -0.9, 0.9, role="initial"),
+        Parameter("beta_z0", r"\beta^3_0", 0.18, -0.9, 0.9, role="initial"),
+    ),
+    state=(
+        StateVar("x0", "x^0", "coordinate"),
+        StateVar("x1", "x^1", "coordinate"),
+        StateVar("x2", "x^2", "coordinate"),
+        StateVar("x3", "x^3", "coordinate"),
+        StateVar("p_x0", "p^0", "momentum"),
+        StateVar("p_x1", "p^1", "momentum"),
+        StateVar("p_x2", "p^2", "momentum"),
+        StateVar("p_x3", "p^3", "momentum"),
+    ),
+    projections={
+        "spacetime": ("x0", "x1", "x2", "x3"),
+        "embedding3d": ("x1", "x2", "x3"),
+        "momentumPlane": ("p_x1", "p_x2"),
+    },
+    conserved=(
+        Conserved(
+            "mass_shell",
+            r"p^\mu p_\mu + m^2",
+            "mass-shell constraint",
+            expression=relativistic_cyclotron_mass_shell,
+        ),
+        Conserved(
+            "four_velocity_norm",
+            r"u^\mu u_\mu",
+            "proper-time normalization",
+            expression=relativistic_cyclotron_four_velocity_norm,
+        ),
+        Conserved(
+            "p_z",
+            r"p^3",
+            "translation along the uniform magnetic-field axis",
+            expression=relativistic_cyclotron_p_z,
+        ),
+        Conserved(
+            "faraday_scalar",
+            r"F_{\mu\nu}F^{\mu\nu}",
+            "uniform electromagnetic field invariant",
+            expression=relativistic_cyclotron_faraday_scalar,
+        ),
+        Conserved(
+            "electric_magnetic",
+            r"E\cdot B",
+            "uniform electromagnetic field invariant",
+            expression=relativistic_cyclotron_e_dot_b,
+        ),
+    ),
+    lenses=("relativisticCyclotron",),
+    data_path="/data/relativistic_cyclotron.json",
+    fields=(
+        {
+            "name": "uniformMagneticField",
+            "kind": "vector-field",
+            "rendererHint": VECTOR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.magnetic",
+        },
+    ),
+    geometry=_relativistic_cyclotron_geometry,
+    system_kind="covariant-em",
+)
+
+
 TWIN_PARADOX = SystemSpec(
     id="twin-paradox",
     title="Twin Paradox",
@@ -1976,6 +2090,7 @@ SPECS: tuple[SystemSpec, ...] = (
     VARIABLE_SPEED_WAVEFRONT,
     RELATIVISTIC_FREE_PARTICLE,
     RELATIVISTIC_PARTICLE_IN_POTENTIAL,
+    RELATIVISTIC_CYCLOTRON,
     TWIN_PARADOX,
     UNIFORM_PROPER_ACCELERATION,
 )

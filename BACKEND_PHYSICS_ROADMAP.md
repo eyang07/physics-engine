@@ -248,7 +248,7 @@ Phase 3:
 - [x] BE-125 — Faraday field tensor + invariants.
 - [x] BE-126 — four-potential + gauge transform.
 - [x] BE-127 — covariant Lorentz force as a first-order system.
-- [ ] BE-128 — relativistic cyclotron (uniform B).
+- [x] BE-128 — relativistic cyclotron (uniform B).
 - [ ] BE-129 — crossed-field E×B drift.
 - [ ] BE-130 — general relativistic charged-particle system.
 - [ ] BE-131 — Maxwell source-constraint diagnostics + EM-invariant obligations.
