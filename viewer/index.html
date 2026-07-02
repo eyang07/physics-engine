@@ -11,10 +11,6 @@
         <span class="app-bar__mark" aria-hidden="true">◆</span>
         <span class="app-bar__title">physics-engine</span>
       </div>
-      <nav class="domain-switch" aria-label="Workbench domain">
-        <button id="domainSystems" class="domain-switch__button domain-switch__button--active" type="button">Systems</button>
-        <button id="domainVerification" class="domain-switch__button" type="button">Verification</button>
-      </nav>
       <button id="aboutButton" class="app-bar__about" type="button">About</button>
     </header>
 
@@ -95,37 +91,6 @@
           </div>
         </aside>
       </section>
-
-      <section id="verificationDomain" class="domain" aria-label="Verification workbench" hidden>
-        <aside class="catalog" aria-label="Verification problems">
-          <p class="control-label">docket</p>
-          <div id="verificationCatalog" class="system-catalog"></div>
-        </aside>
-        <section class="verif-stage" aria-label="Verification problem">
-          <div id="verificationMasthead" class="verif-stage__masthead"></div>
-          <div class="verif-stage__workspace">
-            <figure class="verif-figure">
-              <canvas id="verificationCanvas" class="verif-stage__canvas"></canvas>
-              <figcaption id="verificationFigureCaption" class="verif-figure__caption"></figcaption>
-            </figure>
-            <div class="verif-stage__controls">
-              <button id="verificationPlayButton" type="button">Pause</button>
-              <label>
-                <span>speed</span>
-                <input id="verificationSpeedControl" type="range" min="0.2" max="3" step="0.1" value="1" />
-              </label>
-            </div>
-            <div class="verif-stage__signals" aria-label="Certificate traces">
-              <p class="control-label">certificate traces</p>
-              <div id="verificationCertificateLanes" class="diagnostics"></div>
-            </div>
-          </div>
-          <aside class="verif-stage__summary" aria-label="Proof obligations">
-            <div id="verificationSummary"></div>
-          </aside>
-          <div id="verificationDetails" class="verif-details-band"></div>
-        </section>
-      </section>
     </main>
 
     <dialog id="aboutDialog" class="about">
@@ -135,9 +100,9 @@
         <p class="about__copy">
           A theory-first mechanics engine that turns analytical structure —
           Lagrangians, Hamiltonians, symmetries, conserved quantities, controls,
-          safe sets, and certificate candidates — into visual simulations and
-          backend-agnostic proof obligations. Python is the source of
-          mathematical truth; this viewer only renders what it exports.
+          fields, and generated trajectories — into visual simulations. Python is
+          the source of mathematical truth; this viewer only renders what it
+          exports.
         </p>
         <button id="aboutClose" class="about__close" type="button">Close</button>
       </div>

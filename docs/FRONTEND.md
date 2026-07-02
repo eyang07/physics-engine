@@ -5,116 +5,52 @@ and trajectory data; it must not re-derive physics.
 
 ## Current Capabilities
 
-- Persistent workbench shell: a top bar with a hard top-level domain menu
-  (**Systems** for simulation/visualization vs. **Verification** for the safety
-  and proof-obligation surfaces) plus an About dialog. The app boots straight
-  into the Systems workbench — no splash gate.
-- Systems domain laid out as a three-pane workbench: an always-visible catalog
-  rail that swaps the stage directly, the visualization stage, and an inspector.
-- Verification domain rendered by a **React + Tailwind + Radix** shell in a
-  light-technical (no-serif) theme (FE-055..FE-065). It reads exported
-  verification-problem IR only; it computes no physics and records no proof
-  results. The shell is composed of:
-  - a **docket rail** listing the problems the workbench can open, grounded in the
-    package discovery index (model · status · region/obligation/candidate counts ·
-    Tier/regime);
-  - a **top-bar identity** line (model · claim · one overall verdict token) and an
-    unmissable **active-assumptions** block (the undischarged preconditions every
-    obligation is conditional on);
-  - a scannable **proof-obligation list** with progressive disclosure — each row
-    reads name · status · signed margin and expands (Radix Collapsible) to its
-    formal statement, evidence chips, dependencies, and what would discharge it;
-  - an **artifact/export panel** offering the backend-agnostic IR and, when the
-    export bundled one, a self-contained verification-package bundle;
-  - a **state-space diagnostic stage** (Canvas 2D): the safe/unsafe/initial/domain
-    region boundaries, the rollout, the measured closest-approach and violation
-    markers, and — for a disturbance-robust (Tier-3) package — the assumed wind box
-    `W`, all keyed by **one compact, collapsible on-stage legend** that shows only
-    the marks actually present (FE-064). The legend keys kinds, not individual
-    markers, and carries no raw decimals; marker counts ride the canvas dataset
-    (`data-violation-markers` / `data-holds-markers`) for coverage;
-  - a **collapsible bottom strip** (Radix Collapsible, collapsed by default,
-    FE-065) holding the rollout playback controls and the full formal detail
-    (dynamics, region definitions, candidate certificates, proof obligations,
-    measured statuses, assumptions, and the four-level rigor ladder).
-  Every claim renders with KaTeX and every status is labeled honestly by rigor
-  (`candidate` / `external-required` / measured, never "proved"); a clean sample is
-  evidence, never a discharge. Cross-links navigate within the document (opening
-  the bottom strip to reveal the target card). Data comes from
-  `scripts/generate_verification_problems.py`
-  (`viewer/public/data/verification/`).
-- Playback controls (now inside the Verification bottom strip); both the Systems
-  and Verification stages loop continuously (a finished run wraps and restarts
-  rather than pausing at the end), driven by the shared `PlaybackClock`.
+- Systems-only workbench shell: top bar, About dialog, always-visible system
+  catalog, visualization stage, and inspector. The app boots straight into the
+  Systems workbench.
 - Parameter-family switch: for systems exporting manifest `variants` (e.g. the
   Lorenz rho family and ideal-spring stiffness family), the inspector loads each
-  backend-generated variant's data in place — no browser-side regeneration.
+  backend-generated variant's data in place.
 - Mathematical structure panels for symbolic backend exports.
-- Invariant lanes and sampled series display.
-- Diagnostics panel for exported phase-space structure: the finite-time Lyapunov
-  estimate, Poincaré-section crossings, and per-invariant conservation-drift
-  lanes (the measured `invariantResiduals`), all shown qualitatively with no raw
-  decimals.
-- 2D canvas lenses for pendulum, effective-potential views, and wavefront/ray
-  bundles.
-- Focused full-stage Poincaré-section lens for Hénon-Heiles, rendering the
-  exported `(x, p_x)` crossings on the `y = 0` surface; crossings accrete as
-  playback reaches each backend-located crossing time. Reads
-  `metadata.poincareSections` only — no browser-side section finding.
-- Systems and Verification are decoupled domains. The Systems workbench renders
-  physics visuals only; all safety/verification surfaces (region geometry,
-  candidate-certificate lanes, measured statuses) live entirely in the
-  Verification domain. There is intentionally no Systems-side safety overlay and
-  no cross-link between the two domains.
-- Safety geometry on the Verification hero. The phase plane shades the exported
-  `regionGeometry` set boundaries color-coded by role (safe/unsafe/initial),
-  honoring each set's `convention`; the viewer draws the exported grids only and
-  never evaluates the symbolic sets. Measured violations are marked on the stage
-  with a focusable legend.
-- Measured certificate lanes + status. The summary rail draws each candidate
-  certificate's value `B(x(t))` and its flow derivative against the obligation
-  threshold (e.g. `\dot B \le 0`), qualitatively and with no decimals, read from
-  the exported `certificateSeries`. The IR details render the problem's
-  `proofStatuses`: per-obligation sampled outcomes (`holds`/`violated`/`not
-  sampled`) with the evaluation source, sample count, and worst sample. Both stay
-  honest — a clean sample is evidence, never a discharge, and every obligation
-  remains `external-required`.
+- Diagnostics panel for exported phase-space structure: finite-time Lyapunov
+  estimate, Poincare-section crossings, per-invariant conservation-drift lanes,
+  and measured geodesic-deviation lanes where exported.
+- 2D canvas lenses for pendulum, effective-potential views, normal modes,
+  wave/string systems, Poincare sections, scalar fields, vector fields,
+  wavefront/ray bundles, and spacetime diagrams.
 - Three.js scenes for configuration-space, phase-space, orbit, field, spring,
-  and attractor views.
+  attitude, rigid-body, N-body, membrane, and attractor views.
 - Rigid-body lenses driven by exported geometry: the heavy symmetric top's
-  attitude playback orients a reusable body primitive (`AttitudeBody`) from the
-  exported quaternion series, and the free asymmetric top's polhode lens draws
-  the angular-momentum sphere, kinetic-energy ellipsoid, and their intersection
-  (the polhode) from `metadata.rigidBodyGeometry`, highlighting the intermediate
-  principal axis so the intermediate-axis instability reads clearly. The viewer
-  renders the exported attitude and geometry; it never integrates Euler's
-  equations.
-- N-body orbit lens: the gravitational N-body systems draw one colored orbit
-  trail and a live marker per body, framed on the center of mass from the
-  exported COM-frame positions, with a categorical body legend keying the
-  palette. Backend-generated variants (figure-eight, Sun + two planets) load in
-  place. The viewer plots the exported trajectory; it never integrates the
-  N-body problem.
-- Normal-mode lens: the coupled-oscillator chain animates an exported mode shape
-  on the 2D canvas, with a mode selector and a superposition scrub that blends
-  toward the next mode (their frequencies beat). The mode shapes and frequencies
-  come from the backend small-oscillation eigenproblem (`manifest.normalModes`);
-  the viewer displays the exported eigenvectors at their exported frequencies and
-  never solves the eigenproblem. Frequencies stay qualitative — modes are numbered
-  low→high with no raw decimals on the stage.
+  attitude playback and the free asymmetric top's polhode lens both render
+  backend-exported attitude/geometry data.
+- N-body orbit lens: per-body trails and live markers, framed on exported
+  center-of-mass data, with backend-generated variants loading in place.
+- Normal-mode lens: exported mode shapes, frequencies, and superposition scrub
+  are rendered without solving the eigenproblem in the browser.
 - Renderer-hint-based camera framing and a fit-to-system reset control.
 - Playwright visual regression coverage for all examples and fit-to-system
   behavior on desktop/mobile.
+
+## Removed Verification Frontend
+
+The previous frontend Verification workbench has been stripped pending a
+redesign. This removes the old React/Radix/Tailwind shell, verification catalog,
+state-space stage, certificate lanes, frontend verification data loaders, and
+visual tests for that UI.
+
+Backend verification IR/export support remains documented in `docs/BACKEND.md`.
+Generated verification artifacts may still exist under ignored data paths, but
+the viewer does not load or render them.
 
 ## Scope
 
 - In: manifest-driven rendering, controls, lens polish, diagnostics display,
   visual regression coverage, frontend ergonomics, and viewer-only styling.
 - Out: physics derivation, solver behavior, new systems, export-contract design,
-  generated data shape, and backend diagnostics. Those belong in
+  generated data shape, backend diagnostics, and proof discharge. Those belong in
   `docs/BACKEND.md`.
 
-## Verification
+## Checks
 
 Build/type-check:
 
@@ -136,20 +72,7 @@ The Vite main-bundle chunk-size warning is known and non-fatal.
 
 ## Next Work
 
-1. Finish assembling the redesigned verification layout: the React shell and the
-   legacy dossier panel still both render, so the shell overlays the legacy stage
-   for pointer hit-testing (interaction tests dispatch clicks programmatically to
-   work around it). Complete the §3 grid assembly in
-   [`UI_RECONFIGURATION_PLAN.md`](../UI_RECONFIGURATION_PLAN.md) — wire the React
-   state-space stage and retire the legacy panel — so every affordance is directly
-   clickable.
-2. Make the hero slot pluggable so a richer renderer (e.g. a drone's physical
-   motion with geofence/obstacles + brief verification stats) can replace the
-   phase-plane animation per system, driven by each problem's declared
-   projection/state axes.
-2. Generalize the safety surfaces across more exported problems (3-state and
-   discrete-time cases) as the backend adds them; the certificate lanes still
-   assume a 2-D phase projection.
-3. Consider a complementary "safety margin over time" read (e.g. barrier value
-   vs its threshold) alongside the hero for a clearer at-a-glance "is it staying
-   safe?" signal.
+1. Continue Systems-domain renderer work against backend-generated relativity and
+   electrodynamics exports.
+2. Keep the redesign surface clear: do not add frontend Verification code back
+   until the replacement information architecture and contracts are chosen.

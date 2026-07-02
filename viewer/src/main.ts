@@ -27,16 +27,6 @@ import { drawNormalModeScene } from "./normalModeCanvas";
 import { drawScalarFieldScene, fieldPlotArea } from "./scalarFieldCanvas";
 import { drawVectorFieldOverlay, robustMagnitudeMax } from "./vectorFieldCanvas";
 import { drawWaveScene } from "./waveCanvas";
-import { VerificationPanel } from "./verificationPanel";
-import { VerificationStage } from "./verificationStage";
-import {
-  mountVerificationApp,
-  setVerificationDocket,
-  setVerificationObligationSelect,
-  setVerificationProblem,
-  unmountVerificationApp,
-  type DocketEntry,
-} from "./verification/mount";
 import { resolveRendererSurface } from "./rendererRegistry";
 import { createScalarLegend } from "./scalarLegend";
 import { createBodyLegend } from "./bodyLegend";
@@ -52,17 +42,6 @@ import {
   type SurfaceFieldSeries,
   vectorField,
 } from "./data/trajectory";
-import {
-  loadVerificationAdapterStubs,
-  loadVerificationIndex,
-  loadVerificationPackageIndex,
-  loadVerificationPackageManifest,
-  loadVerificationProblem,
-  type PackageIndexEntry,
-  type PackageRegime,
-  type VerificationProblem,
-  type VerificationProblemSummary,
-} from "./data/verification";
 import "./styles.css";
 
 type CanvasMode =
@@ -94,22 +73,10 @@ function requireElement<T extends Element>(selector: string): T {
 }
 
 const systemsDomain = requireElement<HTMLElement>("#systemsDomain");
-const verificationDomain = requireElement<HTMLElement>("#verificationDomain");
-const domainSystemsButton = requireElement<HTMLButtonElement>("#domainSystems");
-const domainVerificationButton = requireElement<HTMLButtonElement>("#domainVerification");
 const aboutButton = requireElement<HTMLButtonElement>("#aboutButton");
 const aboutDialog = requireElement<HTMLDialogElement>("#aboutDialog");
 const aboutClose = requireElement<HTMLButtonElement>("#aboutClose");
 const systemCatalog = requireElement<HTMLElement>("#systemCatalog");
-const verificationCatalog = requireElement<HTMLElement>("#verificationCatalog");
-const verificationMasthead = requireElement<HTMLElement>("#verificationMasthead");
-const verificationSummary = requireElement<HTMLElement>("#verificationSummary");
-const verificationDetails = requireElement<HTMLElement>("#verificationDetails");
-const verificationFigureCaption = requireElement<HTMLElement>("#verificationFigureCaption");
-const verificationCanvas = requireElement<HTMLCanvasElement>("#verificationCanvas");
-const verificationPlayButton = requireElement<HTMLButtonElement>("#verificationPlayButton");
-const verificationSpeedControl = requireElement<HTMLInputElement>("#verificationSpeedControl");
-const verificationCertificateLanes = requireElement<HTMLElement>("#verificationCertificateLanes");
 const stage = requireElement<HTMLElement>("#systemsDomain .stage");
 const canvas = requireElement<HTMLCanvasElement>("#scene");
 const threeCanvas = requireElement<HTMLCanvasElement>("#hamiltonianScene");
@@ -169,35 +136,8 @@ stage.appendChild(bodyLegend.element);
 const trajectorySource = new StaticSource();
 const structurePanel = new StructurePanel(principlesPanel, invariantsPanel, parametersPanel, loopPhaseArc);
 const diagnosticsPanel = new DiagnosticsPanel(diagnosticsSection, diagnosticsPanel_);
-const verificationPanel = new VerificationPanel(
-  verificationMasthead,
-  verificationSummary,
-  verificationDetails,
-);
-const verificationStage = new VerificationStage(
-  verificationCanvas,
-  verificationPlayButton,
-  verificationSpeedControl,
-  verificationCertificateLanes,
-);
-// Selecting an obligation's evidence in the document emphasizes the certificate
-// lanes that bear on it (both live in the Verification domain).
-verificationPanel.onEvidenceSelect = (obligationId) =>
-  verificationStage.emphasizeCertificates(obligationId);
-// The reverse direction: selecting a certificate lane emphasizes the obligations
-// it bears on in the document.
-verificationStage.setOnCertificateSelect((obligationIds) =>
-  verificationPanel.emphasizeObligations(obligationIds),
-);
-// Selecting (expanding) an obligation in the React obligation list highlights its
-// margin marker on the figure and dims the rest (FE-064).
-setVerificationObligationSelect((obligationId) =>
-  verificationStage.focusObligation(obligationId),
-);
 const clock = new PlaybackClock();
 
-type Domain = "systems" | "verification";
-let activeDomain: Domain = "systems";
 let examples: SystemManifest[] = [];
 let lensById = new Map<string, ManifestLens>();
 let selectedExample: SystemManifest | null = null;
@@ -215,12 +155,6 @@ let trajectory: Trajectory | null = null;
 let pendulumBounds: Bounds | null = null;
 // Monotonic guard so a slow trajectory load can't overwrite a newer selection.
 let loadToken = 0;
-let verificationProblems: VerificationProblemSummary[] = [];
-// The package discovery index per problem id (BE-047): the published listing the
-// catalog is grounded in (model, status, counts, regime). Empty when the index
-// is absent, in which case the catalog degrades to the per-example viewer index.
-let verificationPackageIndex = new Map<string, PackageIndexEntry>();
-let selectedProblemId: string | null = null;
 
 function syncPlayButton() {
   // Playback loops continuously, so the control is only ever Play/Pause.
@@ -243,14 +177,6 @@ modeBlend.addEventListener("input", () => {
   if (modes) {
     updateModeBlendLabel(modes);
   }
-});
-
-domainSystemsButton.addEventListener("click", () => {
-  setDomain("systems");
-});
-
-domainVerificationButton.addEventListener("click", () => {
-  setDomain("verification");
 });
 
 aboutButton.addEventListener("click", () => {
@@ -335,179 +261,6 @@ function updateCatalogActive() {
   systemCatalog.querySelectorAll<HTMLButtonElement>(".catalog-item").forEach((item) => {
     item.classList.toggle("catalog-item--active", item.dataset.systemId === selectedExample?.id);
   });
-}
-
-function renderVerificationCatalog() {
-  verificationCatalog.replaceChildren();
-  verificationProblems.forEach((problem) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "catalog-item";
-    button.dataset.problemId = problem.id;
-    button.classList.toggle("catalog-item--active", problem.id === selectedProblemId);
-
-    // Ground each entry's model/status/counts in the published discovery index
-    // when available, degrading to the per-example viewer summary otherwise.
-    const entry = verificationPackageIndex.get(problem.id);
-    const model = entry?.model ?? problem.model;
-    const status = entry?.status ?? problem.status;
-    const itemCounts = entry?.counts ?? problem.counts;
-
-    const category = document.createElement("span");
-    category.className = "catalog-item__category";
-    category.textContent = model ?? status;
-
-    const title = document.createElement("strong");
-    title.textContent = problem.name;
-
-    // The full region/obligation/candidate counts let the workbench be scanned
-    // without opening each problem; a status chip names the listed rigor.
-    const counts = document.createElement("span");
-    counts.className = "catalog-item__counts";
-    counts.append(
-      countBadge("regions", itemCounts.regions),
-      countBadge("obligations", itemCounts.obligations),
-      countBadge("candidates", itemCounts.candidates),
-      statusChip(status),
-    );
-
-    button.append(category, title, counts);
-    // The Tier/regime badge (BE-054) lets a reader tell a nominal package from a
-    // disturbance-robust one without opening it. Only shown when the discovery
-    // index carries the descriptor; it claims nothing beyond the listed rigor.
-    if (entry?.regime) {
-      button.append(regimeBadge(entry.regime));
-    }
-    button.addEventListener("click", () => {
-      void selectVerificationProblem(problem.id);
-    });
-    verificationCatalog.append(button);
-  });
-  refreshVerificationDocket();
-}
-
-// The React docket (FE-062) mirrors the legacy catalog rail: the same problems,
-// resolved against the discovery index (model · status · counts · regime), with
-// selection driving the same loader. Kept in sync from both the catalog render
-// and the active-selection update so the two rails never disagree.
-function refreshVerificationDocket() {
-  const entries: DocketEntry[] = verificationProblems.map((problem) => {
-    const indexEntry = verificationPackageIndex.get(problem.id);
-    return {
-      id: problem.id,
-      name: problem.name,
-      model: indexEntry?.model ?? problem.model,
-      status: indexEntry?.status ?? problem.status,
-      counts: indexEntry?.counts ?? problem.counts,
-      regime: indexEntry?.regime ?? null,
-    };
-  });
-  setVerificationDocket({
-    entries,
-    selectedId: selectedProblemId,
-    onSelect: (id) => void selectVerificationProblem(id),
-  });
-}
-
-// The package status as a small chip (e.g. "candidate"), read from the listing —
-// it names the rigor of the listed package, nothing more.
-function statusChip(status: string): HTMLSpanElement {
-  const chip = document.createElement("span");
-  chip.className = "catalog-item__status";
-  chip.dataset.status = status;
-  chip.textContent = status;
-  return chip;
-}
-
-function countBadge(label: string, value: number): HTMLSpanElement {
-  const badge = document.createElement("span");
-  badge.className = "catalog-item__count";
-  badge.dataset.count = label;
-  badge.textContent = `${value} ${label}`;
-  return badge;
-}
-
-// The catalog Tier/regime badge: "robust" for a disturbance-robust (Tier-3)
-// package, "nominal" otherwise — read straight from the index descriptor, never
-// claiming more than the listed package's rigor.
-function regimeBadge(regime: PackageRegime): HTMLSpanElement {
-  const robust = regime.kind === "disturbance-robust";
-  const badge = document.createElement("span");
-  badge.className = `catalog-item__regime catalog-item__regime--${
-    robust ? "robust" : "nominal"
-  }`;
-  badge.dataset.regime = regime.kind;
-  badge.textContent = robust ? "robust" : "nominal";
-  badge.title = robust
-    ? "disturbance-robust (Tier-3): obligations quantified over a wind box — still external-required, not discharged"
-    : "nominal (Tier-1/2): no disturbance channel";
-  return badge;
-}
-
-function updateVerificationCatalogActive() {
-  verificationCatalog.querySelectorAll<HTMLButtonElement>(".catalog-item").forEach((item) => {
-    item.classList.toggle("catalog-item--active", item.dataset.problemId === selectedProblemId);
-  });
-  refreshVerificationDocket();
-}
-
-async function selectVerificationProblem(problemId: string) {
-  const summary = verificationProblems.find((problem) => problem.id === problemId);
-  if (!summary) {
-    return;
-  }
-  selectedProblemId = summary.id;
-  updateVerificationCatalogActive();
-  try {
-    // The package manifest is an optional, self-contained bundle index; a
-    // missing one resolves to null so the view simply omits the package export.
-    const [problem, manifest] = await Promise.all([
-      loadVerificationProblem(summary.dataPath),
-      summary.packagePath
-        ? loadVerificationPackageManifest(summary.packagePath)
-        : Promise.resolve(null),
-    ]);
-    // The non-discharging adapter stubs are an optional package component; load
-    // them only when a manifest indexes them, resolving to null otherwise.
-    const pkg =
-      manifest && summary.packagePath
-        ? { manifest, path: summary.packagePath }
-        : null;
-    const stubs = pkg ? await loadVerificationAdapterStubs(pkg.path, pkg.manifest) : null;
-    // The open problem's Tier/regime from the discovery index, when listed.
-    const regime = verificationPackageIndex.get(summary.id)?.regime ?? null;
-    // A stale click (the user moved on) should not overwrite the newer problem.
-    if (selectedProblemId === summary.id) {
-      verificationStage.show(problem);
-      verificationPanel.render(problem, summary.irPath, pkg, stubs, regime);
-      setVerificationProblem(problem, {
-        irPath: summary.irPath,
-        packagePath: summary.packagePath,
-        packageManifest: pkg?.manifest ?? null,
-      });
-      setFigureCaption(problem);
-    }
-  } catch (error) {
-    console.warn("Verification problem unavailable:", error);
-    verificationStage.clear();
-    setVerificationProblem(null);
-    verificationFigureCaption.textContent = "";
-    verificationPanel.renderEmpty(
-      `Could not load ${summary.name}. Regenerate with "python -m scripts.generate_verification_problems".`,
-    );
-  }
-}
-
-// The figure caption: a typeset plate label naming the state-space axes and the
-// safe set the rollout must stay within. Derived from the problem's own axes and
-// region roles — the figure renders the same data, this only names it.
-function setFigureCaption(problem: VerificationProblem) {
-  const axes = problem.trajectory?.stateNames ?? [];
-  const plane = axes.length >= 2 ? `(${axes[0]}, ${axes[1]})` : "state";
-  const hasSafe = problem.regions.some((region) => region.role === "safe");
-  verificationFigureCaption.textContent = hasSafe
-    ? `Figure — state space ${plane}; safe set 𝒮 shaded, controlled rollout in ink.`
-    : `Figure — state space ${plane}; controlled rollout in ink.`;
 }
 
 function renderVisualizationButtons() {
@@ -722,36 +475,14 @@ function setCanvasMode(mode: "2d" | "3d") {
   fitToSystem.hidden = is2d;
 }
 
-function setDomain(domain: Domain) {
-  activeDomain = domain;
-  const systemsActive = domain === "systems";
-  systemsDomain.classList.toggle("domain--active", systemsActive);
-  systemsDomain.hidden = !systemsActive;
-  verificationDomain.classList.toggle("domain--active", !systemsActive);
-  verificationDomain.hidden = systemsActive;
-  domainSystemsButton.classList.toggle("domain-switch__button--active", systemsActive);
-  domainVerificationButton.classList.toggle("domain-switch__button--active", !systemsActive);
-  // The Three.js scene only renders inside the Systems domain, and only when the
-  // active lens is a Three mode; otherwise it stays inactive to spare the GPU.
+function activateSystemsDomain() {
+  systemsDomain.classList.add("domain--active");
+  systemsDomain.hidden = false;
   threeScene.setActive(
-    systemsActive && selectedVisualization !== null && isThreeMode(selectedVisualization.id),
+    selectedVisualization !== null && isThreeMode(selectedVisualization.id),
   );
-  verificationStage.setActive(!systemsActive);
-  // The Verification domain owns a React root (FE-055); it only runs while that
-  // domain is visible, so mount it on entry and tear it down on exit. The legacy
-  // vanilla panel continues to render alongside it for now.
-  if (systemsActive) {
-    unmountVerificationApp();
-  } else {
-    mountVerificationApp(verificationDomain);
-  }
-  if (systemsActive) {
-    resize2dCanvas();
-    threeScene.resize();
-  } else if (selectedProblemId === null && verificationProblems.length > 0) {
-    // Lazily load the first problem the first time the domain is opened.
-    void selectVerificationProblem(verificationProblems[0].id);
-  }
+  resize2dCanvas();
+  threeScene.resize();
 }
 
 function applyVisualization() {
@@ -891,7 +622,6 @@ function resize2dCanvas() {
 window.addEventListener("resize", () => {
   resize2dCanvas();
   threeScene.resize();
-  verificationStage.resize();
 });
 
 // A graceful placeholder for a lens whose viewer primitive does not exist yet:
@@ -911,13 +641,6 @@ function drawFallbackStage(title: string, width: number, height: number) {
 }
 
 function render(now: number) {
-  // The stage only renders inside the Systems domain; the Verification domain is
-  // static markup, so we keep pumping the frame loop without drawing.
-  if (activeDomain !== "systems") {
-    requestAnimationFrame(render);
-    return;
-  }
-
   if (!trajectory || !selectedVisualization) {
     resize2dCanvas();
     drawStageBackground(ctx, canvas.clientWidth, canvas.clientHeight);
@@ -1005,7 +728,7 @@ function render(now: number) {
   requestAnimationFrame(render);
 }
 
-setDomain("systems");
+activateSystemsDomain();
 
 async function initialize() {
   try {
@@ -1016,9 +739,6 @@ async function initialize() {
     selectedVisualization = selectedExample ? lensFor(selectedExample.lenses[0]) : null;
     populateSystemSelect();
     renderSystemCatalog();
-    // Load the verification index before the first system render so a system's
-    // linked-problem cross-link and region geometry resolve on first paint.
-    await initializeVerification();
     // Boot straight into the workbench: render the first system's stage
     // immediately instead of waiting behind a splash gate.
     if (selectedExample) {
@@ -1026,26 +746,6 @@ async function initialize() {
     }
   } catch (error) {
     console.warn("Manifest preload failed:", error);
-  }
-}
-
-async function initializeVerification() {
-  // The discovery index grounds the catalog (model, status, counts, regime),
-  // joined by problem id; a missing index degrades to the per-example viewer
-  // index.
-  const [index, packageIndex] = await Promise.all([
-    loadVerificationIndex(),
-    loadVerificationPackageIndex(),
-  ]);
-  verificationProblems = index.problems;
-  verificationPackageIndex = packageIndex;
-  renderVerificationCatalog();
-  if (verificationProblems.length === 0) {
-    verificationStage.clear();
-    setVerificationProblem(null);
-    verificationPanel.renderEmpty(
-      'No verification problems found. Generate them with "python -m scripts.generate_verification_problems".',
-    );
   }
 }
 
