@@ -4,6 +4,7 @@ from pathlib import Path
 
 from engine.export.manifest import write_manifest
 from scripts.example_specs import LENSES, SPECS
+from scripts.generate_crossed_eb_drift import write_crossed_eb_drift_trajectory
 from scripts.generate_bead_on_hoop import write_bead_on_hoop_trajectory
 from scripts.generate_charged_particle import write_charged_particle_trajectory
 from scripts.generate_coupled_oscillators import write_coupled_oscillator_trajectory
@@ -173,6 +174,10 @@ def main() -> None:
     write_relativistic_cyclotron_trajectory(
         Path("data/generated/relativistic_cyclotron.json"),
         viewer_output=Path("viewer/public/data/relativistic_cyclotron.json"),
+    )
+    write_crossed_eb_drift_trajectory(
+        Path("data/generated/crossed_eb_drift.json"),
+        viewer_output=Path("viewer/public/data/crossed_eb_drift.json"),
     )
     write_twin_paradox_trajectory(
         Path("data/generated/twin_paradox.json"),

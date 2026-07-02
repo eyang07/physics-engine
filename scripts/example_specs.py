@@ -28,6 +28,15 @@ from engine.mechanics.symmetries import InfinitesimalSymmetry
 from systems.bead_on_hoop import build_system as build_bead_on_hoop
 from systems.charged_particle import build_uniform_magnetic_field_system
 from systems.coupled_oscillators import build_system as build_coupled_oscillators
+from systems.crossed_eb_drift import (
+    build_system as build_crossed_eb_drift,
+    drift_velocity_y_expression as crossed_eb_drift_velocity_y,
+    electric_magnetic_invariant_expression as crossed_eb_e_dot_b,
+    faraday_scalar_expression as crossed_eb_faraday_scalar,
+    four_velocity_norm_expression as crossed_eb_four_velocity_norm,
+    mass_shell_expression as crossed_eb_mass_shell,
+    p_z_expression as crossed_eb_p_z,
+)
 from systems.double_pendulum import build_system as build_double_pendulum
 from systems.electromagnetic_field import build_system as build_electromagnetic_field
 from systems.free_rigid_body import (
@@ -247,6 +256,14 @@ def _relativistic_cyclotron_geometry(system):
         "kind": "covariant-em",
         "gyrofrequency": str(relativistic_cyclotron_gyrofrequency(system)),
         "gyrofrequencySource": "trajectory.metadata.gyrofrequency",
+    }
+
+
+def _crossed_eb_drift_geometry(system):
+    return {
+        "kind": "covariant-em",
+        "driftVelocityY": str(crossed_eb_drift_velocity_y(system)),
+        "driftSource": "trajectory.metadata.drift",
     }
 
 
@@ -611,6 +628,20 @@ LENSES: tuple[Lens, ...] = (
         kind="covariant-em-trajectory",
         description="Uniform-B charged-particle worldline with backend-computed EM invariants.",
         projections=("spacetime", "momentumPlane"),
+        conserved=(
+            "mass_shell",
+            "four_velocity_norm",
+            "p_z",
+            "faraday_scalar",
+            "electric_magnetic",
+        ),
+    ),
+    Lens(
+        id="crossedEbDrift",
+        title="E x B Drift",
+        kind="covariant-em-trajectory",
+        description="Crossed uniform-field charged-particle drift with backend-measured velocity.",
+        projections=("spacetime", "driftPlane"),
         conserved=(
             "mass_shell",
             "four_velocity_norm",
@@ -2005,6 +2036,94 @@ RELATIVISTIC_CYCLOTRON = SystemSpec(
 )
 
 
+CROSSED_EB_DRIFT = SystemSpec(
+    id="crossed-eb-drift",
+    title="Crossed E x B Drift",
+    category="Relativity",
+    description=(
+        "A proper-time charged-particle worldline in crossed uniform electric "
+        "and magnetic fields, exporting the analytic E x B drift as measured data."
+    ),
+    build=build_crossed_eb_drift,
+    parameters=(
+        Parameter("m", "m", 1.0, 0.2, 3.0),
+        Parameter("q", "q", 1.0, -3.0, 3.0),
+        Parameter("E_x", "E_x", 0.25, -0.8, 0.8),
+        Parameter("B_z", "B_z", 1.0, 0.4, 3.0),
+        Parameter("x0_0", "x^0_0", 0.0, -2.0, 2.0, role="initial"),
+        Parameter("x1_0", "x^1_0", 0.0, -2.0, 2.0, role="initial"),
+        Parameter("x2_0", "x^2_0", 0.0, -2.0, 2.0, role="initial"),
+        Parameter("x3_0", "x^3_0", -0.8, -2.0, 2.0, role="initial"),
+        Parameter("beta_z0", r"\beta^3_0", 0.0, -0.9, 0.9, role="initial"),
+    ),
+    state=(
+        StateVar("x0", "x^0", "coordinate"),
+        StateVar("x1", "x^1", "coordinate"),
+        StateVar("x2", "x^2", "coordinate"),
+        StateVar("x3", "x^3", "coordinate"),
+        StateVar("p_x0", "p^0", "momentum"),
+        StateVar("p_x1", "p^1", "momentum"),
+        StateVar("p_x2", "p^2", "momentum"),
+        StateVar("p_x3", "p^3", "momentum"),
+    ),
+    projections={
+        "spacetime": ("x0", "x1", "x2", "x3"),
+        "embedding3d": ("x1", "x2", "x3"),
+        "driftPlane": ("x1", "x2"),
+    },
+    conserved=(
+        Conserved(
+            "mass_shell",
+            r"p^\mu p_\mu + m^2",
+            "mass-shell constraint",
+            expression=crossed_eb_mass_shell,
+        ),
+        Conserved(
+            "four_velocity_norm",
+            r"u^\mu u_\mu",
+            "proper-time normalization",
+            expression=crossed_eb_four_velocity_norm,
+        ),
+        Conserved(
+            "p_z",
+            r"p^3",
+            "translation along the uniform magnetic-field axis",
+            expression=crossed_eb_p_z,
+        ),
+        Conserved(
+            "faraday_scalar",
+            r"F_{\mu\nu}F^{\mu\nu}",
+            "uniform electromagnetic field invariant",
+            expression=crossed_eb_faraday_scalar,
+        ),
+        Conserved(
+            "electric_magnetic",
+            r"E\cdot B",
+            "uniform electromagnetic field invariant",
+            expression=crossed_eb_e_dot_b,
+        ),
+    ),
+    lenses=("crossedEbDrift",),
+    data_path="/data/crossed_eb_drift.json",
+    fields=(
+        {
+            "name": "uniformElectricField",
+            "kind": "vector-field",
+            "rendererHint": VECTOR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.electric",
+        },
+        {
+            "name": "uniformMagneticField",
+            "kind": "vector-field",
+            "rendererHint": VECTOR_FIELD_HINT,
+            "source": "trajectory.metadata.fields.magnetic",
+        },
+    ),
+    geometry=_crossed_eb_drift_geometry,
+    system_kind="covariant-em",
+)
+
+
 TWIN_PARADOX = SystemSpec(
     id="twin-paradox",
     title="Twin Paradox",
@@ -2091,6 +2210,7 @@ SPECS: tuple[SystemSpec, ...] = (
     RELATIVISTIC_FREE_PARTICLE,
     RELATIVISTIC_PARTICLE_IN_POTENTIAL,
     RELATIVISTIC_CYCLOTRON,
+    CROSSED_EB_DRIFT,
     TWIN_PARADOX,
     UNIFORM_PROPER_ACCELERATION,
 )
