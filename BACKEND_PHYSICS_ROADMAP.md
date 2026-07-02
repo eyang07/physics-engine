@@ -254,7 +254,7 @@ Phase 3:
 - [x] BE-131 — Maxwell source-constraint diagnostics + EM-invariant obligations.
 
 Phase 4:
-- [ ] BE-132 — Lagrangian field-density + symbolic Euler–Lagrange.
+- [x] BE-132 — Lagrangian field-density + symbolic Euler–Lagrange.
 - [ ] BE-133 — symbolic stress-energy + measured conservation residual.
 - [ ] BE-134 — scalar field-density example + export.
 

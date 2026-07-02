@@ -162,15 +162,7 @@ mass-shell/four-momentum obligation glue at
 
 #### Phase 4 — Thin field-theoretic abstractions (symbolic + sampled only; no PDE solver)
 
-1. **BE-132: Add a Lagrangian field-density object with symbolic Euler-Lagrange**
-    - Goal: A minimal field-density value object `L(phi, d_mu phi, x)` that produces the
-      symbolic Euler-Lagrange equation for one scalar field — structure only, **no**
-      time-stepping PDE integrator.
-    - Scope: `engine/fieldtheory/density.py` (new), `tests/`.
-    - Acceptance: the Euler-Lagrange expression for a Klein-Gordon-style density matches
-      by hand; the object validates free symbols like the existing fields; tests pass.
-
-2. **BE-133: Add symbolic stress-energy and a measured conservation residual**
+1. **BE-133: Add symbolic stress-energy and a measured conservation residual**
     - Goal: Symbolic `T_mu_nu` for a scalar field density plus a **measured** sampled
       `d_mu T^mu_nu` residual over field configurations, consistent with the rigor ladder
       (sampling is evidence, not a theorem).
@@ -179,7 +171,7 @@ mass-shell/four-momentum obligation glue at
     - Acceptance: `T_mu_nu` is symmetric for the scalar density; the sampled divergence
       residual is near zero for an on-shell configuration and labeled measured; tests pass.
 
-3. **BE-134: Add the scalar field-density example and export**
+2. **BE-134: Add the scalar field-density example and export**
     - Goal: A Klein-Gordon-style scalar field-density gallery system exporting its
       density, Euler-Lagrange form, and measured `T_mu_nu` conservation residual under a
       new `system_kind="field-density"`.
@@ -190,7 +182,7 @@ mass-shell/four-momentum obligation glue at
 
 #### Phase 5 — Quantum exploratory (DEFERRED / RESEARCH-GATED — DO NOT START)
 
-4. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
+3. **BE-135: (UNSCHEDULED, gated) Sketch a finite-dimensional Hilbert / spin-precession toy**
     - Goal: Research placeholder only — a finite-dimensional Hilbert state under a unitary
       `FirstOrderSystem` flow (spin precession), with measured norm/probability
       invariants. **No QED, no QFT, no PDE.** Do not implement until Phases 1-3 have landed
